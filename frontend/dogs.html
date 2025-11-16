@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hunde - Gassigeher</title>
+    <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <a href="/" class="logo">🐕 Gassigeher</a>
+            <nav>
+                <ul>
+                    <li><a href="/dogs.html" data-i18n="dogs.all_dogs">Hunde</a></li>
+                    <li><a href="/dashboard.html" data-i18n="nav.dashboard">Dashboard</a></li>
+                    <li><a href="/profile.html" data-i18n="nav.profile">Profil</a></li>
+                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main style="padding: 40px 0;">
+        <div class="container">
+            <h1 data-i18n="dogs.all_dogs">Alle Hunde</h1>
+
+            <div id="alert-container"></div>
+
+            <!-- Experience Level Info -->
+            <div id="level-info" class="card" style="margin-bottom: 20px;">
+                <p style="margin: 0;">
+                    <strong data-i18n="dogs.your_level">Ihr Level:</strong>
+                    <span id="user-level" class="dog-category-badge"></span>
+                </p>
+                <p style="font-size: 0.875rem; color: #666; margin-top: 10px; margin-bottom: 0;">
+                    <span data-i18n="dogs.level_info">Sie können Hunde entsprechend Ihres Levels buchen. Höhere Level werden mit einem Schloss-Symbol angezeigt.</span>
+                </p>
+            </div>
+
+            <!-- Filters -->
+            <div class="filter-bar">
+                <h3 style="margin-bottom: 15px;" data-i18n="dogs.filter">Filter</h3>
+                <div class="filter-row">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label data-i18n="dogs.search">Suchen</label>
+                        <input type="text" id="filter-search" placeholder="Name oder Rasse...">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label data-i18n="dogs.breed">Rasse</label>
+                        <select id="filter-breed">
+                            <option value="">Alle</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label data-i18n="dogs.size">Größe</label>
+                        <select id="filter-size">
+                            <option value="">Alle</option>
+                            <option value="small" data-i18n="dogs.size_small">Klein</option>
+                            <option value="medium" data-i18n="dogs.size_medium">Mittel</option>
+                            <option value="large" data-i18n="dogs.size_large">Groß</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label data-i18n="dogs.category">Kategorie</label>
+                        <select id="filter-category">
+                            <option value="">Alle</option>
+                            <option value="green" data-i18n="dogs.category_green">Grün</option>
+                            <option value="blue" data-i18n="dogs.category_blue">Blau</option>
+                            <option value="orange" data-i18n="dogs.category_orange">Orange</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <button class="btn" onclick="applyFilters()" data-i18n="common.apply">Anwenden</button>
+                    <button class="btn btn-secondary" onclick="resetFilters()" data-i18n="common.reset">Zurücksetzen</button>
+                </div>
+            </div>
+
+            <!-- Dogs Grid -->
+            <div id="dogs-list" class="dog-grid"></div>
+        </div>
+    </main>
+
+    <script src="/js/i18n.js"></script>
+    <script src="/js/api.js"></script>
+    <script>
+        let currentDogs = [];
+        let userLevel = 'green';
+        let allBreeds = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!api.isAuthenticated()) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            await window.i18n.load();
+
+            try {
+                // Get user info
+                const user = await api.getMe();
+                userLevel = user.experience_level || 'green';
+                updateUserLevelDisplay();
+
+                // Load breeds and dogs
+                await loadBreeds();
+                await loadDogs();
+
+                // Setup filter event listeners
+                setupFilterListeners();
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Laden');
+            }
+        });
+
+        function updateUserLevelDisplay() {
+            const levelBadge = document.getElementById('user-level');
+            levelBadge.className = `dog-category-badge ${userLevel}`;
+            levelBadge.textContent = getCategoryLabel(userLevel);
+        }
+
+        async function loadBreeds() {
+            try {
+                allBreeds = await api.getBreeds();
+                const breedSelect = document.getElementById('filter-breed');
+                allBreeds.forEach(breed => {
+                    const option = document.createElement('option');
+                    option.value = breed;
+                    option.textContent = breed;
+                    breedSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Failed to load breeds:', error);
+            }
+        }
+
+        async function loadDogs() {
+            try {
+                const filters = getFilters();
+                currentDogs = await api.getDogs(filters);
+                renderDogs();
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Laden der Hunde');
+            }
+        }
+
+        function getFilters() {
+            const filters = {};
+            const search = document.getElementById('filter-search').value.trim();
+            const breed = document.getElementById('filter-breed').value;
+            const size = document.getElementById('filter-size').value;
+            const category = document.getElementById('filter-category').value;
+
+            if (search) filters.search = search;
+            if (breed) filters.breed = breed;
+            if (size) filters.size = size;
+            if (category) filters.category = category;
+            filters.is_available = 'true'; // Only show available dogs by default
+
+            return filters;
+        }
+
+        function setupFilterListeners() {
+            const searchInput = document.getElementById('filter-search');
+            let searchTimeout;
+            searchInput.addEventListener('input', () => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => applyFilters(), 500);
+            });
+        }
+
+        function applyFilters() {
+            loadDogs();
+        }
+
+        function resetFilters() {
+            document.getElementById('filter-search').value = '';
+            document.getElementById('filter-breed').value = '';
+            document.getElementById('filter-size').value = '';
+            document.getElementById('filter-category').value = '';
+            loadDogs();
+        }
+
+        function renderDogs() {
+            const container = document.getElementById('dogs-list');
+
+            if (currentDogs.length === 0) {
+                container.innerHTML = '<p data-i18n="dogs.no_dogs">Keine Hunde gefunden</p>';
+                window.i18n.updateElement(container.querySelector('p'));
+                return;
+            }
+
+            container.innerHTML = currentDogs.map(dog => {
+                const canAccess = canUserAccessDog(userLevel, dog.category);
+                const isUnavailable = !dog.is_available;
+
+                return `
+                    <div class="dog-card ${!canAccess ? 'locked' : ''} ${isUnavailable ? 'unavailable' : ''}"
+                         onclick="${canAccess && !isUnavailable ? `viewDog(${dog.id})` : ''}"
+                         style="${!canAccess || isUnavailable ? 'cursor: not-allowed;' : 'cursor: pointer;'}">
+                        ${isUnavailable ? `<div class="dog-unavailable-banner">${dog.unavailable_reason || 'Nicht verfügbar'}</div>` : ''}
+                        ${!canAccess ? '<div class="dog-locked-banner">🔒 Level erforderlich</div>' : ''}
+                        ${dog.photo ? `<img src="/uploads/${dog.photo}" class="dog-card-image" alt="${dog.name}">` : '<div class="dog-card-image" style="background: #ddd; display: flex; align-items: center; justify-content: center;">🐕</div>'}
+                        <div class="dog-card-body">
+                            <div class="dog-category-badge ${dog.category}">${getCategoryLabel(dog.category)}</div>
+                            <h3 class="dog-card-title">${dog.name}</h3>
+                            <p class="dog-card-info">${dog.breed} • ${getSizeLabel(dog.size)} • ${dog.age} Jahre</p>
+                            ${dog.special_needs ? `<p class="dog-card-info" style="color: var(--warning-orange); font-size: 0.8rem;">⚠️ ${dog.special_needs}</p>` : ''}
+                            ${!canAccess ? `<p class="dog-card-info" style="color: #666; font-size: 0.8rem; margin-top: 10px;">Erfordert ${getCategoryLabel(dog.category)} Level</p>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function canUserAccessDog(userLevel, dogCategory) {
+            const levelOrder = { 'green': 1, 'blue': 2, 'orange': 3 };
+            return (levelOrder[userLevel] || 0) >= (levelOrder[dogCategory] || 0);
+        }
+
+        function getCategoryLabel(category) {
+            const labels = {
+                green: 'Grün',
+                blue: 'Blau',
+                orange: 'Orange'
+            };
+            return labels[category] || category;
+        }
+
+        function getSizeLabel(size) {
+            const labels = {
+                small: 'Klein',
+                medium: 'Mittel',
+                large: 'Groß'
+            };
+            return labels[size] || size;
+        }
+
+        function viewDog(id) {
+            // Navigate to dog detail page (to be implemented in Phase 3)
+            window.location.href = `/dog-detail.html?id=${id}`;
+        }
+
+        function showAlert(type, message) {
+            const container = document.getElementById('alert-container');
+            container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => container.innerHTML = '', 5000);
+        }
+    </script>
+</body>
+</html>

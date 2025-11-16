@@ -44,6 +44,7 @@ func main() {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(db, cfg)
 	userHandler := handlers.NewUserHandler(db, cfg)
+	dogHandler := handlers.NewDogHandler(db, cfg)
 
 	// Public routes
 	router.HandleFunc("/api/auth/register", authHandler.Register).Methods("POST")
@@ -52,14 +53,33 @@ func main() {
 	router.HandleFunc("/api/auth/forgot-password", authHandler.ForgotPassword).Methods("POST")
 	router.HandleFunc("/api/auth/reset-password", authHandler.ResetPassword).Methods("POST")
 
-	// Protected routes
+	// Protected routes (authenticated users)
 	protected := router.PathPrefix("/api").Subrouter()
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 
+	// Auth
 	protected.HandleFunc("/auth/change-password", authHandler.ChangePassword).Methods("PUT")
+
+	// Users
 	protected.HandleFunc("/users/me", userHandler.GetMe).Methods("GET")
 	protected.HandleFunc("/users/me", userHandler.UpdateMe).Methods("PUT")
 	protected.HandleFunc("/users/me/photo", userHandler.UploadPhoto).Methods("POST")
+
+	// Dogs (read-only for authenticated users)
+	protected.HandleFunc("/dogs", dogHandler.ListDogs).Methods("GET")
+	protected.HandleFunc("/dogs/breeds", dogHandler.GetBreeds).Methods("GET")
+	protected.HandleFunc("/dogs/{id}", dogHandler.GetDog).Methods("GET")
+
+	// Admin-only routes
+	admin := protected.PathPrefix("").Subrouter()
+	admin.Use(middleware.RequireAdmin)
+
+	// Dog management (admin only)
+	admin.HandleFunc("/dogs", dogHandler.CreateDog).Methods("POST")
+	admin.HandleFunc("/dogs/{id}", dogHandler.UpdateDog).Methods("PUT")
+	admin.HandleFunc("/dogs/{id}", dogHandler.DeleteDog).Methods("DELETE")
+	admin.HandleFunc("/dogs/{id}/photo", dogHandler.UploadDogPhoto).Methods("POST")
+	admin.HandleFunc("/dogs/{id}/availability", dogHandler.ToggleAvailability).Methods("PUT")
 
 	// Static files
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./frontend")))

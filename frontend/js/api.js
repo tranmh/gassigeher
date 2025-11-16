@@ -143,6 +143,47 @@ class API {
         formData.append('photo', file);
         return this.uploadFile('/users/me/photo', formData);
     }
+
+    // DOG ENDPOINTS
+
+    async getDogs(filters = {}) {
+        const params = new URLSearchParams(filters);
+        const endpoint = `/dogs${params.toString() ? '?' + params.toString() : ''}`;
+        return this.request('GET', endpoint);
+    }
+
+    async getDog(id) {
+        return this.request('GET', `/dogs/${id}`);
+    }
+
+    async getBreeds() {
+        return this.request('GET', '/dogs/breeds');
+    }
+
+    async createDog(data) {
+        return this.request('POST', '/dogs', data);
+    }
+
+    async updateDog(id, data) {
+        return this.request('PUT', `/dogs/${id}`, data);
+    }
+
+    async deleteDog(id) {
+        return this.request('DELETE', `/dogs/${id}`);
+    }
+
+    async uploadDogPhoto(dogId, file) {
+        const formData = new FormData();
+        formData.append('photo', file);
+        return this.uploadFile(`/dogs/${dogId}/photo`, formData);
+    }
+
+    async toggleDogAvailability(dogId, isAvailable, reason = null) {
+        return this.request('PUT', `/dogs/${dogId}/availability`, {
+            is_available: isAvailable,
+            unavailable_reason: reason,
+        });
+    }
 }
 
 // Global instance

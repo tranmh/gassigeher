@@ -362,6 +362,133 @@ footer p {
     font-size: 0.875rem;
 }
 
+/* Dog Cards */
+.dog-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--spacing-lg);
+    margin: var(--spacing-xl) 0;
+}
+
+.dog-card {
+    background: white;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.dog-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.dog-card.unavailable {
+    opacity: 0.7;
+    background: #f5f5f5;
+}
+
+.dog-card-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    background: var(--light-gray);
+}
+
+.dog-card-body {
+    padding: var(--spacing-md);
+}
+
+.dog-card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: var(--spacing-xs);
+}
+
+.dog-card-info {
+    font-size: 0.875rem;
+    color: #666;
+    margin-bottom: var(--spacing-xs);
+}
+
+.dog-category-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: var(--border-radius);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: var(--spacing-sm);
+}
+
+.dog-category-badge.green {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.dog-category-badge.blue {
+    background-color: #d1ecf1;
+    color: #0c5460;
+}
+
+.dog-category-badge.orange {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.dog-unavailable-banner {
+    background-color: #f8d7da;
+    color: #721c24;
+    padding: var(--spacing-sm);
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.dog-locked-banner {
+    background-color: #fff3cd;
+    color: #856404;
+    padding: var(--spacing-sm);
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.dog-card.locked {
+    opacity: 0.6;
+    position: relative;
+}
+
+.dog-card.locked::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.3);
+    pointer-events: none;
+}
+
+/* Filters */
+.filter-bar {
+    background: white;
+    padding: var(--spacing-lg);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-lg);
+}
+
+.filter-row {
+    display: flex;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+.filter-row > * {
+    flex: 1;
+    min-width: 200px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     header .container {
