@@ -1,6 +1,15 @@
 # Gassigeher - Administrator-Handbuch
 
-Umfassende Anleitung für Administratoren zur Verwaltung der Gassigeher-Plattform.
+**Umfassende Anleitung für Administratoren zur Verwaltung der Gassigeher-Plattform.**
+
+**🎯 Verwaltung**: 8 Admin-Seiten | Dashboard mit Live-Statistiken | Vollständige Kontrolle
+**🔧 Funktionen**: Hunde, Buchungen, Benutzer, Einstellungen, Level-Anfragen, Reaktivierungen
+
+> **Für Benutzer**: Siehe [USER_GUIDE.md](USER_GUIDE.md)
+> **Für Deployment**: Siehe [DEPLOYMENT.md](DEPLOYMENT.md)
+> **API-Referenz**: Siehe [API.md](API.md)
+
+---
 
 ## Administrator-Zugang
 
@@ -644,3 +653,26 @@ Bei Bugs oder Feature-Anfragen:
 **Viel Erfolg bei der Verwaltung von Gassigeher! 🐕**
 
 Bei Fragen: support@gassigeher.example.com
+
+---
+
+## Related Documentation
+
+**Essential Guides:**
+- [USER_GUIDE.md](USER_GUIDE.md) - User manual (share with users)
+- [DEPLOYMENT.md](DEPLOYMENT.md) - Production deployment and troubleshooting
+- [API.md](API.md) - Complete API reference
+
+**Technical Documentation:**
+- [README.md](README.md) - Project overview and setup
+- [ImplementationPlan.md](ImplementationPlan.md) - Complete architecture
+- [CLAUDE.md](CLAUDE.md) - Development guide
+
+**For Emergencies:**
+- Check server logs: `journalctl -u gassigeher -f`
+- Database issues: See DEPLOYMENT.md "Troubleshooting"
+- Email problems: Check Gmail API credentials in .env
+
+---
+
+**📞 Support Contact**: support@gassigeher.example.com

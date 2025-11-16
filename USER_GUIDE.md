@@ -1,6 +1,14 @@
 # Gassigeher - Benutzerhandbuch
 
-Willkommen bei Gassigeher! Diese Anleitung hilft Ihnen, die Plattform optimal zu nutzen.
+**Willkommen bei Gassigeher! Diese Anleitung hilft Ihnen, die Plattform optimal zu nutzen.**
+
+**📱 Funktionen**: Hunde buchen | Profil verwalten | Level aufsteigen | Notizen hinzufügen
+**🌐 Sprache**: Deutsch | **📱 Geräte**: Desktop, Tablet, Smartphone
+
+> **Für Administratoren**: Siehe [ADMIN_GUIDE.md](ADMIN_GUIDE.md)
+> **Technische Dokumentation**: Siehe [API.md](API.md)
+
+---
 
 ## Erste Schritte
 
@@ -299,3 +307,18 @@ Wir helfen Ihnen gerne!
 ---
 
 **Viel Spaß beim Gassigehen! 🐕**
+
+---
+
+## Weitere Dokumentation
+
+**Für Administratoren:**
+- [ADMIN_GUIDE.md](ADMIN_GUIDE.md) - Umfassendes Administrator-Handbuch
+
+**Technische Dokumentation:**
+- [README.md](README.md) - Projektübersicht
+- [API.md](API.md) - API-Referenz für Entwickler
+
+**Rechtliches:**
+- [Terms & Conditions](/terms.html) - Allgemeine Geschäftsbedingungen
+- [Privacy Policy](/privacy.html) - Datenschutzerklärung

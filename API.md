@@ -1,6 +1,12 @@
 # Gassigeher API Documentation
 
-Complete REST API documentation for the Gassigeher dog walking booking system.
+**Complete REST API documentation for the Gassigeher dog walking booking system.**
+
+**Status**: ✅ All 50+ endpoints implemented and documented
+
+> **Quick Links**: [README](README.md) | [Deployment](DEPLOYMENT.md) | [User Guide](USER_GUIDE.md) | [Admin Guide](ADMIN_GUIDE.md)
+
+---
 
 ## Base URL
 
@@ -823,3 +829,55 @@ See test files in `internal/*/` directories for examples of API usage and expect
 - All timestamps are in ISO 8601 format
 - File uploads use `multipart/form-data`
 - All other requests/responses use `application/json`
+
+---
+
+## Testing the API
+
+### Using curl
+
+**Login example:**
+```bash
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"TestPass123"}'
+```
+
+**Authenticated request:**
+```bash
+curl -X GET http://localhost:8080/api/users/me \
+  -H "Authorization: Bearer <your-jwt-token>"
+```
+
+### Using JavaScript (Frontend)
+
+The application includes a complete API client in `frontend/js/api.js`:
+
+```javascript
+// Global instance available
+await api.login('test@example.com', 'TestPass123');
+const user = await api.getMe();
+const dogs = await api.getDogs({ category: 'green' });
+```
+
+See [CLAUDE.md](CLAUDE.md) for development guide.
+
+---
+
+## Related Documentation
+
+**For Implementation:**
+- [CLAUDE.md](CLAUDE.md) - Development guide with architecture
+- [README.md](README.md) - Project setup and overview
+- [ImplementationPlan.md](ImplementationPlan.md) - Complete architecture
+
+**For Deployment:**
+- [DEPLOYMENT.md](DEPLOYMENT.md) - Production deployment guide
+
+**For Users:**
+- [USER_GUIDE.md](USER_GUIDE.md) - User manual
+- [ADMIN_GUIDE.md](ADMIN_GUIDE.md) - Administrator handbook
+
+---
+
+**API Status**: ✅ All 50+ endpoints implemented and production-ready
