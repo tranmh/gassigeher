@@ -8,24 +8,40 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/tranm/gassigeher/internal/config"
 	"github.com/tranm/gassigeher/internal/middleware"
 	"github.com/tranm/gassigeher/internal/models"
 	"github.com/tranm/gassigeher/internal/repository"
+	"github.com/tranm/gassigeher/internal/services"
 )
 
 // UserHandler handles user-related endpoints
 type UserHandler struct {
-	userRepo *repository.UserRepository
-	config   *config.Config
+	userRepo     *repository.UserRepository
+	authService  *services.AuthService
+	emailService *services.EmailService
+	config       *config.Config
 }
 
 // NewUserHandler creates a new user handler
 func NewUserHandler(db *sql.DB, cfg *config.Config) *UserHandler {
+	emailService, err := services.NewEmailService(
+		cfg.GmailClientID,
+		cfg.GmailClientSecret,
+		cfg.GmailRefreshToken,
+		cfg.GmailFromEmail,
+	)
+	if err != nil {
+		println("Warning: Failed to initialize email service:", err.Error())
+	}
+
 	return &UserHandler{
-		userRepo: repository.NewUserRepository(db),
-		config:   cfg,
+		userRepo:     repository.NewUserRepository(db),
+		authService:  services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours),
+		emailService: emailService,
+		config:       cfg,
 	}
 }
 
@@ -79,6 +95,9 @@ func (h *UserHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Track if email changed
+	emailChanged := false
+
 	// Update fields
 	if req.Name != nil && strings.TrimSpace(*req.Name) != "" {
 		user.Name = *req.Name
@@ -88,14 +107,65 @@ func (h *UserHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		user.Phone = req.Phone
 	}
 
-	// TODO: Email change requires re-verification (implement in Phase 6)
+	// Handle email change - requires re-verification
+	if req.Email != nil && strings.TrimSpace(*req.Email) != "" {
+		newEmail := strings.TrimSpace(*req.Email)
+
+		// Check if email actually changed
+		if user.Email != nil && *user.Email != newEmail {
+			// Check if new email already exists
+			existingUser, err := h.userRepo.FindByEmail(newEmail)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "Database error")
+				return
+			}
+			if existingUser != nil {
+				respondError(w, http.StatusConflict, "Email already in use")
+				return
+			}
+
+			// Generate new verification token
+			token, err := h.authService.GenerateToken()
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "Failed to generate token")
+				return
+			}
+
+			user.Email = &newEmail
+			user.VerificationToken = &token
+			user.IsVerified = false
+			emailChanged = true
+
+			// Set token expiration
+			expires := time.Now().Add(24 * time.Hour)
+			user.VerificationTokenExpires = &expires
+		}
+	}
 
 	if err := h.userRepo.Update(user); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to update profile")
 		return
 	}
 
-	respondJSON(w, http.StatusOK, user)
+	// Send verification email if email changed
+	if emailChanged && user.Email != nil {
+		go h.emailService.SendVerificationEmail(*user.Email, user.Name, *user.VerificationToken)
+	}
+
+	// Don't return sensitive data
+	user.PasswordHash = nil
+	user.VerificationToken = nil
+	user.PasswordResetToken = nil
+
+	message := "Profile updated successfully"
+	if emailChanged {
+		message = "Profile updated. Please check your new email to verify it."
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"message": message,
+		"user":    user,
+	})
 }
 
 // UploadPhoto handles profile photo upload

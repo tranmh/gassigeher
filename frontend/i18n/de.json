@@ -240,7 +240,11 @@
     "requested_level": "Angefragtes Level",
     "request_status": "Status",
     "reviewed_at": "Geprüft am",
-    "admin_message": "Nachricht vom Administrator"
+    "admin_message": "Nachricht vom Administrator",
+    "upload_photo": "Foto hochladen",
+    "profile_updated": "Profil aktualisiert",
+    "photo_uploaded": "Foto hochgeladen",
+    "highest_level": "Sie haben das höchste Level erreicht!"
   },
   "errors": {
     "required_field": "Dieses Feld ist erforderlich",

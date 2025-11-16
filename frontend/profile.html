@@ -27,14 +27,39 @@
 
             <div id="alert-container"></div>
 
+            <!-- Profile Photo -->
+            <div class="card">
+                <h3>Profilfoto</h3>
+                <div style="text-align: center; margin: 20px 0;">
+                    <div id="photo-preview" style="width: 150px; height: 150px; margin: 0 auto 20px; border-radius: 50%; overflow: hidden; background: #ddd; display: flex; align-items: center; justify-content: center;">
+                        <span style="font-size: 3rem;">👤</span>
+                    </div>
+                    <input type="file" id="photo-input" accept="image/jpeg,image/png" style="display: none;" onchange="uploadPhoto()">
+                    <button class="btn" onclick="document.getElementById('photo-input').click()">Foto hochladen</button>
+                </div>
+            </div>
+
             <!-- Profile Info -->
             <div class="card">
-                <h3>Benutzerinformationen</h3>
-                <div style="margin: 20px 0;">
-                    <p><strong>Name:</strong> <span id="user-name"></span></p>
-                    <p><strong>E-Mail:</strong> <span id="user-email"></span></p>
-                    <p><strong>Telefon:</strong> <span id="user-phone"></span></p>
-                </div>
+                <h3 data-i18n="profile.edit_profile">Profil bearbeiten</h3>
+                <form id="profile-form">
+                    <div class="form-group">
+                        <label data-i18n="auth.name">Name</label>
+                        <input type="text" id="edit-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="auth.email">E-Mail-Adresse</label>
+                        <input type="email" id="edit-email" required>
+                        <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                            Hinweis: Bei Änderung der E-Mail müssen Sie diese erneut bestätigen.
+                        </p>
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="auth.phone">Telefonnummer</label>
+                        <input type="tel" id="edit-phone" required>
+                    </div>
+                    <button type="submit" class="btn" data-i18n="common.save">Speichern</button>
+                </form>
             </div>
 
             <!-- Experience Level -->
@@ -108,14 +133,23 @@
                 showAlert('error', error.message || 'Fehler beim Laden');
             }
 
+            document.getElementById('profile-form').addEventListener('submit', handleProfileUpdate);
             document.getElementById('password-form').addEventListener('submit', handlePasswordChange);
         });
 
         function renderProfile() {
-            document.getElementById('user-name').textContent = currentUser.name;
-            document.getElementById('user-email').textContent = currentUser.email || '-';
-            document.getElementById('user-phone').textContent = currentUser.phone || '-';
+            // Populate edit form
+            document.getElementById('edit-name').value = currentUser.name;
+            document.getElementById('edit-email').value = currentUser.email || '';
+            document.getElementById('edit-phone').value = currentUser.phone || '';
 
+            // Display profile photo
+            if (currentUser.profile_photo) {
+                const photoPreview = document.getElementById('photo-preview');
+                photoPreview.innerHTML = `<img src="/uploads/${currentUser.profile_photo}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">`;
+            }
+
+            // Display experience level
             const levelBadge = document.getElementById('current-level-badge');
             levelBadge.className = `dog-category-badge ${currentUser.experience_level}`;
             levelBadge.textContent = getLevelLabel(currentUser.experience_level);
@@ -221,6 +255,63 @@
                 loadMyRequests();
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Einreichen des Antrags');
+            }
+        }
+
+        async function handleProfileUpdate(e) {
+            e.preventDefault();
+
+            const name = document.getElementById('edit-name').value;
+            const email = document.getElementById('edit-email').value;
+            const phone = document.getElementById('edit-phone').value;
+
+            try {
+                const response = await api.updateMe({ name, email, phone });
+                showAlert('success', response.message || 'Profil aktualisiert');
+
+                // Reload user data
+                currentUser = await api.getMe();
+                renderProfile();
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Aktualisieren');
+            }
+        }
+
+        async function uploadPhoto() {
+            const fileInput = document.getElementById('photo-input');
+            const file = fileInput.files[0];
+
+            if (!file) return;
+
+            // Validate file type
+            if (!file.type.match(/image\/(jpeg|jpg|png)/)) {
+                showAlert('error', 'Nur JPEG und PNG Dateien sind erlaubt');
+                return;
+            }
+
+            // Validate file size (5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                showAlert('error', 'Datei zu groß (max. 5MB)');
+                return;
+            }
+
+            // Preview image
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const photoPreview = document.getElementById('photo-preview');
+                photoPreview.innerHTML = `<img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;" alt="Preview">`;
+            };
+            reader.readAsDataURL(file);
+
+            // Upload
+            try {
+                const response = await api.uploadPhoto(file);
+                showAlert('success', 'Foto erfolgreich hochgeladen');
+
+                // Reload user data
+                currentUser = await api.getMe();
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Hochladen');
             }
         }
 
