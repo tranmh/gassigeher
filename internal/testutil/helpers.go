@@ -49,9 +49,9 @@ func SeedTestUser(t *testing.T, db *sql.DB, email, name, level string) int {
 func SeedTestDog(t *testing.T, db *sql.DB, name, breed, category string) int {
 	now := time.Now()
 	result, err := db.Exec(`
-		INSERT INTO dogs (name, breed, size, category, is_available, created_at)
-		VALUES (?, ?, ?, ?, 1, ?)
-	`, name, breed, "medium", category, now)
+		INSERT INTO dogs (name, breed, size, age, category, is_available, created_at)
+		VALUES (?, ?, ?, ?, ?, 1, ?)
+	`, name, breed, "medium", 5, category, now)
 
 	if err != nil {
 		t.Fatalf("Failed to seed test dog: %v", err)
