@@ -63,11 +63,11 @@
 				
 				<option value="file3">github.com/tranm/gassigeher/internal/database/database.go (0.0%)</option>
 				
-				<option value="file4">github.com/tranm/gassigeher/internal/handlers/auth_handler.go (0.0%)</option>
+				<option value="file4">github.com/tranm/gassigeher/internal/handlers/auth_handler.go (51.4%)</option>
 				
 				<option value="file5">github.com/tranm/gassigeher/internal/handlers/blocked_date_handler.go (0.0%)</option>
 				
-				<option value="file6">github.com/tranm/gassigeher/internal/handlers/booking_handler.go (0.0%)</option>
+				<option value="file6">github.com/tranm/gassigeher/internal/handlers/booking_handler.go (31.0%)</option>
 				
 				<option value="file7">github.com/tranm/gassigeher/internal/handlers/dashboard_handler.go (0.0%)</option>
 				
@@ -79,7 +79,7 @@
 				
 				<option value="file11">github.com/tranm/gassigeher/internal/handlers/settings_handler.go (0.0%)</option>
 				
-				<option value="file12">github.com/tranm/gassigeher/internal/handlers/user_handler.go (0.0%)</option>
+				<option value="file12">github.com/tranm/gassigeher/internal/handlers/user_handler.go (32.7%)</option>
 				
 				<option value="file13">github.com/tranm/gassigeher/internal/middleware/middleware.go (91.2%)</option>
 				
@@ -802,7 +802,7 @@ type AuthHandler struct {
 }
 
 // NewAuthHandler creates a new auth handler
-func NewAuthHandler(db *sql.DB, cfg *config.Config) *AuthHandler <span class="cov0" title="0">{
+func NewAuthHandler(db *sql.DB, cfg *config.Config) *AuthHandler <span class="cov4" title="4">{
         emailService, err := services.NewEmailService(
                 cfg.GmailClientID,
                 cfg.GmailClientSecret,
@@ -814,7 +814,7 @@ func NewAuthHandler(db *sql.DB, cfg *config.Config) *AuthHandler <span class="co
                 fmt.Printf("Warning: Failed to initialize email service: %v\n", err)
         }</span>
 
-        <span class="cov0" title="0">return &amp;AuthHandler{
+        <span class="cov4" title="4">return &amp;AuthHandler{
                 userRepo:     repository.NewUserRepository(db),
                 authService:  services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours),
                 emailService: emailService,
@@ -823,7 +823,7 @@ func NewAuthHandler(db *sql.DB, cfg *config.Config) *AuthHandler <span class="co
 }
 
 // Register handles user registration
-func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) <span class="cov6" title="8">{
         var req models.RegisterRequest
         if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Invalid request body")
@@ -831,59 +831,59 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) <span cla
         }</span>
 
         // Validate input
-        <span class="cov0" title="0">if strings.TrimSpace(req.Name) == "" </span><span class="cov0" title="0">{
+        <span class="cov6" title="8">if strings.TrimSpace(req.Name) == "" </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "Name is required")
                 return
         }</span>
-        <span class="cov0" title="0">if strings.TrimSpace(req.Email) == "" </span><span class="cov0" title="0">{
+        <span class="cov5" title="7">if strings.TrimSpace(req.Email) == "" </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "Email is required")
                 return
         }</span>
-        <span class="cov0" title="0">if strings.TrimSpace(req.Phone) == "" </span><span class="cov0" title="0">{
+        <span class="cov5" title="6">if strings.TrimSpace(req.Phone) == "" </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "Phone is required")
                 return
         }</span>
-        <span class="cov0" title="0">if req.Password != req.ConfirmPassword </span><span class="cov0" title="0">{
+        <span class="cov4" title="5">if req.Password != req.ConfirmPassword </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "Passwords do not match")
                 return
         }</span>
-        <span class="cov0" title="0">if !req.AcceptTerms </span><span class="cov0" title="0">{
+        <span class="cov4" title="4">if !req.AcceptTerms </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "You must accept the terms and conditions")
                 return
         }</span>
 
         // Validate password strength
-        <span class="cov0" title="0">if err := h.authService.ValidatePassword(req.Password); err != nil </span><span class="cov0" title="0">{
+        <span class="cov3" title="3">if err := h.authService.ValidatePassword(req.Password); err != nil </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, err.Error())
                 return
         }</span>
 
         // Check if user already exists
-        <span class="cov0" title="0">existing, err := h.userRepo.FindByEmail(req.Email)
+        <span class="cov2" title="2">existing, err := h.userRepo.FindByEmail(req.Email)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Database error")
                 return
         }</span>
-        <span class="cov0" title="0">if existing != nil </span><span class="cov0" title="0">{
+        <span class="cov2" title="2">if existing != nil </span><span class="cov1" title="1">{
                 respondError(w, http.StatusConflict, "Email already registered")
                 return
         }</span>
 
         // Hash password
-        <span class="cov0" title="0">passwordHash, err := h.authService.HashPassword(req.Password)
+        <span class="cov1" title="1">passwordHash, err := h.authService.HashPassword(req.Password)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to hash password")
                 return
         }</span>
 
         // Generate verification token
-        <span class="cov0" title="0">verificationToken, err := h.authService.GenerateToken()
+        <span class="cov1" title="1">verificationToken, err := h.authService.GenerateToken()
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to generate verification token")
                 return
         }</span>
 
-        <span class="cov0" title="0">expires := time.Now().Add(24 * time.Hour)
+        <span class="cov1" title="1">expires := time.Now().Add(24 * time.Hour)
 
         // Create user
         user := &amp;models.User{
@@ -907,57 +907,57 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) <span cla
         }</span>
 
         // Send verification email
-        <span class="cov0" title="0">if h.emailService != nil </span><span class="cov0" title="0">{
-                if err := h.emailService.SendVerificationEmail(req.Email, req.Name, verificationToken); err != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if h.emailService != nil </span><span class="cov1" title="1">{
+                if err := h.emailService.SendVerificationEmail(req.Email, req.Name, verificationToken); err != nil </span><span class="cov1" title="1">{
                         fmt.Printf("Failed to send verification email: %v\n", err)
                         // Don't fail the registration if email fails
                 }</span>
         }
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusCreated, map[string]interface{}{
+        <span class="cov1" title="1">respondJSON(w, http.StatusCreated, map[string]interface{}{
                 "message": "Registration successful. Please check your email to verify your account.",
                 "user_id": user.ID,
         })</span>
 }
 
 // VerifyEmail handles email verification
-func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) <span class="cov3" title="3">{
         var req models.VerifyEmailRequest
         if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Invalid request body")
                 return
         }</span>
 
-        <span class="cov0" title="0">if strings.TrimSpace(req.Token) == "" </span><span class="cov0" title="0">{
+        <span class="cov3" title="3">if strings.TrimSpace(req.Token) == "" </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Token is required")
                 return
         }</span>
 
         // Find user by token
-        <span class="cov0" title="0">user, err := h.userRepo.FindByVerificationToken(req.Token)
+        <span class="cov3" title="3">user, err := h.userRepo.FindByVerificationToken(req.Token)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Database error")
                 return
         }</span>
-        <span class="cov0" title="0">if user == nil </span><span class="cov0" title="0">{
+        <span class="cov3" title="3">if user == nil </span><span class="cov1" title="1">{
                 respondError(w, http.StatusNotFound, "Invalid or expired verification token")
                 return
         }</span>
 
         // Check if already verified
-        <span class="cov0" title="0">if user.IsVerified </span><span class="cov0" title="0">{
+        <span class="cov2" title="2">if user.IsVerified </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Email already verified")
                 return
         }</span>
 
         // Check if token expired
-        <span class="cov0" title="0">if user.VerificationTokenExpires != nil &amp;&amp; time.Now().After(*user.VerificationTokenExpires) </span><span class="cov0" title="0">{
+        <span class="cov2" title="2">if user.VerificationTokenExpires != nil &amp;&amp; time.Now().After(*user.VerificationTokenExpires) </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "Verification token expired")
                 return
         }</span>
 
         // Mark as verified
-        <span class="cov0" title="0">user.IsVerified = true
+        <span class="cov1" title="1">user.IsVerified = true
         user.VerificationToken = nil
         user.VerificationTokenExpires = nil
 
@@ -967,66 +967,66 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) <span 
         }</span>
 
         // Send welcome email
-        <span class="cov0" title="0">if h.emailService != nil &amp;&amp; user.Email != nil </span><span class="cov0" title="0">{
-                if err := h.emailService.SendWelcomeEmail(*user.Email, user.Name); err != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if h.emailService != nil &amp;&amp; user.Email != nil </span><span class="cov1" title="1">{
+                if err := h.emailService.SendWelcomeEmail(*user.Email, user.Name); err != nil </span><span class="cov1" title="1">{
                         fmt.Printf("Failed to send welcome email: %v\n", err)
                 }</span>
         }
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusOK, map[string]string{
+        <span class="cov1" title="1">respondJSON(w, http.StatusOK, map[string]string{
                 "message": "Email verified successfully. You can now login.",
         })</span>
 }
 
 // Login handles user login
-func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) <span class="cov5" title="6">{
         var req models.LoginRequest
-        if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
+        if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "Invalid request body")
                 return
         }</span>
 
-        <span class="cov0" title="0">if strings.TrimSpace(req.Email) == "" || strings.TrimSpace(req.Password) == "" </span><span class="cov0" title="0">{
+        <span class="cov4" title="5">if strings.TrimSpace(req.Email) == "" || strings.TrimSpace(req.Password) == "" </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Email and password are required")
                 return
         }</span>
 
         // Find user
-        <span class="cov0" title="0">user, err := h.userRepo.FindByEmail(req.Email)
+        <span class="cov4" title="5">user, err := h.userRepo.FindByEmail(req.Email)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Database error")
                 return
         }</span>
-        <span class="cov0" title="0">if user == nil || user.PasswordHash == nil </span><span class="cov0" title="0">{
+        <span class="cov4" title="5">if user == nil || user.PasswordHash == nil </span><span class="cov1" title="1">{
                 respondError(w, http.StatusUnauthorized, "Invalid credentials")
                 return
         }</span>
 
         // Check password
-        <span class="cov0" title="0">if !h.authService.CheckPassword(req.Password, *user.PasswordHash) </span><span class="cov0" title="0">{
+        <span class="cov4" title="4">if !h.authService.CheckPassword(req.Password, *user.PasswordHash) </span><span class="cov1" title="1">{
                 respondError(w, http.StatusUnauthorized, "Invalid credentials")
                 return
         }</span>
 
         // Check if verified
-        <span class="cov0" title="0">if !user.IsVerified </span><span class="cov0" title="0">{
+        <span class="cov3" title="3">if !user.IsVerified </span><span class="cov1" title="1">{
                 respondError(w, http.StatusForbidden, "Please verify your email before logging in")
                 return
         }</span>
 
         // Check if active
-        <span class="cov0" title="0">if !user.IsActive </span><span class="cov0" title="0">{
+        <span class="cov2" title="2">if !user.IsActive </span><span class="cov1" title="1">{
                 respondError(w, http.StatusForbidden, "Your account has been deactivated. Please contact support for reactivation.")
                 return
         }</span>
 
         // Update last activity
-        <span class="cov0" title="0">if err := h.userRepo.UpdateLastActivity(user.ID); err != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if err := h.userRepo.UpdateLastActivity(user.ID); err != nil </span><span class="cov0" title="0">{
                 fmt.Printf("Failed to update last activity: %v\n", err)
         }</span>
 
         // Check if admin
-        <span class="cov0" title="0">isAdmin := h.config.IsAdmin(req.Email)
+        <span class="cov1" title="1">isAdmin := h.config.IsAdmin(req.Email)
 
         // Generate JWT
         token, err := h.authService.GenerateJWT(user.ID, req.Email, isAdmin)
@@ -1035,7 +1035,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) <span class=
                 return
         }</span>
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusOK, models.LoginResponse{
+        <span class="cov1" title="1">respondJSON(w, http.StatusOK, models.LoginResponse{
                 Token:   token,
                 User:    user,
                 IsAdmin: isAdmin,
@@ -1162,74 +1162,74 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) <spa
 }
 
 // ChangePassword handles password change for logged-in users
-func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) <span class="cov4" title="4">{
         userID, ok := r.Context().Value(middleware.UserIDKey).(int)
         if !ok </span><span class="cov0" title="0">{
                 respondError(w, http.StatusUnauthorized, "Unauthorized")
                 return
         }</span>
 
-        <span class="cov0" title="0">var req models.ChangePasswordRequest
+        <span class="cov4" title="4">var req models.ChangePasswordRequest
         if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Invalid request body")
                 return
         }</span>
 
-        <span class="cov0" title="0">if req.NewPassword != req.ConfirmPassword </span><span class="cov0" title="0">{
+        <span class="cov4" title="4">if req.NewPassword != req.ConfirmPassword </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "Passwords do not match")
                 return
         }</span>
 
         // Validate new password
-        <span class="cov0" title="0">if err := h.authService.ValidatePassword(req.NewPassword); err != nil </span><span class="cov0" title="0">{
+        <span class="cov3" title="3">if err := h.authService.ValidatePassword(req.NewPassword); err != nil </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, err.Error())
                 return
         }</span>
 
         // Get user
-        <span class="cov0" title="0">user, err := h.userRepo.FindByID(userID)
+        <span class="cov2" title="2">user, err := h.userRepo.FindByID(userID)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Database error")
                 return
         }</span>
-        <span class="cov0" title="0">if user == nil || user.PasswordHash == nil </span><span class="cov0" title="0">{
+        <span class="cov2" title="2">if user == nil || user.PasswordHash == nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusNotFound, "User not found")
                 return
         }</span>
 
         // Verify old password
-        <span class="cov0" title="0">if !h.authService.CheckPassword(req.OldPassword, *user.PasswordHash) </span><span class="cov0" title="0">{
+        <span class="cov2" title="2">if !h.authService.CheckPassword(req.OldPassword, *user.PasswordHash) </span><span class="cov1" title="1">{
                 respondError(w, http.StatusUnauthorized, "Incorrect old password")
                 return
         }</span>
 
         // Hash new password
-        <span class="cov0" title="0">newHash, err := h.authService.HashPassword(req.NewPassword)
+        <span class="cov1" title="1">newHash, err := h.authService.HashPassword(req.NewPassword)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to hash password")
                 return
         }</span>
 
-        <span class="cov0" title="0">user.PasswordHash = &amp;newHash
+        <span class="cov1" title="1">user.PasswordHash = &amp;newHash
         if err := h.userRepo.Update(user); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to update password")
                 return
         }</span>
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusOK, map[string]string{
+        <span class="cov1" title="1">respondJSON(w, http.StatusOK, map[string]string{
                 "message": "Password changed successfully",
         })</span>
 }
 
 // Helper functions
 
-func respondJSON(w http.ResponseWriter, status int, data interface{}) <span class="cov0" title="0">{
+func respondJSON(w http.ResponseWriter, status int, data interface{}) <span class="cov10" title="42">{
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(status)
         json.NewEncoder(w).Encode(data)
 }</span>
 
-func respondError(w http.ResponseWriter, status int, message string) <span class="cov0" title="0">{
+func respondError(w http.ResponseWriter, status int, message string) <span class="cov9" title="29">{
         respondJSON(w, status, map[string]string{"error": message})
 }</span>
 </pre>
@@ -1362,7 +1362,7 @@ type BookingHandler struct {
 }
 
 // NewBookingHandler creates a new booking handler
-func NewBookingHandler(db *sql.DB, cfg *config.Config) *BookingHandler <span class="cov0" title="0">{
+func NewBookingHandler(db *sql.DB, cfg *config.Config) *BookingHandler <span class="cov6" title="3">{
         emailService, err := services.NewEmailService(
                 cfg.GmailClientID,
                 cfg.GmailClientSecret,
@@ -1374,7 +1374,7 @@ func NewBookingHandler(db *sql.DB, cfg *config.Config) *BookingHandler <span cla
                 fmt.Printf("Warning: Failed to initialize email service: %v\n", err)
         }</span>
 
-        <span class="cov0" title="0">return &amp;BookingHandler{
+        <span class="cov6" title="3">return &amp;BookingHandler{
                 db:                   db,
                 cfg:                  cfg,
                 bookingRepo:          repository.NewBookingRepository(db),
@@ -1387,7 +1387,7 @@ func NewBookingHandler(db *sql.DB, cfg *config.Config) *BookingHandler <span cla
 }
 
 // CreateBooking creates a new booking
-func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) <span class="cov10" title="7">{
         // Get user ID from context
         userID, ok := r.Context().Value("user_id").(int)
         if !ok </span><span class="cov0" title="0">{
@@ -1396,106 +1396,106 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) <
         }</span>
 
         // Parse request
-        <span class="cov0" title="0">var req models.CreateBookingRequest
+        <span class="cov10" title="7">var req models.CreateBookingRequest
         if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Invalid request body")
                 return
         }</span>
 
         // Validate request
-        <span class="cov0" title="0">if err := req.Validate(); err != nil </span><span class="cov0" title="0">{
+        <span class="cov10" title="7">if err := req.Validate(); err != nil </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, err.Error())
                 return
         }</span>
 
         // Get user to check experience level
-        <span class="cov0" title="0">user, err := h.userRepo.FindByID(userID)
+        <span class="cov9" title="6">user, err := h.userRepo.FindByID(userID)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to get user")
                 return
         }</span>
-        <span class="cov0" title="0">if user == nil </span><span class="cov0" title="0">{
+        <span class="cov9" title="6">if user == nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusNotFound, "User not found")
                 return
         }</span>
 
         // Check if user is active
-        <span class="cov0" title="0">if !user.IsActive </span><span class="cov0" title="0">{
+        <span class="cov9" title="6">if !user.IsActive </span><span class="cov1" title="1">{
                 respondError(w, http.StatusForbidden, "Your account is deactivated")
                 return
         }</span>
 
         // Get dog
-        <span class="cov0" title="0">dog, err := h.dogRepo.FindByID(req.DogID)
+        <span class="cov8" title="5">dog, err := h.dogRepo.FindByID(req.DogID)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to get dog")
                 return
         }</span>
-        <span class="cov0" title="0">if dog == nil </span><span class="cov0" title="0">{
+        <span class="cov8" title="5">if dog == nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusNotFound, "Dog not found")
                 return
         }</span>
 
         // Check if dog is available
-        <span class="cov0" title="0">if !dog.IsAvailable </span><span class="cov0" title="0">{
+        <span class="cov8" title="5">if !dog.IsAvailable </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Dog is currently unavailable")
                 return
         }</span>
 
         // Check experience level access
-        <span class="cov0" title="0">if !repository.CanUserAccessDog(user.ExperienceLevel, dog.Category) </span><span class="cov0" title="0">{
+        <span class="cov8" title="5">if !repository.CanUserAccessDog(user.ExperienceLevel, dog.Category) </span><span class="cov1" title="1">{
                 respondError(w, http.StatusForbidden, "You don't have the required experience level for this dog")
                 return
         }</span>
 
         // Check if date is in the past
-        <span class="cov0" title="0">bookingDate, _ := time.Parse("2006-01-02", req.Date)
+        <span class="cov7" title="4">bookingDate, _ := time.Parse("2006-01-02", req.Date)
         today := time.Now().Truncate(24 * time.Hour)
-        if bookingDate.Before(today) </span><span class="cov0" title="0">{
+        if bookingDate.Before(today) </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "Cannot book dates in the past")
                 return
         }</span>
 
         // Check booking advance limit
-        <span class="cov0" title="0">advanceSetting, err := h.settingsRepo.Get("booking_advance_days")
+        <span class="cov6" title="3">advanceSetting, err := h.settingsRepo.Get("booking_advance_days")
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to get settings")
                 return
         }</span>
-        <span class="cov0" title="0">advanceDays := 14 // default
-        if advanceSetting != nil </span><span class="cov0" title="0">{
+        <span class="cov6" title="3">advanceDays := 14 // default
+        if advanceSetting != nil </span><span class="cov6" title="3">{
                 advanceDays, _ = strconv.Atoi(advanceSetting.Value)
         }</span>
-        <span class="cov0" title="0">maxDate := today.AddDate(0, 0, advanceDays)
+        <span class="cov6" title="3">maxDate := today.AddDate(0, 0, advanceDays)
         if bookingDate.After(maxDate) </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, fmt.Sprintf("Cannot book more than %d days in advance", advanceDays))
                 return
         }</span>
 
         // Check if date is blocked
-        <span class="cov0" title="0">isBlocked, err := h.blockedDateRepo.IsBlocked(req.Date)
+        <span class="cov6" title="3">isBlocked, err := h.blockedDateRepo.IsBlocked(req.Date)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to check blocked dates")
                 return
         }</span>
-        <span class="cov0" title="0">if isBlocked </span><span class="cov0" title="0">{
+        <span class="cov6" title="3">if isBlocked </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "This date is blocked")
                 return
         }</span>
 
         // Check for double-booking
-        <span class="cov0" title="0">isDoubleBooked, err := h.bookingRepo.CheckDoubleBooking(req.DogID, req.Date, req.WalkType)
+        <span class="cov4" title="2">isDoubleBooked, err := h.bookingRepo.CheckDoubleBooking(req.DogID, req.Date, req.WalkType)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to check availability")
                 return
         }</span>
-        <span class="cov0" title="0">if isDoubleBooked </span><span class="cov0" title="0">{
+        <span class="cov4" title="2">if isDoubleBooked </span><span class="cov1" title="1">{
                 respondError(w, http.StatusConflict, "This dog is already booked for this time")
                 return
         }</span>
 
         // Create booking
-        <span class="cov0" title="0">booking := &amp;models.Booking{
+        <span class="cov1" title="1">booking := &amp;models.Booking{
                 UserID:        userID,
                 DogID:         req.DogID,
                 Date:          req.Date,
@@ -1509,18 +1509,18 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) <
         }</span>
 
         // Update user last activity
-        <span class="cov0" title="0">h.userRepo.UpdateLastActivity(userID)
+        <span class="cov1" title="1">h.userRepo.UpdateLastActivity(userID)
 
         // Send confirmation email
-        if user.Email != nil </span><span class="cov0" title="0">{
+        if user.Email != nil </span><span class="cov1" title="1">{
                 go h.emailService.SendBookingConfirmation(*user.Email, user.Name, dog.Name, booking.Date, booking.WalkType, booking.ScheduledTime)
         }</span>
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusCreated, booking)</span>
+        <span class="cov1" title="1">respondJSON(w, http.StatusCreated, booking)</span>
 }
 
 // ListBookings lists bookings
-func (h *BookingHandler) ListBookings(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *BookingHandler) ListBookings(w http.ResponseWriter, r *http.Request) <span class="cov4" title="2">{
         // Get user ID and admin status from context
         userID, _ := r.Context().Value("user_id").(int)
         isAdmin, _ := r.Context().Value("is_admin").(bool)
@@ -1533,24 +1533,24 @@ func (h *BookingHandler) ListBookings(w http.ResponseWriter, r *http.Request) <s
                 filter.DogID = &amp;dogID
         }</span>
 
-        <span class="cov0" title="0">if dateFrom := r.URL.Query().Get("date_from"); dateFrom != "" </span><span class="cov0" title="0">{
+        <span class="cov4" title="2">if dateFrom := r.URL.Query().Get("date_from"); dateFrom != "" </span><span class="cov0" title="0">{
                 filter.DateFrom = &amp;dateFrom
         }</span>
 
-        <span class="cov0" title="0">if dateTo := r.URL.Query().Get("date_to"); dateTo != "" </span><span class="cov0" title="0">{
+        <span class="cov4" title="2">if dateTo := r.URL.Query().Get("date_to"); dateTo != "" </span><span class="cov0" title="0">{
                 filter.DateTo = &amp;dateTo
         }</span>
 
-        <span class="cov0" title="0">if status := r.URL.Query().Get("status"); status != "" </span><span class="cov0" title="0">{
+        <span class="cov4" title="2">if status := r.URL.Query().Get("status"); status != "" </span><span class="cov0" title="0">{
                 filter.Status = &amp;status
         }</span>
 
-        <span class="cov0" title="0">if walkType := r.URL.Query().Get("walk_type"); walkType != "" </span><span class="cov0" title="0">{
+        <span class="cov4" title="2">if walkType := r.URL.Query().Get("walk_type"); walkType != "" </span><span class="cov0" title="0">{
                 filter.WalkType = &amp;walkType
         }</span>
 
         // Non-admins can only see their own bookings
-        <span class="cov0" title="0">if !isAdmin </span><span class="cov0" title="0">{
+        <span class="cov4" title="2">if !isAdmin </span><span class="cov4" title="2">{
                 filter.UserID = &amp;userID
         }</span> else<span class="cov0" title="0"> if userIDStr := r.URL.Query().Get("user_id"); userIDStr != "" </span><span class="cov0" title="0">{
                 uid, _ := strconv.Atoi(userIDStr)
@@ -1558,13 +1558,13 @@ func (h *BookingHandler) ListBookings(w http.ResponseWriter, r *http.Request) <s
         }</span>
 
         // Get bookings
-        <span class="cov0" title="0">bookings, err := h.bookingRepo.FindAll(filter)
+        <span class="cov4" title="2">bookings, err := h.bookingRepo.FindAll(filter)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to get bookings")
                 return
         }</span>
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusOK, bookings)</span>
+        <span class="cov4" title="2">respondJSON(w, http.StatusOK, bookings)</span>
 }
 
 // GetBooking gets a booking by ID
@@ -1602,7 +1602,7 @@ func (h *BookingHandler) GetBooking(w http.ResponseWriter, r *http.Request) <spa
 }
 
 // CancelBooking cancels a booking
-func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) <span class="cov6" title="3">{
         // Get booking ID from URL
         vars := mux.Vars(r)
         id, err := strconv.Atoi(vars["id"])
@@ -1612,41 +1612,41 @@ func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) <
         }</span>
 
         // Get user ID and admin status
-        <span class="cov0" title="0">userID, _ := r.Context().Value("user_id").(int)
+        <span class="cov6" title="3">userID, _ := r.Context().Value("user_id").(int)
         isAdmin, _ := r.Context().Value("is_admin").(bool)
 
         // Parse request
         var req models.CancelBookingRequest
-        if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
+        if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov6" title="3">{
                 // Allow empty body
                 req = models.CancelBookingRequest{}
         }</span>
 
         // Get booking
-        <span class="cov0" title="0">booking, err := h.bookingRepo.FindByIDWithDetails(id)
+        <span class="cov6" title="3">booking, err := h.bookingRepo.FindByIDWithDetails(id)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to get booking")
                 return
         }</span>
-        <span class="cov0" title="0">if booking == nil </span><span class="cov0" title="0">{
+        <span class="cov6" title="3">if booking == nil </span><span class="cov1" title="1">{
                 respondError(w, http.StatusNotFound, "Booking not found")
                 return
         }</span>
 
         // Check authorization
-        <span class="cov0" title="0">if !isAdmin &amp;&amp; booking.UserID != userID </span><span class="cov0" title="0">{
+        <span class="cov4" title="2">if !isAdmin &amp;&amp; booking.UserID != userID </span><span class="cov1" title="1">{
                 respondError(w, http.StatusForbidden, "Access denied")
                 return
         }</span>
 
         // Check if already cancelled or completed
-        <span class="cov0" title="0">if booking.Status != "scheduled" </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if booking.Status != "scheduled" </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Booking is already "+booking.Status)
                 return
         }</span>
 
         // For non-admin users, check cancellation notice period
-        <span class="cov0" title="0">if !isAdmin </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if !isAdmin </span><span class="cov0" title="0">{
                 noticeSetting, err := h.settingsRepo.Get("cancellation_notice_hours")
                 if err != nil </span><span class="cov0" title="0">{
                         respondError(w, http.StatusInternalServerError, "Failed to get settings")
@@ -1670,26 +1670,26 @@ func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) <
         }
 
         // Cancel booking
-        <span class="cov0" title="0">if err := h.bookingRepo.Cancel(id, req.Reason); err != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if err := h.bookingRepo.Cancel(id, req.Reason); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to cancel booking")
                 return
         }</span>
 
         // Update user last activity
-        <span class="cov0" title="0">h.userRepo.UpdateLastActivity(userID)
+        <span class="cov1" title="1">h.userRepo.UpdateLastActivity(userID)
 
         // Send cancellation email
-        if booking.User.Email != nil </span><span class="cov0" title="0">{
+        if booking.User.Email != nil </span><span class="cov1" title="1">{
                 if isAdmin &amp;&amp; req.Reason != nil </span><span class="cov0" title="0">{
                         // Admin cancelled
                         go h.emailService.SendAdminCancellation(*booking.User.Email, booking.User.Name, booking.Dog.Name, booking.Date, booking.WalkType, *req.Reason)
-                }</span> else<span class="cov0" title="0"> {
+                }</span> else<span class="cov1" title="1"> {
                         // User cancelled
                         go h.emailService.SendBookingCancellation(*booking.User.Email, booking.User.Name, booking.Dog.Name, booking.Date, booking.WalkType)
                 }</span>
         }
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusOK, map[string]string{"message": "Booking cancelled successfully"})</span>
+        <span class="cov1" title="1">respondJSON(w, http.StatusOK, map[string]string{"message": "Booking cancelled successfully"})</span>
 }
 
 // AddNotes adds notes to a completed booking
@@ -3168,7 +3168,7 @@ type UserHandler struct {
 }
 
 // NewUserHandler creates a new user handler
-func NewUserHandler(db *sql.DB, cfg *config.Config) *UserHandler <span class="cov0" title="0">{
+func NewUserHandler(db *sql.DB, cfg *config.Config) *UserHandler <span class="cov8" title="3">{
         emailService, err := services.NewEmailService(
                 cfg.GmailClientID,
                 cfg.GmailClientSecret,
@@ -3179,7 +3179,7 @@ func NewUserHandler(db *sql.DB, cfg *config.Config) *UserHandler <span class="co
                 println("Warning: Failed to initialize email service:", err.Error())
         }</span>
 
-        <span class="cov0" title="0">return &amp;UserHandler{
+        <span class="cov8" title="3">return &amp;UserHandler{
                 userRepo:     repository.NewUserRepository(db),
                 authService:  services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours),
                 emailService: emailService,
@@ -3188,25 +3188,25 @@ func NewUserHandler(db *sql.DB, cfg *config.Config) *UserHandler <span class="co
 }
 
 // GetMe returns the current user's profile
-func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) <span class="cov8" title="3">{
         userID, ok := r.Context().Value(middleware.UserIDKey).(int)
-        if !ok </span><span class="cov0" title="0">{
+        if !ok </span><span class="cov1" title="1">{
                 respondError(w, http.StatusUnauthorized, "Unauthorized")
                 return
         }</span>
 
-        <span class="cov0" title="0">user, err := h.userRepo.FindByID(userID)
+        <span class="cov5" title="2">user, err := h.userRepo.FindByID(userID)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Database error")
                 return
         }</span>
-        <span class="cov0" title="0">if user == nil </span><span class="cov0" title="0">{
+        <span class="cov5" title="2">if user == nil </span><span class="cov1" title="1">{
                 respondError(w, http.StatusNotFound, "User not found")
                 return
         }</span>
 
         // Don't return sensitive data
-        <span class="cov0" title="0">user.PasswordHash = nil
+        <span class="cov1" title="1">user.PasswordHash = nil
         user.VerificationToken = nil
         user.PasswordResetToken = nil
 
@@ -3214,66 +3214,66 @@ func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) <span class=
 }
 
 // UpdateMe updates the current user's profile
-func (h *UserHandler) UpdateMe(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *UserHandler) UpdateMe(w http.ResponseWriter, r *http.Request) <span class="cov10" title="4">{
         userID, ok := r.Context().Value(middleware.UserIDKey).(int)
         if !ok </span><span class="cov0" title="0">{
                 respondError(w, http.StatusUnauthorized, "Unauthorized")
                 return
         }</span>
 
-        <span class="cov0" title="0">var req models.UpdateProfileRequest
+        <span class="cov10" title="4">var req models.UpdateProfileRequest
         if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Invalid request body")
                 return
         }</span>
 
-        <span class="cov0" title="0">user, err := h.userRepo.FindByID(userID)
+        <span class="cov10" title="4">user, err := h.userRepo.FindByID(userID)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Database error")
                 return
         }</span>
-        <span class="cov0" title="0">if user == nil </span><span class="cov0" title="0">{
+        <span class="cov10" title="4">if user == nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusNotFound, "User not found")
                 return
         }</span>
 
         // Track if email changed
-        <span class="cov0" title="0">emailChanged := false
+        <span class="cov10" title="4">emailChanged := false
 
         // Update fields
-        if req.Name != nil &amp;&amp; strings.TrimSpace(*req.Name) != "" </span><span class="cov0" title="0">{
+        if req.Name != nil &amp;&amp; strings.TrimSpace(*req.Name) != "" </span><span class="cov1" title="1">{
                 user.Name = *req.Name
         }</span>
 
-        <span class="cov0" title="0">if req.Phone != nil &amp;&amp; strings.TrimSpace(*req.Phone) != "" </span><span class="cov0" title="0">{
+        <span class="cov10" title="4">if req.Phone != nil &amp;&amp; strings.TrimSpace(*req.Phone) != "" </span><span class="cov1" title="1">{
                 user.Phone = req.Phone
         }</span>
 
         // Handle email change - requires re-verification
-        <span class="cov0" title="0">if req.Email != nil &amp;&amp; strings.TrimSpace(*req.Email) != "" </span><span class="cov0" title="0">{
+        <span class="cov10" title="4">if req.Email != nil &amp;&amp; strings.TrimSpace(*req.Email) != "" </span><span class="cov5" title="2">{
                 newEmail := strings.TrimSpace(*req.Email)
 
                 // Check if email actually changed
-                if user.Email != nil &amp;&amp; *user.Email != newEmail </span><span class="cov0" title="0">{
+                if user.Email != nil &amp;&amp; *user.Email != newEmail </span><span class="cov5" title="2">{
                         // Check if new email already exists
                         existingUser, err := h.userRepo.FindByEmail(newEmail)
                         if err != nil </span><span class="cov0" title="0">{
                                 respondError(w, http.StatusInternalServerError, "Database error")
                                 return
                         }</span>
-                        <span class="cov0" title="0">if existingUser != nil </span><span class="cov0" title="0">{
+                        <span class="cov5" title="2">if existingUser != nil </span><span class="cov1" title="1">{
                                 respondError(w, http.StatusConflict, "Email already in use")
                                 return
                         }</span>
 
                         // Generate new verification token
-                        <span class="cov0" title="0">token, err := h.authService.GenerateToken()
+                        <span class="cov1" title="1">token, err := h.authService.GenerateToken()
                         if err != nil </span><span class="cov0" title="0">{
                                 respondError(w, http.StatusInternalServerError, "Failed to generate token")
                                 return
                         }</span>
 
-                        <span class="cov0" title="0">user.Email = &amp;newEmail
+                        <span class="cov1" title="1">user.Email = &amp;newEmail
                         user.VerificationToken = &amp;token
                         user.IsVerified = false
                         emailChanged = true
@@ -3284,27 +3284,27 @@ func (h *UserHandler) UpdateMe(w http.ResponseWriter, r *http.Request) <span cla
                 }
         }
 
-        <span class="cov0" title="0">if err := h.userRepo.Update(user); err != nil </span><span class="cov0" title="0">{
+        <span class="cov8" title="3">if err := h.userRepo.Update(user); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to update profile")
                 return
         }</span>
 
         // Send verification email if email changed
-        <span class="cov0" title="0">if emailChanged &amp;&amp; user.Email != nil </span><span class="cov0" title="0">{
+        <span class="cov8" title="3">if emailChanged &amp;&amp; user.Email != nil </span><span class="cov1" title="1">{
                 go h.emailService.SendVerificationEmail(*user.Email, user.Name, *user.VerificationToken)
         }</span>
 
         // Don't return sensitive data
-        <span class="cov0" title="0">user.PasswordHash = nil
+        <span class="cov8" title="3">user.PasswordHash = nil
         user.VerificationToken = nil
         user.PasswordResetToken = nil
 
         message := "Profile updated successfully"
-        if emailChanged </span><span class="cov0" title="0">{
+        if emailChanged </span><span class="cov1" title="1">{
                 message = "Profile updated. Please check your new email to verify it."
         }</span>
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusOK, map[string]interface{}{
+        <span class="cov8" title="3">respondJSON(w, http.StatusOK, map[string]interface{}{
                 "message": message,
                 "user":    user,
         })</span>
@@ -3392,15 +3392,15 @@ func (h *UserHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) <span 
 }
 
 // DeleteAccount deletes the current user's account (GDPR anonymization)
-func (h *UserHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *UserHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) <span class="cov5" title="2">{
         userID, ok := r.Context().Value(middleware.UserIDKey).(int)
-        if !ok </span><span class="cov0" title="0">{
+        if !ok </span><span class="cov1" title="1">{
                 respondError(w, http.StatusUnauthorized, "Unauthorized")
                 return
         }</span>
 
         // Parse request to get password confirmation
-        <span class="cov0" title="0">var req struct {
+        <span class="cov1" title="1">var req struct {
                 Password string `json:"password"`
         }
         if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
@@ -3408,46 +3408,46 @@ func (h *UserHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) <spa
                 return
         }</span>
 
-        <span class="cov0" title="0">if req.Password == "" </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if req.Password == "" </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Password is required to confirm deletion")
                 return
         }</span>
 
         // Get user
-        <span class="cov0" title="0">user, err := h.userRepo.FindByID(userID)
+        <span class="cov1" title="1">user, err := h.userRepo.FindByID(userID)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Database error")
                 return
         }</span>
-        <span class="cov0" title="0">if user == nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if user == nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusNotFound, "User not found")
                 return
         }</span>
 
         // Verify password
-        <span class="cov0" title="0">if user.PasswordHash == nil || !h.authService.CheckPassword(req.Password, *user.PasswordHash) </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if user.PasswordHash == nil || !h.authService.CheckPassword(req.Password, *user.PasswordHash) </span><span class="cov0" title="0">{
                 respondError(w, http.StatusUnauthorized, "Invalid password")
                 return
         }</span>
 
         // Store email for confirmation before deletion
-        <span class="cov0" title="0">var emailForConfirmation string
-        if user.Email != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">var emailForConfirmation string
+        if user.Email != nil </span><span class="cov1" title="1">{
                 emailForConfirmation = *user.Email
         }</span>
 
         // Delete account (GDPR anonymization)
-        <span class="cov0" title="0">if err := h.userRepo.DeleteAccount(userID); err != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if err := h.userRepo.DeleteAccount(userID); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to delete account")
                 return
         }</span>
 
         // Send confirmation email to original email
-        <span class="cov0" title="0">if emailForConfirmation != "" </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if emailForConfirmation != "" </span><span class="cov1" title="1">{
                 go h.emailService.SendAccountDeletionConfirmation(emailForConfirmation, user.Name)
         }</span>
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusOK, map[string]string{"message": "Account deleted successfully"})</span>
+        <span class="cov1" title="1">respondJSON(w, http.StatusOK, map[string]string{"message": "Account deleted successfully"})</span>
 }
 
 // ListUsers lists all users (admin only)
