@@ -59,7 +59,7 @@
 				
 				<option value="file1">github.com/tranm/gassigeher/internal/config/config.go (0.0%)</option>
 				
-				<option value="file2">github.com/tranm/gassigeher/internal/cron/cron.go (0.0%)</option>
+				<option value="file2">github.com/tranm/gassigeher/internal/cron/cron.go (32.8%)</option>
 				
 				<option value="file3">github.com/tranm/gassigeher/internal/database/database.go (0.0%)</option>
 				
@@ -81,7 +81,7 @@
 				
 				<option value="file12">github.com/tranm/gassigeher/internal/handlers/user_handler.go (0.0%)</option>
 				
-				<option value="file13">github.com/tranm/gassigeher/internal/middleware/middleware.go (0.0%)</option>
+				<option value="file13">github.com/tranm/gassigeher/internal/middleware/middleware.go (91.2%)</option>
 				
 				<option value="file14">github.com/tranm/gassigeher/internal/models/blocked_date.go (100.0%)</option>
 				
@@ -438,7 +438,7 @@ type CronService struct {
 }
 
 // NewCronService creates a new cron service
-func NewCronService(db *sql.DB) *CronService <span class="cov0" title="0">{
+func NewCronService(db *sql.DB) *CronService <span class="cov10" title="3">{
         return &amp;CronService{
                 db:           db,
                 bookingRepo:  repository.NewBookingRepository(db),
@@ -490,14 +490,14 @@ func (s *CronService) runPeriodically(name string, interval time.Duration, fn fu
 }
 
 // autoCompleteBookings marks past scheduled bookings as completed
-func (s *CronService) autoCompleteBookings() <span class="cov0" title="0">{
+func (s *CronService) autoCompleteBookings() <span class="cov10" title="3">{
         count, err := s.bookingRepo.AutoComplete()
         if err != nil </span><span class="cov0" title="0">{
                 log.Printf("Error auto-completing bookings: %v", err)
                 return
         }</span>
 
-        <span class="cov0" title="0">if count &gt; 0 </span><span class="cov0" title="0">{
+        <span class="cov10" title="3">if count &gt; 0 </span><span class="cov1" title="1">{
                 log.Printf("Auto-completed %d booking(s)", count)
         }</span>
 }
@@ -549,7 +549,7 @@ func (s *CronService) runDaily(name string, hour, minute int, fn func()) <span c
 }
 
 // autoDeactivateInactiveUsers deactivates users who haven't been active for the configured period
-func (s *CronService) autoDeactivateInactiveUsers() <span class="cov0" title="0">{
+func (s *CronService) autoDeactivateInactiveUsers() <span class="cov10" title="3">{
         // Get deactivation period from settings
         setting, err := s.settingsRepo.Get("auto_deactivation_days")
         if err != nil </span><span class="cov0" title="0">{
@@ -557,35 +557,35 @@ func (s *CronService) autoDeactivateInactiveUsers() <span class="cov0" title="0"
                 return
         }</span>
 
-        <span class="cov0" title="0">days := 365 // default 1 year
-        if setting != nil </span><span class="cov0" title="0">{
-                if d, err := strconv.Atoi(setting.Value); err == nil </span><span class="cov0" title="0">{
+        <span class="cov10" title="3">days := 365 // default 1 year
+        if setting != nil </span><span class="cov10" title="3">{
+                if d, err := strconv.Atoi(setting.Value); err == nil </span><span class="cov10" title="3">{
                         days = d
                 }</span>
         }
 
         // Find inactive users
-        <span class="cov0" title="0">users, err := s.userRepo.FindInactiveUsers(days)
+        <span class="cov10" title="3">users, err := s.userRepo.FindInactiveUsers(days)
         if err != nil </span><span class="cov0" title="0">{
                 log.Printf("Error finding inactive users: %v", err)
                 return
         }</span>
 
-        <span class="cov0" title="0">if len(users) == 0 </span><span class="cov0" title="0">{
+        <span class="cov10" title="3">if len(users) == 0 </span><span class="cov6" title="2">{
                 log.Println("No inactive users to deactivate")
                 return
         }</span>
 
-        <span class="cov0" title="0">log.Printf("Found %d inactive user(s) to deactivate", len(users))
+        <span class="cov1" title="1">log.Printf("Found %d inactive user(s) to deactivate", len(users))
 
         // Deactivate each user
-        for _, user := range users </span><span class="cov0" title="0">{
+        for _, user := range users </span><span class="cov1" title="1">{
                 if err := s.userRepo.Deactivate(user.ID, "auto_inactivity"); err != nil </span><span class="cov0" title="0">{
                         log.Printf("Error deactivating user %d: %v", user.ID, err)
                         continue</span>
                 }
 
-                <span class="cov0" title="0">log.Printf("Auto-deactivated user %d (inactive for %d days)", user.ID, days)</span>
+                <span class="cov1" title="1">log.Printf("Auto-deactivated user %d (inactive for %d days)", user.ID, days)</span>
         }
 }
 </pre>
@@ -3614,8 +3614,8 @@ const EmailKey contextKey = "email"
 const IsAdminKey contextKey = "isAdmin"
 
 // LoggingMiddleware logs HTTP requests
-func LoggingMiddleware(next http.Handler) http.Handler <span class="cov0" title="0">{
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span><span class="cov0" title="0">{
+func LoggingMiddleware(next http.Handler) http.Handler <span class="cov1" title="1">{
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span><span class="cov4" title="2">{
                 start := time.Now()
                 log.Printf("%s %s", r.Method, r.URL.Path)
                 next.ServeHTTP(w, r)
@@ -3624,68 +3624,68 @@ func LoggingMiddleware(next http.Handler) http.Handler <span class="cov0" title=
 }
 
 // CORSMiddleware adds CORS headers
-func CORSMiddleware(next http.Handler) http.Handler <span class="cov0" title="0">{
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span><span class="cov0" title="0">{
+func CORSMiddleware(next http.Handler) http.Handler <span class="cov1" title="1">{
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span><span class="cov4" title="2">{
                 w.Header().Set("Access-Control-Allow-Origin", "*")
                 w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
                 w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
-                if r.Method == "OPTIONS" </span><span class="cov0" title="0">{
+                if r.Method == "OPTIONS" </span><span class="cov1" title="1">{
                         w.WriteHeader(http.StatusOK)
                         return
                 }</span>
 
-                <span class="cov0" title="0">next.ServeHTTP(w, r)</span>
+                <span class="cov1" title="1">next.ServeHTTP(w, r)</span>
         })
 }
 
 // AuthMiddleware validates JWT tokens
-func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler <span class="cov0" title="0">{
-        return func(next http.Handler) http.Handler </span><span class="cov0" title="0">{
-                return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span><span class="cov0" title="0">{
+func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler <span class="cov1" title="1">{
+        return func(next http.Handler) http.Handler </span><span class="cov10" title="6">{
+                return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span><span class="cov10" title="6">{
                         authHeader := r.Header.Get("Authorization")
-                        if authHeader == "" </span><span class="cov0" title="0">{
+                        if authHeader == "" </span><span class="cov1" title="1">{
                                 http.Error(w, `{"error":"Missing authorization header"}`, http.StatusUnauthorized)
                                 return
                         }</span>
 
                         // Extract token from "Bearer &lt;token&gt;"
-                        <span class="cov0" title="0">parts := strings.Split(authHeader, " ")
-                        if len(parts) != 2 || parts[0] != "Bearer" </span><span class="cov0" title="0">{
+                        <span class="cov9" title="5">parts := strings.Split(authHeader, " ")
+                        if len(parts) != 2 || parts[0] != "Bearer" </span><span class="cov1" title="1">{
                                 http.Error(w, `{"error":"Invalid authorization header format"}`, http.StatusUnauthorized)
                                 return
                         }</span>
 
-                        <span class="cov0" title="0">tokenString := parts[1]
+                        <span class="cov7" title="4">tokenString := parts[1]
 
                         // Validate token
                         authService := services.NewAuthService(jwtSecret, 24) // expiration not used here
                         claims, err := authService.ValidateJWT(tokenString)
-                        if err != nil </span><span class="cov0" title="0">{
+                        if err != nil </span><span class="cov4" title="2">{
                                 http.Error(w, fmt.Sprintf(`{"error":"Invalid token: %v"}`, err), http.StatusUnauthorized)
                                 return
                         }</span>
 
                         // Extract claims
-                        <span class="cov0" title="0">userID, ok := (*claims)["user_id"].(float64)
+                        <span class="cov4" title="2">userID, ok := (*claims)["user_id"].(float64)
                         if !ok </span><span class="cov0" title="0">{
                                 http.Error(w, `{"error":"Invalid token claims"}`, http.StatusUnauthorized)
                                 return
                         }</span>
 
-                        <span class="cov0" title="0">email, ok := (*claims)["email"].(string)
+                        <span class="cov4" title="2">email, ok := (*claims)["email"].(string)
                         if !ok </span><span class="cov0" title="0">{
                                 http.Error(w, `{"error":"Invalid token claims"}`, http.StatusUnauthorized)
                                 return
                         }</span>
 
-                        <span class="cov0" title="0">isAdmin, ok := (*claims)["is_admin"].(bool)
+                        <span class="cov4" title="2">isAdmin, ok := (*claims)["is_admin"].(bool)
                         if !ok </span><span class="cov0" title="0">{
                                 isAdmin = false
                         }</span>
 
                         // Add to context
-                        <span class="cov0" title="0">ctx := context.WithValue(r.Context(), UserIDKey, int(userID))
+                        <span class="cov4" title="2">ctx := context.WithValue(r.Context(), UserIDKey, int(userID))
                         ctx = context.WithValue(ctx, EmailKey, email)
                         ctx = context.WithValue(ctx, IsAdminKey, isAdmin)
 
@@ -3695,20 +3695,20 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler <span clas
 }
 
 // RequireAdmin middleware checks if user is an admin
-func RequireAdmin(next http.Handler) http.Handler <span class="cov0" title="0">{
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span><span class="cov0" title="0">{
+func RequireAdmin(next http.Handler) http.Handler <span class="cov6" title="3">{
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span><span class="cov6" title="3">{
                 isAdmin, ok := r.Context().Value(IsAdminKey).(bool)
-                if !ok || !isAdmin </span><span class="cov0" title="0">{
+                if !ok || !isAdmin </span><span class="cov4" title="2">{
                         http.Error(w, `{"error":"Admin access required"}`, http.StatusForbidden)
                         return
                 }</span>
-                <span class="cov0" title="0">next.ServeHTTP(w, r)</span>
+                <span class="cov1" title="1">next.ServeHTTP(w, r)</span>
         })
 }
 
 // SecurityHeadersMiddleware adds security headers
-func SecurityHeadersMiddleware(next http.Handler) http.Handler <span class="cov0" title="0">{
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span><span class="cov0" title="0">{
+func SecurityHeadersMiddleware(next http.Handler) http.Handler <span class="cov1" title="1">{
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span><span class="cov1" title="1">{
                 // Prevent clickjacking
                 w.Header().Set("X-Frame-Options", "DENY")
 
@@ -6071,7 +6071,7 @@ type AuthService struct {
 }
 
 // NewAuthService creates a new auth service
-func NewAuthService(jwtSecret string, jwtExpirationHours int) *AuthService <span class="cov5" title="6">{
+func NewAuthService(jwtSecret string, jwtExpirationHours int) *AuthService <span class="cov5" title="12">{
         return &amp;AuthService{
                 jwtSecret:          jwtSecret,
                 jwtExpirationHours: jwtExpirationHours,
@@ -6079,16 +6079,16 @@ func NewAuthService(jwtSecret string, jwtExpirationHours int) *AuthService <span
 }</span>
 
 // HashPassword hashes a password using bcrypt
-func (s *AuthService) HashPassword(password string) (string, error) <span class="cov2" title="2">{
+func (s *AuthService) HashPassword(password string) (string, error) <span class="cov4" title="7">{
         bytes, err := bcrypt.GenerateFromPassword([]byte(password), 12)
         if err != nil </span><span class="cov0" title="0">{
                 return "", fmt.Errorf("failed to hash password: %w", err)
         }</span>
-        <span class="cov2" title="2">return string(bytes), nil</span>
+        <span class="cov4" title="7">return string(bytes), nil</span>
 }
 
 // CheckPassword verifies a password against a hash
-func (s *AuthService) CheckPassword(password, hash string) bool <span class="cov2" title="2">{
+func (s *AuthService) CheckPassword(password, hash string) bool <span class="cov4" title="7">{
         err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
         return err == nil
 }</span>
@@ -6103,7 +6103,7 @@ func (s *AuthService) GenerateToken() (string, error) <span class="cov2" title="
 }
 
 // GenerateJWT generates a JWT token for a user
-func (s *AuthService) GenerateJWT(userID int, email string, isAdmin bool) (string, error) <span class="cov3" title="3">{
+func (s *AuthService) GenerateJWT(userID int, email string, isAdmin bool) (string, error) <span class="cov4" title="6">{
         claims := jwt.MapClaims{
                 "user_id":  userID,
                 "email":    email,
@@ -6117,23 +6117,23 @@ func (s *AuthService) GenerateJWT(userID int, email string, isAdmin bool) (strin
                 return "", fmt.Errorf("failed to sign token: %w", err)
         }</span>
 
-        <span class="cov3" title="3">return tokenString, nil</span>
+        <span class="cov4" title="6">return tokenString, nil</span>
 }
 
 // ValidateJWT validates and parses a JWT token
-func (s *AuthService) ValidateJWT(tokenString string) (*jwt.MapClaims, error) <span class="cov3" title="3">{
-        token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) </span><span class="cov2" title="2">{
+func (s *AuthService) ValidateJWT(tokenString string) (*jwt.MapClaims, error) <span class="cov5" title="10">{
+        token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) </span><span class="cov4" title="6">{
                 if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok </span><span class="cov0" title="0">{
                         return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
                 }</span>
-                <span class="cov2" title="2">return []byte(s.jwtSecret), nil</span>
+                <span class="cov4" title="6">return []byte(s.jwtSecret), nil</span>
         })
 
-        <span class="cov3" title="3">if err != nil </span><span class="cov2" title="2">{
+        <span class="cov5" title="10">if err != nil </span><span class="cov4" title="7">{
                 return nil, fmt.Errorf("failed to parse token: %w", err)
         }</span>
 
-        <span class="cov1" title="1">if claims, ok := token.Claims.(jwt.MapClaims); ok &amp;&amp; token.Valid </span><span class="cov1" title="1">{
+        <span class="cov2" title="3">if claims, ok := token.Claims.(jwt.MapClaims); ok &amp;&amp; token.Valid </span><span class="cov2" title="3">{
                 return &amp;claims, nil
         }</span>
 
@@ -6141,37 +6141,37 @@ func (s *AuthService) ValidateJWT(tokenString string) (*jwt.MapClaims, error) <s
 }
 
 // ValidatePassword checks if a password meets requirements
-func (s *AuthService) ValidatePassword(password string) error <span class="cov5" title="6">{
-        if len(password) &lt; 8 </span><span class="cov1" title="1">{
+func (s *AuthService) ValidatePassword(password string) error <span class="cov5" title="16">{
+        if len(password) &lt; 8 </span><span class="cov2" title="3">{
                 return fmt.Errorf("password must be at least 8 characters long")
         }</span>
 
-        <span class="cov4" title="5">hasUpper := false
+        <span class="cov5" title="13">hasUpper := false
         hasLower := false
         hasNumber := false
 
-        for _, char := range password </span><span class="cov10" title="55">{
+        for _, char := range password </span><span class="cov10" title="156">{
                 switch </span>{
-                case 'A' &lt;= char &amp;&amp; char &lt;= 'Z':<span class="cov6" title="14">
+                case 'A' &lt;= char &amp;&amp; char &lt;= 'Z':<span class="cov6" title="26">
                         hasUpper = true</span>
-                case 'a' &lt;= char &amp;&amp; char &lt;= 'z':<span class="cov8" title="30">
+                case 'a' &lt;= char &amp;&amp; char &lt;= 'z':<span class="cov8" title="58">
                         hasLower = true</span>
-                case '0' &lt;= char &amp;&amp; char &lt;= '9':<span class="cov6" title="10">
+                case '0' &lt;= char &amp;&amp; char &lt;= '9':<span class="cov8" title="59">
                         hasNumber = true</span>
                 }
         }
 
-        <span class="cov4" title="5">if !hasUpper </span><span class="cov1" title="1">{
+        <span class="cov5" title="13">if !hasUpper </span><span class="cov3" title="5">{
                 return fmt.Errorf("password must contain at least one uppercase letter")
         }</span>
-        <span class="cov4" title="4">if !hasLower </span><span class="cov1" title="1">{
+        <span class="cov4" title="8">if !hasLower </span><span class="cov2" title="2">{
                 return fmt.Errorf("password must contain at least one lowercase letter")
         }</span>
-        <span class="cov3" title="3">if !hasNumber </span><span class="cov1" title="1">{
+        <span class="cov4" title="6">if !hasNumber </span><span class="cov1" title="1">{
                 return fmt.Errorf("password must contain at least one number")
         }</span>
 
-        <span class="cov2" title="2">return nil</span>
+        <span class="cov3" title="5">return nil</span>
 }
 </pre>
 		
