@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verfügbarkeitskalender - Gassigeher</title>
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <style>
+        .calendar-container {
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: 150px repeat(14, 1fr);
+            gap: 2px;
+            min-width: 1400px;
+            background: var(--background-dark);
+        }
+        .calendar-header {
+            background: var(--dark-gray);
+            padding: 15px 10px;
+            text-align: center;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .calendar-header.dog-name {
+            text-align: left;
+            position: sticky;
+            left: 0;
+            z-index: 11;
+        }
+        .calendar-cell {
+            background: var(--dark-gray);
+            padding: 10px;
+            min-height: 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+        }
+        .calendar-cell.dog-name {
+            text-align: left;
+            justify-content: flex-start;
+            position: sticky;
+            left: 0;
+            z-index: 5;
+            font-weight: bold;
+        }
+        .calendar-cell.available {
+            background: #2d5016;
+            cursor: pointer;
+        }
+        .calendar-cell.available:hover {
+            background: #3d6020;
+        }
+        .calendar-cell.booked {
+            background: #663d00;
+        }
+        .calendar-cell.unavailable {
+            background: #4d1a1a;
+            opacity: 0.6;
+        }
+        .walk-type {
+            font-size: 0.75rem;
+            margin: 2px 0;
+        }
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .legend-color {
+            width: 30px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        .filter-section {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .date-display {
+            font-size: 0.7rem;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo">🐕 Gassigeher</div>
+            <nav>
+                <ul>
+                    <li><a href="/dashboard.html">Dashboard</a></li>
+                    <li><a href="/dogs.html">Hunde</a></li>
+                    <li><a href="/calendar.html" class="active">Kalender</a></li>
+                    <li><a href="/profile.html">Profil</a></li>
+                    <li><a href="#" onclick="logout()">Abmelden</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <div id="alert-container"></div>
+
+            <h1>Verfügbarkeitskalender - Nächste 2 Wochen</h1>
+            <p>Übersicht über verfügbare Hunde und Buchungen für die nächsten 14 Tage</p>
+
+            <!-- Filters -->
+            <div class="filter-section">
+                <div class="form-group" style="margin: 0;">
+                    <label for="category-filter">Kategorie:</label>
+                    <select id="category-filter" onchange="loadCalendar()">
+                        <option value="">Alle</option>
+                        <option value="green">Grün</option>
+                        <option value="blue">Blau</option>
+                        <option value="orange">Orange</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Legend -->
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #2d5016;"></div>
+                    <span>Verfügbar</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #663d00;"></div>
+                    <span>Gebucht</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4d1a1a;"></div>
+                    <span>Nicht verfügbar</span>
+                </div>
+            </div>
+
+            <!-- Calendar Grid -->
+            <div class="calendar-container">
+                <div id="calendar-grid" class="calendar-grid"></div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/js/i18n.js"></script>
+    <script src="/js/api.js"></script>
+    <script>
+        let allDogs = [];
+        let bookings = [];
+        let blockedDates = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!api.isAuthenticated()) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            await loadCalendar();
+        });
+
+        async function loadCalendar() {
+            try {
+                const categoryFilter = document.getElementById('category-filter').value;
+
+                // Fetch dogs
+                const params = categoryFilter ? { category: categoryFilter } : {};
+                allDogs = await api.getDogs(params);
+
+                // Fetch bookings for next 14 days
+                const today = new Date();
+                const twoWeeksLater = new Date();
+                twoWeeksLater.setDate(today.getDate() + 14);
+
+                bookings = await api.getBookings({
+                    start_date: today.toISOString().split('T')[0],
+                    end_date: twoWeeksLater.toISOString().split('T')[0]
+                });
+
+                // Fetch blocked dates
+                blockedDates = await api.getBlockedDates();
+
+                renderCalendar();
+            } catch (error) {
+                showAlert('error', 'Fehler beim Laden der Daten: ' + (error.message || 'Unbekannter Fehler'));
+            }
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            const dates = getNext14Days();
+
+            // Build grid HTML
+            let html = '';
+
+            // Header row
+            html += '<div class="calendar-header dog-name">Hund</div>';
+            dates.forEach(date => {
+                const dayName = getDayName(date);
+                const dateStr = formatDate(date);
+                html += `<div class="calendar-header">
+                    <div>${dayName}</div>
+                    <div class="date-display">${dateStr}</div>
+                </div>`;
+            });
+
+            // Dog rows
+            allDogs.forEach(dog => {
+                html += `<div class="calendar-cell dog-name">
+                    ${dog.name}
+                    <span style="font-size: 0.7rem; color: #999;">${getCategoryLabel(dog.category)}</span>
+                </div>`;
+
+                dates.forEach(date => {
+                    const dateStr = date.toISOString().split('T')[0];
+                    const cellData = getCellData(dog.id, dateStr);
+                    html += renderCell(dog, dateStr, cellData);
+                });
+            });
+
+            grid.innerHTML = html;
+        }
+
+        function getNext14Days() {
+            const days = [];
+            const today = new Date();
+            for (let i = 0; i < 14; i++) {
+                const date = new Date(today);
+                date.setDate(today.getDate() + i);
+                days.push(date);
+            }
+            return days;
+        }
+
+        function getDayName(date) {
+            const days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+            return days[date.getDay()];
+        }
+
+        function formatDate(date) {
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            return `${day}.${month}`;
+        }
+
+        function getCellData(dogId, date) {
+            const dogBookings = bookings.filter(b =>
+                b.dog_id === dogId && b.date === date && b.status !== 'cancelled'
+            );
+
+            const isBlocked = blockedDates.some(bd => bd.date === date);
+            const dog = allDogs.find(d => d.id === dogId);
+
+            return {
+                dogBookings,
+                isBlocked,
+                isDogAvailable: dog?.is_available
+            };
+        }
+
+        function renderCell(dog, date, data) {
+            if (!data.isDogAvailable) {
+                return `<div class="calendar-cell unavailable">
+                    <span>❌</span>
+                </div>`;
+            }
+
+            if (data.isBlocked) {
+                return `<div class="calendar-cell unavailable">
+                    <span>🚫</span>
+                    <div style="font-size: 0.7rem;">Gesperrt</div>
+                </div>`;
+            }
+
+            const morningBooked = data.dogBookings.some(b => b.walk_type === 'morning');
+            const eveningBooked = data.dogBookings.some(b => b.walk_type === 'evening');
+
+            if (morningBooked && eveningBooked) {
+                return `<div class="calendar-cell booked">
+                    <div class="walk-type">🌅 Gebucht</div>
+                    <div class="walk-type">🌆 Gebucht</div>
+                </div>`;
+            }
+
+            let cellClass = 'available';
+            let content = '';
+
+            if (morningBooked) {
+                cellClass = 'booked';
+                content += '<div class="walk-type">🌅 Gebucht</div>';
+                content += '<div class="walk-type" style="color: #82b965;">🌆 Frei</div>';
+            } else if (eveningBooked) {
+                cellClass = 'booked';
+                content += '<div class="walk-type" style="color: #82b965;">🌅 Frei</div>';
+                content += '<div class="walk-type">🌆 Gebucht</div>';
+            } else {
+                cellClass = 'available';
+                content += '<div class="walk-type" style="color: #82b965;">🌅 Frei</div>';
+                content += '<div class="walk-type" style="color: #82b965;">🌆 Frei</div>';
+            }
+
+            return `<div class="calendar-cell ${cellClass}" onclick="quickBook(${dog.id}, '${date}', ${!morningBooked}, ${!eveningBooked})">
+                ${content}
+            </div>`;
+        }
+
+        function getCategoryLabel(category) {
+            const labels = {
+                green: 'Grün',
+                blue: 'Blau',
+                orange: 'Orange'
+            };
+            return labels[category] || category;
+        }
+
+        function quickBook(dogId, date, morningFree, eveningFree) {
+            const dog = allDogs.find(d => d.id === dogId);
+            if (!dog) return;
+
+            let walkType;
+            if (morningFree && eveningFree) {
+                walkType = confirm('Morgenspaziergang? (OK = Morgen, Abbrechen = Abend)') ? 'morning' : 'evening';
+            } else if (morningFree) {
+                walkType = 'morning';
+            } else if (eveningFree) {
+                walkType = 'evening';
+            } else {
+                showAlert('error', 'Keine freien Zeiten an diesem Tag');
+                return;
+            }
+
+            // Redirect to dogs page with pre-filled booking
+            localStorage.setItem('pendingBooking', JSON.stringify({
+                dogId,
+                date,
+                walkType
+            }));
+            window.location.href = '/dogs.html';
+        }
+
+        function logout() {
+            api.logout();
+            window.location.href = '/login.html';
+        }
+
+        function showAlert(type, message) {
+            const container = document.getElementById('alert-container');
+            container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => container.innerHTML = '', 5000);
+        }
+    </script>
+</body>
+</html>
