@@ -85,6 +85,83 @@
         </div>
     </main>
 
+    <!-- Booking Modal -->
+    <div id="booking-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeBookingModal()">&times;</span>
+            <h2 id="modal-title">Spaziergang buchen</h2>
+            <form id="booking-form" onsubmit="submitBooking(event)">
+                <div class="form-group">
+                    <label for="booking-date">Datum *</label>
+                    <input type="date" id="booking-date" required min="">
+                </div>
+                <div class="form-group">
+                    <label for="booking-walk-type">Spaziergangszeit *</label>
+                    <select id="booking-walk-type" required onchange="updateTimeOptions()">
+                        <option value="morning">Morgen (09:00-12:00)</option>
+                        <option value="evening">Abend (14:00-17:00)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="booking-time">Uhrzeit *</label>
+                    <select id="booking-time" required>
+                        <option value="09:00">09:00</option>
+                        <option value="09:30">09:30</option>
+                        <option value="10:00">10:00</option>
+                    </select>
+                </div>
+                <input type="hidden" id="booking-dog-id">
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeBookingModal()">Abbrechen</button>
+                    <button type="submit" class="btn">Buchen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <style>
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: var(--dark-gray);
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+            position: relative;
+        }
+        .modal-close {
+            position: absolute;
+            right: 15px;
+            top: 15px;
+            font-size: 28px;
+            font-weight: bold;
+            color: #aaa;
+            cursor: pointer;
+        }
+        .modal-close:hover {
+            color: #fff;
+        }
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .form-actions button {
+            flex: 1;
+        }
+    </style>
+
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
     <script>
@@ -256,19 +333,62 @@
             const dog = currentDogs.find(d => d.id === dogId);
             if (!dog) return;
 
-            const date = prompt(`Buchung für ${dog.name}\n\nDatum (JJJJ-MM-TT):`);
-            if (!date) return;
+            // Set modal title
+            document.getElementById('modal-title').textContent = `Spaziergang buchen - ${dog.name}`;
 
-            const walkType = confirm('Morgenspaziergang? (OK = Morgen, Abbrechen = Abend)') ? 'morning' : 'evening';
+            // Set dog ID
+            document.getElementById('booking-dog-id').value = dogId;
 
-            const defaultTime = walkType === 'morning' ? '09:00' : '17:00';
-            const time = prompt(`Uhrzeit (HH:MM):`, defaultTime);
-            if (!time) return;
+            // Set minimum date to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('booking-date').min = today;
+            document.getElementById('booking-date').value = today;
 
-            createBooking(dogId, date, walkType, time);
+            // Reset form
+            document.getElementById('booking-form').reset();
+            document.getElementById('booking-dog-id').value = dogId;
+            updateTimeOptions();
+
+            // Show modal
+            document.getElementById('booking-modal').style.display = 'flex';
         }
 
-        async function createBooking(dogId, date, walkType, time) {
+        function closeBookingModal() {
+            document.getElementById('booking-modal').style.display = 'none';
+        }
+
+        function updateTimeOptions() {
+            const walkType = document.getElementById('booking-walk-type').value;
+            const timeSelect = document.getElementById('booking-time');
+
+            if (walkType === 'morning') {
+                timeSelect.innerHTML = `
+                    <option value="09:00">09:00</option>
+                    <option value="09:30">09:30</option>
+                    <option value="10:00">10:00</option>
+                    <option value="10:30">10:30</option>
+                    <option value="11:00">11:00</option>
+                `;
+            } else {
+                timeSelect.innerHTML = `
+                    <option value="14:00">14:00</option>
+                    <option value="14:30">14:30</option>
+                    <option value="15:00">15:00</option>
+                    <option value="15:30">15:30</option>
+                    <option value="16:00">16:00</option>
+                    <option value="16:30">16:30</option>
+                `;
+            }
+        }
+
+        async function submitBooking(event) {
+            event.preventDefault();
+
+            const dogId = parseInt(document.getElementById('booking-dog-id').value);
+            const date = document.getElementById('booking-date').value;
+            const walkType = document.getElementById('booking-walk-type').value;
+            const time = document.getElementById('booking-time').value;
+
             try {
                 const booking = await api.createBooking({
                     dog_id: dogId,
@@ -277,14 +397,23 @@
                     scheduled_time: time
                 });
 
+                closeBookingModal();
                 showAlert('success', 'Buchung erfolgreich erstellt! Sie erhalten eine Bestätigung per E-Mail.');
 
-                // Optionally redirect to dashboard
+                // Redirect to dashboard
                 setTimeout(() => {
                     window.location.href = '/dashboard.html';
                 }, 2000);
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Erstellen der Buchung');
+            }
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('booking-modal');
+            if (event.target === modal) {
+                closeBookingModal();
             }
         }
 
