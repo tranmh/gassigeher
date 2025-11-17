@@ -159,10 +159,11 @@ func TestAuthService_ValidatePassword(t *testing.T) {
 	}
 }
 
+// DONE: TestAuthService_JWTExpiration tests token expiration
 func TestAuthService_JWTExpiration(t *testing.T) {
 	// Create service with 0 hour expiration for testing
 	service := &AuthService{
-		jwtSecret:           "test-secret",
+		jwtSecret:          "test-secret",
 		jwtExpirationHours: 0,
 	}
 
@@ -176,5 +177,150 @@ func TestAuthService_JWTExpiration(t *testing.T) {
 	_, err := service.ValidateJWT(tokenString)
 	if err == nil {
 		t.Error("Expected error for expired token")
+	}
+}
+
+// DONE: TestAuthService_HashPassword_EdgeCases tests password hashing edge cases
+func TestAuthService_HashPassword_EdgeCases(t *testing.T) {
+	service := NewAuthService("test-secret", 24)
+
+	tests := []struct {
+		name     string
+		password string
+	}{
+		{"empty password", ""},
+		{"long password 72 chars", "TestPassword123456789012345678901234567890123456789012345678901234"},
+		{"special characters", "P@ssw0rd!#$%^&*()"},
+		{"unicode characters", "Päßwörd123"},
+		{"spaces", "Pass word 123"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hash, err := service.HashPassword(tt.password)
+			if err != nil {
+				t.Errorf("HashPassword() error = %v", err)
+			}
+			if hash == "" {
+				t.Error("Hash should not be empty")
+			}
+			// Verify we can check it
+			if !service.CheckPassword(tt.password, hash) {
+				t.Error("Password should match generated hash")
+			}
+		})
+	}
+}
+
+// DONE: TestAuthService_GenerateJWT_AdminClaims tests admin claims in JWT
+func TestAuthService_GenerateJWT_AdminClaims(t *testing.T) {
+	service := NewAuthService("test-secret", 24)
+
+	t.Run("admin user", func(t *testing.T) {
+		tokenString, err := service.GenerateJWT(1, "admin@example.com", true)
+		if err != nil {
+			t.Fatalf("GenerateJWT() failed: %v", err)
+		}
+
+		claims, err := service.ValidateJWT(tokenString)
+		if err != nil {
+			t.Fatalf("ValidateJWT() failed: %v", err)
+		}
+
+		if (*claims)["is_admin"].(bool) != true {
+			t.Error("Admin flag should be true")
+		}
+	})
+
+	t.Run("non-admin user", func(t *testing.T) {
+		tokenString, err := service.GenerateJWT(2, "user@example.com", false)
+		if err != nil {
+			t.Fatalf("GenerateJWT() failed: %v", err)
+		}
+
+		claims, err := service.ValidateJWT(tokenString)
+		if err != nil {
+			t.Fatalf("ValidateJWT() failed: %v", err)
+		}
+
+		if (*claims)["is_admin"].(bool) != false {
+			t.Error("Admin flag should be false")
+		}
+	})
+}
+
+// DONE: TestAuthService_ValidateJWT_InvalidTokens tests various invalid token scenarios
+func TestAuthService_ValidateJWT_InvalidTokens(t *testing.T) {
+	service := NewAuthService("test-secret", 24)
+
+	tests := []struct {
+		name  string
+		token string
+	}{
+		{"empty token", ""},
+		{"random string", "not-a-jwt-token"},
+		{"malformed jwt", "eyJhbGciOiJIUzI1.malformed.token"},
+		{"wrong signature", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxfQ.wrong_signature"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			claims, err := service.ValidateJWT(tt.token)
+			if err == nil {
+				t.Error("Expected error for invalid token")
+			}
+			if claims != nil {
+				t.Error("Expected nil claims for invalid token")
+			}
+		})
+	}
+}
+
+// DONE: TestAuthService_ValidateJWT_WrongSecret tests token validation with wrong secret
+func TestAuthService_ValidateJWT_WrongSecret(t *testing.T) {
+	service1 := NewAuthService("secret-1", 24)
+	service2 := NewAuthService("secret-2", 24)
+
+	// Generate token with service1
+	tokenString, _ := service1.GenerateJWT(1, "test@example.com", false)
+
+	// Try to validate with service2 (different secret)
+	claims, err := service2.ValidateJWT(tokenString)
+	if err == nil {
+		t.Error("Expected error when validating token with wrong secret")
+	}
+	if claims != nil {
+		t.Error("Expected nil claims when secret doesn't match")
+	}
+}
+
+// DONE: TestAuthService_ValidatePassword_EdgeCases tests password validation edge cases
+func TestAuthService_ValidatePassword_EdgeCases(t *testing.T) {
+	service := NewAuthService("test-secret", 24)
+
+	tests := []struct {
+		name     string
+		password string
+		wantErr  bool
+	}{
+		{"exactly 8 chars valid", "Test1234", false},
+		{"exactly 7 chars", "Test123", true},
+		{"only numbers", "12345678", true},
+		{"only letters lowercase", "testtest", true},
+		{"only letters uppercase", "TESTTEST", true},
+		{"letters and numbers no case mix", "test1234", true},
+		{"very long valid", "TestPassword123456789012345678901234567890", false},
+		{"empty", "", true},
+		{"only spaces", "        ", true},
+		{"leading/trailing spaces", "  Test123  ", false}, // Spaces allowed if other criteria met
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := service.ValidatePassword(tt.password)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidatePassword(%q) error = %v, wantErr %v", tt.password, err, tt.wantErr)
+			}
+		})
 	}
 }
