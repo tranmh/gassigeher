@@ -11,6 +11,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tranm/gassigeher/internal/config"
+	"github.com/tranm/gassigeher/internal/models"
 	"github.com/tranm/gassigeher/internal/services"
 	"github.com/tranm/gassigeher/internal/testutil"
 )
@@ -421,6 +422,98 @@ func TestBookingHandler_AddNotes(t *testing.T) {
 
 		rec := httptest.NewRecorder()
 		handler.AddNotes(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", rec.Code)
+		}
+	})
+}
+
+// DONE: TestBookingHandler_GetBooking tests getting a booking by ID
+func TestBookingHandler_GetBooking(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{JWTSecret: "test-secret"}
+	handler := NewBookingHandler(db, cfg)
+
+	userID := testutil.SeedTestUser(t, db, "user@example.com", "Test User", "green")
+	dogID := testutil.SeedTestDog(t, db, "Bella", "Labrador", "green")
+	bookingID := testutil.SeedTestBooking(t, db, userID, dogID, "2025-12-01", "morning", "09:00", "scheduled")
+
+	t.Run("user can get their own booking", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/bookings/"+fmt.Sprintf("%d", bookingID), nil)
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", bookingID)})
+		ctx := contextWithUser(req.Context(), userID, "user@example.com", false)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.GetBooking(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", rec.Code)
+		}
+
+		var response models.Booking
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		if response.ID != bookingID {
+			t.Errorf("Expected booking ID %d, got %d", bookingID, response.ID)
+		}
+	})
+
+	t.Run("user cannot get another user's booking", func(t *testing.T) {
+		otherUserID := testutil.SeedTestUser(t, db, "other@example.com", "Other User", "green")
+
+		req := httptest.NewRequest("GET", "/api/bookings/"+fmt.Sprintf("%d", bookingID), nil)
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", bookingID)})
+		ctx := contextWithUser(req.Context(), otherUserID, "other@example.com", false)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.GetBooking(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("Expected status 403, got %d", rec.Code)
+		}
+	})
+
+	t.Run("admin can get any booking", func(t *testing.T) {
+		adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
+
+		req := httptest.NewRequest("GET", "/api/bookings/"+fmt.Sprintf("%d", bookingID), nil)
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", bookingID)})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.GetBooking(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200 for admin, got %d", rec.Code)
+		}
+	})
+
+	t.Run("booking not found", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/bookings/99999", nil)
+		req = mux.SetURLVars(req, map[string]string{"id": "99999"})
+		ctx := contextWithUser(req.Context(), userID, "user@example.com", false)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.GetBooking(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("Expected status 404, got %d", rec.Code)
+		}
+	})
+
+	t.Run("invalid booking ID", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/bookings/invalid", nil)
+		req = mux.SetURLVars(req, map[string]string{"id": "invalid"})
+		ctx := contextWithUser(req.Context(), userID, "user@example.com", false)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.GetBooking(rec, req)
 
 		if rec.Code != http.StatusBadRequest {
 			t.Errorf("Expected status 400, got %d", rec.Code)
