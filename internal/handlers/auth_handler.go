@@ -230,15 +230,23 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SECURITY FIX: Return uniform error messages to prevent account enumeration
+	// Don't reveal if account is unverified or deactivated
+
 	// Check if verified
 	if !user.IsVerified {
-		respondError(w, http.StatusForbidden, "Please verify your email before logging in")
+		// Send verification reminder email in background (don't block response)
+		if user.Email != nil && user.VerificationToken != nil {
+			go h.emailService.SendVerificationEmail(*user.Email, user.Name, *user.VerificationToken)
+		}
+		respondError(w, http.StatusUnauthorized, "Invalid credentials")
 		return
 	}
 
 	// Check if active
 	if !user.IsActive {
-		respondError(w, http.StatusForbidden, "Your account has been deactivated. Please contact support for reactivation.")
+		// Could send reactivation instructions via email (don't reveal in response)
+		respondError(w, http.StatusUnauthorized, "Invalid credentials")
 		return
 	}
 

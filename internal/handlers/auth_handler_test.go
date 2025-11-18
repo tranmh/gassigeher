@@ -332,8 +332,15 @@ func TestAuthHandler_Login(t *testing.T) {
 		rec := httptest.NewRecorder()
 		handler.Login(rec, req)
 
-		if rec.Code != http.StatusForbidden {
-			t.Errorf("Expected status 403 for unverified user, got %d", rec.Code)
+		// SECURITY FIX: Now returns 401 with generic message to prevent enumeration
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("Expected status 401 for unverified user (security fix), got %d", rec.Code)
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+		if response["error"] != "Invalid credentials" {
+			t.Errorf("Expected generic error message, got %q", response["error"])
 		}
 	})
 
@@ -364,8 +371,15 @@ func TestAuthHandler_Login(t *testing.T) {
 		rec := httptest.NewRecorder()
 		handler.Login(rec, req)
 
-		if rec.Code != http.StatusForbidden {
-			t.Errorf("Expected status 403 for inactive user, got %d", rec.Code)
+		// SECURITY FIX: Now returns 401 with generic message to prevent enumeration
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("Expected status 401 for inactive user (security fix), got %d", rec.Code)
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+		if response["error"] != "Invalid credentials" {
+			t.Errorf("Expected generic error message, got %q", response["error"])
 		}
 	})
 
@@ -379,6 +393,110 @@ func TestAuthHandler_Login(t *testing.T) {
 		if rec.Code != http.StatusBadRequest {
 			t.Errorf("Expected status 400 for invalid JSON, got %d", rec.Code)
 		}
+	})
+
+	// DONE: Security test - prevent account enumeration via uniform error messages
+	t.Run("SECURITY: uniform errors prevent account enumeration", func(t *testing.T) {
+		// This test ensures attackers cannot determine account state by error messages
+		// All authentication failures should return identical errors
+
+		// Create users in different states
+		unverifiedEmail := "security_unverified@example.com"
+		unverifiedUser := &models.User{
+			Name:            "Unverified Security Test",
+			Email:           &unverifiedEmail,
+			PasswordHash:    &hash,
+			ExperienceLevel: "green",
+			IsVerified:      false, // UNVERIFIED
+			IsActive:        true,
+			TermsAcceptedAt: time.Now(),
+			LastActivityAt:  time.Now(),
+		}
+		userRepo.Create(unverifiedUser)
+
+		deactivatedEmail := "security_deactivated@example.com"
+		deactivatedUser := &models.User{
+			Name:            "Deactivated Security Test",
+			Email:           &deactivatedEmail,
+			PasswordHash:    &hash,
+			ExperienceLevel: "green",
+			IsVerified:      true,
+			IsActive:        false, // DEACTIVATED
+			TermsAcceptedAt: time.Now(),
+			LastActivityAt:  time.Now(),
+		}
+		userRepo.Create(deactivatedUser)
+
+		// Test scenarios that should all return IDENTICAL error messages
+		testCases := []struct {
+			name     string
+			email    string
+			password string
+			desc     string
+		}{
+			{"non-existent user", "nobody@example.com", "Test1234", "user not in database"},
+			{"wrong password", "test@example.com", "WrongPass123", "correct email, wrong password"},
+			{"unverified user", "security_unverified@example.com", "Test1234", "unverified account"},
+			{"deactivated user", "security_deactivated@example.com", "Test1234", "deactivated account"},
+		}
+
+		var errorMessages []string
+		var statusCodes []int
+
+		for _, tc := range testCases {
+			reqBody := map[string]string{
+				"email":    tc.email,
+				"password": tc.password,
+			}
+
+			body, _ := json.Marshal(reqBody)
+			req := httptest.NewRequest("POST", "/api/auth/login", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+
+			rec := httptest.NewRecorder()
+			handler.Login(rec, req)
+
+			statusCodes = append(statusCodes, rec.Code)
+
+			var response map[string]interface{}
+			json.Unmarshal(rec.Body.Bytes(), &response)
+			if msg, ok := response["error"].(string); ok {
+				errorMessages = append(errorMessages, msg)
+			}
+
+			t.Logf("%s (%s): status=%d, error=%q", tc.name, tc.desc, rec.Code, errorMessages[len(errorMessages)-1])
+		}
+
+		// SECURITY CHECK: All error messages should be IDENTICAL
+		if len(errorMessages) < 2 {
+			t.Fatal("Need at least 2 error messages to compare")
+		}
+
+		firstMessage := errorMessages[0]
+		for i, msg := range errorMessages {
+			if msg != firstMessage {
+				t.Errorf("SECURITY VULNERABILITY: Error message %d differs from first: %q vs %q (allows account enumeration!)",
+					i, msg, firstMessage)
+			}
+		}
+
+		// SECURITY CHECK: All status codes should be IDENTICAL (401 Unauthorized)
+		firstStatus := statusCodes[0]
+		expectedStatus := http.StatusUnauthorized // Should be 401 for all auth failures
+
+		if firstStatus != expectedStatus {
+			t.Errorf("Expected status %d for auth failures, got %d", expectedStatus, firstStatus)
+		}
+
+		for i, code := range statusCodes {
+			if code != expectedStatus {
+				t.Errorf("SECURITY VULNERABILITY: Status code %d differs: %d vs %d (allows account enumeration!)",
+					i, code, expectedStatus)
+			}
+		}
+
+		// Log the uniform error message (should be generic like "Invalid credentials")
+		t.Logf("✅ SECURITY: All failures return uniform error: %q with status %d", firstMessage, expectedStatus)
 	})
 }
 
