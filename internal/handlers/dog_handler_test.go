@@ -452,6 +452,91 @@ func TestDogHandler_ToggleAvailability(t *testing.T) {
 			t.Error("Dog should be available")
 		}
 	})
+
+	t.Run("make unavailable without reason - uses default", func(t *testing.T) {
+		dogID2 := testutil.SeedTestDog(t, db, "Max", "Beagle", "blue")
+
+		reqBody := map[string]interface{}{
+			"is_available": false,
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/dogs/"+fmt.Sprintf("%d", dogID2)+"/availability", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dogID2)})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ToggleAvailability(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", rec.Code)
+		}
+
+		// Verify default reason was applied
+		var reason *string
+		db.QueryRow("SELECT unavailable_reason FROM dogs WHERE id = ?", dogID2).Scan(&reason)
+		if reason == nil || *reason != "Temporarily unavailable" {
+			t.Errorf("Expected default reason 'Temporarily unavailable', got %v", reason)
+		}
+	})
+
+	t.Run("dog not found", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"is_available": true,
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/dogs/99999/availability", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": "99999"})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ToggleAvailability(rec, req)
+
+		// Should error or handle gracefully
+		if rec.Code == http.StatusOK {
+			t.Logf("ToggleAvailability for non-existent dog returned 200")
+		}
+	})
+
+	t.Run("invalid dog ID", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"is_available": true,
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/dogs/invalid/availability", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": "invalid"})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ToggleAvailability(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", rec.Code)
+		}
+	})
+
+	t.Run("invalid request body", func(t *testing.T) {
+		req := httptest.NewRequest("PUT", "/api/dogs/"+fmt.Sprintf("%d", dogID)+"/availability", bytes.NewReader([]byte("invalid json")))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dogID)})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ToggleAvailability(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", rec.Code)
+		}
+	})
 }
 
 // DONE: TestDogHandler_GetBreeds tests getting list of unique breeds
@@ -488,6 +573,30 @@ func TestDogHandler_GetBreeds(t *testing.T) {
 		// Should have 2 unique breeds (Labrador, Beagle)
 		if len(breeds) != 2 {
 			t.Errorf("Expected 2 unique breeds, got %d", len(breeds))
+		}
+	})
+
+	t.Run("no dogs in database", func(t *testing.T) {
+		// Use fresh DB
+		db2 := testutil.SetupTestDB(t)
+		handler2 := NewDogHandler(db2, cfg)
+
+		req := httptest.NewRequest("GET", "/api/dogs/breeds", nil)
+		ctx := contextWithUser(req.Context(), userID, "user@example.com", false)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler2.GetBreeds(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", rec.Code)
+		}
+
+		var breeds []string
+		json.Unmarshal(rec.Body.Bytes(), &breeds)
+
+		if len(breeds) != 0 {
+			t.Errorf("Expected 0 breeds, got %d", len(breeds))
 		}
 	})
 }

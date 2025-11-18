@@ -116,18 +116,53 @@ func TestSettingsHandler_UpdateSetting(t *testing.T) {
 		}
 
 		body, _ := json.Marshal(reqBody)
-		req := httptest.NewRequest("PUT", "/api/settings/", bytes.NewReader(body))
+		req := httptest.NewRequest("PUT", "/api/settings/nonexistent_key", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		req = mux.SetURLVars(req, map[string]string{"key": ""})
+		req = mux.SetURLVars(req, map[string]string{"key": "nonexistent_key"})
 		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
 		handler.UpdateSetting(rec, req)
 
-		// Should fail (400 or 404 depending on implementation)
-		if rec.Code == http.StatusOK {
-			t.Error("Empty key should fail")
+		// Should fail with 404 for non-existent setting
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("Expected status 404 for non-existent key, got %d", rec.Code)
+		}
+	})
+
+	t.Run("empty value", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"value": "",
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/settings/booking_advance_days", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"key": "booking_advance_days"})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UpdateSetting(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400 for empty value, got %d", rec.Code)
+		}
+	})
+
+	t.Run("invalid request body", func(t *testing.T) {
+		req := httptest.NewRequest("PUT", "/api/settings/booking_advance_days", bytes.NewReader([]byte("invalid json")))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"key": "booking_advance_days"})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UpdateSetting(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400 for invalid JSON, got %d", rec.Code)
 		}
 	})
 }
