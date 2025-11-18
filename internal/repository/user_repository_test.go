@@ -432,6 +432,355 @@ func TestUserRepository_FindInactiveUsers(t *testing.T) {
 	})
 }
 
+// DONE: TestUserRepository_FindByVerificationToken tests finding users by verification token
+func TestUserRepository_FindByVerificationToken(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewUserRepository(db)
+
+	t.Run("user with valid token exists", func(t *testing.T) {
+		email := "verify@example.com"
+		verificationToken := "test-verification-token-123"
+		tokenExpires := time.Now().Add(24 * time.Hour)
+
+		// Create user with verification token
+		_, err := db.Exec(`
+			INSERT INTO users (email, name, password_hash, experience_level, is_verified, is_active,
+			                   verification_token, verification_token_expires, terms_accepted_at, last_activity_at, created_at)
+			VALUES (?, 'Verify Me', 'hash', 'green', 0, 1, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+		`, email, verificationToken, tokenExpires)
+		if err != nil {
+			t.Fatalf("Failed to seed user: %v", err)
+		}
+
+		// Find by verification token
+		user, err := repo.FindByVerificationToken(verificationToken)
+		if err != nil {
+			t.Fatalf("FindByVerificationToken() failed: %v", err)
+		}
+
+		if user == nil {
+			t.Fatal("Expected user, got nil")
+		}
+
+		if user.Email == nil || *user.Email != email {
+			t.Errorf("Expected email %s, got %v", email, user.Email)
+		}
+
+		if user.VerificationToken == nil || *user.VerificationToken != verificationToken {
+			t.Errorf("Expected token %s, got %v", verificationToken, user.VerificationToken)
+		}
+
+		if user.IsVerified {
+			t.Error("User should not be verified yet")
+		}
+	})
+
+	t.Run("token not found", func(t *testing.T) {
+		user, err := repo.FindByVerificationToken("nonexistent-token")
+		if err != nil {
+			t.Fatalf("FindByVerificationToken() failed: %v", err)
+		}
+
+		if user != nil {
+			t.Error("Expected nil user for non-existent token")
+		}
+	})
+
+	t.Run("empty token", func(t *testing.T) {
+		user, err := repo.FindByVerificationToken("")
+		if err != nil {
+			t.Fatalf("FindByVerificationToken() failed: %v", err)
+		}
+
+		if user != nil {
+			t.Error("Expected nil user for empty token")
+		}
+	})
+
+	t.Run("deleted user with token should not be found", func(t *testing.T) {
+		email := "deleted-verify@example.com"
+		verificationToken := "deleted-user-token"
+		tokenExpires := time.Now().Add(24 * time.Hour)
+
+		// Create deleted user with verification token
+		_, err := db.Exec(`
+			INSERT INTO users (email, name, password_hash, experience_level, is_verified, is_active, is_deleted,
+			                   verification_token, verification_token_expires, terms_accepted_at, last_activity_at, created_at)
+			VALUES (?, 'Deleted User', 'hash', 'green', 0, 0, 1, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+		`, email, verificationToken, tokenExpires)
+		if err != nil {
+			t.Fatalf("Failed to seed deleted user: %v", err)
+		}
+
+		// Try to find deleted user
+		user, err := repo.FindByVerificationToken(verificationToken)
+		if err != nil {
+			t.Fatalf("FindByVerificationToken() failed: %v", err)
+		}
+
+		if user != nil {
+			t.Error("Deleted user should not be found by verification token")
+		}
+	})
+}
+
+// DONE: TestUserRepository_FindByPasswordResetToken tests finding users by password reset token
+func TestUserRepository_FindByPasswordResetToken(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewUserRepository(db)
+
+	t.Run("user with valid reset token exists", func(t *testing.T) {
+		email := "reset@example.com"
+		resetToken := "test-reset-token-456"
+		tokenExpires := time.Now().Add(1 * time.Hour)
+
+		// Create user with password reset token
+		_, err := db.Exec(`
+			INSERT INTO users (email, name, password_hash, experience_level, is_verified, is_active,
+			                   password_reset_token, password_reset_expires, terms_accepted_at, last_activity_at, created_at)
+			VALUES (?, 'Reset Me', 'hash', 'blue', 1, 1, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+		`, email, resetToken, tokenExpires)
+		if err != nil {
+			t.Fatalf("Failed to seed user: %v", err)
+		}
+
+		// Find by password reset token
+		user, err := repo.FindByPasswordResetToken(resetToken)
+		if err != nil {
+			t.Fatalf("FindByPasswordResetToken() failed: %v", err)
+		}
+
+		if user == nil {
+			t.Fatal("Expected user, got nil")
+		}
+
+		if user.Email == nil || *user.Email != email {
+			t.Errorf("Expected email %s, got %v", email, user.Email)
+		}
+
+		if user.PasswordResetToken == nil || *user.PasswordResetToken != resetToken {
+			t.Errorf("Expected token %s, got %v", resetToken, user.PasswordResetToken)
+		}
+
+		if user.ExperienceLevel != "blue" {
+			t.Errorf("Expected level 'blue', got %s", user.ExperienceLevel)
+		}
+	})
+
+	t.Run("token not found", func(t *testing.T) {
+		user, err := repo.FindByPasswordResetToken("nonexistent-reset-token")
+		if err != nil {
+			t.Fatalf("FindByPasswordResetToken() failed: %v", err)
+		}
+
+		if user != nil {
+			t.Error("Expected nil user for non-existent token")
+		}
+	})
+
+	t.Run("empty token", func(t *testing.T) {
+		user, err := repo.FindByPasswordResetToken("")
+		if err != nil {
+			t.Fatalf("FindByPasswordResetToken() failed: %v", err)
+		}
+
+		if user != nil {
+			t.Error("Expected nil user for empty token")
+		}
+	})
+
+	t.Run("deleted user with reset token should not be found", func(t *testing.T) {
+		email := "deleted-reset@example.com"
+		resetToken := "deleted-reset-token"
+		tokenExpires := time.Now().Add(1 * time.Hour)
+
+		// Create deleted user with reset token
+		_, err := db.Exec(`
+			INSERT INTO users (email, name, password_hash, experience_level, is_verified, is_active, is_deleted,
+			                   password_reset_token, password_reset_expires, terms_accepted_at, last_activity_at, created_at)
+			VALUES (?, 'Deleted User', 'hash', 'green', 1, 0, 1, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+		`, email, resetToken, tokenExpires)
+		if err != nil {
+			t.Fatalf("Failed to seed deleted user: %v", err)
+		}
+
+		// Try to find deleted user
+		user, err := repo.FindByPasswordResetToken(resetToken)
+		if err != nil {
+			t.Fatalf("FindByPasswordResetToken() failed: %v", err)
+		}
+
+		if user != nil {
+			t.Error("Deleted user should not be found by password reset token")
+		}
+	})
+}
+
+// DONE: TestUserRepository_Update tests user update functionality
+func TestUserRepository_Update(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewUserRepository(db)
+
+	t.Run("successful update of user fields", func(t *testing.T) {
+		// Create initial user
+		userID := testutil.SeedTestUser(t, db, "update@example.com", "Original Name", "green")
+
+		// Get user
+		user, err := repo.FindByID(userID)
+		if err != nil {
+			t.Fatalf("Failed to find user: %v", err)
+		}
+
+		// Update fields
+		newName := "Updated Name"
+		newPhone := "+49 987 654321"
+		user.Name = newName
+		user.Phone = &newPhone
+		user.ExperienceLevel = "blue"
+
+		// Perform update
+		err = repo.Update(user)
+		if err != nil {
+			t.Fatalf("Update() failed: %v", err)
+		}
+
+		// Verify updates
+		updated, err := repo.FindByID(userID)
+		if err != nil {
+			t.Fatalf("Failed to find updated user: %v", err)
+		}
+
+		if updated.Name != newName {
+			t.Errorf("Expected name '%s', got '%s'", newName, updated.Name)
+		}
+
+		if updated.Phone == nil || *updated.Phone != newPhone {
+			t.Errorf("Expected phone '%s', got %v", newPhone, updated.Phone)
+		}
+
+		if updated.ExperienceLevel != "blue" {
+			t.Errorf("Expected level 'blue', got %s", updated.ExperienceLevel)
+		}
+	})
+
+	t.Run("update verification status", func(t *testing.T) {
+		userID := testutil.SeedTestUser(t, db, "verify-update@example.com", "Verify User", "green")
+
+		// Get user
+		user, err := repo.FindByID(userID)
+		if err != nil {
+			t.Fatalf("Failed to find user: %v", err)
+		}
+
+		// Update verification status
+		user.IsVerified = true
+		verificationToken := (*string)(nil) // Clear token
+		user.VerificationToken = verificationToken
+
+		err = repo.Update(user)
+		if err != nil {
+			t.Fatalf("Update() failed: %v", err)
+		}
+
+		// Verify updates
+		updated, err := repo.FindByID(userID)
+		if err != nil {
+			t.Fatalf("Failed to find updated user: %v", err)
+		}
+
+		if !updated.IsVerified {
+			t.Error("User should be verified after update")
+		}
+	})
+
+	t.Run("update with tokens", func(t *testing.T) {
+		userID := testutil.SeedTestUser(t, db, "token-update@example.com", "Token User", "green")
+
+		// Get user
+		user, err := repo.FindByID(userID)
+		if err != nil {
+			t.Fatalf("Failed to find user: %v", err)
+		}
+
+		// Set tokens
+		resetToken := "new-reset-token"
+		resetExpires := time.Now().Add(1 * time.Hour)
+		user.PasswordResetToken = &resetToken
+		user.PasswordResetExpires = &resetExpires
+
+		err = repo.Update(user)
+		if err != nil {
+			t.Fatalf("Update() failed: %v", err)
+		}
+
+		// Verify updates
+		updated, err := repo.FindByID(userID)
+		if err != nil {
+			t.Fatalf("Failed to find updated user: %v", err)
+		}
+
+		if updated.PasswordResetToken == nil || *updated.PasswordResetToken != resetToken {
+			t.Errorf("Expected reset token '%s', got %v", resetToken, updated.PasswordResetToken)
+		}
+	})
+
+	t.Run("update non-existent user", func(t *testing.T) {
+		email := "nonexistent@example.com"
+		user := &models.User{
+			ID:              99999,
+			Name:            "Nonexistent",
+			Email:           &email,
+			ExperienceLevel: "green",
+		}
+
+		err := repo.Update(user)
+		// Should not error even if no rows affected
+		if err != nil {
+			t.Logf("Update for non-existent user returned: %v", err)
+		}
+	})
+
+	t.Run("update email to new address", func(t *testing.T) {
+		userID := testutil.SeedTestUser(t, db, "oldemail@example.com", "Email Change", "green")
+
+		// Get user
+		user, err := repo.FindByID(userID)
+		if err != nil {
+			t.Fatalf("Failed to find user: %v", err)
+		}
+
+		// Change email and set verification to false
+		newEmail := "newemail@example.com"
+		user.Email = &newEmail
+		user.IsVerified = false
+		verifyToken := "new-verify-token"
+		user.VerificationToken = &verifyToken
+
+		err = repo.Update(user)
+		if err != nil {
+			t.Fatalf("Update() failed: %v", err)
+		}
+
+		// Verify updates
+		updated, err := repo.FindByID(userID)
+		if err != nil {
+			t.Fatalf("Failed to find updated user: %v", err)
+		}
+
+		if updated.Email == nil || *updated.Email != newEmail {
+			t.Errorf("Expected email '%s', got %v", newEmail, updated.Email)
+		}
+
+		if updated.IsVerified {
+			t.Error("User should not be verified after email change")
+		}
+
+		if updated.VerificationToken == nil || *updated.VerificationToken != verifyToken {
+			t.Errorf("Expected verification token '%s', got %v", verifyToken, updated.VerificationToken)
+		}
+	})
+}
+
 func stringPtr(s string) *string {
 	return &s
 }

@@ -123,28 +123,41 @@ func TestReactivationRequestRepository_FindByUserID(t *testing.T) {
 // DONE: TestReactivationRequestRepository_FindAllPending tests finding all pending requests
 func TestReactivationRequestRepository_FindAllPending(t *testing.T) {
 	t.Run("find only pending requests", func(t *testing.T) {
-		t.Skip("Test isolation issue with FindAllPending - skipping for now")
-
 		db := testutil.SetupTestDB(t)
 		repo := NewReactivationRequestRepository(db)
 
-		user1ID := testutil.SeedTestUser(t, db, "user1@example.com", "User 1", "green")
-		user2ID := testutil.SeedTestUser(t, db, "user2@example.com", "User 2", "green")
+		user1ID := testutil.SeedTestUser(t, db, "pending1@example.com", "User 1", "green")
+		user2ID := testutil.SeedTestUser(t, db, "pending2@example.com", "User 2", "green")
+		user3ID := testutil.SeedTestUser(t, db, "approved@example.com", "User 3", "green")
+		user4ID := testutil.SeedTestUser(t, db, "denied@example.com", "User 4", "green")
 
-		// Create pending and non-pending requests
+		// Create pending requests
 		pending1 := &models.ReactivationRequest{UserID: user1ID, Status: "pending"}
 		pending2 := &models.ReactivationRequest{UserID: user2ID, Status: "pending"}
-		approved := &models.ReactivationRequest{UserID: user1ID, Status: "approved"}
-		denied := &models.ReactivationRequest{UserID: user2ID, Status: "denied"}
-
 		repo.Create(pending1)
 		repo.Create(pending2)
-		repo.Create(approved)
-		repo.Create(denied)
 
+		// Create and approve a request
+		approved := &models.ReactivationRequest{UserID: user3ID, Status: "pending"}
+		repo.Create(approved)
+		adminMsg := "Approved"
+		repo.Approve(approved.ID, 1, &adminMsg)
+
+		// Create and deny a request
+		denied := &models.ReactivationRequest{UserID: user4ID, Status: "pending"}
+		repo.Create(denied)
+		denyMsg := "Denied"
+		repo.Deny(denied.ID, 1, &denyMsg)
+
+		// Find all pending
 		requests, err := repo.FindAllPending()
 		if err != nil {
 			t.Fatalf("FindAllPending() failed: %v", err)
+		}
+
+		// Should only find 2 pending requests
+		if len(requests) != 2 {
+			t.Errorf("Expected 2 pending requests, got %d", len(requests))
 		}
 
 		// All returned should be pending
@@ -155,6 +168,20 @@ func TestReactivationRequestRepository_FindAllPending(t *testing.T) {
 		}
 
 		t.Logf("Found %d pending requests", len(requests))
+	})
+
+	t.Run("empty result when no pending requests", func(t *testing.T) {
+		db := testutil.SetupTestDB(t)
+		repo := NewReactivationRequestRepository(db)
+
+		requests, err := repo.FindAllPending()
+		if err != nil {
+			t.Fatalf("FindAllPending() failed: %v", err)
+		}
+
+		if len(requests) != 0 {
+			t.Errorf("Expected 0 pending requests, got %d", len(requests))
+		}
 	})
 }
 
@@ -296,3 +323,4 @@ func TestReactivationRequestRepository_HasPendingRequest(t *testing.T) {
 		}
 	})
 }
+

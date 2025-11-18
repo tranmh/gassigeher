@@ -338,3 +338,129 @@ func TestDogRepository_GetBreeds(t *testing.T) {
 		}
 	})
 }
+
+// DONE: TestCanUserAccessDog tests experience level access control
+func TestCanUserAccessDog(t *testing.T) {
+	tests := []struct {
+		name         string
+		userLevel    string
+		dogCategory  string
+		expectedAccess bool
+	}{
+		// Green user tests
+		{
+			name:         "green user can access green dog",
+			userLevel:    "green",
+			dogCategory:  "green",
+			expectedAccess: true,
+		},
+		{
+			name:         "green user cannot access blue dog",
+			userLevel:    "green",
+			dogCategory:  "blue",
+			expectedAccess: false,
+		},
+		{
+			name:         "green user cannot access orange dog",
+			userLevel:    "green",
+			dogCategory:  "orange",
+			expectedAccess: false,
+		},
+
+		// Blue user tests
+		{
+			name:         "blue user can access green dog",
+			userLevel:    "blue",
+			dogCategory:  "green",
+			expectedAccess: true,
+		},
+		{
+			name:         "blue user can access blue dog",
+			userLevel:    "blue",
+			dogCategory:  "blue",
+			expectedAccess: true,
+		},
+		{
+			name:         "blue user cannot access orange dog",
+			userLevel:    "blue",
+			dogCategory:  "orange",
+			expectedAccess: false,
+		},
+
+		// Orange user tests
+		{
+			name:         "orange user can access green dog",
+			userLevel:    "orange",
+			dogCategory:  "green",
+			expectedAccess: true,
+		},
+		{
+			name:         "orange user can access blue dog",
+			userLevel:    "orange",
+			dogCategory:  "blue",
+			expectedAccess: true,
+		},
+		{
+			name:         "orange user can access orange dog",
+			userLevel:    "orange",
+			dogCategory:  "orange",
+			expectedAccess: true,
+		},
+
+		// Case insensitivity tests
+		{
+			name:         "case insensitive - GREEN user, green dog",
+			userLevel:    "GREEN",
+			dogCategory:  "green",
+			expectedAccess: true,
+		},
+		{
+			name:         "case insensitive - Blue user, BLUE dog",
+			userLevel:    "Blue",
+			dogCategory:  "BLUE",
+			expectedAccess: true,
+		},
+
+		// Invalid level tests
+		{
+			name:         "invalid user level",
+			userLevel:    "red",
+			dogCategory:  "green",
+			expectedAccess: false,
+		},
+		{
+			name:         "invalid dog category",
+			userLevel:    "green",
+			dogCategory:  "purple",
+			expectedAccess: false,
+		},
+		{
+			name:         "empty user level",
+			userLevel:    "",
+			dogCategory:  "green",
+			expectedAccess: false,
+		},
+		{
+			name:         "empty dog category",
+			userLevel:    "green",
+			dogCategory:  "",
+			expectedAccess: false,
+		},
+		{
+			name:         "both invalid",
+			userLevel:    "invalid",
+			dogCategory:  "invalid",
+			expectedAccess: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := CanUserAccessDog(tt.userLevel, tt.dogCategory)
+			if result != tt.expectedAccess {
+				t.Errorf("CanUserAccessDog(%q, %q) = %v, expected %v",
+					tt.userLevel, tt.dogCategory, result, tt.expectedAccess)
+			}
+		})
+	}
+}

@@ -7,6 +7,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/tranm/gassigeher/internal/models"
+	"github.com/tranm/gassigeher/internal/testutil"
 )
 
 // setupTestDB creates a test database
@@ -470,9 +471,264 @@ func TestBookingRepository_Update(t *testing.T) {
 	})
 }
 
+// DONE: TestBookingRepository_GetForReminders tests getting bookings for reminder emails
+func TestBookingRepository_GetForReminders(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewBookingRepository(db)
+	now := time.Now()
+
+	t.Run("returns bookings in reminder window", func(t *testing.T) {
+		// Create booking scheduled 1.5 hours from now
+		reminderTime := now.Add(90 * time.Minute)
+		reminderDate := reminderTime.Format("2006-01-02")
+		reminderScheduledTime := reminderTime.Format("15:04")
+
+		booking := &models.Booking{
+			UserID:        1,
+			DogID:         1,
+			Date:          reminderDate,
+			WalkType:      "morning",
+			ScheduledTime: reminderScheduledTime,
+			Status:        "scheduled",
+		}
+		repo.Create(booking)
+
+		// Get reminders
+		reminders, err := repo.GetForReminders()
+		if err != nil {
+			t.Fatalf("GetForReminders() failed: %v", err)
+		}
+
+		// Should find the booking (if time is within 1-2 hour window)
+		found := false
+		for _, r := range reminders {
+			if r.ID == booking.ID {
+				found = true
+				break
+			}
+		}
+
+		if !found && reminderTime.Sub(now) >= 1*time.Hour && reminderTime.Sub(now) < 2*time.Hour {
+			t.Error("Expected to find booking in reminder window")
+		}
+
+		t.Logf("GetForReminders() found %d bookings", len(reminders))
+	})
+
+	t.Run("does not return bookings too far in future", func(t *testing.T) {
+		// Create booking 5 hours from now
+		futureTime := now.Add(5 * time.Hour)
+		futureDate := futureTime.Format("2006-01-02")
+		futureScheduledTime := futureTime.Format("15:04")
+
+		booking := &models.Booking{
+			UserID:        2,
+			DogID:         2,
+			Date:          futureDate,
+			WalkType:      "evening",
+			ScheduledTime: futureScheduledTime,
+			Status:        "scheduled",
+		}
+		repo.Create(booking)
+
+		// Get reminders
+		reminders, err := repo.GetForReminders()
+		if err != nil {
+			t.Fatalf("GetForReminders() failed: %v", err)
+		}
+
+		// Should not find the booking
+		for _, r := range reminders {
+			if r.ID == booking.ID {
+				t.Error("Should not find booking too far in future")
+			}
+		}
+	})
+
+	t.Run("does not return completed bookings", func(t *testing.T) {
+		// Create completed booking in reminder window
+		reminderTime := now.Add(90 * time.Minute)
+		reminderDate := reminderTime.Format("2006-01-02")
+		reminderScheduledTime := reminderTime.Format("15:04")
+
+		completedTime := time.Now()
+		booking := &models.Booking{
+			UserID:        3,
+			DogID:         3,
+			Date:          reminderDate,
+			WalkType:      "morning",
+			ScheduledTime: reminderScheduledTime,
+			Status:        "completed",
+			CompletedAt:   &completedTime,
+		}
+		repo.Create(booking)
+
+		// Manually update status since Create sets it to scheduled
+		db.Exec("UPDATE bookings SET status = 'completed', completed_at = ? WHERE id = ?", completedTime, booking.ID)
+
+		// Get reminders
+		reminders, err := repo.GetForReminders()
+		if err != nil {
+			t.Fatalf("GetForReminders() failed: %v", err)
+		}
+
+		// Should not find completed booking
+		for _, r := range reminders {
+			if r.ID == booking.ID {
+				t.Error("Should not find completed booking")
+			}
+		}
+	})
+
+	t.Run("does not return cancelled bookings", func(t *testing.T) {
+		// Create cancelled booking in reminder window
+		reminderTime := now.Add(90 * time.Minute)
+		reminderDate := reminderTime.Format("2006-01-02")
+		reminderScheduledTime := reminderTime.Format("15:04")
+
+		booking := &models.Booking{
+			UserID:        4,
+			DogID:         4,
+			Date:          reminderDate,
+			WalkType:      "evening",
+			ScheduledTime: reminderScheduledTime,
+			Status:        "cancelled",
+		}
+		repo.Create(booking)
+
+		// Manually update status
+		db.Exec("UPDATE bookings SET status = 'cancelled' WHERE id = ?", booking.ID)
+
+		// Get reminders
+		reminders, err := repo.GetForReminders()
+		if err != nil {
+			t.Fatalf("GetForReminders() failed: %v", err)
+		}
+
+		// Should not find cancelled booking
+		for _, r := range reminders {
+			if r.ID == booking.ID {
+				t.Error("Should not find cancelled booking")
+			}
+		}
+	})
+}
+
 // DONE: TestBookingRepository_FindByIDWithDetails tests finding booking with joined data
 func TestBookingRepository_FindByIDWithDetails(t *testing.T) {
-	t.Skip("Requires full schema with all columns - use integration test instead")
-	// This test needs complete database schema with all dog/user columns
-	// Skipping for unit test, will be covered in integration tests
+	// Use testutil for full schema
+	db := testutil.SetupTestDB(t)
+	repo := NewBookingRepository(db)
+
+	t.Run("returns booking with user and dog details", func(t *testing.T) {
+		// Seed data using testutil
+		userID := testutil.SeedTestUser(t, db, "bookinguser@example.com", "Booking User", "green")
+		dogID := testutil.SeedTestDog(t, db, "Test Dog", "Labrador", "green")
+
+		// Create booking
+		bookingDate := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
+		bookingID := testutil.SeedTestBooking(t, db, userID, dogID, bookingDate, "morning", "09:00", "scheduled")
+
+		// Find with details
+		booking, err := repo.FindByIDWithDetails(bookingID)
+		if err != nil {
+			t.Fatalf("FindByIDWithDetails() failed: %v", err)
+		}
+
+		if booking == nil {
+			t.Fatal("Expected booking, got nil")
+		}
+
+		// Verify booking data
+		if booking.ID != bookingID {
+			t.Errorf("Expected ID %d, got %d", bookingID, booking.ID)
+		}
+
+		// Verify user details are populated
+		if booking.User == nil {
+			t.Fatal("Expected user details, got nil")
+		}
+
+		if booking.User.Name != "Booking User" {
+			t.Errorf("Expected user name 'Booking User', got %s", booking.User.Name)
+		}
+
+		if booking.User.Email == nil || *booking.User.Email != "bookinguser@example.com" {
+			t.Errorf("Expected user email 'bookinguser@example.com', got %v", booking.User.Email)
+		}
+
+		// Verify dog details are populated
+		if booking.Dog == nil {
+			t.Fatal("Expected dog details, got nil")
+		}
+
+		if booking.Dog.Name != "Test Dog" {
+			t.Errorf("Expected dog name 'Test Dog', got %s", booking.Dog.Name)
+		}
+
+		if booking.Dog.Breed != "Labrador" {
+			t.Errorf("Expected breed 'Labrador', got %s", booking.Dog.Breed)
+		}
+
+		if booking.Dog.Size != "medium" {
+			t.Errorf("Expected size 'medium', got %s", booking.Dog.Size)
+		}
+
+		// Age is set by seed helper to 5
+		if booking.Dog.Age == 0 {
+			t.Error("Dog age should be set")
+		}
+	})
+
+	t.Run("handles deleted user gracefully", func(t *testing.T) {
+		// Create user and delete them
+		userID := testutil.SeedTestUser(t, db, "deleteduser@example.com", "Deleted User Name", "green")
+		dogID := testutil.SeedTestDog(t, db, "Test Dog 2", "Poodle", "green")
+
+		// Create booking before deletion
+		bookingDate := time.Now().AddDate(0, 0, 2).Format("2006-01-02")
+		bookingID := testutil.SeedTestBooking(t, db, userID, dogID, bookingDate, "evening", "16:00", "scheduled")
+
+		// Delete user (GDPR anonymization)
+		userRepo := NewUserRepository(db)
+		userRepo.DeleteAccount(userID)
+
+		// Find booking with details
+		booking, err := repo.FindByIDWithDetails(bookingID)
+		if err != nil {
+			t.Fatalf("FindByIDWithDetails() failed: %v", err)
+		}
+
+		if booking == nil {
+			t.Fatal("Expected booking, got nil")
+		}
+
+		// User name should be "Deleted User"
+		if booking.User.Name != "Deleted User" {
+			t.Errorf("Expected user name 'Deleted User', got %s", booking.User.Name)
+		}
+
+		// Email should be nil after deletion
+		if booking.User.Email != nil {
+			t.Errorf("Expected nil email for deleted user, got %v", booking.User.Email)
+		}
+
+		// Dog details should still be present
+		if booking.Dog.Name != "Test Dog 2" {
+			t.Errorf("Expected dog name 'Test Dog 2', got %s", booking.Dog.Name)
+		}
+	})
+
+	t.Run("returns nil for non-existent booking", func(t *testing.T) {
+		booking, err := repo.FindByIDWithDetails(99999)
+		if err != nil {
+			t.Fatalf("FindByIDWithDetails() failed: %v", err)
+		}
+
+		if booking != nil {
+			t.Error("Expected nil for non-existent booking")
+		}
+	})
 }
