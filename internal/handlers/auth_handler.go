@@ -220,13 +220,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if user == nil || user.PasswordHash == nil {
-		respondError(w, http.StatusUnauthorized, "Invalid credentials")
+		respondError(w, http.StatusUnauthorized, "Ungültige Anmeldedaten")
 		return
 	}
 
 	// Check password
 	if !h.authService.CheckPassword(req.Password, *user.PasswordHash) {
-		respondError(w, http.StatusUnauthorized, "Invalid credentials")
+		respondError(w, http.StatusUnauthorized, "Ungültige Anmeldedaten")
 		return
 	}
 
@@ -239,14 +239,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		if user.Email != nil && user.VerificationToken != nil {
 			go h.emailService.SendVerificationEmail(*user.Email, user.Name, *user.VerificationToken)
 		}
-		respondError(w, http.StatusUnauthorized, "Invalid credentials")
+		respondError(w, http.StatusUnauthorized, "Ungültige Anmeldedaten")
 		return
 	}
 
 	// Check if active
 	if !user.IsActive {
 		// Could send reactivation instructions via email (don't reveal in response)
-		respondError(w, http.StatusUnauthorized, "Invalid credentials")
+		respondError(w, http.StatusUnauthorized, "Ungültige Anmeldedaten")
 		return
 	}
 
