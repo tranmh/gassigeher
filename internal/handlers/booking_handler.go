@@ -115,9 +115,18 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if date is in the past
-	bookingDate, _ := time.Parse("2006-01-02", req.Date)
-	today := time.Now().Truncate(24 * time.Hour)
+	// BUGFIX #4: Check if date is in the past with consistent timezone handling
+	// Parse date in UTC to match how dates are stored
+	bookingDate, parseErr := time.Parse("2006-01-02", req.Date)
+	if parseErr != nil {
+		respondError(w, http.StatusBadRequest, "Invalid date format")
+		return
+	}
+
+	// Compare dates in UTC, not local timezone
+	now := time.Now().UTC()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+
 	if bookingDate.Before(today) {
 		respondError(w, http.StatusBadRequest, "Cannot book dates in the past")
 		return

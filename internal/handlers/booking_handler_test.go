@@ -331,6 +331,45 @@ func TestBookingHandler_CreateBooking(t *testing.T) {
 		// For now, documenting that invalid settings fall back to default
 		t.Logf("✅ System handles invalid setting by using default value (14 days)")
 	})
+
+	// DONE: BUG #4 - Test timezone consistency in past date validation
+	t.Run("BUGFIX: consistent timezone handling for past date check", func(t *testing.T) {
+		userID := testutil.SeedTestUser(t, db, "tz@example.com", "TZ User", "green")
+		dogID := testutil.SeedTestDog(t, db, "TZDog", "Husky", "green")
+
+		// Test with today's date (should be allowed)
+		today := time.Now().Format("2006-01-02")
+
+		reqBody := map[string]interface{}{
+			"dog_id":         dogID,
+			"date":           today,
+			"walk_type":      "evening",
+			"scheduled_time": "16:00",
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/bookings", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), userID, "tz@example.com", false)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateBooking(rec, req)
+
+		// Today's date should be allowed (not considered "past")
+		// BUGFIX: Ensure timezone-aware comparison doesn't reject valid bookings
+		if rec.Code == http.StatusBadRequest {
+			var response map[string]interface{}
+			json.Unmarshal(rec.Body.Bytes(), &response)
+			if response["error"] == "Cannot book dates in the past" {
+				t.Errorf("BUGFIX: Today's date rejected as 'past' due to timezone issue! Status=%d, Error=%q",
+					rec.Code, response["error"])
+			}
+		}
+
+		// Should succeed or fail for other reasons (not timezone)
+		t.Logf("BUGFIX: Today's date booking returns status=%d (should not be rejected as past)", rec.Code)
+	})
 }
 
 // DONE: TestBookingHandler_ListBookings tests listing user's bookings
