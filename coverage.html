@@ -65,15 +65,15 @@
 				
 				<option value="file4">github.com/tranm/gassigeher/internal/handlers/auth_handler.go (51.4%)</option>
 				
-				<option value="file5">github.com/tranm/gassigeher/internal/handlers/blocked_date_handler.go (0.0%)</option>
+				<option value="file5">github.com/tranm/gassigeher/internal/handlers/blocked_date_handler.go (74.2%)</option>
 				
 				<option value="file6">github.com/tranm/gassigeher/internal/handlers/booking_handler.go (31.0%)</option>
 				
-				<option value="file7">github.com/tranm/gassigeher/internal/handlers/dashboard_handler.go (0.0%)</option>
+				<option value="file7">github.com/tranm/gassigeher/internal/handlers/dashboard_handler.go (89.3%)</option>
 				
-				<option value="file8">github.com/tranm/gassigeher/internal/handlers/dog_handler.go (0.0%)</option>
+				<option value="file8">github.com/tranm/gassigeher/internal/handlers/dog_handler.go (47.7%)</option>
 				
-				<option value="file9">github.com/tranm/gassigeher/internal/handlers/experience_request_handler.go (0.0%)</option>
+				<option value="file9">github.com/tranm/gassigeher/internal/handlers/experience_request_handler.go (62.0%)</option>
 				
 				<option value="file10">github.com/tranm/gassigeher/internal/handlers/reactivation_request_handler.go (0.0%)</option>
 				
@@ -802,7 +802,7 @@ type AuthHandler struct {
 }
 
 // NewAuthHandler creates a new auth handler
-func NewAuthHandler(db *sql.DB, cfg *config.Config) *AuthHandler <span class="cov4" title="4">{
+func NewAuthHandler(db *sql.DB, cfg *config.Config) *AuthHandler <span class="cov3" title="4">{
         emailService, err := services.NewEmailService(
                 cfg.GmailClientID,
                 cfg.GmailClientSecret,
@@ -814,7 +814,7 @@ func NewAuthHandler(db *sql.DB, cfg *config.Config) *AuthHandler <span class="co
                 fmt.Printf("Warning: Failed to initialize email service: %v\n", err)
         }</span>
 
-        <span class="cov4" title="4">return &amp;AuthHandler{
+        <span class="cov3" title="4">return &amp;AuthHandler{
                 userRepo:     repository.NewUserRepository(db),
                 authService:  services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours),
                 emailService: emailService,
@@ -823,7 +823,7 @@ func NewAuthHandler(db *sql.DB, cfg *config.Config) *AuthHandler <span class="co
 }
 
 // Register handles user registration
-func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) <span class="cov6" title="8">{
+func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) <span class="cov5" title="8">{
         var req models.RegisterRequest
         if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Invalid request body")
@@ -831,15 +831,15 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) <span cla
         }</span>
 
         // Validate input
-        <span class="cov6" title="8">if strings.TrimSpace(req.Name) == "" </span><span class="cov1" title="1">{
+        <span class="cov5" title="8">if strings.TrimSpace(req.Name) == "" </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "Name is required")
                 return
         }</span>
-        <span class="cov5" title="7">if strings.TrimSpace(req.Email) == "" </span><span class="cov1" title="1">{
+        <span class="cov4" title="7">if strings.TrimSpace(req.Email) == "" </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "Email is required")
                 return
         }</span>
-        <span class="cov5" title="6">if strings.TrimSpace(req.Phone) == "" </span><span class="cov1" title="1">{
+        <span class="cov4" title="6">if strings.TrimSpace(req.Phone) == "" </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "Phone is required")
                 return
         }</span>
@@ -847,7 +847,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) <span cla
                 respondError(w, http.StatusBadRequest, "Passwords do not match")
                 return
         }</span>
-        <span class="cov4" title="4">if !req.AcceptTerms </span><span class="cov1" title="1">{
+        <span class="cov3" title="4">if !req.AcceptTerms </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "You must accept the terms and conditions")
                 return
         }</span>
@@ -979,7 +979,7 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) <span 
 }
 
 // Login handles user login
-func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) <span class="cov5" title="6">{
+func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) <span class="cov4" title="6">{
         var req models.LoginRequest
         if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "Invalid request body")
@@ -1003,7 +1003,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) <span class=
         }</span>
 
         // Check password
-        <span class="cov4" title="4">if !h.authService.CheckPassword(req.Password, *user.PasswordHash) </span><span class="cov1" title="1">{
+        <span class="cov3" title="4">if !h.authService.CheckPassword(req.Password, *user.PasswordHash) </span><span class="cov1" title="1">{
                 respondError(w, http.StatusUnauthorized, "Invalid credentials")
                 return
         }</span>
@@ -1162,20 +1162,20 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) <spa
 }
 
 // ChangePassword handles password change for logged-in users
-func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) <span class="cov4" title="4">{
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) <span class="cov3" title="4">{
         userID, ok := r.Context().Value(middleware.UserIDKey).(int)
         if !ok </span><span class="cov0" title="0">{
                 respondError(w, http.StatusUnauthorized, "Unauthorized")
                 return
         }</span>
 
-        <span class="cov4" title="4">var req models.ChangePasswordRequest
+        <span class="cov3" title="4">var req models.ChangePasswordRequest
         if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Invalid request body")
                 return
         }</span>
 
-        <span class="cov4" title="4">if req.NewPassword != req.ConfirmPassword </span><span class="cov1" title="1">{
+        <span class="cov3" title="4">if req.NewPassword != req.ConfirmPassword </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "Passwords do not match")
                 return
         }</span>
@@ -1223,13 +1223,13 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) <sp
 
 // Helper functions
 
-func respondJSON(w http.ResponseWriter, status int, data interface{}) <span class="cov10" title="42">{
+func respondJSON(w http.ResponseWriter, status int, data interface{}) <span class="cov10" title="81">{
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(status)
         json.NewEncoder(w).Encode(data)
 }</span>
 
-func respondError(w http.ResponseWriter, status int, message string) <span class="cov9" title="29">{
+func respondError(w http.ResponseWriter, status int, message string) <span class="cov8" title="42">{
         respondJSON(w, status, map[string]string{"error": message})
 }</span>
 </pre>
@@ -1256,7 +1256,7 @@ type BlockedDateHandler struct {
 }
 
 // NewBlockedDateHandler creates a new blocked date handler
-func NewBlockedDateHandler(db *sql.DB, cfg *config.Config) *BlockedDateHandler <span class="cov0" title="0">{
+func NewBlockedDateHandler(db *sql.DB, cfg *config.Config) *BlockedDateHandler <span class="cov8" title="4">{
         return &amp;BlockedDateHandler{
                 db:              db,
                 cfg:             cfg,
@@ -1265,18 +1265,18 @@ func NewBlockedDateHandler(db *sql.DB, cfg *config.Config) *BlockedDateHandler <
 }</span>
 
 // ListBlockedDates lists all blocked dates
-func (h *BlockedDateHandler) ListBlockedDates(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *BlockedDateHandler) ListBlockedDates(w http.ResponseWriter, r *http.Request) <span class="cov4" title="2">{
         blockedDates, err := h.blockedDateRepo.FindAll()
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to get blocked dates")
                 return
         }</span>
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusOK, blockedDates)</span>
+        <span class="cov4" title="2">respondJSON(w, http.StatusOK, blockedDates)</span>
 }
 
 // CreateBlockedDate creates a new blocked date (admin only)
-func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Request) <span class="cov10" title="5">{
         // Get admin user ID from context
         userID, _ := r.Context().Value("user_id").(int)
 
@@ -1288,20 +1288,20 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
         }</span>
 
         // Validate request
-        <span class="cov0" title="0">if err := req.Validate(); err != nil </span><span class="cov0" title="0">{
+        <span class="cov10" title="5">if err := req.Validate(); err != nil </span><span class="cov4" title="2">{
                 respondError(w, http.StatusBadRequest, err.Error())
                 return
         }</span>
 
         // Create blocked date
-        <span class="cov0" title="0">blockedDate := &amp;models.BlockedDate{
+        <span class="cov7" title="3">blockedDate := &amp;models.BlockedDate{
                 Date:      req.Date,
                 Reason:    req.Reason,
                 CreatedBy: userID,
         }
 
-        if err := h.blockedDateRepo.Create(blockedDate); err != nil </span><span class="cov0" title="0">{
-                if err.Error() == "date is already blocked" </span><span class="cov0" title="0">{
+        if err := h.blockedDateRepo.Create(blockedDate); err != nil </span><span class="cov1" title="1">{
+                if err.Error() == "date is already blocked" </span><span class="cov1" title="1">{
                         respondError(w, http.StatusConflict, err.Error())
                         return
                 }</span>
@@ -1309,26 +1309,26 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
                 return</span>
         }
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusCreated, blockedDate)</span>
+        <span class="cov4" title="2">respondJSON(w, http.StatusCreated, blockedDate)</span>
 }
 
 // DeleteBlockedDate deletes a blocked date (admin only)
-func (h *BlockedDateHandler) DeleteBlockedDate(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *BlockedDateHandler) DeleteBlockedDate(w http.ResponseWriter, r *http.Request) <span class="cov7" title="3">{
         // Get ID from URL
         vars := mux.Vars(r)
         id, err := strconv.Atoi(vars["id"])
-        if err != nil </span><span class="cov0" title="0">{
+        if err != nil </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "Invalid blocked date ID")
                 return
         }</span>
 
         // Delete blocked date
-        <span class="cov0" title="0">if err := h.blockedDateRepo.Delete(id); err != nil </span><span class="cov0" title="0">{
+        <span class="cov4" title="2">if err := h.blockedDateRepo.Delete(id); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to delete blocked date")
                 return
         }</span>
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusOK, map[string]string{"message": "Blocked date deleted successfully"})</span>
+        <span class="cov4" title="2">respondJSON(w, http.StatusOK, map[string]string{"message": "Blocked date deleted successfully"})</span>
 }
 </pre>
 		
@@ -1960,7 +1960,7 @@ type DashboardHandler struct {
 }
 
 // NewDashboardHandler creates a new dashboard handler
-func NewDashboardHandler(db *sql.DB, cfg *config.Config) *DashboardHandler <span class="cov0" title="0">{
+func NewDashboardHandler(db *sql.DB, cfg *config.Config) *DashboardHandler <span class="cov5" title="2">{
         return &amp;DashboardHandler{
                 db:               db,
                 cfg:              cfg,
@@ -1973,28 +1973,28 @@ func NewDashboardHandler(db *sql.DB, cfg *config.Config) *DashboardHandler <span
 }</span>
 
 // GetStats returns dashboard statistics (admin only)
-func (h *DashboardHandler) GetStats(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *DashboardHandler) GetStats(w http.ResponseWriter, r *http.Request) <span class="cov1" title="1">{
         stats := &amp;models.DashboardStats{}
 
         // Get total completed walks
         completedBookings, err := h.bookingRepo.FindAll(&amp;models.BookingFilterRequest{
                 Status: strPtr("completed"),
         })
-        if err == nil </span><span class="cov0" title="0">{
+        if err == nil </span><span class="cov1" title="1">{
                 stats.TotalWalksCompleted = len(completedBookings)
         }</span>
 
         // Get upcoming walks
-        <span class="cov0" title="0">today := time.Now().Format("2006-01-02")
+        <span class="cov1" title="1">today := time.Now().Format("2006-01-02")
         upcomingBookings, err := h.bookingRepo.FindAll(&amp;models.BookingFilterRequest{
                 Status:   strPtr("scheduled"),
                 DateFrom: &amp;today,
         })
-        if err == nil </span><span class="cov0" title="0">{
+        if err == nil </span><span class="cov1" title="1">{
                 stats.UpcomingWalksTotal = len(upcomingBookings)
 
                 // Count today's walks
-                for _, booking := range upcomingBookings </span><span class="cov0" title="0">{
+                for _, booking := range upcomingBookings </span><span class="cov5" title="2">{
                         if booking.Date == today </span><span class="cov0" title="0">{
                                 stats.UpcomingWalksToday++
                         }</span>
@@ -2002,48 +2002,48 @@ func (h *DashboardHandler) GetStats(w http.ResponseWriter, r *http.Request) <spa
         }
 
         // Get active/inactive users
-        <span class="cov0" title="0">activeUsers, err := h.userRepo.FindAll(boolPtr(true))
-        if err == nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">activeUsers, err := h.userRepo.FindAll(boolPtr(true))
+        if err == nil </span><span class="cov1" title="1">{
                 stats.ActiveUsers = len(activeUsers)
         }</span>
 
-        <span class="cov0" title="0">inactiveUsers, err := h.userRepo.FindAll(boolPtr(false))
-        if err == nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">inactiveUsers, err := h.userRepo.FindAll(boolPtr(false))
+        if err == nil </span><span class="cov1" title="1">{
                 stats.InactiveUsers = len(inactiveUsers)
         }</span>
 
         // Get available/unavailable dogs
-        <span class="cov0" title="0">availableDogs, err := h.dogRepo.FindAll(&amp;models.DogFilterRequest{
+        <span class="cov1" title="1">availableDogs, err := h.dogRepo.FindAll(&amp;models.DogFilterRequest{
                 Available: boolPtr(true),
         })
-        if err == nil </span><span class="cov0" title="0">{
+        if err == nil </span><span class="cov1" title="1">{
                 stats.AvailableDogs = len(availableDogs)
         }</span>
 
-        <span class="cov0" title="0">unavailableDogs, err := h.dogRepo.FindAll(&amp;models.DogFilterRequest{
+        <span class="cov1" title="1">unavailableDogs, err := h.dogRepo.FindAll(&amp;models.DogFilterRequest{
                 Available: boolPtr(false),
         })
-        if err == nil </span><span class="cov0" title="0">{
+        if err == nil </span><span class="cov1" title="1">{
                 stats.UnavailableDogs = len(unavailableDogs)
         }</span>
 
         // Get pending experience requests
-        <span class="cov0" title="0">pendingExperienceReqs, err := h.experienceRepo.FindAllPending()
-        if err == nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">pendingExperienceReqs, err := h.experienceRepo.FindAllPending()
+        if err == nil </span><span class="cov1" title="1">{
                 stats.PendingExperienceReqs = len(pendingExperienceReqs)
         }</span>
 
         // Get pending reactivation requests
-        <span class="cov0" title="0">pendingReactivationReqs, err := h.reactivationRepo.FindAllPending()
-        if err == nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">pendingReactivationReqs, err := h.reactivationRepo.FindAllPending()
+        if err == nil </span><span class="cov1" title="1">{
                 stats.PendingReactivationReqs = len(pendingReactivationReqs)
         }</span>
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusOK, stats)</span>
+        <span class="cov1" title="1">respondJSON(w, http.StatusOK, stats)</span>
 }
 
 // GetRecentActivity returns recent activity feed (admin only)
-func (h *DashboardHandler) GetRecentActivity(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *DashboardHandler) GetRecentActivity(w http.ResponseWriter, r *http.Request) <span class="cov1" title="1">{
         activities := []*models.ActivityItem{}
 
         // Get recent bookings (last 24 hours)
@@ -2052,18 +2052,18 @@ func (h *DashboardHandler) GetRecentActivity(w http.ResponseWriter, r *http.Requ
                 DateFrom: &amp;yesterday,
         })
 
-        if err == nil </span><span class="cov0" title="0">{
-                for _, booking := range recentBookings </span><span class="cov0" title="0">{
+        if err == nil </span><span class="cov1" title="1">{
+                for _, booking := range recentBookings </span><span class="cov1" title="1">{
                         // Get dog name
                         dog, err := h.dogRepo.FindByID(booking.DogID)
                         dogName := "Unknown"
-                        if err == nil &amp;&amp; dog != nil </span><span class="cov0" title="0">{
+                        if err == nil &amp;&amp; dog != nil </span><span class="cov1" title="1">{
                                 dogName = dog.Name
                         }</span>
 
-                        <span class="cov0" title="0">var activityType, message string
+                        <span class="cov1" title="1">var activityType, message string
                         switch booking.Status </span>{
-                        case "scheduled":<span class="cov0" title="0">
+                        case "scheduled":<span class="cov1" title="1">
                                 activityType = "booking_created"
                                 message = "Neue Buchung für " + dogName</span>
                         case "completed":<span class="cov0" title="0">
@@ -2074,7 +2074,7 @@ func (h *DashboardHandler) GetRecentActivity(w http.ResponseWriter, r *http.Requ
                                 message = "Buchung für " + dogName + " storniert"</span>
                         }
 
-                        <span class="cov0" title="0">activity := &amp;models.ActivityItem{
+                        <span class="cov1" title="1">activity := &amp;models.ActivityItem{
                                 Type:      activityType,
                                 Message:   message,
                                 Timestamp: booking.CreatedAt.Format(time.RFC3339),
@@ -2088,11 +2088,11 @@ func (h *DashboardHandler) GetRecentActivity(w http.ResponseWriter, r *http.Requ
         }
 
         // Limit to 20 most recent activities
-        <span class="cov0" title="0">if len(activities) &gt; 20 </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if len(activities) &gt; 20 </span><span class="cov0" title="0">{
                 activities = activities[:20]
         }</span>
 
-        <span class="cov0" title="0">response := &amp;models.RecentActivityResponse{
+        <span class="cov1" title="1">response := &amp;models.RecentActivityResponse{
                 Activities: activities,
         }
 
@@ -2100,11 +2100,11 @@ func (h *DashboardHandler) GetRecentActivity(w http.ResponseWriter, r *http.Requ
 }
 
 // Helper functions
-func strPtr(s string) *string <span class="cov0" title="0">{
+func strPtr(s string) *string <span class="cov5" title="2">{
         return &amp;s
 }</span>
 
-func boolPtr(b bool) *bool <span class="cov0" title="0">{
+func boolPtr(b bool) *bool <span class="cov10" title="4">{
         return &amp;b
 }</span>
 </pre>
@@ -2137,7 +2137,7 @@ type DogHandler struct {
 }
 
 // NewDogHandler creates a new dog handler
-func NewDogHandler(db *sql.DB, cfg *config.Config) *DogHandler <span class="cov0" title="0">{
+func NewDogHandler(db *sql.DB, cfg *config.Config) *DogHandler <span class="cov10" title="7">{
         return &amp;DogHandler{
                 dogRepo:  repository.NewDogRepository(db),
                 userRepo: repository.NewUserRepository(db),
@@ -2146,7 +2146,7 @@ func NewDogHandler(db *sql.DB, cfg *config.Config) *DogHandler <span class="cov0
 }</span>
 
 // ListDogs handles GET /api/dogs - list all dogs with optional filters
-func (h *DogHandler) ListDogs(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *DogHandler) ListDogs(w http.ResponseWriter, r *http.Request) <span class="cov6" title="3">{
         // Parse query parameters for filtering
         filter := &amp;models.DogFilterRequest{}
 
@@ -2154,89 +2154,89 @@ func (h *DogHandler) ListDogs(w http.ResponseWriter, r *http.Request) <span clas
                 filter.Breed = &amp;breed
         }</span>
 
-        <span class="cov0" title="0">if size := r.URL.Query().Get("size"); size != "" </span><span class="cov0" title="0">{
+        <span class="cov6" title="3">if size := r.URL.Query().Get("size"); size != "" </span><span class="cov0" title="0">{
                 filter.Size = &amp;size
         }</span>
 
-        <span class="cov0" title="0">if minAge := r.URL.Query().Get("min_age"); minAge != "" </span><span class="cov0" title="0">{
+        <span class="cov6" title="3">if minAge := r.URL.Query().Get("min_age"); minAge != "" </span><span class="cov0" title="0">{
                 if age, err := strconv.Atoi(minAge); err == nil </span><span class="cov0" title="0">{
                         filter.MinAge = &amp;age
                 }</span>
         }
 
-        <span class="cov0" title="0">if maxAge := r.URL.Query().Get("max_age"); maxAge != "" </span><span class="cov0" title="0">{
+        <span class="cov6" title="3">if maxAge := r.URL.Query().Get("max_age"); maxAge != "" </span><span class="cov0" title="0">{
                 if age, err := strconv.Atoi(maxAge); err == nil </span><span class="cov0" title="0">{
                         filter.MaxAge = &amp;age
                 }</span>
         }
 
-        <span class="cov0" title="0">if category := r.URL.Query().Get("category"); category != "" </span><span class="cov0" title="0">{
+        <span class="cov6" title="3">if category := r.URL.Query().Get("category"); category != "" </span><span class="cov1" title="1">{
                 filter.Category = &amp;category
         }</span>
 
-        <span class="cov0" title="0">if available := r.URL.Query().Get("available"); available != "" </span><span class="cov0" title="0">{
+        <span class="cov6" title="3">if available := r.URL.Query().Get("available"); available != "" </span><span class="cov1" title="1">{
                 avail := available == "true" || available == "1"
                 filter.Available = &amp;avail
         }</span>
 
-        <span class="cov0" title="0">if search := r.URL.Query().Get("search"); search != "" </span><span class="cov0" title="0">{
+        <span class="cov6" title="3">if search := r.URL.Query().Get("search"); search != "" </span><span class="cov0" title="0">{
                 filter.Search = &amp;search
         }</span>
 
         // Get dogs
-        <span class="cov0" title="0">dogs, err := h.dogRepo.FindAll(filter)
+        <span class="cov6" title="3">dogs, err := h.dogRepo.FindAll(filter)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to fetch dogs")
                 return
         }</span>
 
         // If user is authenticated, filter based on their experience level
-        <span class="cov0" title="0">userID, ok := r.Context().Value(middleware.UserIDKey).(int)
-        if ok </span><span class="cov0" title="0">{
+        <span class="cov6" title="3">userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+        if ok </span><span class="cov6" title="3">{
                 user, err := h.userRepo.FindByID(userID)
-                if err == nil &amp;&amp; user != nil </span><span class="cov0" title="0">{
+                if err == nil &amp;&amp; user != nil </span><span class="cov6" title="3">{
                         filteredDogs := []*models.Dog{}
-                        for _, dog := range dogs </span><span class="cov0" title="0">{
+                        for _, dog := range dogs </span><span class="cov10" title="7">{
                                 // Check if user can access this dog
-                                if repository.CanUserAccessDog(user.ExperienceLevel, dog.Category) </span><span class="cov0" title="0">{
+                                if repository.CanUserAccessDog(user.ExperienceLevel, dog.Category) </span><span class="cov6" title="3">{
                                         filteredDogs = append(filteredDogs, dog)
-                                }</span> else<span class="cov0" title="0"> {
+                                }</span> else<span class="cov7" title="4"> {
                                         // Include but mark as inaccessible (frontend will handle display)
                                         filteredDogs = append(filteredDogs, dog)
                                 }</span>
                         }
-                        <span class="cov0" title="0">dogs = filteredDogs</span>
+                        <span class="cov6" title="3">dogs = filteredDogs</span>
                 }
         }
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusOK, dogs)</span>
+        <span class="cov6" title="3">respondJSON(w, http.StatusOK, dogs)</span>
 }
 
 // GetDog handles GET /api/dogs/:id - get a single dog
-func (h *DogHandler) GetDog(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *DogHandler) GetDog(w http.ResponseWriter, r *http.Request) <span class="cov6" title="3">{
         vars := mux.Vars(r)
         id, err := strconv.Atoi(vars["id"])
-        if err != nil </span><span class="cov0" title="0">{
+        if err != nil </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "Invalid dog ID")
                 return
         }</span>
 
-        <span class="cov0" title="0">dog, err := h.dogRepo.FindByID(id)
+        <span class="cov4" title="2">dog, err := h.dogRepo.FindByID(id)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Database error")
                 return
         }</span>
 
-        <span class="cov0" title="0">if dog == nil </span><span class="cov0" title="0">{
+        <span class="cov4" title="2">if dog == nil </span><span class="cov1" title="1">{
                 respondError(w, http.StatusNotFound, "Dog not found")
                 return
         }</span>
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusOK, dog)</span>
+        <span class="cov1" title="1">respondJSON(w, http.StatusOK, dog)</span>
 }
 
 // CreateDog handles POST /api/dogs - create a new dog (admin only)
-func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) <span class="cov7" title="4">{
         var req models.CreateDogRequest
         if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Invalid request body")
@@ -2244,28 +2244,28 @@ func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) <span cla
         }</span>
 
         // Validate required fields
-        <span class="cov0" title="0">if strings.TrimSpace(req.Name) == "" </span><span class="cov0" title="0">{
+        <span class="cov7" title="4">if strings.TrimSpace(req.Name) == "" </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "Name is required")
                 return
         }</span>
 
-        <span class="cov0" title="0">if strings.TrimSpace(req.Breed) == "" </span><span class="cov0" title="0">{
+        <span class="cov6" title="3">if strings.TrimSpace(req.Breed) == "" </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Breed is required")
                 return
         }</span>
 
-        <span class="cov0" title="0">if req.Size != "small" &amp;&amp; req.Size != "medium" &amp;&amp; req.Size != "large" </span><span class="cov0" title="0">{
+        <span class="cov6" title="3">if req.Size != "small" &amp;&amp; req.Size != "medium" &amp;&amp; req.Size != "large" </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Size must be small, medium, or large")
                 return
         }</span>
 
-        <span class="cov0" title="0">if req.Category != "green" &amp;&amp; req.Category != "blue" &amp;&amp; req.Category != "orange" </span><span class="cov0" title="0">{
+        <span class="cov6" title="3">if req.Category != "green" &amp;&amp; req.Category != "blue" &amp;&amp; req.Category != "orange" </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "Category must be green, blue, or orange")
                 return
         }</span>
 
         // Create dog
-        <span class="cov0" title="0">dog := &amp;models.Dog{
+        <span class="cov4" title="2">dog := &amp;models.Dog{
                 Name:                req.Name,
                 Breed:               req.Breed,
                 Size:                req.Size,
@@ -2286,11 +2286,11 @@ func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) <span cla
                 return
         }</span>
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusCreated, dog)</span>
+        <span class="cov4" title="2">respondJSON(w, http.StatusCreated, dog)</span>
 }
 
 // UpdateDog handles PUT /api/dogs/:id - update a dog (admin only)
-func (h *DogHandler) UpdateDog(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *DogHandler) UpdateDog(w http.ResponseWriter, r *http.Request) <span class="cov4" title="2">{
         vars := mux.Vars(r)
         id, err := strconv.Atoi(vars["id"])
         if err != nil </span><span class="cov0" title="0">{
@@ -2299,73 +2299,73 @@ func (h *DogHandler) UpdateDog(w http.ResponseWriter, r *http.Request) <span cla
         }</span>
 
         // Get existing dog
-        <span class="cov0" title="0">dog, err := h.dogRepo.FindByID(id)
+        <span class="cov4" title="2">dog, err := h.dogRepo.FindByID(id)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Database error")
                 return
         }</span>
 
-        <span class="cov0" title="0">if dog == nil </span><span class="cov0" title="0">{
+        <span class="cov4" title="2">if dog == nil </span><span class="cov1" title="1">{
                 respondError(w, http.StatusNotFound, "Dog not found")
                 return
         }</span>
 
         // Parse update request
-        <span class="cov0" title="0">var req models.UpdateDogRequest
+        <span class="cov1" title="1">var req models.UpdateDogRequest
         if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Invalid request body")
                 return
         }</span>
 
         // Update fields if provided
-        <span class="cov0" title="0">if req.Name != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if req.Name != nil </span><span class="cov1" title="1">{
                 dog.Name = *req.Name
         }</span>
-        <span class="cov0" title="0">if req.Breed != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if req.Breed != nil </span><span class="cov0" title="0">{
                 dog.Breed = *req.Breed
         }</span>
-        <span class="cov0" title="0">if req.Size != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if req.Size != nil </span><span class="cov0" title="0">{
                 dog.Size = *req.Size
         }</span>
-        <span class="cov0" title="0">if req.Age != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if req.Age != nil </span><span class="cov1" title="1">{
                 dog.Age = *req.Age
         }</span>
-        <span class="cov0" title="0">if req.Category != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if req.Category != nil </span><span class="cov0" title="0">{
                 dog.Category = *req.Category
         }</span>
-        <span class="cov0" title="0">if req.SpecialNeeds != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if req.SpecialNeeds != nil </span><span class="cov0" title="0">{
                 dog.SpecialNeeds = req.SpecialNeeds
         }</span>
-        <span class="cov0" title="0">if req.PickupLocation != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if req.PickupLocation != nil </span><span class="cov0" title="0">{
                 dog.PickupLocation = req.PickupLocation
         }</span>
-        <span class="cov0" title="0">if req.WalkRoute != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if req.WalkRoute != nil </span><span class="cov0" title="0">{
                 dog.WalkRoute = req.WalkRoute
         }</span>
-        <span class="cov0" title="0">if req.WalkDuration != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if req.WalkDuration != nil </span><span class="cov0" title="0">{
                 dog.WalkDuration = req.WalkDuration
         }</span>
-        <span class="cov0" title="0">if req.SpecialInstructions != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if req.SpecialInstructions != nil </span><span class="cov0" title="0">{
                 dog.SpecialInstructions = req.SpecialInstructions
         }</span>
-        <span class="cov0" title="0">if req.DefaultMorningTime != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if req.DefaultMorningTime != nil </span><span class="cov0" title="0">{
                 dog.DefaultMorningTime = req.DefaultMorningTime
         }</span>
-        <span class="cov0" title="0">if req.DefaultEveningTime != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if req.DefaultEveningTime != nil </span><span class="cov0" title="0">{
                 dog.DefaultEveningTime = req.DefaultEveningTime
         }</span>
 
         // Update in database
-        <span class="cov0" title="0">if err := h.dogRepo.Update(dog); err != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if err := h.dogRepo.Update(dog); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to update dog")
                 return
         }</span>
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusOK, dog)</span>
+        <span class="cov1" title="1">respondJSON(w, http.StatusOK, dog)</span>
 }
 
 // DeleteDog handles DELETE /api/dogs/:id - delete a dog (admin only)
-func (h *DogHandler) DeleteDog(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *DogHandler) DeleteDog(w http.ResponseWriter, r *http.Request) <span class="cov4" title="2">{
         vars := mux.Vars(r)
         id, err := strconv.Atoi(vars["id"])
         if err != nil </span><span class="cov0" title="0">{
@@ -2374,7 +2374,7 @@ func (h *DogHandler) DeleteDog(w http.ResponseWriter, r *http.Request) <span cla
         }</span>
 
         // Delete (will fail if future bookings exist)
-        <span class="cov0" title="0">if err := h.dogRepo.Delete(id); err != nil </span><span class="cov0" title="0">{
+        <span class="cov4" title="2">if err := h.dogRepo.Delete(id); err != nil </span><span class="cov0" title="0">{
                 if strings.Contains(err.Error(), "future bookings") </span><span class="cov0" title="0">{
                         respondError(w, http.StatusConflict, "Cannot delete dog with future bookings")
                 }</span> else<span class="cov0" title="0"> {
@@ -2383,7 +2383,7 @@ func (h *DogHandler) DeleteDog(w http.ResponseWriter, r *http.Request) <span cla
                 <span class="cov0" title="0">return</span>
         }
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusOK, map[string]string{
+        <span class="cov4" title="2">respondJSON(w, http.StatusOK, map[string]string{
                 "message": "Dog deleted successfully",
         })</span>
 }
@@ -2474,7 +2474,7 @@ func (h *DogHandler) UploadDogPhoto(w http.ResponseWriter, r *http.Request) <spa
 }
 
 // ToggleAvailability handles PUT /api/dogs/:id/availability - toggle availability (admin only)
-func (h *DogHandler) ToggleAvailability(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *DogHandler) ToggleAvailability(w http.ResponseWriter, r *http.Request) <span class="cov4" title="2">{
         vars := mux.Vars(r)
         id, err := strconv.Atoi(vars["id"])
         if err != nil </span><span class="cov0" title="0">{
@@ -2482,43 +2482,43 @@ func (h *DogHandler) ToggleAvailability(w http.ResponseWriter, r *http.Request) 
                 return
         }</span>
 
-        <span class="cov0" title="0">var req models.ToggleAvailabilityRequest
+        <span class="cov4" title="2">var req models.ToggleAvailabilityRequest
         if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Invalid request body")
                 return
         }</span>
 
         // If marking as unavailable, reason is optional but recommended
-        <span class="cov0" title="0">if !req.IsAvailable &amp;&amp; (req.UnavailableReason == nil || *req.UnavailableReason == "") </span><span class="cov0" title="0">{
+        <span class="cov4" title="2">if !req.IsAvailable &amp;&amp; (req.UnavailableReason == nil || *req.UnavailableReason == "") </span><span class="cov0" title="0">{
                 defaultReason := "Temporarily unavailable"
                 req.UnavailableReason = &amp;defaultReason
         }</span>
 
         // Toggle availability
-        <span class="cov0" title="0">if err := h.dogRepo.ToggleAvailability(id, req.IsAvailable, req.UnavailableReason); err != nil </span><span class="cov0" title="0">{
+        <span class="cov4" title="2">if err := h.dogRepo.ToggleAvailability(id, req.IsAvailable, req.UnavailableReason); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to toggle availability")
                 return
         }</span>
 
         // Get updated dog
-        <span class="cov0" title="0">dog, err := h.dogRepo.FindByID(id)
+        <span class="cov4" title="2">dog, err := h.dogRepo.FindByID(id)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to fetch updated dog")
                 return
         }</span>
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusOK, dog)</span>
+        <span class="cov4" title="2">respondJSON(w, http.StatusOK, dog)</span>
 }
 
 // GetBreeds handles GET /api/dogs/breeds - get list of all breeds
-func (h *DogHandler) GetBreeds(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *DogHandler) GetBreeds(w http.ResponseWriter, r *http.Request) <span class="cov1" title="1">{
         breeds, err := h.dogRepo.GetBreeds()
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to fetch breeds")
                 return
         }</span>
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusOK, breeds)</span>
+        <span class="cov1" title="1">respondJSON(w, http.StatusOK, breeds)</span>
 }
 </pre>
 		
@@ -2547,7 +2547,7 @@ type ExperienceRequestHandler struct {
 }
 
 // NewExperienceRequestHandler creates a new experience request handler
-func NewExperienceRequestHandler(db *sql.DB, cfg *config.Config) *ExperienceRequestHandler <span class="cov0" title="0">{
+func NewExperienceRequestHandler(db *sql.DB, cfg *config.Config) *ExperienceRequestHandler <span class="cov8" title="4">{
         emailService, err := services.NewEmailService(
                 cfg.GmailClientID,
                 cfg.GmailClientSecret,
@@ -2559,7 +2559,7 @@ func NewExperienceRequestHandler(db *sql.DB, cfg *config.Config) *ExperienceRequ
                 println("Warning: Failed to initialize email service:", err.Error())
         }</span>
 
-        <span class="cov0" title="0">return &amp;ExperienceRequestHandler{
+        <span class="cov8" title="4">return &amp;ExperienceRequestHandler{
                 db:           db,
                 cfg:          cfg,
                 requestRepo:  repository.NewExperienceRequestRepository(db),
@@ -2569,7 +2569,7 @@ func NewExperienceRequestHandler(db *sql.DB, cfg *config.Config) *ExperienceRequ
 }
 
 // CreateRequest creates a new experience level request
-func (h *ExperienceRequestHandler) CreateRequest(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *ExperienceRequestHandler) CreateRequest(w http.ResponseWriter, r *http.Request) <span class="cov10" title="5">{
         // Get user ID from context
         userID, ok := r.Context().Value("user_id").(int)
         if !ok </span><span class="cov0" title="0">{
@@ -2578,31 +2578,31 @@ func (h *ExperienceRequestHandler) CreateRequest(w http.ResponseWriter, r *http.
         }</span>
 
         // Parse request
-        <span class="cov0" title="0">var req models.CreateExperienceRequestRequest
+        <span class="cov10" title="5">var req models.CreateExperienceRequestRequest
         if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Invalid request body")
                 return
         }</span>
 
         // Validate request
-        <span class="cov0" title="0">if err := req.Validate(); err != nil </span><span class="cov0" title="0">{
+        <span class="cov10" title="5">if err := req.Validate(); err != nil </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, err.Error())
                 return
         }</span>
 
         // Get user
-        <span class="cov0" title="0">user, err := h.userRepo.FindByID(userID)
+        <span class="cov8" title="4">user, err := h.userRepo.FindByID(userID)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to get user")
                 return
         }</span>
-        <span class="cov0" title="0">if user == nil </span><span class="cov0" title="0">{
+        <span class="cov8" title="4">if user == nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusNotFound, "User not found")
                 return
         }</span>
 
         // Check if user already has this level or higher
-        <span class="cov0" title="0">currentLevel := user.ExperienceLevel
+        <span class="cov8" title="4">currentLevel := user.ExperienceLevel
         requestedLevel := req.RequestedLevel
 
         if currentLevel == "orange" </span><span class="cov0" title="0">{
@@ -2610,29 +2610,29 @@ func (h *ExperienceRequestHandler) CreateRequest(w http.ResponseWriter, r *http.
                 return
         }</span>
 
-        <span class="cov0" title="0">if currentLevel == "blue" &amp;&amp; requestedLevel == "blue" </span><span class="cov0" title="0">{
+        <span class="cov8" title="4">if currentLevel == "blue" &amp;&amp; requestedLevel == "blue" </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "You already have this level")
                 return
         }</span>
 
-        <span class="cov0" title="0">if currentLevel == "green" &amp;&amp; requestedLevel == "orange" </span><span class="cov0" title="0">{
+        <span class="cov8" title="4">if currentLevel == "green" &amp;&amp; requestedLevel == "orange" </span><span class="cov1" title="1">{
                 respondError(w, http.StatusBadRequest, "You must first get blue level")
                 return
         }</span>
 
         // Check if user already has a pending request for this level
-        <span class="cov0" title="0">hasPending, err := h.requestRepo.HasPendingRequest(userID, requestedLevel)
+        <span class="cov7" title="3">hasPending, err := h.requestRepo.HasPendingRequest(userID, requestedLevel)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to check pending requests")
                 return
         }</span>
-        <span class="cov0" title="0">if hasPending </span><span class="cov0" title="0">{
+        <span class="cov7" title="3">if hasPending </span><span class="cov1" title="1">{
                 respondError(w, http.StatusConflict, "You already have a pending request for this level")
                 return
         }</span>
 
         // Create request
-        <span class="cov0" title="0">experienceRequest := &amp;models.ExperienceRequest{
+        <span class="cov4" title="2">experienceRequest := &amp;models.ExperienceRequest{
                 UserID:         userID,
                 RequestedLevel: requestedLevel,
         }
@@ -2642,11 +2642,11 @@ func (h *ExperienceRequestHandler) CreateRequest(w http.ResponseWriter, r *http.
                 return
         }</span>
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusCreated, experienceRequest)</span>
+        <span class="cov4" title="2">respondJSON(w, http.StatusCreated, experienceRequest)</span>
 }
 
 // ListRequests lists experience requests (user sees own, admin sees all pending)
-func (h *ExperienceRequestHandler) ListRequests(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *ExperienceRequestHandler) ListRequests(w http.ResponseWriter, r *http.Request) <span class="cov4" title="2">{
         // Get user ID and admin status from context
         userID, _ := r.Context().Value("user_id").(int)
         isAdmin, _ := r.Context().Value("is_admin").(bool)
@@ -2654,34 +2654,34 @@ func (h *ExperienceRequestHandler) ListRequests(w http.ResponseWriter, r *http.R
         var requests []*models.ExperienceRequest
         var err error
 
-        if isAdmin </span><span class="cov0" title="0">{
+        if isAdmin </span><span class="cov1" title="1">{
                 // Admin sees all pending requests
                 requests, err = h.requestRepo.FindAllPending()
-        }</span> else<span class="cov0" title="0"> {
+        }</span> else<span class="cov1" title="1"> {
                 // User sees their own requests
                 requests, err = h.requestRepo.FindByUserID(userID)
         }</span>
 
-        <span class="cov0" title="0">if err != nil </span><span class="cov0" title="0">{
+        <span class="cov4" title="2">if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to get requests")
                 return
         }</span>
 
         // If admin, populate user details
-        <span class="cov0" title="0">if isAdmin </span><span class="cov0" title="0">{
-                for _, req := range requests </span><span class="cov0" title="0">{
+        <span class="cov4" title="2">if isAdmin </span><span class="cov1" title="1">{
+                for _, req := range requests </span><span class="cov4" title="2">{
                         user, err := h.userRepo.FindByID(req.UserID)
-                        if err == nil &amp;&amp; user != nil </span><span class="cov0" title="0">{
+                        if err == nil &amp;&amp; user != nil </span><span class="cov4" title="2">{
                                 req.User = user
                         }</span>
                 }
         }
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusOK, requests)</span>
+        <span class="cov4" title="2">respondJSON(w, http.StatusOK, requests)</span>
 }
 
 // ApproveRequest approves an experience request (admin only)
-func (h *ExperienceRequestHandler) ApproveRequest(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *ExperienceRequestHandler) ApproveRequest(w http.ResponseWriter, r *http.Request) <span class="cov4" title="2">{
         // Get request ID from URL
         vars := mux.Vars(r)
         id, err := strconv.Atoi(vars["id"])
@@ -2691,7 +2691,7 @@ func (h *ExperienceRequestHandler) ApproveRequest(w http.ResponseWriter, r *http
         }</span>
 
         // Get admin user ID
-        <span class="cov0" title="0">reviewerID, _ := r.Context().Value("user_id").(int)
+        <span class="cov4" title="2">reviewerID, _ := r.Context().Value("user_id").(int)
 
         // Parse request body
         var req models.ReviewExperienceRequestRequest
@@ -2701,56 +2701,56 @@ func (h *ExperienceRequestHandler) ApproveRequest(w http.ResponseWriter, r *http
         }</span>
 
         // Get experience request
-        <span class="cov0" title="0">experienceRequest, err := h.requestRepo.FindByID(id)
+        <span class="cov4" title="2">experienceRequest, err := h.requestRepo.FindByID(id)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to get request")
                 return
         }</span>
-        <span class="cov0" title="0">if experienceRequest == nil </span><span class="cov0" title="0">{
+        <span class="cov4" title="2">if experienceRequest == nil </span><span class="cov1" title="1">{
                 respondError(w, http.StatusNotFound, "Request not found")
                 return
         }</span>
 
         // Check if already reviewed
-        <span class="cov0" title="0">if experienceRequest.Status != "pending" </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if experienceRequest.Status != "pending" </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Request has already been reviewed")
                 return
         }</span>
 
         // Get user
-        <span class="cov0" title="0">user, err := h.userRepo.FindByID(experienceRequest.UserID)
+        <span class="cov1" title="1">user, err := h.userRepo.FindByID(experienceRequest.UserID)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to get user")
                 return
         }</span>
-        <span class="cov0" title="0">if user == nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if user == nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusNotFound, "User not found")
                 return
         }</span>
 
         // Approve request
-        <span class="cov0" title="0">if err := h.requestRepo.Approve(id, reviewerID, req.Message); err != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if err := h.requestRepo.Approve(id, reviewerID, req.Message); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to approve request")
                 return
         }</span>
 
         // Update user experience level
-        <span class="cov0" title="0">user.ExperienceLevel = experienceRequest.RequestedLevel
+        <span class="cov1" title="1">user.ExperienceLevel = experienceRequest.RequestedLevel
         if err := h.userRepo.Update(user); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to update user level")
                 return
         }</span>
 
         // Send email notification
-        <span class="cov0" title="0">if user.Email != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if user.Email != nil </span><span class="cov1" title="1">{
                 go h.emailService.SendExperienceLevelApproved(*user.Email, user.Name, experienceRequest.RequestedLevel, req.Message)
         }</span>
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusOK, map[string]string{"message": "Request approved"})</span>
+        <span class="cov1" title="1">respondJSON(w, http.StatusOK, map[string]string{"message": "Request approved"})</span>
 }
 
 // DenyRequest denies an experience request (admin only)
-func (h *ExperienceRequestHandler) DenyRequest(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+func (h *ExperienceRequestHandler) DenyRequest(w http.ResponseWriter, r *http.Request) <span class="cov1" title="1">{
         // Get request ID from URL
         vars := mux.Vars(r)
         id, err := strconv.Atoi(vars["id"])
@@ -2760,7 +2760,7 @@ func (h *ExperienceRequestHandler) DenyRequest(w http.ResponseWriter, r *http.Re
         }</span>
 
         // Get admin user ID
-        <span class="cov0" title="0">reviewerID, _ := r.Context().Value("user_id").(int)
+        <span class="cov1" title="1">reviewerID, _ := r.Context().Value("user_id").(int)
 
         // Parse request body
         var req models.ReviewExperienceRequestRequest
@@ -2770,45 +2770,45 @@ func (h *ExperienceRequestHandler) DenyRequest(w http.ResponseWriter, r *http.Re
         }</span>
 
         // Get experience request
-        <span class="cov0" title="0">experienceRequest, err := h.requestRepo.FindByID(id)
+        <span class="cov1" title="1">experienceRequest, err := h.requestRepo.FindByID(id)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to get request")
                 return
         }</span>
-        <span class="cov0" title="0">if experienceRequest == nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if experienceRequest == nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusNotFound, "Request not found")
                 return
         }</span>
 
         // Check if already reviewed
-        <span class="cov0" title="0">if experienceRequest.Status != "pending" </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if experienceRequest.Status != "pending" </span><span class="cov0" title="0">{
                 respondError(w, http.StatusBadRequest, "Request has already been reviewed")
                 return
         }</span>
 
         // Get user
-        <span class="cov0" title="0">user, err := h.userRepo.FindByID(experienceRequest.UserID)
+        <span class="cov1" title="1">user, err := h.userRepo.FindByID(experienceRequest.UserID)
         if err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to get user")
                 return
         }</span>
-        <span class="cov0" title="0">if user == nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if user == nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusNotFound, "User not found")
                 return
         }</span>
 
         // Deny request
-        <span class="cov0" title="0">if err := h.requestRepo.Deny(id, reviewerID, req.Message); err != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if err := h.requestRepo.Deny(id, reviewerID, req.Message); err != nil </span><span class="cov0" title="0">{
                 respondError(w, http.StatusInternalServerError, "Failed to deny request")
                 return
         }</span>
 
         // Send email notification
-        <span class="cov0" title="0">if user.Email != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if user.Email != nil </span><span class="cov1" title="1">{
                 go h.emailService.SendExperienceLevelDenied(*user.Email, user.Name, experienceRequest.RequestedLevel, req.Message)
         }</span>
 
-        <span class="cov0" title="0">respondJSON(w, http.StatusOK, map[string]string{"message": "Request denied"})</span>
+        <span class="cov1" title="1">respondJSON(w, http.StatusOK, map[string]string{"message": "Request denied"})</span>
 }
 </pre>
 		
