@@ -295,7 +295,8 @@ func RateLimitMiddleware(next http.Handler) http.Handler {
 
 Or implement IP-based rate limiting with redis/memory store.
 
-**Status**: ⏳ Needs Fix
+**Status**: ✅ FIXED (commit 83ea91a) - Rate limiting implemented (5 attempts/minute/IP)
+**// DONE**: BUG #6 - Brute force protection added to login
 
 ---
 
