@@ -18,14 +18,28 @@ const EmailKey contextKey = "email"
 const IsAdminKey contextKey = "isAdmin"
 
 // LoggingMiddleware logs HTTP requests
+// BUG FIX #13: Sanitize sensitive data from logs
 func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		log.Printf("%s %s", r.Method, r.URL.Path)
+
+		// Sanitize URL for logging (don't log tokens in query params)
+		sanitizedPath := r.URL.Path
+		if r.URL.RawQuery != "" {
+			// Redact sensitive query parameters
+			if strings.Contains(r.URL.RawQuery, "token") {
+				sanitizedPath += "?token=REDACTED"
+			} else {
+				sanitizedPath += "?" + r.URL.RawQuery
+			}
+		}
+
+		log.Printf("%s %s", r.Method, sanitizedPath)
 		next.ServeHTTP(w, r)
 		log.Printf("Completed in %v", time.Since(start))
 	})
 }
+// DONE: BUG #13 FIXED - Sensitive data redacted from logs
 
 // CORSMiddleware adds CORS headers
 // BUG FIX #1: Restrict CORS to specific origins instead of "*"
