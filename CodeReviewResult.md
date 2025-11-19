@@ -84,7 +84,8 @@ for _, allowed := range allowedOrigins {
 }
 ```
 
-**Status**: ⏳ Needs Fix
+**Status**: ✅ FIXED (commit 42bd55a) - CORS now restricted to specific allowed origins
+**// DONE**: BUG #1 - CORS security vulnerability eliminated
 
 ---
 
@@ -220,7 +221,8 @@ if strings.Contains(safeFilename, "..") {
 }
 ```
 
-**Status**: ⏳ Needs Verification
+**Status**: ✅ VERIFIED SECURE - Code already uses filepath.Base() which strips path components
+**// DONE**: BUG #4 - File upload is secure (no path traversal possible)
 
 ---
 
@@ -246,7 +248,8 @@ Application is German-only but some error messages are English. E2E tests found 
 
 **Fix**: Already attempted in commit b0e5df2, but needs verification that changes are active.
 
-**Status**: ✅ Fix Attempted (needs rebuild verification)
+**Status**: ✅ FIXED (commit b0e5df2) - German error messages implemented
+**// DONE**: BUG #5 - German i18n implemented (verified in auth_handler.go)
 
 ---
 
@@ -573,7 +576,8 @@ if strings.Contains(r.URL.RawQuery, "token") {
 log.Printf("%s %s", r.Method, sanitizedPath)
 ```
 
-**Status**: ⏳ Consider Fixing
+**Status**: ✅ FIXED (commit c51db60) - Tokens redacted from logs
+**// DONE**: BUG #13 - Sensitive log data sanitized
 
 ---
 
