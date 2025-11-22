@@ -7,7 +7,8 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3"      // CGO-based SQLite (faster, but requires CGO)
+	_ "modernc.org/sqlite"               // Pure Go SQLite (slower, but cross-compiles easily)
 )
 
 // Note: Migration files (001_*.go, 002_*.go, etc.) are in this package

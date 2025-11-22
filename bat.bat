@@ -30,6 +30,7 @@ echo [OK] Dependencies downloaded
 echo.
 
 echo [3/5] Building application for Windows...
+set CGO_ENABLED=0
 go build -o gassigeher.exe cmd/server/main.go
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Windows build failed
@@ -38,17 +39,19 @@ if %ERRORLEVEL% NEQ 0 (
 echo [OK] Windows build successful: gassigeher.exe
 echo.
 
-echo [4/5] Building application for Linux...
+echo [4/5] Building application for Linux (cross-compile)...
 set GOOS=linux
 set GOARCH=amd64
+set CGO_ENABLED=0
 go build -o gassigeher cmd/server/main.go
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Linux build failed
     exit /b 1
 )
-echo [OK] Linux build successful: gassigeher
+echo [OK] Linux build successful: gassigeher (using pure Go SQLite)
 set GOOS=
 set GOARCH=
+set CGO_ENABLED=
 echo.
 
 echo [5/5] Running tests...

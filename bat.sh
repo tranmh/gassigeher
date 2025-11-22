@@ -35,9 +35,9 @@ fi
 echo ""
 
 echo "[3/4] Building application..."
-if go build -o gassigeher cmd/server/main.go; then
+if CGO_ENABLED=0 go build -o gassigeher ./cmd/server; then
     chmod +x gassigeher
-    echo -e "${GREEN}[OK] Build successful: gassigeher${NC}"
+    echo -e "${GREEN}[OK] Build successful: gassigeher (pure Go SQLite)${NC}"
 else
     echo -e "${RED}[ERROR] Build failed${NC}"
     exit 1
