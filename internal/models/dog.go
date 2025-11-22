@@ -13,6 +13,7 @@ type Dog struct {
 	Age                  int        `json:"age"`
 	Category             string     `json:"category"` // green, blue, orange
 	Photo                *string    `json:"photo,omitempty"`
+	PhotoThumbnail       *string    `json:"photo_thumbnail,omitempty"`
 	SpecialNeeds         *string    `json:"special_needs,omitempty"`
 	PickupLocation       *string    `json:"pickup_location,omitempty"`
 	WalkRoute            *string    `json:"walk_route,omitempty"`

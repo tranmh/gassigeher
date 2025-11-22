@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,21 +15,24 @@ import (
 	"github.com/tranm/gassigeher/internal/middleware"
 	"github.com/tranm/gassigeher/internal/models"
 	"github.com/tranm/gassigeher/internal/repository"
+	"github.com/tranm/gassigeher/internal/services"
 )
 
 // DogHandler handles dog-related endpoints
 type DogHandler struct {
-	dogRepo  *repository.DogRepository
-	userRepo *repository.UserRepository
-	config   *config.Config
+	dogRepo      *repository.DogRepository
+	userRepo     *repository.UserRepository
+	imageService *services.ImageService
+	config       *config.Config
 }
 
 // NewDogHandler creates a new dog handler
 func NewDogHandler(db *sql.DB, cfg *config.Config) *DogHandler {
 	return &DogHandler{
-		dogRepo:  repository.NewDogRepository(db),
-		userRepo: repository.NewUserRepository(db),
-		config:   cfg,
+		dogRepo:      repository.NewDogRepository(db),
+		userRepo:     repository.NewUserRepository(db),
+		imageService: services.NewImageService(cfg.UploadDir),
+		config:       cfg,
 	}
 }
 
@@ -311,54 +313,46 @@ func (h *DogHandler) UploadDogPhoto(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Validate file type
+	// Validate file type (checking extension first for quick validation)
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" {
 		respondError(w, http.StatusBadRequest, "Only JPEG and PNG files are allowed")
 		return
 	}
 
-	// Create upload directory if it doesn't exist
-	dogDir := filepath.Join(h.config.UploadDir, "dogs")
-	if err := os.MkdirAll(dogDir, 0755); err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to create upload directory")
-		return
-	}
-
-	// Generate filename
-	filename := fmt.Sprintf("dog_%d%s", id, ext)
-	relPath := filepath.Join("dogs", filename)
-	destPath := filepath.Join(h.config.UploadDir, relPath)
-
-	// Save file
-	dest, err := os.Create(destPath)
-	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to save file")
-		return
-	}
-	defer dest.Close()
-
-	if _, err := io.Copy(dest, file); err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to save file")
-		return
-	}
-
-	// Delete old photo if exists
+	// Delete old photos if they exist (before processing new ones)
 	if dog.Photo != nil && *dog.Photo != "" {
+		// Use ImageService to delete both full and thumbnail
+		// This handles the new naming scheme (dog_{id}_full.jpg, dog_{id}_thumb.jpg)
+		h.imageService.DeleteDogPhotos(id)
+
+		// Also try to delete old photo with original naming scheme (backward compatibility)
 		oldPath := filepath.Join(h.config.UploadDir, *dog.Photo)
-		os.Remove(oldPath) // Ignore errors
+		os.Remove(oldPath) // Ignore errors if file doesn't exist
 	}
 
-	// Update dog
-	dog.Photo = &relPath
+	// Process the uploaded photo (resize, compress, create thumbnail)
+	fullPath, thumbPath, err := h.imageService.ProcessDogPhoto(file, id)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to process image: %v", err))
+		return
+	}
+
+	// Update dog with new photo paths
+	dog.Photo = &fullPath
+	dog.PhotoThumbnail = &thumbPath
+
 	if err := h.dogRepo.Update(dog); err != nil {
+		// If database update fails, clean up the newly created files
+		h.imageService.DeleteDogPhotos(id)
 		respondError(w, http.StatusInternalServerError, "Failed to update dog")
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{
-		"message": "Photo uploaded successfully",
-		"photo":   relPath,
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"message":   "Photo uploaded successfully",
+		"photo":     fullPath,
+		"thumbnail": thumbPath,
 	})
 }
 

@@ -165,6 +165,7 @@
 
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
+    <script src="/js/dog-photo-helpers.js"></script>
     <script>
         let currentDogs = [];
         let userLevel = 'green';
@@ -235,6 +236,9 @@
                 const filters = getFilters();
                 currentDogs = await api.getDogs(filters);
                 renderDogs();
+
+                // Preload first 3 dog images for better performance
+                preloadCriticalDogImages(currentDogs, 3);
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Laden der Hunde');
             }
@@ -328,7 +332,7 @@
                          style="${!canAccess || isUnavailable ? 'cursor: not-allowed;' : 'cursor: pointer;'}">
                         ${isUnavailable ? `<div class="dog-unavailable-banner">${dog.unavailable_reason || 'Nicht verfügbar'}</div>` : ''}
                         ${!canAccess ? '<div class="dog-locked-banner">🔒 Level erforderlich</div>' : ''}
-                        ${dog.photo ? `<img src="/uploads/${dog.photo}" class="dog-card-image" alt="${dog.name}">` : '<div class="dog-card-image" style="background: #ddd; display: flex; align-items: center; justify-content: center;">🐕</div>'}
+                        ${getDogPhotoHtml(dog, true, 'dog-card-image', true, true)}
                         <div class="dog-card-body">
                             <div class="dog-category-badge ${dog.category}">${getCategoryLabel(dog.category)}</div>
                             <h3 class="dog-card-title">${dog.name}</h3>

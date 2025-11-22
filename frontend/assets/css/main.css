@@ -653,3 +653,298 @@ footer a:hover {
         margin-bottom: var(--spacing-sm);
     }
 }
+
+/* Photo Upload Styles */
+
+/* Photo upload zone */
+.photo-upload-zone {
+    border: 2px dashed var(--primary-green);
+    border-radius: var(--border-radius);
+    padding: 30px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: var(--warm-cream);
+    position: relative;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.photo-upload-zone:hover {
+    background: rgba(130, 185, 101, 0.05);
+    border-color: var(--secondary-green);
+}
+
+.photo-upload-zone.drag-over {
+    background: rgba(130, 185, 101, 0.1);
+    border-color: var(--secondary-green);
+    border-style: solid;
+    transform: scale(1.02);
+}
+
+/* Upload prompt */
+.upload-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+.upload-icon {
+    font-size: 48px;
+    display: block;
+    margin-bottom: 15px;
+}
+
+.upload-hint {
+    font-size: 0.85rem;
+    color: var(--text-gray);
+    margin: 5px 0;
+}
+
+/* Photo preview */
+.photo-preview {
+    position: relative;
+    max-width: 400px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.photo-preview.hidden {
+    display: none;
+}
+
+.photo-preview img {
+    width: 100%;
+    max-height: 400px;
+    object-fit: contain;
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* Remove preview button */
+.btn-remove-preview {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.9);
+    border: none;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    transition: all 0.2s ease;
+    color: var(--text-dark);
+}
+
+.btn-remove-preview:hover {
+    background: var(--error-red);
+    color: white;
+    transform: scale(1.1);
+}
+
+/* Current photo display */
+.current-photo-display {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: var(--spacing-md);
+    background: var(--warm-cream);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-light);
+}
+
+.current-dog-photo {
+    width: 150px;
+    height: 150px;
+    object-fit: cover;
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.photo-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+}
+
+.btn-small {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+}
+
+/* Upload progress overlay */
+.upload-progress-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.upload-progress {
+    background: var(--text-dark);
+    padding: 30px 50px;
+    border-radius: var(--border-radius);
+    text-align: center;
+}
+
+/* Spinner animation */
+.spinner {
+    border: 4px solid rgba(130, 185, 101, 0.3);
+    border-top-color: var(--primary-green);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Warning alert style */
+.alert-warning {
+    background-color: var(--warning-orange);
+    color: white;
+    padding: var(--spacing-md);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-md);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* Responsive photo upload */
+@media (max-width: 768px) {
+    .photo-upload-zone {
+        padding: 20px;
+        min-height: 150px;
+    }
+
+    .upload-icon {
+        font-size: 36px;
+    }
+
+    .current-photo-display {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .current-dog-photo {
+        width: 120px;
+        height: 120px;
+    }
+
+    .photo-actions {
+        width: 100%;
+    }
+}
+
+/* Phase 5: Display Optimization Styles */
+
+/* Image Loading Skeleton */
+.dog-card-image-container {
+    position: relative;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s ease-in-out infinite;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.dog-card-image-container.loaded {
+    background: none;
+    animation: none;
+}
+
+@keyframes skeleton-loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Image fade-in effect */
+.dog-card-image {
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.dog-card-image.loaded {
+    opacity: 1;
+}
+
+/* For images that are already in cache or load immediately */
+.dog-card-image.no-animation {
+    opacity: 1;
+    transition: none;
+}
+
+/* Calendar dog photo styles */
+.calendar-dog-photo {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border-light);
+    margin-right: 8px;
+}
+
+.calendar-dog-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Thumbnail optimization */
+.dog-card-thumbnail {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+/* Performance: Prevent layout shift */
+.dog-card-image-wrapper {
+    aspect-ratio: 1 / 1;
+    width: 100%;
+    overflow: hidden;
+    border-radius: var(--border-radius);
+}
+
+.dog-card-image-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Preload critical images hint */
+.dog-card-image[data-priority="high"] {
+    /* Browser hint for important images */
+    content-visibility: auto;
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+    .dog-card-image {
+        transition: none;
+    }
+
+    .dog-card-image-container {
+        animation: none;
+    }
+}

@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="Dog placeholder image (blue category)">
+  <defs>
+    <linearGradient id="bgGradientBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#eef6fc;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e3f0f9;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="400" height="400" fill="url(#bgGradientBlue)"/>
+
+  <!-- Border -->
+  <rect width="400" height="400" fill="none" stroke="#4a90e2" stroke-width="3"/>
+
+  <!-- Dog Silhouette (Simplified) -->
+  <g transform="translate(200, 220)" fill="#4a90e2" opacity="0.4">
+    <!-- Body -->
+    <ellipse cx="0" cy="0" rx="80" ry="60"/>
+
+    <!-- Head -->
+    <circle cx="-55" cy="-50" r="40"/>
+
+    <!-- Ears -->
+    <ellipse cx="-75" cy="-75" rx="18" ry="30" transform="rotate(-20 -75 -75)"/>
+    <ellipse cx="-35" cy="-80" rx="15" ry="25" transform="rotate(15 -35 -80)"/>
+
+    <!-- Front legs -->
+    <rect x="-45" y="40" width="20" height="50" rx="10"/>
+    <rect x="-15" y="40" width="20" height="50" rx="10"/>
+
+    <!-- Back legs -->
+    <rect x="25" y="35" width="22" height="50" rx="11"/>
+    <rect x="55" y="35" width="22" height="50" rx="11"/>
+
+    <!-- Tail -->
+    <path d="M 80 -10 Q 110 -30, 105 -50" stroke="#4a90e2" stroke-width="18" stroke-linecap="round" fill="none"/>
+  </g>
+
+  <!-- Badge -->
+  <circle cx="60" cy="60" r="30" fill="#4a90e2"/>
+  <text x="60" y="70"
+        font-family="Arial, sans-serif"
+        font-size="24"
+        fill="white"
+        text-anchor="middle"
+        font-weight="bold">
+    B
+  </text>
+
+  <!-- Text -->
+  <text x="200" y="340"
+        font-family="Arial, sans-serif"
+        font-size="18"
+        fill="#3a7bc8"
+        text-anchor="middle"
+        font-weight="600">
+    Kein Foto (Blau)
+  </text>
+</svg>

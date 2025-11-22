@@ -316,21 +316,49 @@ func (r *BookingRepository) GetForReminders() ([]*models.Booking, error) {
 	oneHourFromNow := now.Add(1 * time.Hour)
 	twoHoursFromNow := now.Add(2 * time.Hour)
 
+	// Need to handle bookings that might be on different dates
+	// (e.g., if it's 23:30 now, a booking at 00:30 tomorrow is 1 hour away)
 	currentDate := now.Format("2006-01-02")
+	nextDate := now.Add(24 * time.Hour).Format("2006-01-02")
+
 	oneHourTime := oneHourFromNow.Format("15:04")
 	twoHoursTime := twoHoursFromNow.Format("15:04")
 
+	// Query handles both same-day and next-day bookings
 	query := `
 		SELECT id, user_id, dog_id, date, walk_type, scheduled_time, status,
 		       completed_at, user_notes, admin_cancellation_reason, created_at, updated_at
 		FROM bookings
 		WHERE status = 'scheduled'
-		AND date = ?
-		AND scheduled_time >= ?
-		AND scheduled_time < ?
+		AND (
+			(date = ? AND scheduled_time >= ? AND scheduled_time < ?)
+			OR (date = ? AND scheduled_time >= '00:00' AND scheduled_time < ?)
+		)
 	`
 
-	rows, err := r.db.Query(query, currentDate, oneHourTime, twoHoursTime)
+	// For same-day bookings: use oneHourTime to twoHoursTime
+	// For next-day bookings: check if twoHoursFromNow crosses midnight
+	var rows *sql.Rows
+	var err error
+
+	if twoHoursFromNow.Format("2006-01-02") != currentDate {
+		// Crosses midnight - need to check both today and tomorrow
+		nextDayTime := twoHoursFromNow.Format("15:04")
+		rows, err = r.db.Query(query, currentDate, oneHourTime, "23:59", nextDate, nextDayTime)
+	} else {
+		// Same day - simpler query
+		simpleQuery := `
+			SELECT id, user_id, dog_id, date, walk_type, scheduled_time, status,
+			       completed_at, user_notes, admin_cancellation_reason, created_at, updated_at
+			FROM bookings
+			WHERE status = 'scheduled'
+			AND date = ?
+			AND scheduled_time >= ?
+			AND scheduled_time < ?
+		`
+		rows, err = r.db.Query(simpleQuery, currentDate, oneHourTime, twoHoursTime)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to query bookings for reminders: %w", err)
 	}

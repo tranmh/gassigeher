@@ -413,7 +413,95 @@ Implementation: `internal/handlers/experience_request_handler.go` → `CreateReq
 
 **Storage**: Photos stored in filesystem, paths in database.
 
-## Documentation Files
+### Dog Photo Handling
+
+**Database Schema:**
+- `dogs.photo` - Path to full-size photo (e.g., "dogs/dog_1_full.jpg")
+- `dogs.photo_thumbnail` - Path to thumbnail (e.g., "dogs/dog_1_thumb.jpg")
+- Both fields nullable (dogs can exist without photos)
+
+**Upload Process (Current - Without Phase 1):**
+1. Admin selects photo via admin-dogs.html
+2. Client-side validation (JPEG/PNG, max 10MB)
+3. Photo preview shown via FileReader API
+4. On form submit: Dog created/updated first
+5. Then photo uploaded via `POST /api/dogs/:id/photo`
+6. Backend saves photo to `uploads/dogs/` directory
+7. Database updated with photo path
+8. Old photo deleted if exists
+
+**Upload Process (With Phase 1 - Future):**
+Same as above, but step 6 includes:
+- Automatic resizing to 800x800 max
+- JPEG compression (quality 85%)
+- Thumbnail generation (300x300)
+- Saves both full and thumbnail
+- ~85% file size reduction
+
+**Frontend Display Pattern:**
+
+```javascript
+// Use helper functions (recommended)
+${getDogPhotoHtml(dog, true)}  // Uses thumbnail, lazy loading, category placeholder
+
+// Manual pattern (not recommended)
+${dog.photo ? `<img src="/uploads/${dog.photo}" ...>` : 'fallback'}
+```
+
+**Helper Functions (frontend/js/dog-photo-helpers.js):**
+- `getDogPhotoUrl(dog, useThumbnail, useCategoryPlaceholder)` - Get photo URL
+- `getDogPhotoHtml(dog, useThumbnail, className, lazyLoad, categoryPlaceholder, withSkeleton)` - Generate img tag
+- `getDogPhotoResponsive(dog, className, lazyLoad)` - Generate picture element for mobile/desktop
+- `getCalendarDogCell(dog)` - Calendar grid cell with photo
+- `preloadCriticalDogImages(dogs, count)` - Preload first N images
+
+**Placeholder Strategy:**
+- Dogs without photos show SVG placeholders
+- Category-specific colors: green, blue, orange
+- Files: `frontend/assets/images/placeholders/dog-placeholder-{category}.svg`
+- Fallback: `dog-placeholder.svg` (generic)
+
+**Upload UI (admin-dogs.html):**
+- Drag & drop zone with visual feedback
+- File validation before upload
+- Preview before upload
+- Progress indicator during upload
+- Edit mode shows current photo with "Change" and "Remove" buttons
+- German error messages
+
+**Performance Optimizations:**
+- Lazy loading: `loading="lazy"` attribute (95%+ browser support)
+- Responsive images: `<picture>` element (mobile gets thumbnails)
+- Skeleton loader: Animated shimmer while loading
+- Fade-in: Smooth appearance when loaded
+- Preload: First 3 images preloaded for instant display
+- Calendar: Uses thumbnails in grid (40x40 circles)
+
+**Best Practices:**
+- Always use helper functions for consistency
+- Use thumbnails in lists/grids (performance)
+- Use full-size in detail views
+- Enable lazy loading by default
+- Provide meaningful alt text
+- Handle NULL photo values gracefully
+
+**Common Patterns:**
+
+```javascript
+// Dog card in list
+${getDogPhotoHtml(dog, true)}  // Thumbnail, lazy load, skeleton
+
+// Dog detail modal
+${getDogPhotoHtml(dog, false, 'dog-detail-image', false)}  // Full size, no lazy load
+
+// Calendar view
+${getCalendarDogCell(dog)}  // Pre-formatted cell with thumbnail
+
+// Responsive (mobile/desktop)
+${getDogPhotoResponsive(dog)}  // Picture element with media queries
+```
+
+**Storage**: Photos in `uploads/dogs/`, paths in database (nullable).
 
 Read these for context:
 - [ImplementationPlan.md](docs/ImplementationPlan.md) - Complete architecture, all 10 phases

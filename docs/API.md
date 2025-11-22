@@ -412,6 +412,79 @@ Mark dog as available or unavailable (e.g., for vet visits).
 
 ---
 
+### Upload Dog Photo
+`POST /dogs/:id/photo` 🔒 Admin Only
+
+Upload a photo for a dog. Supports JPEG and PNG files up to 10MB.
+
+**Request:**
+- Content-Type: `multipart/form-data`
+- Field name: `photo`
+- Accepted formats: JPEG, PNG
+- Max size: 10MB (configurable)
+
+**Example (using cURL):**
+```bash
+curl -X POST http://localhost:8080/api/dogs/1/photo \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -F "photo=@dog_photo.jpg"
+```
+
+**Example (using JavaScript):**
+```javascript
+const formData = new FormData();
+formData.append('photo', fileInput.files[0]);
+
+const response = await api.uploadDogPhoto(dogId, fileInput.files[0]);
+```
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Photo uploaded successfully",
+  "photo": "dogs/dog_1_full.jpg",
+  "photo_thumbnail": "dogs/dog_1_thumb.jpg"
+}
+```
+
+**Note:** When Phase 1 (Backend Image Processing) is implemented, the uploaded photo will be automatically:
+- Resized to max 800x800 pixels
+- Compressed (JPEG quality 85%)
+- Thumbnail generated (300x300 pixels)
+
+Currently, photos are stored as-is without processing.
+
+**Validation:**
+- File type must be JPEG or PNG
+- File size must not exceed configured limit (default: 10MB)
+- Dog must exist
+- Requires admin authentication
+
+**Error Responses:**
+
+`400 Bad Request` - Invalid file type or size
+```json
+{
+  "error": "Only JPEG and PNG files are allowed"
+}
+```
+
+`404 Not Found` - Dog doesn't exist
+```json
+{
+  "error": "Dog not found"
+}
+```
+
+`413 Payload Too Large` - File exceeds size limit
+```json
+{
+  "error": "File too large. Maximum size: 10MB"
+}
+```
+
+---
+
 ## Booking Endpoints
 
 ### Create Booking

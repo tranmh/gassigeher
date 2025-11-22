@@ -1,3 +1,5 @@
+//go:build ignore
+
 // Quick utility to generate bcrypt hash for test password
 // Usage: go run scripts/genhash.go test123
 

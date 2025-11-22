@@ -91,10 +91,53 @@ Das Dashboard zeigt Ihnen auf einen Blick:
 
 ### Hundefoto hochladen
 
-1. Beim Erstellen oder Bearbeiten
-2. Wählen Sie "Foto hochladen"
-3. Laden Sie JPEG oder PNG hoch (max. 5MB)
-4. Das Foto wird in der Hundeliste angezeigt
+**Beim Hinzufügen eines neuen Hundes:**
+
+1. Füllen Sie das Formular aus (Name, Rasse, etc.)
+2. Im Abschnitt "Foto":
+   - Klicken Sie auf die Upload-Zone **oder**
+   - Ziehen Sie eine Datei per Drag & Drop in die Zone
+3. Vorschau wird angezeigt
+4. Klicken Sie "Speichern" - Hund und Foto werden hochgeladen
+5. Das Foto erscheint in der Hundeliste
+
+**Beim Bearbeiten eines bestehenden Hundes:**
+
+**Ohne Foto (Foto hinzufügen):**
+1. Klicken Sie auf ✏️ beim Hund
+2. Im Abschnitt "Foto":
+   - Klicken Sie auf die Upload-Zone **oder**
+   - Ziehen Sie eine Datei in die Zone
+3. Vorschau wird angezeigt
+4. Klicken Sie "Speichern"
+
+**Mit bestehendem Foto (Foto ändern):**
+1. Klicken Sie auf ✏️ beim Hund
+2. Aktuelles Foto wird angezeigt
+3. Klicken Sie "Foto ändern"
+4. Wählen Sie neue Datei aus
+5. Vorschau wird angezeigt
+6. Klicken Sie "Speichern"
+
+**Unterstützte Formate:**
+- ✅ JPEG (.jpg, .jpeg)
+- ✅ PNG (.png)
+- ❌ Andere Formate (GIF, BMP, etc.) nicht erlaubt
+
+**Maximale Dateigröße:** 10MB
+
+**Hinweise:**
+- Drag & Drop funktioniert in allen modernen Browsern
+- Eine Vorschau wird vor dem Upload angezeigt
+- Das × Symbol entfernt die Vorschau (Datei wird nicht hochgeladen)
+- Bei Fehlern erscheint eine deutsche Fehlermeldung
+- Alte Fotos werden automatisch beim Upload neuer Fotos gelöscht
+
+**Platzhalterbild:**
+Hunde ohne Foto zeigen ein professionelles Platzbild in der Farbe ihrer Kategorie:
+- 🟢 Grüne Hunde: Grünes Platzhalterbild
+- 🔵 Blaue Hunde: Blaues Platzhalterbild
+- 🟠 Orange Hunde: Oranges Platzhalterbild
 
 ### Hund als nicht verfügbar markieren
 

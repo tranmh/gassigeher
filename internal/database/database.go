@@ -38,10 +38,16 @@ func RunMigrations(db *sql.DB) error {
 		createSystemSettingsTable,
 		createReactivationRequestsTable,
 		insertDefaultSettings,
+		addPhotoThumbnailColumn,
 	}
 
 	for i, migration := range migrations {
 		if _, err := db.Exec(migration); err != nil {
+			// Ignore error if column already exists (ALTER TABLE ADD COLUMN error)
+			if i == len(migrations)-1 && (err.Error() == "duplicate column name: photo_thumbnail" ||
+				err.Error() == "SQLSTATE 42S21: duplicate column name: photo_thumbnail") {
+				continue
+			}
 			return fmt.Errorf("migration %d failed: %w", i+1, err)
 		}
 	}
@@ -181,4 +187,11 @@ INSERT OR IGNORE INTO system_settings (key, value) VALUES
   ('booking_advance_days', '14'),
   ('cancellation_notice_hours', '12'),
   ('auto_deactivation_days', '365');
+`
+
+const addPhotoThumbnailColumn = `
+-- Add photo_thumbnail column to dogs table
+-- Uses ALTER TABLE which will fail if column exists, so we catch the error
+-- SQLite doesn't support IF NOT EXISTS for ALTER TABLE ADD COLUMN before version 3.35.0
+ALTER TABLE dogs ADD COLUMN photo_thumbnail TEXT;
 `

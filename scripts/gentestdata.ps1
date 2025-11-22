@@ -199,7 +199,7 @@ Write-Info "Generated $userCount users"
 
 # Generate dogs
 [void]$sql.AppendLine("-- Dogs (18 total)")
-[void]$sql.AppendLine("INSERT INTO dogs (name, breed, size, age, category, special_needs, pickup_location, walk_route, walk_duration, special_instructions, default_morning_time, default_evening_time, is_available, created_at) VALUES")
+[void]$sql.AppendLine("INSERT INTO dogs (name, breed, size, age, category, photo, photo_thumbnail, special_needs, pickup_location, walk_route, walk_duration, special_instructions, default_morning_time, default_evening_time, is_available, created_at) VALUES")
 
 $dogCategories = @(@{category='green'; count=7}, @{category='blue'; count=6}, @{category='orange'; count=5})
 $dogSizes = @('small', 'medium', 'large')
@@ -221,11 +221,16 @@ foreach ($catDef in $dogCategories) {
         $eveningTime = "15:00"
         $isAvailable = 1
 
+        # Add sample photo paths (will be created by ProcessDogPhoto when real photos uploaded)
+        # For test data, we use NULL to demonstrate placeholder functionality
+        $photo = "NULL"
+        $photoThumb = "NULL"
+
         # Make dogs 3 and 8 unavailable
         if ($dogCount -eq 3 -or $dogCount -eq 8) { $isAvailable = 0 }
 
         $comma = if ($dogCount -eq $totalDogs - 1) { ";" } else { "," }
-        [void]$sql.AppendLine("('$name', '$breed', '$size', $age, '$($catDef.category)', '$needs', '$pickup', '$route', $duration, '$instructions', '$morningTime', '$eveningTime', $isAvailable, '$now')$comma")
+        [void]$sql.AppendLine("('$name', '$breed', '$size', $age, '$($catDef.category)', $photo, $photoThumb, '$needs', '$pickup', '$route', $duration, '$instructions', '$morningTime', '$eveningTime', $isAvailable, '$now')$comma")
         $dogCount++
     }
 }

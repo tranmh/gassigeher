@@ -68,6 +68,32 @@
                             <option value="orange" data-i18n="dogs.category_orange">Orange</option>
                         </select>
                     </div>
+
+                    <!-- Photo Upload Section -->
+                    <div class="form-group">
+                        <label>Foto</label>
+
+                        <!-- Current Photo Display (shown when editing dog with photo) -->
+                        <div id="current-photo-container" style="display: none;">
+                            <!-- Populated by JavaScript -->
+                        </div>
+
+                        <!-- Photo Upload Zone -->
+                        <div id="photo-upload-zone" class="photo-upload-zone">
+                            <input type="file" id="dog-photo" accept="image/jpeg,image/png" style="display: none;">
+                            <div class="upload-prompt">
+                                <span class="upload-icon">📷</span>
+                                <p style="margin: 10px 0 5px 0; font-weight: bold;">Foto hochladen</p>
+                                <p class="upload-hint">Drag & Drop oder klicken</p>
+                                <p class="upload-hint">JPEG/PNG, max 10MB</p>
+                            </div>
+                            <div id="photo-preview" class="photo-preview hidden">
+                                <img id="preview-img" src="" alt="Preview" style="display: none;">
+                                <button type="button" class="btn-remove-preview" onclick="dogPhotoManager.clearPreview()">&times;</button>
+                            </div>
+                        </div>
+                    </div>
+
                     <div style="display: flex; gap: 10px;">
                         <button type="submit" class="btn" data-i18n="common.save">Speichern</button>
                         <button type="button" class="btn btn-secondary" onclick="hideForm()" data-i18n="common.cancel">Abbrechen</button>
@@ -82,6 +108,8 @@
 
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
+    <script src="/js/dog-photo-helpers.js"></script>
+    <script src="/js/dog-photo.js"></script>
     <script>
         let currentDogs = [];
 
@@ -109,12 +137,41 @@
             loadDogs();
 
             document.getElementById('dog-form').addEventListener('submit', handleFormSubmit);
+
+            // Initialize photo upload functionality
+            initPhotoUpload();
         });
+
+        function initPhotoUpload() {
+            // Setup drag and drop
+            dogPhotoManager.setupDragDrop('photo-upload-zone', handleFileSelected);
+
+            // Setup file input change handler
+            const fileInput = document.getElementById('dog-photo');
+            if (fileInput) {
+                fileInput.addEventListener('change', (e) => {
+                    if (e.target.files.length > 0) {
+                        handleFileSelected(e.target.files[0]);
+                    }
+                });
+            }
+        }
+
+        async function handleFileSelected(file) {
+            try {
+                await dogPhotoManager.previewFile(file, 'preview-img');
+            } catch (error) {
+                showAlert('error', error.message);
+            }
+        }
 
         async function loadDogs() {
             try {
                 currentDogs = await api.getDogs();
                 renderDogs();
+
+                // Preload first 3 dog images for better performance
+                preloadCriticalDogImages(currentDogs, 3);
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Laden der Hunde');
             }
@@ -130,7 +187,7 @@
             container.innerHTML = currentDogs.map(dog => `
                 <div class="dog-card ${!dog.is_available ? 'unavailable' : ''}">
                     ${!dog.is_available ? `<div class="dog-unavailable-banner">${dog.unavailable_reason || 'Nicht verfügbar'}</div>` : ''}
-                    ${dog.photo ? `<img src="/uploads/${dog.photo}" class="dog-card-image" alt="${dog.name}">` : '<div class="dog-card-image" style="background: #ddd; display: flex; align-items: center; justify-content: center;">🐕</div>'}
+                    ${getDogPhotoHtml(dog, false, 'dog-card-image', true, true)}
                     <div class="dog-card-body">
                         <div class="dog-category-badge ${dog.category}">${getCategoryLabel(dog.category)}</div>
                         <h3 class="dog-card-title">${dog.name}</h3>
@@ -162,6 +219,9 @@
             document.getElementById('dog-form').reset();
             document.getElementById('dog-id').value = '';
             document.getElementById('dog-form-container').classList.remove('hidden');
+
+            // Reset photo upload UI
+            dogPhotoManager.reset();
         }
 
         function editDog(id) {
@@ -176,6 +236,9 @@
             document.getElementById('dog-age').value = dog.age;
             document.getElementById('dog-category').value = dog.category;
             document.getElementById('dog-form-container').classList.remove('hidden');
+
+            // Initialize photo UI for this dog
+            dogPhotoManager.initForDog(dog);
         }
 
         function hideForm() {
@@ -195,13 +258,31 @@
             };
 
             try {
+                let dogId = id;
+
+                // Create or update dog
                 if (id) {
                     await api.updateDog(id, data);
-                    showAlert('success', 'Hund erfolgreich aktualisiert');
                 } else {
-                    await api.createDog(data);
-                    showAlert('success', 'Hund erfolgreich hinzugefügt');
+                    const result = await api.createDog(data);
+                    dogId = result.id;
                 }
+
+                // Upload photo if one is selected
+                if (dogPhotoManager.selectedFile && dogId) {
+                    try {
+                        await dogPhotoManager.uploadSelectedFile(dogId);
+                        showAlert('success', id ? 'Hund und Foto erfolgreich aktualisiert' : 'Hund und Foto erfolgreich hinzugefügt');
+                    } catch (photoError) {
+                        // Dog was saved but photo upload failed
+                        showAlert('warning', id ?
+                            'Hund aktualisiert, aber Foto-Upload fehlgeschlagen: ' + photoError.message :
+                            'Hund hinzugefügt, aber Foto-Upload fehlgeschlagen: ' + photoError.message);
+                    }
+                } else {
+                    showAlert('success', id ? 'Hund erfolgreich aktualisiert' : 'Hund erfolgreich hinzugefügt');
+                }
+
                 hideForm();
                 loadDogs();
             } catch (error) {

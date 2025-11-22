@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 5 Performance Test - Display Optimization</title>
+    <link rel="stylesheet" href="../frontend/assets/css/main.css">
+    <style>
+        body {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        .test-result.pass {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .test-result.fail {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .test-result.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .metric {
+            display: inline-block;
+            background: var(--primary-green);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 4px;
+            margin: 0 5px;
+            font-weight: bold;
+        }
+
+        .dog-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Phase 5: Display Optimization - Performance Test</h1>
+    <p>This page tests the display optimization features implemented in Phase 5.</p>
+
+    <div class="test-section">
+        <h2>Test 1: Helper Functions</h2>
+        <div id="test1-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Lazy Loading</h2>
+        <div id="test2-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: Skeleton Loader</h2>
+        <div id="test3-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 4: Responsive Images</h2>
+        <div id="test4-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 5: Calendar Dog Cell</h2>
+        <div id="test5-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 6: Performance with Many Dogs (20 dogs)</h2>
+        <div id="test6-results"></div>
+        <div id="test6-dogs" class="dog-grid"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Summary</h2>
+        <div id="test-summary"></div>
+    </div>
+
+    <script src="../frontend/js/dog-photo-helpers.js"></script>
+    <script>
+        let passedTests = 0;
+        let totalTests = 0;
+
+        // Test data
+        const testDogs = [
+            {
+                id: 1,
+                name: 'Bella',
+                breed: 'Labrador',
+                category: 'green',
+                photo: 'dogs/dog_1_full.jpg',
+                photo_thumbnail: 'dogs/dog_1_thumb.jpg'
+            },
+            {
+                id: 2,
+                name: 'Max',
+                breed: 'German Shepherd',
+                category: 'blue',
+                photo: null,
+                photo_thumbnail: null
+            },
+            {
+                id: 3,
+                name: 'Charlie',
+                breed: 'Beagle',
+                category: 'orange',
+                photo: 'dogs/dog_3_full.jpg',
+                photo_thumbnail: null // Has photo but no thumbnail
+            }
+        ];
+
+        function runTest(name, testFn) {
+            totalTests++;
+            try {
+                const result = testFn();
+                if (result.pass) {
+                    passedTests++;
+                    return `<div class="test-result pass">✅ ${name}: ${result.message}</div>`;
+                } else {
+                    return `<div class="test-result fail">❌ ${name}: ${result.message}</div>`;
+                }
+            } catch (error) {
+                return `<div class="test-result fail">❌ ${name}: Error - ${error.message}</div>`;
+            }
+        }
+
+        function runInfoTest(name, message) {
+            return `<div class="test-result info">ℹ️ ${name}: ${message}</div>`;
+        }
+
+        // Test 1: Helper Functions
+        document.getElementById('test1-results').innerHTML = `
+            ${runTest('getDogPhotoUrl with photo', () => {
+                const url = getDogPhotoUrl(testDogs[0], false);
+                return {
+                    pass: url === '/uploads/dogs/dog_1_full.jpg',
+                    message: `Returned: ${url}`
+                };
+            })}
+            ${runTest('getDogPhotoUrl with thumbnail', () => {
+                const url = getDogPhotoUrl(testDogs[0], true);
+                return {
+                    pass: url === '/uploads/dogs/dog_1_thumb.jpg',
+                    message: `Returned: ${url}`
+                };
+            })}
+            ${runTest('getDogPhotoUrl without photo (green)', () => {
+                const url = getDogPhotoUrl(testDogs[1], false, true);
+                return {
+                    pass: url.includes('dog-placeholder-blue.svg'),
+                    message: `Returned: ${url}`
+                };
+            })}
+            ${runTest('getDogPhotoAlt with photo', () => {
+                const alt = getDogPhotoAlt(testDogs[0]);
+                return {
+                    pass: alt === 'Bella (Labrador)',
+                    message: `Returned: "${alt}"`
+                };
+            })}
+            ${runTest('getDogPhotoAlt without photo', () => {
+                const alt = getDogPhotoAlt(testDogs[1]);
+                return {
+                    pass: alt === 'Kein Foto für Max',
+                    message: `Returned: "${alt}"`
+                };
+            })}
+        `;
+
+        // Test 2: Lazy Loading
+        document.getElementById('test2-results').innerHTML = `
+            ${runTest('Lazy loading attribute present', () => {
+                const html = getDogPhotoHtml(testDogs[0], false, 'test-class', true);
+                return {
+                    pass: html.includes('loading="lazy"'),
+                    message: 'Loading="lazy" attribute found'
+                };
+            })}
+            ${runTest('Lazy loading can be disabled', () => {
+                const html = getDogPhotoHtml(testDogs[0], false, 'test-class', false);
+                return {
+                    pass: !html.includes('loading="lazy"'),
+                    message: 'Loading attribute correctly omitted'
+                };
+            })}
+        `;
+
+        // Test 3: Skeleton Loader
+        document.getElementById('test3-results').innerHTML = `
+            ${runTest('Skeleton wrapper for real photos', () => {
+                const html = getDogPhotoHtml(testDogs[0], false, 'test-class', true, true, true);
+                return {
+                    pass: html.includes('dog-card-image-container') && html.includes('handleImageLoad'),
+                    message: 'Skeleton wrapper and onload handler present'
+                };
+            })}
+            ${runTest('No skeleton for SVG placeholders', () => {
+                const html = getDogPhotoHtml(testDogs[1], false, 'test-class', true, true, true);
+                return {
+                    pass: !html.includes('dog-card-image-container'),
+                    message: 'SVG placeholder has no skeleton wrapper (correct)'
+                };
+            })}
+            ${runTest('Skeleton can be disabled', () => {
+                const html = getDogPhotoHtml(testDogs[0], false, 'test-class', true, true, false);
+                return {
+                    pass: !html.includes('dog-card-image-container'),
+                    message: 'Skeleton correctly omitted when withSkeleton=false'
+                };
+            })}
+        `;
+
+        // Test 4: Responsive Images
+        document.getElementById('test4-results').innerHTML = `
+            ${runTest('Responsive picture element with thumbnail', () => {
+                const html = getDogPhotoResponsive(testDogs[0]);
+                return {
+                    pass: html.includes('<picture>') && html.includes('<source media='),
+                    message: 'Picture element with source tag generated'
+                };
+            })}
+            ${runTest('Falls back to img for no thumbnail', () => {
+                const html = getDogPhotoResponsive(testDogs[2]);
+                return {
+                    pass: !html.includes('<picture>') && html.includes('<img'),
+                    message: 'Regular img tag when no separate thumbnail'
+                };
+            })}
+        `;
+
+        // Test 5: Calendar Dog Cell
+        document.getElementById('test5-results').innerHTML = `
+            ${runTest('Calendar cell with photo', () => {
+                const html = getCalendarDogCell(testDogs[0]);
+                return {
+                    pass: html.includes('calendar-dog-photo') && html.includes('calendar-dog-name-cell'),
+                    message: 'Calendar cell HTML structure correct'
+                };
+            })}
+            ${runTest('Calendar cell uses thumbnail', () => {
+                const html = getCalendarDogCell(testDogs[0]);
+                return {
+                    pass: html.includes('dog_1_thumb.jpg'),
+                    message: 'Uses thumbnail URL for performance'
+                };
+            })}
+            ${runTest('Calendar cell with placeholder', () => {
+                const html = getCalendarDogCell(testDogs[1]);
+                return {
+                    pass: html.includes('dog-placeholder-blue.svg'),
+                    message: 'Uses category-specific placeholder'
+                };
+            })}
+        `;
+
+        // Test 6: Performance with Many Dogs
+        const manyDogs = [];
+        for (let i = 1; i <= 20; i++) {
+            manyDogs.push({
+                id: i,
+                name: `Dog ${i}`,
+                breed: 'Test Breed',
+                category: ['green', 'blue', 'orange'][i % 3],
+                photo: i % 2 === 0 ? `dogs/dog_${i}_full.jpg` : null,
+                photo_thumbnail: i % 2 === 0 ? `dogs/dog_${i}_thumb.jpg` : null
+            });
+        }
+
+        const startTime = performance.now();
+        const dogsHtml = manyDogs.map(dog => `
+            <div class="dog-card">
+                ${getDogPhotoHtml(dog, true, 'dog-card-image', true, true, true)}
+                <div class="dog-card-body">
+                    <h3>${dog.name}</h3>
+                    <p>${dog.breed}</p>
+                </div>
+            </div>
+        `).join('');
+        const endTime = performance.now();
+        const renderTime = Math.round(endTime - startTime);
+
+        document.getElementById('test6-dogs').innerHTML = dogsHtml;
+        document.getElementById('test6-results').innerHTML = `
+            ${runInfoTest('Rendered 20 dogs', `Time: <span class="metric">${renderTime}ms</span>`)}
+            ${runTest('Render time acceptable', () => {
+                return {
+                    pass: renderTime < 100,
+                    message: `${renderTime}ms (target: <100ms)`
+                };
+            })}
+            ${runTest('Lazy loading enabled for all', () => {
+                const lazyImages = document.querySelectorAll('#test6-dogs img[loading="lazy"]').length;
+                return {
+                    pass: lazyImages > 0,
+                    message: `${lazyImages} images with lazy loading`
+                };
+            })}
+        `;
+
+        // Test Summary
+        const percentage = Math.round((passedTests / totalTests) * 100);
+        const summaryClass = percentage === 100 ? 'pass' : (percentage >= 80 ? 'info' : 'fail');
+
+        document.getElementById('test-summary').innerHTML = `
+            <div class="test-result ${summaryClass}">
+                <h3>Test Results</h3>
+                <p><strong>Passed:</strong> ${passedTests} / ${totalTests} (${percentage}%)</p>
+                ${percentage === 100 ? '<p>✅ All tests passed! Phase 5 optimization working correctly.</p>' : ''}
+                ${percentage >= 80 && percentage < 100 ? '<p>⚠️ Most tests passed, review failures above.</p>' : ''}
+                ${percentage < 80 ? '<p>❌ Multiple test failures, review implementation.</p>' : ''}
+            </div>
+        `;
+
+        console.log('=== Phase 5 Performance Test Results ===');
+        console.log(`Passed: ${passedTests}/${totalTests} (${percentage}%)`);
+        console.log(`Render time for 20 dogs: ${renderTime}ms`);
+    </script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-label="Sample Labrador photo">
+  <defs>
+    <radialGradient id="labBg" cx="50%" cy="50%">
+      <stop offset="0%" style="stop-color:#fef9f3;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e8dcc8;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="800" fill="url(#labBg)"/>
+
+  <!-- Simple dog representation (Labrador) -->
+  <g transform="translate(400, 450)">
+    <!-- Body (golden/tan color for Labrador) -->
+    <ellipse cx="0" cy="0" rx="180" ry="140" fill="#d4a574"/>
+
+    <!-- Head -->
+    <circle cx="-130" cy="-120" r="95" fill="#d4a574"/>
+
+    <!-- Ears (floppy) -->
+    <ellipse cx="-180" cy="-150" rx="40" ry="70" fill="#c89860" transform="rotate(-25 -180 -150)"/>
+    <ellipse cx="-80" cy="-170" rx="35" ry="65" fill="#c89860" transform="rotate(15 -80 -170)"/>
+
+    <!-- Snout -->
+    <ellipse cx="-150" cy="-90" rx="45" ry="35" fill="#e8c9a1"/>
+
+    <!-- Nose -->
+    <ellipse cx="-165" cy="-95" rx="18" ry="12" fill="#3d2817"/>
+
+    <!-- Eyes -->
+    <circle cx="-145" cy="-130" r="8" fill="#3d2817"/>
+    <circle cx="-110" cy="-135" r="8" fill="#3d2817"/>
+
+    <!-- Front legs -->
+    <rect x="-100" y="100" width="45" height="110" rx="22" fill="#d4a574"/>
+    <rect x="-35" y="100" width="45" height="110" rx="22" fill="#d4a574"/>
+
+    <!-- Back legs -->
+    <rect x="60" y="90" width="50" height="110" rx="25" fill="#d4a574"/>
+    <rect x="130" y="90" width="50" height="110" rx="25" fill="#d4a574"/>
+
+    <!-- Tail (wagging up) -->
+    <path d="M 180 -20 Q 240 -60, 250 -100" stroke="#d4a574" stroke-width="35" stroke-linecap="round" fill="none"/>
+
+    <!-- Collar -->
+    <ellipse cx="-70" cy="-80" rx="55" ry="15" fill="#e74c3c"/>
+    <circle cx="-70" cy="-80" r="8" fill="#f39c12"/>
+  </g>
+
+  <!-- Category badge -->
+  <circle cx="70" cy="70" r="45" fill="#82b965"/>
+  <text x="70" y="85"
+        font-family="Arial, sans-serif"
+        font-size="36"
+        fill="white"
+        text-anchor="middle"
+        font-weight="bold">
+    G
+  </text>
+
+  <!-- Sample watermark -->
+  <text x="400" y="750"
+        font-family="Arial, sans-serif"
+        font-size="24"
+        fill="#999"
+        text-anchor="middle"
+        opacity="0.5">
+    Sample Photo - Bella (Labrador)
+  </text>
+</svg>

@@ -23,10 +23,10 @@ func NewDogRepository(db *sql.DB) *DogRepository {
 func (r *DogRepository) Create(dog *models.Dog) error {
 	query := `
 		INSERT INTO dogs (
-			name, breed, size, age, category, special_needs,
+			name, breed, size, age, category, photo, photo_thumbnail, special_needs,
 			pickup_location, walk_route, walk_duration, special_instructions,
 			default_morning_time, default_evening_time, is_available
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	result, err := r.db.Exec(
@@ -36,6 +36,8 @@ func (r *DogRepository) Create(dog *models.Dog) error {
 		dog.Size,
 		dog.Age,
 		dog.Category,
+		dog.Photo,
+		dog.PhotoThumbnail,
 		dog.SpecialNeeds,
 		dog.PickupLocation,
 		dog.WalkRoute,
@@ -63,7 +65,7 @@ func (r *DogRepository) Create(dog *models.Dog) error {
 // FindByID finds a dog by ID
 func (r *DogRepository) FindByID(id int) (*models.Dog, error) {
 	query := `
-		SELECT id, name, breed, size, age, category, photo, special_needs,
+		SELECT id, name, breed, size, age, category, photo, photo_thumbnail, special_needs,
 		       pickup_location, walk_route, walk_duration, special_instructions,
 		       default_morning_time, default_evening_time, is_available,
 		       unavailable_reason, unavailable_since, created_at, updated_at
@@ -80,6 +82,7 @@ func (r *DogRepository) FindByID(id int) (*models.Dog, error) {
 		&dog.Age,
 		&dog.Category,
 		&dog.Photo,
+		&dog.PhotoThumbnail,
 		&dog.SpecialNeeds,
 		&dog.PickupLocation,
 		&dog.WalkRoute,
@@ -107,7 +110,7 @@ func (r *DogRepository) FindByID(id int) (*models.Dog, error) {
 // FindAll finds all dogs with optional filtering
 func (r *DogRepository) FindAll(filter *models.DogFilterRequest) ([]*models.Dog, error) {
 	query := `
-		SELECT id, name, breed, size, age, category, photo, special_needs,
+		SELECT id, name, breed, size, age, category, photo, photo_thumbnail, special_needs,
 		       pickup_location, walk_route, walk_duration, special_instructions,
 		       default_morning_time, default_evening_time, is_available,
 		       unavailable_reason, unavailable_since, created_at, updated_at
@@ -175,6 +178,7 @@ func (r *DogRepository) FindAll(filter *models.DogFilterRequest) ([]*models.Dog,
 			&dog.Age,
 			&dog.Category,
 			&dog.Photo,
+			&dog.PhotoThumbnail,
 			&dog.SpecialNeeds,
 			&dog.PickupLocation,
 			&dog.WalkRoute,
@@ -207,6 +211,7 @@ func (r *DogRepository) Update(dog *models.Dog) error {
 			age = ?,
 			category = ?,
 			photo = ?,
+			photo_thumbnail = ?,
 			special_needs = ?,
 			pickup_location = ?,
 			walk_route = ?,
@@ -229,6 +234,7 @@ func (r *DogRepository) Update(dog *models.Dog) error {
 		dog.Age,
 		dog.Category,
 		dog.Photo,
+		dog.PhotoThumbnail,
 		dog.SpecialNeeds,
 		dog.PickupLocation,
 		dog.WalkRoute,
