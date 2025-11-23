@@ -9,15 +9,34 @@
 <body>
     <header>
         <div class="container">
-            <div class="logo">🐕 Gassigeher</div>
-            <nav>
+            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <a href="/" class="logo">🐕 Gassigeher</a>
+
+            <!-- Public Navigation (for non-authenticated users) -->
+            <nav id="public-nav" style="display: none;">
                 <ul>
                     <li><a href="/login.html" data-i18n="nav.login">Anmelden</a></li>
                     <li><a href="/register.html" data-i18n="nav.register">Registrieren</a></li>
                 </ul>
             </nav>
+
+            <!-- Authenticated Navigation (for logged-in users) -->
+            <nav id="main-nav" style="display: none;">
+                <ul>
+                    <li><a href="/dashboard.html" data-i18n="nav.dashboard">Dashboard</a></li>
+                    <li><a href="/dogs.html" data-i18n="dogs.all_dogs">Hunde</a></li>
+                    <li><a href="/calendar.html">Kalender</a></li>
+                    <li><a href="/profile.html" style="display: flex; align-items: center; gap: 8px;">
+                        <span id="header-photo" style="width: 32px; height: 32px; border-radius: 50%; background: #ddd; display: inline-flex; align-items: center; justify-content: center; overflow: hidden;">👤</span>
+                        <span data-i18n="nav.profile">Profil</span>
+                    </a></li>
+                    <li id="admin-area-link" style="display: none;"><a href="/admin-dashboard.html" class="area-switcher" data-i18n="nav.admin_area">🔧 Admin-Bereich</a></li>
+                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                </ul>
+            </nav>
         </div>
     </header>
+    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
 
     <main>
         <section class="hero">
@@ -63,9 +82,93 @@
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
     <script>
-        // Load translations
+        // Custom toggle menu function for index.html (handles both public and authenticated nav)
+        function toggleMenu() {
+            const publicNav = document.getElementById('public-nav');
+            const mainNav = document.getElementById('main-nav');
+            const overlay = document.getElementById('nav-overlay');
+
+            // Toggle the nav that is currently visible
+            const activeNav = (publicNav && publicNav.style.display !== 'none') ? publicNav : mainNav;
+
+            if (activeNav && overlay) {
+                activeNav.classList.toggle('active');
+                overlay.classList.toggle('active');
+            }
+        }
+
+        // Close menu when clicking on a link
+        document.addEventListener('click', function(e) {
+            if (e.target.tagName === 'A' && e.target.getAttribute('href') !== '#') {
+                const publicNav = document.getElementById('public-nav');
+                const mainNav = document.getElementById('main-nav');
+                const overlay = document.getElementById('nav-overlay');
+
+                if (publicNav && publicNav.classList.contains('active')) {
+                    publicNav.classList.remove('active');
+                    overlay.classList.remove('active');
+                }
+                if (mainNav && mainNav.classList.contains('active')) {
+                    mainNav.classList.remove('active');
+                    overlay.classList.remove('active');
+                }
+            }
+        });
+
+        // Show admin link if user is admin (reused from nav-menu.js)
+        function showAdminLinkIfAdmin(user) {
+            if (user && user.is_admin) {
+                const adminLink = document.getElementById('admin-area-link');
+                if (adminLink) {
+                    adminLink.style.display = 'list-item';
+                    if (window.i18n && window.i18n.updateElement) {
+                        window.i18n.updateElement(adminLink);
+                    }
+                }
+            }
+        }
+
+        // Check authentication and show appropriate navigation
+        async function setupNavigation() {
+            const isAuthenticated = api.isAuthenticated();
+            const publicNav = document.getElementById('public-nav');
+            const mainNav = document.getElementById('main-nav');
+
+            if (isAuthenticated) {
+                // Show authenticated navigation
+                if (mainNav) mainNav.style.display = 'block';
+                if (publicNav) publicNav.style.display = 'none';
+
+                // Fetch user data to check admin status and profile photo
+                try {
+                    const userData = await api.getMe();
+
+                    // Show admin link if user is admin
+                    if (userData.is_admin) {
+                        showAdminLinkIfAdmin(userData);
+                    }
+
+                    // Load profile photo if available
+                    const headerPhoto = document.getElementById('header-photo');
+                    if (headerPhoto && userData.profile_photo) {
+                        headerPhoto.innerHTML = `<img src="/uploads/${userData.profile_photo}"
+                            style="width: 100%; height: 100%; object-fit: cover;"
+                            alt="Profile">`;
+                    }
+                } catch (error) {
+                    console.error('Error fetching user data:', error);
+                }
+            } else {
+                // Show public navigation
+                if (publicNav) publicNav.style.display = 'block';
+                if (mainNav) mainNav.style.display = 'none';
+            }
+        }
+
+        // Load translations and setup navigation
         document.addEventListener('DOMContentLoaded', async () => {
             await window.i18n.load();
+            await setupNavigation();
         });
     </script>
 </body>
