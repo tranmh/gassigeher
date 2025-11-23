@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/tranm/gassigeher/internal/middleware"
 	"github.com/tranm/gassigeher/internal/models"
 	"github.com/tranm/gassigeher/internal/repository"
+	"github.com/tranm/gassigeher/internal/services"
 )
 
 // BlockedDateHandler handles blocked date-related HTTP requests
@@ -18,14 +20,28 @@ type BlockedDateHandler struct {
 	db              *sql.DB
 	cfg             *config.Config
 	blockedDateRepo *repository.BlockedDateRepository
+	bookingRepo     *repository.BookingRepository
+	userRepo        *repository.UserRepository
+	dogRepo         *repository.DogRepository
+	emailService    *services.EmailService
 }
 
 // NewBlockedDateHandler creates a new blocked date handler
 func NewBlockedDateHandler(db *sql.DB, cfg *config.Config) *BlockedDateHandler {
+	// Initialize email service (fail gracefully if email not configured)
+	emailService, err := services.NewEmailService(services.ConfigToEmailConfig(cfg))
+	if err != nil {
+		fmt.Printf("Warning: Failed to initialize email service in BlockedDateHandler: %v\n", err)
+	}
+
 	return &BlockedDateHandler{
 		db:              db,
 		cfg:             cfg,
 		blockedDateRepo: repository.NewBlockedDateRepository(db),
+		bookingRepo:     repository.NewBookingRepository(db),
+		userRepo:        repository.NewUserRepository(db),
+		dogRepo:         repository.NewDogRepository(db),
+		emailService:    emailService,
 	}
 }
 
@@ -74,7 +90,62 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	respondJSON(w, http.StatusCreated, blockedDate)
+	// Find all scheduled bookings on this date
+	status := "scheduled"
+	filter := &models.BookingFilterRequest{
+		DateFrom: &req.Date,
+		DateTo:   &req.Date,
+		Status:   &status,
+	}
+	bookings, err := h.bookingRepo.FindAll(filter)
+	if err != nil {
+		fmt.Printf("Warning: Failed to find bookings for date %s: %v\n", req.Date, err)
+		// Continue even if we can't find bookings - at least the date is blocked
+	}
+
+	// Cancel each booking and notify users
+	cancelledCount := 0
+	cancellationReason := fmt.Sprintf("Datum wurde durch Administration gesperrt: %s", req.Reason)
+
+	for _, booking := range bookings {
+		// Cancel the booking
+		if err := h.bookingRepo.Cancel(booking.ID, &cancellationReason); err != nil {
+			fmt.Printf("Warning: Failed to cancel booking %d: %v\n", booking.ID, err)
+			continue
+		}
+		cancelledCount++
+
+		// Get user details for email
+		user, err := h.userRepo.FindByID(booking.UserID)
+		if err != nil {
+			fmt.Printf("Warning: Failed to get user %d for cancellation email: %v\n", booking.UserID, err)
+			continue
+		}
+
+		// Get dog details for email
+		dog, err := h.dogRepo.FindByID(booking.DogID)
+		if err != nil {
+			fmt.Printf("Warning: Failed to get dog %d for cancellation email: %v\n", booking.DogID, err)
+			continue
+		}
+
+		// Send cancellation email (in goroutine, don't block)
+		if h.emailService != nil && user.Email != nil {
+			go func(userEmail, userName, dogName, date, walkType, reason string) {
+				if err := h.emailService.SendAdminCancellation(userEmail, userName, dogName, date, walkType, reason); err != nil {
+					fmt.Printf("Warning: Failed to send cancellation email to %s: %v\n", userEmail, err)
+				}
+			}(*user.Email, user.Name, dog.Name, booking.Date, booking.WalkType, cancellationReason)
+		}
+	}
+
+	// Return response with cancellation count
+	response := map[string]interface{}{
+		"blocked_date":      blockedDate,
+		"cancelled_bookings": cancelledCount,
+	}
+
+	respondJSON(w, http.StatusCreated, response)
 }
 
 // DeleteBlockedDate deletes a blocked date (admin only)

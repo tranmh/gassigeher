@@ -145,8 +145,15 @@
             const reason = document.getElementById('block-reason').value;
 
             try {
-                await api.createBlockedDate(date, reason);
-                showAlert('success', 'Tag wurde gesperrt');
+                const response = await api.createBlockedDate(date, reason);
+
+                // Show success message with cancellation count
+                let message = 'Tag wurde gesperrt';
+                if (response.cancelled_bookings > 0) {
+                    message += ` (${response.cancelled_bookings} ${response.cancelled_bookings === 1 ? 'Buchung wurde storniert' : 'Buchungen wurden storniert'})`;
+                }
+
+                showAlert('success', message);
                 hideBlockForm();
                 loadBlockedDates();
             } catch (error) {
