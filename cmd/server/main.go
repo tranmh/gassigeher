@@ -184,6 +184,11 @@ func main() {
 	// Uploads directory (user photos, dog photos)
 	router.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
 
+	// Serve specific HTML pages without .html extension
+	router.HandleFunc("/verify", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./frontend/verify.html")
+	}).Methods("GET")
+
 	// Static files
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./frontend")))
 
