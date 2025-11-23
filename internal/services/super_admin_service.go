@@ -1,10 +1,12 @@
 package services
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"errors"
 	"fmt"
 	"log"
+	"math/big"
 	"os"
 	"strings"
 	"time"
@@ -36,7 +38,20 @@ func (s *SuperAdminService) CheckAndUpdatePassword() error {
 
 	// Check if file exists
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		log.Println("Super Admin credentials file not found (okay for existing installations)")
+		// Credentials file doesn't exist - check if Super Admin exists in database
+		var superAdminExists bool
+		err := s.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = 1 AND is_super_admin = 1)").Scan(&superAdminExists)
+		if err != nil {
+			return fmt.Errorf("failed to check if Super Admin exists: %w", err)
+		}
+
+		if superAdminExists {
+			// Super Admin exists but credentials file is missing - regenerate it with new password
+			log.Println("Super Admin exists but credentials file is missing - generating new password...")
+			return s.regenerateCredentialsFile()
+		}
+
+		log.Println("Super Admin credentials file not found (okay for first-time installation)")
 		return nil
 	}
 
@@ -160,6 +175,123 @@ IMPORTANT:
 `, email, password, createdTime, time.Now().Format("2006-01-02 15:04:05"), changeConfirmation)
 
 	return os.WriteFile("SUPER_ADMIN_CREDENTIALS.txt", []byte(content), 0600)
+}
+
+// regenerateCredentialsFile generates a new password for Super Admin and creates credentials file
+// Used when credentials file is missing but Super Admin exists in database
+// DONE
+func (s *SuperAdminService) regenerateCredentialsFile() error {
+	// Generate new secure password
+	newPassword := generateSecurePassword(20)
+
+	// Hash the new password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash new password: %w", err)
+	}
+
+	// Update database with new password
+	_, err = s.db.Exec("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = 1", string(hashedPassword), time.Now())
+	if err != nil {
+		return fmt.Errorf("failed to update Super Admin password: %w", err)
+	}
+
+	// Create credentials file
+	now := time.Now().Format("2006-01-02 15:04:05")
+	content := fmt.Sprintf(`=============================================================
+GASSIGEHER - SUPER ADMIN CREDENTIALS
+=============================================================
+
+EMAIL: %s
+PASSWORD: %s
+
+CREATED: %s
+LAST UPDATED: %s
+
+IMPORTANT: This password was REGENERATED because the credentials file was missing.
+
+=============================================================
+HOW TO CHANGE PASSWORD:
+=============================================================
+
+1. Edit the PASSWORD line above with your new password
+2. Save this file
+3. Restart the Gassigeher server
+4. Server will hash and save the new password
+5. This file will be updated with confirmation
+
+IMPORTANT:
+- Keep this file secure (never commit to git)
+- This is the ONLY way to change Super Admin password
+- Super Admin email cannot be changed (defined in .env)
+
+=============================================================
+`, s.cfg.SuperAdminEmail, newPassword, now, now)
+
+	err = os.WriteFile("SUPER_ADMIN_CREDENTIALS.txt", []byte(content), 0600)
+	if err != nil {
+		return fmt.Errorf("failed to write credentials file: %w", err)
+	}
+
+	// Print to console
+	fmt.Println()
+	fmt.Println("=============================================================")
+	fmt.Println("  SUPER ADMIN CREDENTIALS REGENERATED")
+	fmt.Println("=============================================================")
+	fmt.Println()
+	fmt.Println("The credentials file was missing, so a NEW password was generated:")
+	fmt.Println()
+	fmt.Printf("  Email:    %s\n", s.cfg.SuperAdminEmail)
+	fmt.Printf("  Password: %s\n", newPassword)
+	fmt.Println()
+	fmt.Println("IMPORTANT:")
+	fmt.Println("- New password saved to: SUPER_ADMIN_CREDENTIALS.txt")
+	fmt.Println("- Old password is no longer valid")
+	fmt.Println("- Change password by editing the file and restarting server")
+	fmt.Println()
+	fmt.Println("=============================================================")
+	fmt.Println()
+
+	log.Println("✓ Super Admin credentials file regenerated successfully")
+	return nil
+}
+
+// generateSecurePassword generates a secure random password using crypto/rand
+// DONE
+func generateSecurePassword(length int) string {
+	// Character sets for password generation
+	lowercase := "abcdefghijklmnopqrstuvwxyz"
+	uppercase := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	numbers := "0123456789"
+	special := "!@#$%^&*"
+	allChars := lowercase + uppercase + numbers + special
+
+	password := make([]byte, length)
+
+	// Helper function to get random character from charset
+	randomChar := func(charset string) byte {
+		n, _ := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		return charset[n.Int64()]
+	}
+
+	// Ensure at least one of each type
+	password[0] = randomChar(lowercase)
+	password[1] = randomChar(uppercase)
+	password[2] = randomChar(numbers)
+	password[3] = randomChar(special)
+
+	// Fill rest randomly
+	for i := 4; i < length; i++ {
+		password[i] = randomChar(allChars)
+	}
+
+	// Shuffle password characters
+	for i := len(password) - 1; i > 0; i-- {
+		j, _ := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
+		password[i], password[j.Int64()] = password[j.Int64()], password[i]
+	}
+
+	return string(password)
 }
 
 // DONE

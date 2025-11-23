@@ -1,0 +1,9 @@
+@echo off
+echo Testing Super Admin credentials regeneration...
+echo.
+echo Step 1: Ensuring credentials file doesn't exist...
+if exist SUPER_ADMIN_CREDENTIALS.txt del SUPER_ADMIN_CREDENTIALS.txt
+echo.
+echo Step 2: Running application (press Ctrl+C to stop after seeing credentials)...
+echo.
+gassigeher.exe

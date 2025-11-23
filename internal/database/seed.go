@@ -176,24 +176,22 @@ func generateDogs(db *sql.DB) error {
 		Category string
 		Breed    string
 		Age      int
-		Gender   string
-		Desc     string
 	}{
-		{"Bella", "green", "Labrador Retriever", 3, "female", "Freundlicher und ruhiger Hund, perfekt für Anfänger"},
-		{"Max", "green", "Golden Retriever", 5, "male", "Sehr gutmütig und leicht zu führen"},
-		{"Luna", "blue", "Deutscher Schäferhund", 4, "female", "Aktiv und intelligent, braucht erfahrene Führung"},
-		{"Charlie", "blue", "Border Collie", 2, "male", "Energiegeladen und verspielt, benötigt Erfahrung"},
-		{"Rocky", "orange", "Belgischer Malinois", 6, "male", "Sehr anspruchsvoll, nur für erfahrene Hundeführer"},
+		{"Bella", "green", "Labrador Retriever", 3},
+		{"Max", "green", "Golden Retriever", 5},
+		{"Luna", "blue", "Deutscher Schäferhund", 4},
+		{"Charlie", "blue", "Border Collie", 2},
+		{"Rocky", "orange", "Belgischer Malinois", 6},
 	}
 
 	now := time.Now()
 	for _, dog := range dogs {
 		_, err := db.Exec(`
-			INSERT INTO dogs (name, category, breed, age, gender,
-				description, special_needs, is_available, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, dog.Name, dog.Category, dog.Breed, dog.Age, dog.Gender,
-			dog.Desc, "Keine besonderen Bedürfnisse", true, now, now)
+			INSERT INTO dogs (name, category, breed, age,
+				special_needs, is_available, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`, dog.Name, dog.Category, dog.Breed, dog.Age,
+			"Keine besonderen Bedürfnisse", true, now, now)
 		if err != nil {
 			return fmt.Errorf("failed to create dog %s: %w", dog.Name, err)
 		}
@@ -218,9 +216,9 @@ func generateBookings(db *sql.DB) error {
 		Status string
 		Type   string
 	}{
-		{2, 1, yesterday, "09:00", "completed", "short"},
-		{3, 2, today, "14:00", "scheduled", "long"},
-		{4, 3, tomorrow, "10:30", "scheduled", "short"},
+		{2, 1, yesterday, "09:00", "completed", "morning"},
+		{3, 2, today, "14:00", "scheduled", "evening"},
+		{4, 3, tomorrow, "10:30", "scheduled", "morning"},
 	}
 
 	now := time.Now()
@@ -257,14 +255,14 @@ func initializeSystemSettings(db *sql.DB) error {
 	for _, setting := range settings {
 		// Check if setting exists
 		var count int
-		err := db.QueryRow("SELECT COUNT(*) FROM system_settings WHERE setting_key = ?", setting.Key).Scan(&count)
+		err := db.QueryRow("SELECT COUNT(*) FROM system_settings WHERE key = ?", setting.Key).Scan(&count)
 		if err != nil {
 			return fmt.Errorf("failed to check setting %s: %w", setting.Key, err)
 		}
 
 		if count == 0 {
 			_, err = db.Exec(`
-				INSERT INTO system_settings (setting_key, setting_value, updated_at)
+				INSERT INTO system_settings (key, value, updated_at)
 				VALUES (?, ?, ?)
 			`, setting.Key, setting.Value, now)
 			if err != nil {

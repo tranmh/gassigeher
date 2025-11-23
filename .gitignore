@@ -3,11 +3,18 @@ gassigeher.exe
 gassigeher
 bin/
 
+# Test binaries
+tests/installation/test_all_scenarios.exe
+tests/installation/test_all_scenarios
+
 # Database files
 gassigeher.db
+gassigeher.db.backup
+*.db.backup
 
 # Super Admin credentials (NEVER commit!)
 SUPER_ADMIN_CREDENTIALS.txt
+SUPER_ADMIN_CREDENTIALS.txt.backup
 
 # Test data
 scripts/testdata.sql
