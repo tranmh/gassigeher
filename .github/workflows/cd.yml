@@ -18,5 +18,7 @@ jobs:
         continue-on-error: true
       - name: Build image
         run: podman build -t gassigeher:latest .
+      - name: Create data directory
+        run: New-Item -ItemType Directory -Force -Path data
       - name: Run new container
         run: podman run -d --name gassigeher -p 8888:8888 -v ./data:/app/data:Z -e DATABASE_PATH=/app/data/gassigeher.db gassigeher:latest
