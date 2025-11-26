@@ -20,4 +20,11 @@ jobs:
       - name: Create uploads directory
         run: New-Item -ItemType Directory -Force -Path uploads
       - name: Run new container
-        run: podman run -d --name gassigeher -p 8888:8888 -v ./data:/app/data:Z -v ./uploads:/app/uploads:Z -e DATABASE_PATH=/app/data/gassigeher.db gassigeher:latest
+        run: podman run -d --name gassigeher -p 8888:8888 \
+              -v ./data:/app/data:Z \
+              -v ./uploads:/app/uploads:Z \
+              -e DATABASE_PATH=/app/data/gassigeher.db \
+              -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
+              -e SUPER_ADMIN_EMAIL=${{ secrets.SUPER_ADMIN_EMAIL }} \
+              -e BASE_URL=${{ secrets.BASE_URL }} \
+              gassigeher:latest
