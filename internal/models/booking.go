@@ -17,6 +17,13 @@ type Booking struct {
 	CreatedAt               time.Time  `json:"created_at"`
 	UpdatedAt               time.Time  `json:"updated_at"`
 
+	// Approval workflow fields
+	RequiresApproval bool       `json:"requires_approval"`
+	ApprovalStatus   string     `json:"approval_status"` // 'pending', 'approved', 'rejected'
+	ApprovedBy       *int       `json:"approved_by,omitempty"`
+	ApprovedAt       *time.Time `json:"approved_at,omitempty"`
+	RejectionReason  *string    `json:"rejection_reason,omitempty"`
+
 	// Joined data for responses
 	User *User `json:"user,omitempty"`
 	Dog  *Dog  `json:"dog,omitempty"`

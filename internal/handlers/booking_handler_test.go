@@ -1013,3 +1013,382 @@ func TestBookingHandler_GetCalendarData(t *testing.T) {
 		}
 	})
 }
+
+// ===== Phase 3: Integration Testing - Time Validation =====
+
+// Test 3.3.1: POST /api/bookings (Time Validation)
+func TestCreateBooking_TimeValidation(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewBookingHandler(db, cfg)
+
+	userID := testutil.SeedTestUser(t, db, "timetest@example.com", "Time Test User", "green")
+	dogID := testutil.SeedTestDog(t, db, "TimeDog", "Beagle", "green")
+	db.Exec("UPDATE users SET is_verified = 1, is_active = 1 WHERE id = ?", userID)
+
+	testCases := []struct {
+		name                string
+		date                string
+		time                string
+		wantStatus          int
+		checkApprovalStatus func(*testing.T, *httptest.ResponseRecorder)
+	}{
+		{
+			name:       "TC-3.3.1-A: Valid afternoon time - auto-approved",
+			date:       time.Now().AddDate(0, 0, 1).Format("2006-01-02"),
+			time:       "15:00",
+			wantStatus: http.StatusCreated,
+			checkApprovalStatus: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				var response models.Booking
+				json.Unmarshal(rec.Body.Bytes(), &response)
+				if response.ApprovalStatus != "approved" {
+					t.Errorf("Expected auto-approved, got %s", response.ApprovalStatus)
+				}
+				if response.RequiresApproval {
+					t.Error("Expected requires_approval=false for afternoon walk")
+				}
+			},
+		},
+		{
+			name:       "TC-3.3.1-B: Morning time - requires approval",
+			date:       time.Now().AddDate(0, 0, 2).Format("2006-01-02"),
+			time:       "10:00",
+			wantStatus: http.StatusCreated,
+			checkApprovalStatus: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				var response models.Booking
+				json.Unmarshal(rec.Body.Bytes(), &response)
+				if response.ApprovalStatus != "pending" {
+					t.Errorf("Expected pending approval, got %s", response.ApprovalStatus)
+				}
+				if !response.RequiresApproval {
+					t.Error("Expected requires_approval=true for morning walk")
+				}
+			},
+		},
+		{
+			name:       "TC-3.3.1-C: Blocked time - lunch block",
+			date:       time.Now().AddDate(0, 0, 3).Format("2006-01-02"),
+			time:       "13:30",
+			wantStatus: http.StatusBadRequest,
+			checkApprovalStatus: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				var response map[string]interface{}
+				json.Unmarshal(rec.Body.Bytes(), &response)
+				errorMsg := response["error"].(string)
+				if !stringContains(errorMsg, "gesperrt") && !stringContains(errorMsg, "blocked") {
+					t.Errorf("Expected blocked time error, got %s", errorMsg)
+				}
+			},
+		},
+		{
+			name:       "TC-3.3.1-D: Outside window - too late",
+			date:       time.Now().AddDate(0, 0, 4).Format("2006-01-02"),
+			time:       "20:00",
+			wantStatus: http.StatusBadRequest,
+			checkApprovalStatus: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				var response map[string]interface{}
+				json.Unmarshal(rec.Body.Bytes(), &response)
+				errorMsg := response["error"].(string)
+				if !stringContains(errorMsg, "außerhalb") && !stringContains(errorMsg, "outside") {
+					t.Errorf("Expected outside window error, got %s", errorMsg)
+				}
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			reqBody := map[string]interface{}{
+				"dog_id":         dogID,
+				"date":           tc.date,
+				"walk_type":      "morning",
+				"scheduled_time": tc.time,
+			}
+
+			body, _ := json.Marshal(reqBody)
+			req := httptest.NewRequest(http.MethodPost, "/api/bookings", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			ctx := contextWithUser(req.Context(), userID, "timetest@example.com", false)
+			req = req.WithContext(ctx)
+
+			rec := httptest.NewRecorder()
+			handler.CreateBooking(rec, req)
+
+			if rec.Code != tc.wantStatus {
+				t.Errorf("Status = %d, want %d. Body: %s", rec.Code, tc.wantStatus, rec.Body.String())
+			}
+
+			if tc.checkApprovalStatus != nil {
+				tc.checkApprovalStatus(t, rec)
+			}
+		})
+	}
+}
+
+// Test 3.3.2: GET /api/bookings/pending-approvals
+func TestGetPendingApprovals(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{JWTSecret: "test-secret"}
+	handler := NewBookingHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
+	user1ID := testutil.SeedTestUser(t, db, "user1@example.com", "User 1", "green")
+	user2ID := testutil.SeedTestUser(t, db, "user2@example.com", "User 2", "green")
+	dogID := testutil.SeedTestDog(t, db, "PendingDog", "Labrador", "green")
+
+	// Create 5 pending bookings
+	for i := 1; i <= 5; i++ {
+		date := time.Now().AddDate(0, 0, i).Format("2006-01-02")
+		bookingID := testutil.SeedTestBooking(t, db, user1ID, dogID, date, "morning", "10:00", "scheduled")
+		db.Exec("UPDATE bookings SET requires_approval = 1, approval_status = 'pending' WHERE id = ?", bookingID)
+	}
+
+	// Create 3 approved bookings (should not appear)
+	for i := 6; i <= 8; i++ {
+		date := time.Now().AddDate(0, 0, i).Format("2006-01-02")
+		bookingID := testutil.SeedTestBooking(t, db, user2ID, dogID, date, "evening", "15:00", "scheduled")
+		db.Exec("UPDATE bookings SET requires_approval = 0, approval_status = 'approved' WHERE id = ?", bookingID)
+	}
+
+	testCases := []struct {
+		name       string
+		isAdmin    bool
+		wantStatus int
+		wantCount  int
+	}{
+		{
+			name:       "TC-3.3.2-A: Admin can get pending approvals",
+			isAdmin:    true,
+			wantStatus: http.StatusOK,
+			wantCount:  5,
+		},
+		{
+			name:       "TC-3.3.2-C: Regular user cannot access",
+			isAdmin:    false,
+			wantStatus: http.StatusForbidden,
+			wantCount:  0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/bookings/pending-approvals", nil)
+			userID := user1ID
+			if tc.isAdmin {
+				userID = adminID
+			}
+			ctx := contextWithUser(req.Context(), userID, "admin@example.com", tc.isAdmin)
+			req = req.WithContext(ctx)
+
+			rec := httptest.NewRecorder()
+			handler.GetPendingApprovals(rec, req)
+
+			if rec.Code != tc.wantStatus {
+				t.Errorf("Status = %d, want %d. Body: %s", rec.Code, tc.wantStatus, rec.Body.String())
+			}
+
+			if tc.wantStatus == http.StatusOK {
+				var bookings []models.Booking
+				json.Unmarshal(rec.Body.Bytes(), &bookings)
+				if len(bookings) != tc.wantCount {
+					t.Errorf("Expected %d pending bookings, got %d", tc.wantCount, len(bookings))
+				}
+			}
+		})
+	}
+}
+
+// Test 3.3.3: PUT /api/bookings/:id/approve
+func TestApproveBooking(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{JWTSecret: "test-secret"}
+	handler := NewBookingHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
+	userID := testutil.SeedTestUser(t, db, "user@example.com", "User", "green")
+	dogID := testutil.SeedTestDog(t, db, "ApproveDog", "Poodle", "green")
+
+	// Create pending booking
+	pendingDate := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
+	pendingID := testutil.SeedTestBooking(t, db, userID, dogID, pendingDate, "morning", "10:00", "scheduled")
+	db.Exec("UPDATE bookings SET requires_approval = 1, approval_status = 'pending' WHERE id = ?", pendingID)
+
+	// Create already approved booking
+	approvedDate := time.Now().AddDate(0, 0, 2).Format("2006-01-02")
+	approvedID := testutil.SeedTestBooking(t, db, userID, dogID, approvedDate, "evening", "15:00", "scheduled")
+	db.Exec("UPDATE bookings SET requires_approval = 0, approval_status = 'approved' WHERE id = ?", approvedID)
+
+	testCases := []struct {
+		name        string
+		bookingID   int
+		isAdmin     bool
+		wantStatus  int
+		checkResult func(*testing.T, int)
+	}{
+		{
+			name:       "TC-3.3.3-A: Admin can approve pending booking",
+			bookingID:  pendingID,
+			isAdmin:    true,
+			wantStatus: http.StatusOK,
+			checkResult: func(t *testing.T, id int) {
+				var status string
+				var approvedBy *int
+				db.QueryRow("SELECT approval_status, approved_by FROM bookings WHERE id = ?", id).Scan(&status, &approvedBy)
+				if status != "approved" {
+					t.Errorf("Expected status='approved', got %s", status)
+				}
+				if approvedBy == nil || *approvedBy != adminID {
+					t.Errorf("Expected approved_by=%d, got %v", adminID, approvedBy)
+				}
+			},
+		},
+		{
+			name:       "TC-3.3.3-D: Regular user cannot approve",
+			bookingID:  pendingID,
+			isAdmin:    false,
+			wantStatus: http.StatusForbidden,
+			checkResult: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := "/api/bookings/" + fmt.Sprintf("%d", tc.bookingID) + "/approve"
+			req := httptest.NewRequest(http.MethodPut, path, nil)
+			req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", tc.bookingID)})
+
+			userCtx := userID
+			if tc.isAdmin {
+				userCtx = adminID
+			}
+			ctx := contextWithUser(req.Context(), userCtx, "admin@example.com", tc.isAdmin)
+			req = req.WithContext(ctx)
+
+			rec := httptest.NewRecorder()
+			handler.ApprovePendingBooking(rec, req)
+
+			if rec.Code != tc.wantStatus {
+				t.Errorf("Status = %d, want %d. Body: %s", rec.Code, tc.wantStatus, rec.Body.String())
+			}
+
+			if tc.checkResult != nil {
+				tc.checkResult(t, tc.bookingID)
+			}
+		})
+	}
+}
+
+// Test 3.3.4: PUT /api/bookings/:id/reject
+func TestRejectBooking(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{JWTSecret: "test-secret"}
+	handler := NewBookingHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
+	userID := testutil.SeedTestUser(t, db, "user@example.com", "User", "green")
+	dogID := testutil.SeedTestDog(t, db, "RejectDog", "Shepherd", "green")
+
+	// Create pending booking
+	pendingDate := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
+	pendingID := testutil.SeedTestBooking(t, db, userID, dogID, pendingDate, "morning", "10:00", "scheduled")
+	db.Exec("UPDATE bookings SET requires_approval = 1, approval_status = 'pending' WHERE id = ?", pendingID)
+
+	// Create approved booking (cannot reject)
+	approvedDate := time.Now().AddDate(0, 0, 2).Format("2006-01-02")
+	approvedID := testutil.SeedTestBooking(t, db, userID, dogID, approvedDate, "evening", "15:00", "scheduled")
+	db.Exec("UPDATE bookings SET requires_approval = 0, approval_status = 'approved' WHERE id = ?", approvedID)
+
+	testCases := []struct {
+		name        string
+		bookingID   int
+		reason      string
+		isAdmin     bool
+		wantStatus  int
+		checkResult func(*testing.T, int)
+	}{
+		{
+			name:       "TC-3.3.4-A: Admin can reject with reason",
+			bookingID:  pendingID,
+			reason:     "Nicht verfügbar",
+			isAdmin:    true,
+			wantStatus: http.StatusOK,
+			checkResult: func(t *testing.T, id int) {
+				var status, rejectionReason string
+				db.QueryRow("SELECT status, rejection_reason FROM bookings WHERE id = ?", id).Scan(&status, &rejectionReason)
+				if status != "cancelled" {
+					t.Errorf("Expected status='cancelled', got %s", status)
+				}
+				if rejectionReason != "Nicht verfügbar" {
+					t.Errorf("Expected rejection_reason='Nicht verfügbar', got %s", rejectionReason)
+				}
+			},
+		},
+		{
+			name:       "TC-3.3.4-B: Reject without reason fails",
+			bookingID:  pendingID,
+			reason:     "",
+			isAdmin:    true,
+			wantStatus: http.StatusBadRequest,
+			checkResult: nil,
+		},
+		{
+			name:       "TC-3.3.4-D: Regular user cannot reject",
+			bookingID:  pendingID,
+			reason:     "Test",
+			isAdmin:    false,
+			wantStatus: http.StatusForbidden,
+			checkResult: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			reqBody := map[string]string{
+				"reason": tc.reason,
+			}
+			body, _ := json.Marshal(reqBody)
+
+			path := "/api/bookings/" + fmt.Sprintf("%d", tc.bookingID) + "/reject"
+			req := httptest.NewRequest(http.MethodPut, path, bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", tc.bookingID)})
+
+			userCtx := userID
+			if tc.isAdmin {
+				userCtx = adminID
+			}
+			ctx := contextWithUser(req.Context(), userCtx, "admin@example.com", tc.isAdmin)
+			req = req.WithContext(ctx)
+
+			rec := httptest.NewRecorder()
+			handler.RejectPendingBooking(rec, req)
+
+			if rec.Code != tc.wantStatus {
+				t.Errorf("Status = %d, want %d. Body: %s", rec.Code, tc.wantStatus, rec.Body.String())
+			}
+
+			if tc.checkResult != nil {
+				tc.checkResult(t, tc.bookingID)
+			}
+		})
+	}
+}
+
+// Helper function for string contains check
+func stringContains(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		match := true
+		for j := 0; j < len(substr); j++ {
+			if s[i+j] != substr[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return true
+		}
+	}
+	return false
+}

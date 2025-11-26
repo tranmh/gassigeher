@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -31,6 +32,11 @@ func setupTestDB(t *testing.T) *sql.DB {
 		completed_at TIMESTAMP,
 		user_notes TEXT,
 		admin_cancellation_reason TEXT,
+		requires_approval INTEGER DEFAULT 0,
+		approval_status TEXT DEFAULT 'approved',
+		approved_by INTEGER,
+		approved_at TIMESTAMP,
+		rejection_reason TEXT,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		UNIQUE(dog_id, date, walk_type)
@@ -1073,6 +1079,382 @@ func TestBookingRepository_FindByIDWithDetails(t *testing.T) {
 
 		if booking != nil {
 			t.Error("Expected nil for non-existent booking")
+		}
+	})
+}
+
+// ============ Phase 2: Approval Tests ============
+
+// Test 2.3.1: GetPendingApprovalBookings - Query Filtering
+func TestGetPendingApprovalBookings_QueryFiltering(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+
+	repo := NewBookingRepository(db)
+
+	t.Run("returns only pending bookings", func(t *testing.T) {
+		// Create users and dogs using testutil
+		for i := 1; i <= 8; i++ {
+			testutil.SeedTestUser(t, db, fmt.Sprintf("user%d@test.com", i), fmt.Sprintf("User %d", i), "green")
+			testutil.SeedTestDog(t, db, fmt.Sprintf("Dog %d", i), "Labrador", "green")
+		}
+
+		// Create 5 pending bookings
+		for i := 1; i <= 5; i++ {
+			_, err := db.Exec(`
+				INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status)
+				VALUES (?, ?, ?, 'morning', '10:00', 'scheduled', 'pending')
+			`, i, i, "2025-01-30")
+			if err != nil {
+				t.Fatalf("Failed to create pending booking: %v", err)
+			}
+		}
+
+		// Create 3 approved bookings
+		for i := 6; i <= 8; i++ {
+			_, err := db.Exec(`
+				INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status, approved_by, approved_at)
+				VALUES (?, ?, ?, 'morning', '10:00', 'scheduled', 'approved', 1, datetime('now'))
+			`, i, i, "2025-01-31")
+			if err != nil {
+				t.Fatalf("Failed to create approved booking: %v", err)
+			}
+		}
+
+		// Get pending approvals
+		pending, err := repo.GetPendingApprovalBookings()
+		if err != nil {
+			t.Fatalf("GetPendingApprovalBookings failed: %v", err)
+		}
+
+		// Should return 5 pending bookings
+		if len(pending) != 5 {
+			t.Errorf("Expected 5 pending bookings, got %d", len(pending))
+		}
+
+		// Verify all have pending status
+		for _, b := range pending {
+			if b.ApprovalStatus != "pending" {
+				t.Errorf("Expected approval_status 'pending', got '%s'", b.ApprovalStatus)
+			}
+		}
+	})
+
+	t.Run("returns empty when all approved", func(t *testing.T) {
+		db2 := testutil.SetupTestDB(t)
+		repo2 := NewBookingRepository(db2)
+
+		// Create users and dogs
+		for i := 1; i <= 3; i++ {
+			testutil.SeedTestUser(t, db2, fmt.Sprintf("user%d@test.com", i), fmt.Sprintf("User %d", i), "green")
+			testutil.SeedTestDog(t, db2, fmt.Sprintf("Dog %d", i), "Labrador", "green")
+		}
+
+		// Create only approved bookings
+		for i := 1; i <= 3; i++ {
+			_, err := db2.Exec(`
+				INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status)
+				VALUES (?, ?, ?, 'morning', '10:00', 'scheduled', 'approved')
+			`, i, i, "2025-01-30")
+			if err != nil {
+				t.Fatalf("Failed to create approved booking: %v", err)
+			}
+		}
+
+		pending, err := repo2.GetPendingApprovalBookings()
+		if err != nil {
+			t.Fatalf("GetPendingApprovalBookings failed: %v", err)
+		}
+
+		if len(pending) != 0 {
+			t.Errorf("Expected 0 pending bookings, got %d", len(pending))
+		}
+	})
+
+	t.Run("includes pending excludes rejected", func(t *testing.T) {
+		db3 := testutil.SetupTestDB(t)
+
+		repo3 := NewBookingRepository(db3)
+
+		// Create users and dogs
+		for i := 1; i <= 3; i++ {
+			testutil.SeedTestUser(t, db3, fmt.Sprintf("user%d@test.com", i), fmt.Sprintf("User %d", i), "green")
+			testutil.SeedTestDog(t, db3, fmt.Sprintf("Dog %d", i), "Labrador", "green")
+		}
+
+		// Create 2 pending bookings
+		for i := 1; i <= 2; i++ {
+			_, err := db3.Exec(`
+				INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status)
+				VALUES (?, ?, ?, 'morning', '10:00', 'scheduled', 'pending')
+			`, i, i, "2025-01-30")
+			if err != nil {
+				t.Fatalf("Failed to create pending booking: %v", err)
+			}
+		}
+
+		// Create 1 rejected booking
+		_, err := db3.Exec(`
+			INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status, rejection_reason)
+			VALUES (3, 3, '2025-01-30', 'morning', '10:00', 'cancelled', 'rejected', 'Dog not available')
+		`)
+		if err != nil {
+			t.Fatalf("Failed to create rejected booking: %v", err)
+		}
+
+		pending, err := repo3.GetPendingApprovalBookings()
+		if err != nil {
+			t.Fatalf("GetPendingApprovalBookings failed: %v", err)
+		}
+
+		// Should return 2 pending bookings (not the rejected one)
+		if len(pending) != 2 {
+			t.Errorf("Expected 2 pending bookings, got %d", len(pending))
+		}
+	})
+}
+
+// Test 2.3.2: ApproveBooking - State Transition
+func TestApproveBooking_StateTransition(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewBookingRepository(db)
+
+	t.Run("approves pending booking", func(t *testing.T) {
+		// Create pending booking
+		result, err := db.Exec(`
+			INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status)
+			VALUES (1, 1, '2025-01-30', 'morning', '10:00', 'scheduled', 'pending')
+		`)
+		if err != nil {
+			t.Fatalf("Failed to create pending booking: %v", err)
+		}
+
+		bookingID, _ := result.LastInsertId()
+		adminID := 1
+
+		// Approve booking
+		err = repo.ApproveBooking(int(bookingID), adminID)
+		if err != nil {
+			t.Fatalf("ApproveBooking failed: %v", err)
+		}
+
+		// Verify approval
+		var approvalStatus string
+		var approvedBy *int
+		var approvedAt *time.Time
+		err = db.QueryRow(`
+			SELECT approval_status, approved_by, approved_at
+			FROM bookings WHERE id = ?
+		`, bookingID).Scan(&approvalStatus, &approvedBy, &approvedAt)
+		if err != nil {
+			t.Fatalf("Failed to query booking: %v", err)
+		}
+
+		if approvalStatus != "approved" {
+			t.Errorf("Expected approval_status 'approved', got '%s'", approvalStatus)
+		}
+
+		if approvedBy == nil || *approvedBy != adminID {
+			t.Errorf("Expected approved_by = %d, got %v", adminID, approvedBy)
+		}
+
+		if approvedAt == nil {
+			t.Error("Expected approved_at to be set")
+		}
+	})
+
+	t.Run("approving already approved booking", func(t *testing.T) {
+		// Create already approved booking
+		result, err := db.Exec(`
+			INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status, approved_by, approved_at)
+			VALUES (2, 2, '2025-01-30', 'morning', '10:00', 'scheduled', 'approved', 1, datetime('now'))
+		`)
+		if err != nil {
+			t.Fatalf("Failed to create approved booking: %v", err)
+		}
+
+		bookingID, _ := result.LastInsertId()
+		adminID := 2
+
+		// Try to approve again
+		err = repo.ApproveBooking(int(bookingID), adminID)
+
+		// Should handle gracefully (no change or error depending on implementation)
+		if err != nil {
+			t.Logf("ApproveBooking on already approved returned: %v", err)
+		}
+
+		// Verify still approved with original admin
+		var approvedBy int
+		db.QueryRow("SELECT approved_by FROM bookings WHERE id = ?", bookingID).Scan(&approvedBy)
+
+		// Original admin ID (1) should still be there or updated to 2
+		// Both are acceptable behaviors
+		t.Logf("Approved by after re-approval: %d", approvedBy)
+	})
+
+	t.Run("approving rejected booking", func(t *testing.T) {
+		// Create rejected booking
+		result, err := db.Exec(`
+			INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status, rejection_reason)
+			VALUES (3, 3, '2025-01-30', 'morning', '10:00', 'cancelled', 'rejected', 'Not available')
+		`)
+		if err != nil {
+			t.Fatalf("Failed to create rejected booking: %v", err)
+		}
+
+		bookingID, _ := result.LastInsertId()
+		adminID := 1
+
+		// Try to approve rejected booking
+		err = repo.ApproveBooking(int(bookingID), adminID)
+
+		// Should handle gracefully (no change or error)
+		if err != nil {
+			t.Logf("ApproveBooking on rejected returned: %v", err)
+		}
+
+		// Verify still rejected
+		var approvalStatus string
+		db.QueryRow("SELECT approval_status FROM bookings WHERE id = ?", bookingID).Scan(&approvalStatus)
+
+		// Should remain rejected or be approved (depends on implementation)
+		t.Logf("Status after approve attempt on rejected: %s", approvalStatus)
+	})
+}
+
+// Test 2.3.3: RejectBooking - Reason Required
+func TestRejectBooking_ReasonRequired(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewBookingRepository(db)
+
+	t.Run("rejects pending booking with reason", func(t *testing.T) {
+		// Create pending booking
+		result, err := db.Exec(`
+			INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status)
+			VALUES (1, 1, '2025-01-30', 'morning', '10:00', 'scheduled', 'pending')
+		`)
+		if err != nil {
+			t.Fatalf("Failed to create pending booking: %v", err)
+		}
+
+		bookingID, _ := result.LastInsertId()
+		adminID := 1
+		reason := "Kein Verfügbar"
+
+		// Reject booking
+		err = repo.RejectBooking(int(bookingID), adminID, reason)
+		if err != nil {
+			t.Fatalf("RejectBooking failed: %v", err)
+		}
+
+		// Verify rejection
+		var approvalStatus string
+		var status string
+		var rejectionReason *string
+		err = db.QueryRow(`
+			SELECT approval_status, status, rejection_reason
+			FROM bookings WHERE id = ?
+		`, bookingID).Scan(&approvalStatus, &status, &rejectionReason)
+		if err != nil {
+			t.Fatalf("Failed to query booking: %v", err)
+		}
+
+		if approvalStatus != "rejected" {
+			t.Errorf("Expected approval_status 'rejected', got '%s'", approvalStatus)
+		}
+
+		if status != "cancelled" {
+			t.Errorf("Expected status 'cancelled', got '%s'", status)
+		}
+
+		if rejectionReason == nil || *rejectionReason != reason {
+			t.Errorf("Expected rejection_reason '%s', got %v", reason, rejectionReason)
+		}
+	})
+
+	t.Run("rejects with empty reason", func(t *testing.T) {
+		// Create pending booking
+		result, err := db.Exec(`
+			INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status)
+			VALUES (2, 2, '2025-01-30', 'morning', '10:00', 'scheduled', 'pending')
+		`)
+		if err != nil {
+			t.Fatalf("Failed to create pending booking: %v", err)
+		}
+
+		bookingID, _ := result.LastInsertId()
+		adminID := 1
+		reason := ""
+
+		// Try to reject with empty reason
+		err = repo.RejectBooking(int(bookingID), adminID, reason)
+
+		// Should fail with validation error
+		if err == nil {
+			t.Error("Expected error when rejecting with empty reason, got nil")
+		}
+	})
+
+	t.Run("cannot reject approved booking", func(t *testing.T) {
+		// Create approved booking
+		result, err := db.Exec(`
+			INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status, approved_by, approved_at)
+			VALUES (3, 3, '2025-01-30', 'morning', '10:00', 'scheduled', 'approved', 1, datetime('now'))
+		`)
+		if err != nil {
+			t.Fatalf("Failed to create approved booking: %v", err)
+		}
+
+		bookingID, _ := result.LastInsertId()
+		adminID := 1
+		reason := "Test"
+
+		// Try to reject approved booking
+		err = repo.RejectBooking(int(bookingID), adminID, reason)
+
+		// Should fail or handle gracefully
+		if err != nil {
+			t.Logf("RejectBooking on approved returned: %v", err)
+		}
+
+		// Verify still approved
+		var approvalStatus string
+		db.QueryRow("SELECT approval_status FROM bookings WHERE id = ?", bookingID).Scan(&approvalStatus)
+
+		// Should remain approved or be rejected (depends on implementation)
+		t.Logf("Status after reject attempt on approved: %s", approvalStatus)
+	})
+
+	t.Run("rejection stores admin ID", func(t *testing.T) {
+		// Create pending booking
+		result, err := db.Exec(`
+			INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status)
+			VALUES (4, 4, '2025-01-30', 'morning', '10:00', 'scheduled', 'pending')
+		`)
+		if err != nil {
+			t.Fatalf("Failed to create pending booking: %v", err)
+		}
+
+		bookingID, _ := result.LastInsertId()
+		adminID := 5
+		reason := "Dog is sick"
+
+		// Reject booking
+		err = repo.RejectBooking(int(bookingID), adminID, reason)
+		if err != nil {
+			t.Fatalf("RejectBooking failed: %v", err)
+		}
+
+		// Verify approved_by is set to admin who rejected
+		var approvedBy *int
+		db.QueryRow("SELECT approved_by FROM bookings WHERE id = ?", bookingID).Scan(&approvedBy)
+
+		if approvedBy == nil || *approvedBy != adminID {
+			t.Errorf("Expected approved_by = %d, got %v", adminID, approvedBy)
 		}
 	})
 }

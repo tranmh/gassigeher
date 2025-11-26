@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buchungszeiten verwalten - Gassigeher Admin</title>
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <style>
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+        .tab-btn {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: 16px;
+            color: #666;
+            transition: all 0.3s;
+        }
+        .tab-btn:hover {
+            color: #82b965;
+        }
+        .tab-btn.active {
+            color: #82b965;
+            border-bottom-color: #82b965;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .form-inline {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .badge {
+            background: #82b965;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .btn-save, .btn-delete, .btn-delete-holiday {
+            padding: 5px 10px;
+            margin: 0 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-save {
+            background: #82b965;
+            color: white;
+        }
+        .btn-save:hover {
+            background: #6fa054;
+        }
+        .btn-delete, .btn-delete-holiday {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-delete:hover, .btn-delete-holiday:hover {
+            background: #c82333;
+        }
+        .table input[type="time"],
+        .table select {
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <a href="/" class="logo">🐕 Gassigeher Admin</a>
+            <nav id="main-nav">
+                <ul>
+                    <li><a href="/admin-dashboard.html" data-i18n="admin_dashboard.title">Dashboard</a></li>
+                    <li><a href="/admin-dogs.html" data-i18n="dogs.manage_dogs">Hunde</a></li>
+                    <li><a href="/admin-bookings.html" data-i18n="admin.manage_bookings">Buchungen</a></li>
+                    <li><a href="/admin-blocked-dates.html" data-i18n="admin.manage_blocked_dates">Gesperrte Tage</a></li>
+                    <li><a href="/admin-experience-requests.html" data-i18n="admin.manage_experience_requests">Level-Anfragen</a></li>
+                    <li><a href="/admin-users.html" data-i18n="users.title">Benutzer</a></li>
+                    <li><a href="/admin-reactivation-requests.html" data-i18n="reactivation.manage_requests">Reaktivierungen</a></li>
+                    <li><a href="/admin-booking-times.html">Buchungszeiten</a></li>
+                    <li><a href="/admin-settings.html" data-i18n="admin_dashboard.system_settings">Einstellungen</a></li>
+                    <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
+                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+
+    <main style="padding: 40px 0;">
+        <div class="container">
+            <h1>Buchungszeiten verwalten</h1>
+
+            <div id="alert-container"></div>
+
+            <!-- Settings Section -->
+            <section class="card">
+                <h2>Einstellungen</h2>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="morning-approval-toggle">
+                        Vormittagsspaziergänge erfordern Admin-Genehmigung
+                    </label>
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        Wenn aktiviert, müssen Buchungen zwischen 09:00 und 12:00 Uhr von einem Admin genehmigt werden.
+                    </p>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="use-feiertage-api">
+                        Automatische Feiertage-Erkennung (Baden-Württemberg)
+                    </label>
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        Lädt automatisch gesetzliche Feiertage aus der feiertage-api.de. An Feiertagen gelten Wochenendregeln.
+                    </p>
+                </div>
+                <button id="save-settings-btn" class="btn btn-primary">Einstellungen speichern</button>
+            </section>
+
+            <!-- Time Rules Section -->
+            <section class="card">
+                <h2>Zeitfenster konfigurieren</h2>
+
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="weekday">Wochentags (Mo-Fr)</button>
+                    <button class="tab-btn" data-tab="weekend">Wochenende/Feiertage (Sa-So)</button>
+                </div>
+
+                <!-- Weekday Rules Tab -->
+                <div id="weekday-tab" class="tab-content active">
+                    <h3>Montag bis Freitag</h3>
+                    <p style="color: #666; margin-bottom: 20px;">
+                        Definieren Sie die erlaubten und gesperrten Zeitfenster für Wochentage.
+                    </p>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Zeitfenster</th>
+                                <th>Von</th>
+                                <th>Bis</th>
+                                <th>Typ</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="weekday-rules">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                    <button id="add-weekday-rule-btn" class="btn btn-secondary" style="margin-top: 10px;">+ Zeitfenster hinzufügen</button>
+                </div>
+
+                <!-- Weekend Rules Tab -->
+                <div id="weekend-tab" class="tab-content">
+                    <h3>Samstag, Sonntag, Feiertage</h3>
+                    <p style="color: #666; margin-bottom: 20px;">
+                        Definieren Sie die erlaubten und gesperrten Zeitfenster für Wochenenden und Feiertage.
+                    </p>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Zeitfenster</th>
+                                <th>Von</th>
+                                <th>Bis</th>
+                                <th>Typ</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="weekend-rules">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                    <button id="add-weekend-rule-btn" class="btn btn-secondary" style="margin-top: 10px;">+ Zeitfenster hinzufügen</button>
+                </div>
+            </section>
+
+            <!-- Holidays Management Section -->
+            <section class="card">
+                <h2>Feiertage verwalten</h2>
+                <p style="color: #666; margin-bottom: 20px;">
+                    Verwalten Sie gesetzliche Feiertage und fügen Sie eigene Feiertage hinzu. An Feiertagen gelten Wochenendregeln.
+                </p>
+
+                <div class="form-inline">
+                    <label>Jahr:</label>
+                    <select id="holiday-year-select">
+                        <option value="2024">2024</option>
+                        <option value="2025">2025</option>
+                        <option value="2026">2026</option>
+                    </select>
+                    <button id="load-holidays-btn" class="btn btn-primary">Laden</button>
+                </div>
+
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Datum</th>
+                            <th>Name</th>
+                            <th>Quelle</th>
+                            <th>Status</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody id="holidays-table">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+
+                <button id="add-holiday-btn" class="btn btn-secondary" style="margin-top: 10px;">+ Feiertag hinzufügen</button>
+            </section>
+        </div>
+    </main>
+
+    <script src="/js/nav-menu.js"></script>
+    <script src="/js/i18n.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/admin-booking-times.js"></script>
+</body>
+</html>

@@ -169,12 +169,25 @@
                 );
 
                 container.innerHTML = bookingsWithDogs.map(booking => `
-                    <div class="card" style="margin-bottom: 15px; padding: 20px;">
+                    <div class="card" style="margin-bottom: 15px; padding: 20px;" data-status="${booking.approval_status || 'approved'}">
                         <div style="display: flex; justify-content: space-between; align-items: start;">
-                            <div>
+                            <div style="flex: 1;">
                                 <h4 style="margin: 0 0 10px 0;">${booking.dog ? booking.dog.name : 'Hund #' + booking.dog_id}</h4>
                                 <p style="margin: 5px 0;">📅 ${booking.date} - ${booking.scheduled_time} Uhr</p>
                                 <p style="margin: 5px 0;">${booking.walk_type === 'morning' ? '🌅 Morgen' : '🌆 Abend'}</p>
+
+                                ${booking.approval_status === 'pending' ? `
+                                    <div class="alert alert-warning" style="margin-top: 10px; padding: 10px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
+                                        ⏳ <strong>Warte auf Admin-Genehmigung</strong>
+                                    </div>
+                                ` : ''}
+
+                                ${booking.approval_status === 'rejected' ? `
+                                    <div class="alert alert-danger" style="margin-top: 10px; padding: 10px; background: #f8d7da; border: 1px solid #dc3545; border-radius: 4px;">
+                                        ✗ <strong>Abgelehnt</strong>
+                                        ${booking.rejection_reason ? `<br><small>${booking.rejection_reason}</small>` : ''}
+                                    </div>
+                                ` : ''}
                             </div>
                             <button class="btn btn-danger" onclick="cancelBooking(${booking.id})" data-i18n="bookings.cancel_booking">Stornieren</button>
                         </div>

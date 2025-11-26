@@ -109,10 +109,16 @@
                 <div class="form-group">
                     <label for="booking-time">Uhrzeit *</label>
                     <select id="booking-time" required>
-                        <option value="09:00">09:00</option>
-                        <option value="09:30">09:30</option>
-                        <option value="10:00">10:00</option>
+                        <option value="">Bitte wählen...</option>
                     </select>
+                    <small id="time-approval-notice" class="text-warning" style="display: none; color: var(--warning-orange); margin-top: 5px; display: block;">
+                        ⚠️ Vormittagsspaziergänge erfordern eine Admin-Genehmigung
+                    </small>
+                </div>
+                <!-- Time Rules Info Box -->
+                <div id="time-rules-info" class="alert alert-info" style="display: none; margin-top: 15px; padding: 15px; background: rgba(130, 185, 101, 0.1); border-left: 3px solid var(--primary-green); border-radius: 4px;">
+                    <h6 style="margin: 0 0 10px 0; font-size: 0.9rem;">Erlaubte Buchungszeiten:</h6>
+                    <ul id="time-rules-list" style="margin: 0; padding-left: 20px; font-size: 0.85rem;"></ul>
                 </div>
                 <input type="hidden" id="booking-dog-id">
                 <div class="form-actions">
@@ -399,10 +405,39 @@
             document.getElementById('booking-date').min = today;
             document.getElementById('booking-date').value = today;
 
+            // Setup event listeners for dynamic time loading
+            setupBookingFormListeners();
+
             updateTimeOptions();
 
             // Show modal
             document.getElementById('booking-modal').style.display = 'flex';
+        }
+
+        // Setup event listeners for booking form
+        function setupBookingFormListeners() {
+            const dateInput = document.getElementById('booking-date');
+            const timeSelect = document.getElementById('booking-time');
+
+            // Remove existing listeners to avoid duplicates
+            const newDateInput = dateInput.cloneNode(true);
+            dateInput.parentNode.replaceChild(newDateInput, dateInput);
+
+            const newTimeSelect = timeSelect.cloneNode(true);
+            timeSelect.parentNode.replaceChild(newTimeSelect, timeSelect);
+
+            // Add date change listener to load available time slots
+            document.getElementById('booking-date').addEventListener('change', async (e) => {
+                const date = e.target.value;
+                if (date) {
+                    await loadAvailableTimeSlots(date);
+                }
+            });
+
+            // Add time change listener to check approval requirement
+            document.getElementById('booking-time').addEventListener('change', () => {
+                checkApprovalRequirement();
+            });
         }
 
         async function showBookingModalWithData(dogId, date, walkType) {
@@ -442,6 +477,10 @@
                 document.getElementById('booking-date').value = date;
                 document.getElementById('booking-walk-type').value = walkType;
 
+                // Setup event listeners for dynamic time loading
+                console.log('[DEBUG] Setting up event listeners');
+                setupBookingFormListeners();
+
                 console.log('[DEBUG] Updating time options');
                 updateTimeOptions();
 
@@ -463,12 +502,69 @@
             document.getElementById('booking-modal').style.display = 'none';
         }
 
-        function updateTimeOptions() {
+        // Load available time slots based on selected date
+        async function loadAvailableTimeSlots(date) {
+            if (!date) return;
+
+            try {
+                // Load available slots from API
+                const response = await api.getAvailableTimeSlots(date);
+                const slots = response.slots || [];
+
+                const timeSelect = document.getElementById('booking-time');
+                timeSelect.innerHTML = '<option value="">Bitte wählen...</option>';
+
+                slots.forEach(slot => {
+                    const option = document.createElement('option');
+                    option.value = slot;
+                    option.textContent = slot;
+                    timeSelect.appendChild(option);
+                });
+
+                // Load and display time rules for the date
+                const rules = await api.getRulesForDate(date);
+                const rulesList = document.getElementById('time-rules-list');
+                const rulesInfo = document.getElementById('time-rules-info');
+
+                rulesList.innerHTML = '';
+                rules.forEach(rule => {
+                    if (!rule.is_blocked) {
+                        const li = document.createElement('li');
+                        li.textContent = `${rule.rule_name}: ${rule.start_time} - ${rule.end_time}`;
+                        rulesList.appendChild(li);
+                    }
+                });
+
+                rulesInfo.style.display = rules.length > 0 ? 'block' : 'none';
+
+            } catch (error) {
+                console.error('Failed to load time slots:', error);
+                // Fallback to basic time options if API fails
+                updateTimeOptionsLegacy();
+            }
+        }
+
+        // Check if selected time requires approval
+        function checkApprovalRequirement() {
+            const time = document.getElementById('booking-time').value;
+            const notice = document.getElementById('time-approval-notice');
+
+            if (time >= '09:00' && time < '12:00') {
+                // Morning walk - may require approval
+                notice.style.display = 'block';
+            } else {
+                notice.style.display = 'none';
+            }
+        }
+
+        // Legacy fallback for time options (if API fails)
+        function updateTimeOptionsLegacy() {
             const walkType = document.getElementById('booking-walk-type').value;
             const timeSelect = document.getElementById('booking-time');
 
             if (walkType === 'morning') {
                 timeSelect.innerHTML = `
+                    <option value="">Bitte wählen...</option>
                     <option value="09:00">09:00</option>
                     <option value="09:30">09:30</option>
                     <option value="10:00">10:00</option>
@@ -477,6 +573,7 @@
                 `;
             } else {
                 timeSelect.innerHTML = `
+                    <option value="">Bitte wählen...</option>
                     <option value="14:00">14:00</option>
                     <option value="14:30">14:30</option>
                     <option value="15:00">15:00</option>
@@ -484,6 +581,17 @@
                     <option value="16:00">16:00</option>
                     <option value="16:30">16:30</option>
                 `;
+            }
+        }
+
+        // Updated to load time slots from API
+        function updateTimeOptions() {
+            const date = document.getElementById('booking-date').value;
+            if (date) {
+                loadAvailableTimeSlots(date);
+            } else {
+                // No date selected yet, use legacy options
+                updateTimeOptionsLegacy();
             }
         }
 

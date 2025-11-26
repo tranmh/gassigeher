@@ -35,6 +35,26 @@
 
             <div id="alert-container"></div>
 
+            <!-- Pending Approvals Section -->
+            <section class="card" id="pending-approvals-section" style="display: none;">
+                <h2>Genehmigungsanfragen <span id="pending-count" class="badge" style="background: #82b965; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.9rem;">0</span></h2>
+
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Datum</th>
+                            <th>Uhrzeit</th>
+                            <th>Benutzer</th>
+                            <th>Hund</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pending-approvals-table">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </section>
+
             <!-- Filters -->
             <div class="filter-bar">
                 <h3 style="margin-bottom: 15px;">Filter</h3>
@@ -103,6 +123,10 @@
             window.i18n.updateElement(document.body);
 
             loadBookings();
+            loadPendingApprovals();
+
+            // Refresh pending approvals every 30 seconds
+            setInterval(loadPendingApprovals, 30000);
         });
 
         async function loadBookings() {
@@ -237,6 +261,69 @@
                 loadBookings();
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Verschieben');
+            }
+        }
+
+        async function loadPendingApprovals() {
+            try {
+                const pendingBookings = await api.getPendingApprovalBookings();
+                const table = document.getElementById('pending-approvals-table');
+                const badge = document.getElementById('pending-count');
+                const section = document.getElementById('pending-approvals-section');
+
+                badge.textContent = pendingBookings.length;
+
+                if (pendingBookings.length === 0) {
+                    section.style.display = 'none';
+                    return;
+                }
+
+                section.style.display = 'block';
+                table.innerHTML = '';
+
+                pendingBookings.forEach(booking => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${booking.date}</td>
+                        <td>${booking.scheduled_time}</td>
+                        <td>User #${booking.user_id}</td>
+                        <td>${booking.dog_name || `Hund #${booking.dog_id}`}</td>
+                        <td>
+                            <button class="btn" style="padding: 6px 12px; background: #82b965;" onclick="approveBooking(${booking.id})">✓ Genehmigen</button>
+                            <button class="btn btn-danger" style="padding: 6px 12px; margin-left: 5px;" onclick="rejectBooking(${booking.id})">✗ Ablehnen</button>
+                        </td>
+                    `;
+                    table.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Failed to load pending approvals:', error);
+            }
+        }
+
+        async function approveBooking(id) {
+            if (!confirm('Buchung wirklich genehmigen?')) return;
+
+            try {
+                await api.approveBooking(id);
+                showAlert('success', 'Buchung genehmigt!');
+                loadPendingApprovals();
+                loadBookings(); // Refresh main table
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Genehmigen');
+            }
+        }
+
+        async function rejectBooking(id) {
+            const reason = prompt('Grund für Ablehnung:');
+            if (!reason) return;
+
+            try {
+                await api.rejectBooking(id, reason);
+                showAlert('success', 'Buchung abgelehnt');
+                loadPendingApprovals();
+                loadBookings();
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Ablehnen');
             }
         }
 

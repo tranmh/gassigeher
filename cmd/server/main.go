@@ -13,6 +13,7 @@ import (
 	"github.com/tranm/gassigeher/internal/database"
 	"github.com/tranm/gassigeher/internal/handlers"
 	"github.com/tranm/gassigeher/internal/middleware"
+	"github.com/tranm/gassigeher/internal/repository"
 	"github.com/tranm/gassigeher/internal/services"
 )
 
@@ -82,6 +83,17 @@ func main() {
 	reactivationHandler := handlers.NewReactivationRequestHandler(db, cfg)
 	dashboardHandler := handlers.NewDashboardHandler(db, cfg)
 
+	// Initialize booking time repositories and services
+	bookingTimeRepo := repository.NewBookingTimeRepository(db)
+	holidayRepo := repository.NewHolidayRepository(db)
+	settingsRepo := repository.NewSettingsRepository(db)
+	holidayService := services.NewHolidayService(holidayRepo, settingsRepo)
+	bookingTimeService := services.NewBookingTimeService(bookingTimeRepo, holidayService, settingsRepo)
+
+	// Initialize booking time handlers
+	bookingTimeHandler := handlers.NewBookingTimeHandler(bookingTimeRepo, bookingTimeService)
+	holidayHandler := handlers.NewHolidayHandler(holidayRepo, holidayService)
+
 	// Start cron service for auto-completion and reminders
 	cronService := cron.NewCronService(db)
 	cronService.Start()
@@ -100,6 +112,11 @@ func main() {
 
 	// Reactivation request (public - for deactivated users)
 	router.HandleFunc("/api/reactivation-requests", reactivationHandler.CreateRequest).Methods("POST")
+
+	// Booking time routes (public - for time slot availability)
+	router.HandleFunc("/api/booking-times/available", bookingTimeHandler.GetAvailableSlots).Methods("GET")
+	router.HandleFunc("/api/booking-times/rules-for-date", bookingTimeHandler.GetRulesForDate).Methods("GET")
+	router.HandleFunc("/api/holidays", holidayHandler.GetHolidays).Methods("GET")
 
 	// Protected routes (authenticated users)
 	protected := router.PathPrefix("/api").Subrouter()
@@ -174,6 +191,22 @@ func main() {
 	// Admin dashboard (admin only)
 	admin.HandleFunc("/admin/stats", dashboardHandler.GetStats).Methods("GET")
 	admin.HandleFunc("/admin/activity", dashboardHandler.GetRecentActivity).Methods("GET")
+
+	// Booking time management (admin only)
+	admin.HandleFunc("/booking-times/rules", bookingTimeHandler.GetRules).Methods("GET")
+	admin.HandleFunc("/booking-times/rules", bookingTimeHandler.UpdateRules).Methods("PUT")
+	admin.HandleFunc("/booking-times/rules", bookingTimeHandler.CreateRule).Methods("POST")
+	admin.HandleFunc("/booking-times/rules/{id}", bookingTimeHandler.DeleteRule).Methods("DELETE")
+
+	// Holiday management (admin only)
+	admin.HandleFunc("/holidays", holidayHandler.CreateHoliday).Methods("POST")
+	admin.HandleFunc("/holidays/{id}", holidayHandler.UpdateHoliday).Methods("PUT")
+	admin.HandleFunc("/holidays/{id}", holidayHandler.DeleteHoliday).Methods("DELETE")
+
+	// Booking approval management (admin only)
+	admin.HandleFunc("/bookings/pending-approvals", bookingHandler.GetPendingApprovals).Methods("GET")
+	admin.HandleFunc("/bookings/{id}/approve", bookingHandler.ApprovePendingBooking).Methods("PUT")
+	admin.HandleFunc("/bookings/{id}/reject", bookingHandler.RejectPendingBooking).Methods("PUT")
 
 	// DONE: Phase 4 - Super Admin routes (authenticated + admin + super admin)
 	superAdmin := admin.PathPrefix("").Subrouter()

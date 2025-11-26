@@ -21,18 +21,33 @@ func NewBookingRepository(db *sql.DB) *BookingRepository {
 // Create creates a new booking
 func (r *BookingRepository) Create(booking *models.Booking) error {
 	query := `
-		INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, requires_approval, approval_status, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	now := time.Now()
+
+	// Set default values if not provided
+	if booking.Status == "" {
+		booking.Status = "scheduled"
+	}
+	if booking.ApprovalStatus == "" {
+		if booking.RequiresApproval {
+			booking.ApprovalStatus = "pending"
+		} else {
+			booking.ApprovalStatus = "approved"
+		}
+	}
+
 	result, err := r.db.Exec(query,
 		booking.UserID,
 		booking.DogID,
 		booking.Date,
 		booking.WalkType,
 		booking.ScheduledTime,
-		"scheduled",
+		booking.Status,
+		booking.RequiresApproval,
+		booking.ApprovalStatus,
 		now,
 		now,
 	)
@@ -47,7 +62,6 @@ func (r *BookingRepository) Create(booking *models.Booking) error {
 	}
 
 	booking.ID = int(id)
-	booking.Status = "scheduled"
 	booking.CreatedAt = now
 	booking.UpdatedAt = now
 
@@ -488,4 +502,158 @@ func (r *BookingRepository) FindByIDWithDetails(id int) (*models.Booking, error)
 	booking.Dog.Age = age
 
 	return booking, nil
+}
+
+// GetPendingApprovalBookings returns all bookings awaiting approval
+func (r *BookingRepository) GetPendingApprovalBookings() ([]*models.Booking, error) {
+	query := `
+		SELECT b.id, b.user_id, b.dog_id, b.date, b.scheduled_time, b.walk_type,
+		       b.status, b.completed_at, b.user_notes, b.admin_cancellation_reason,
+		       b.created_at, b.updated_at,
+		       b.requires_approval, b.approval_status, b.approved_by, b.approved_at, b.rejection_reason,
+		       u.name as user_name, u.email as user_email, u.phone as user_phone,
+		       d.name as dog_name, d.breed, d.size, d.age
+		FROM bookings b
+		JOIN users u ON b.user_id = u.id
+		JOIN dogs d ON b.dog_id = d.id
+		WHERE b.approval_status = 'pending'
+		ORDER BY b.date ASC, b.scheduled_time ASC
+	`
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var bookings []*models.Booking
+	for rows.Next() {
+		booking := &models.Booking{
+			User: &models.User{},
+			Dog:  &models.Dog{},
+		}
+
+		var completedAt, approvedAt sql.NullTime
+		var userNotes, adminCancellationReason, rejectionReason sql.NullString
+		var userEmail, userPhone sql.NullString
+		var approvedBy sql.NullInt64
+		var requiresApproval int
+		var userName, dogName, breed string
+		var size sql.NullString
+		var age sql.NullInt64
+
+		err := rows.Scan(
+			&booking.ID, &booking.UserID, &booking.DogID,
+			&booking.Date, &booking.ScheduledTime, &booking.WalkType,
+			&booking.Status, &completedAt, &userNotes, &adminCancellationReason,
+			&booking.CreatedAt, &booking.UpdatedAt,
+			&requiresApproval, &booking.ApprovalStatus, &approvedBy, &approvedAt, &rejectionReason,
+			&userName, &userEmail, &userPhone,
+			&dogName, &breed, &size, &age,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Convert nullable fields
+		booking.RequiresApproval = requiresApproval == 1
+		if completedAt.Valid {
+			t := completedAt.Time
+			booking.CompletedAt = &t
+		}
+		if userNotes.Valid {
+			n := userNotes.String
+			booking.UserNotes = &n
+		}
+		if adminCancellationReason.Valid {
+			r := adminCancellationReason.String
+			booking.AdminCancellationReason = &r
+		}
+		if approvedBy.Valid {
+			id := int(approvedBy.Int64)
+			booking.ApprovedBy = &id
+		}
+		if approvedAt.Valid {
+			t := approvedAt.Time
+			booking.ApprovedAt = &t
+		}
+		if rejectionReason.Valid {
+			r := rejectionReason.String
+			booking.RejectionReason = &r
+		}
+
+		// Populate user details
+		booking.User.ID = booking.UserID
+		booking.User.Name = userName
+		if userEmail.Valid {
+			email := userEmail.String
+			booking.User.Email = &email
+		}
+		if userPhone.Valid {
+			phone := userPhone.String
+			booking.User.Phone = &phone
+		}
+
+		// Populate dog details
+		booking.Dog.ID = booking.DogID
+		booking.Dog.Name = dogName
+		booking.Dog.Breed = breed
+		if size.Valid {
+			booking.Dog.Size = size.String
+		}
+		if age.Valid {
+			booking.Dog.Age = int(age.Int64)
+		}
+
+		bookings = append(bookings, booking)
+	}
+
+	return bookings, nil
+}
+
+// ApproveBooking approves a pending booking
+func (r *BookingRepository) ApproveBooking(bookingID int, adminID int) error {
+	query := `
+		UPDATE bookings
+		SET approval_status = 'approved', approved_by = ?, approved_at = ?
+		WHERE id = ? AND approval_status = 'pending'
+	`
+
+	result, err := r.db.Exec(query, adminID, time.Now(), bookingID)
+	if err != nil {
+		return err
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("booking not found or not pending")
+	}
+
+	return nil
+}
+
+// RejectBooking rejects a pending booking
+func (r *BookingRepository) RejectBooking(bookingID int, adminID int, reason string) error {
+	// Validate that reason is not empty
+	if reason == "" {
+		return fmt.Errorf("rejection reason is required")
+	}
+
+	query := `
+		UPDATE bookings
+		SET approval_status = 'rejected', approved_by = ?, approved_at = ?, rejection_reason = ?, status = 'cancelled'
+		WHERE id = ? AND approval_status = 'pending'
+	`
+
+	result, err := r.db.Exec(query, adminID, time.Now(), reason, bookingID)
+	if err != nil {
+		return err
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("booking not found or not pending")
+	}
+
+	return nil
 }

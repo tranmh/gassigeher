@@ -66,8 +66,8 @@ func TestSettingsRepository_GetAll(t *testing.T) {
 			t.Fatalf("GetAll() failed: %v", err)
 		}
 
-		if len(settings) != 3 {
-			t.Errorf("Expected 3 settings, got %d", len(settings))
+		if len(settings) != 8 {
+			t.Errorf("Expected 8 settings, got %d", len(settings))
 		}
 
 		// Verify all expected settings are present
@@ -76,7 +76,12 @@ func TestSettingsRepository_GetAll(t *testing.T) {
 			keys[s.Key] = true
 		}
 
-		expectedKeys := []string{"booking_advance_days", "cancellation_notice_hours", "auto_deactivation_days"}
+		// Original 3 settings + 5 from migration 012
+		expectedKeys := []string{
+			"booking_advance_days", "cancellation_notice_hours", "auto_deactivation_days",
+			"morning_walk_requires_approval", "use_feiertage_api", "feiertage_state",
+			"booking_time_granularity", "feiertage_cache_days",
+		}
 		for _, key := range expectedKeys {
 			if !keys[key] {
 				t.Errorf("Expected setting '%s' to be present", key)

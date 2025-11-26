@@ -333,6 +333,64 @@ class API {
     async getRecentActivity() {
         return this.request('GET', '/admin/activity');
     }
+
+    // BOOKING TIME ENDPOINTS
+
+    async getAvailableTimeSlots(date) {
+        return this.request('GET', `/booking-times/available?date=${date}`);
+    }
+
+    async getRulesForDate(date) {
+        return this.request('GET', `/booking-times/rules-for-date?date=${date}`);
+    }
+
+    async getBookingTimeRules() {
+        return this.request('GET', '/booking-times/rules');
+    }
+
+    async updateBookingTimeRules(rules) {
+        return this.request('PUT', '/booking-times/rules', rules);
+    }
+
+    async createBookingTimeRule(rule) {
+        return this.request('POST', '/booking-times/rules', rule);
+    }
+
+    async deleteBookingTimeRule(id) {
+        return this.request('DELETE', `/booking-times/rules/${id}`);
+    }
+
+    // HOLIDAY ENDPOINTS
+
+    async getHolidays(year) {
+        return this.request('GET', `/holidays?year=${year}`);
+    }
+
+    async createHoliday(holiday) {
+        return this.request('POST', '/holidays', holiday);
+    }
+
+    async updateHoliday(id, holiday) {
+        return this.request('PUT', `/holidays/${id}`, holiday);
+    }
+
+    async deleteHoliday(id) {
+        return this.request('DELETE', `/holidays/${id}`);
+    }
+
+    // BOOKING APPROVAL ENDPOINTS
+
+    async getPendingApprovalBookings() {
+        return this.request('GET', '/bookings/pending-approvals');
+    }
+
+    async approveBooking(id) {
+        return this.request('PUT', `/bookings/${id}/approve`);
+    }
+
+    async rejectBooking(id, reason) {
+        return this.request('PUT', `/bookings/${id}/reject`, { reason });
+    }
 }
 
 // Global instance

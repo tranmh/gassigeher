@@ -30,11 +30,16 @@ func SetupTestDBWithType(t *testing.T, dbType string) *sql.DB {
 	switch dbType {
 	case "sqlite", "":
 		// Use in-memory SQLite for fast testing
-		db, err = sql.Open("sqlite3", ":memory:")
+		// Each connection gets its own isolated in-memory database
+		db, err = sql.Open("sqlite3", "file::memory:?mode=memory")
 		if err != nil {
 			t.Fatalf("Failed to open SQLite test database: %v", err)
 		}
 		dialect = database.NewSQLiteDialect()
+
+		// Set max connections to 1 to avoid issues with in-memory databases
+		// (each connection would get its own database otherwise)
+		db.SetMaxOpenConns(1)
 
 		// Apply SQLite settings (PRAGMA foreign_keys, etc.)
 		if err := dialect.ApplySettings(db); err != nil {
