@@ -3,7 +3,7 @@ name: ci
 on: push
 
 jobs:
-  test-chromium.desktop:
+  test-chromium-desktop:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
