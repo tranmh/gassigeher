@@ -9,8 +9,8 @@ module.exports = defineConfig({
   testDir: './tests',
 
   // Test execution settings
-  fullyParallel: process.env.CI ? true : false,
-  workers: process.env.CI ? 4 : 1,
+  fullyParallel: false,  // Run sequentially for easier debugging
+  workers: 1,            // One worker = sequential execution
   retries: 0,            // No retries locally (fast feedback)
   timeout: 30 * 1000,    // 30s per test
 
