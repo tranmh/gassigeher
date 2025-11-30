@@ -533,20 +533,8 @@ func (h *DogHandler) SetFeatured(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If setting as featured, check count limit (max 3)
-	if req.IsFeatured {
-		count, err := h.dogRepo.CountFeatured()
-		if err != nil {
-			respondError(w, http.StatusInternalServerError, "Failed to check featured count")
-			return
-		}
-
-		// Allow if dog is already featured (just updating) or if under limit
-		if !dog.IsFeatured && count >= 3 {
-			respondError(w, http.StatusBadRequest, "Es können maximal nur 3 Hunde auf der Startseite angezeigt werden.")
-			return
-		}
-	}
+	// Note: No limit on featured dogs - frontend randomly displays 3 from all featured
+	// This gives all featured dogs a chance to be shown to visitors
 
 	// Update featured status
 	if err := h.dogRepo.SetFeatured(id, req.IsFeatured); err != nil {

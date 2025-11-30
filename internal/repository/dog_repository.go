@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -203,7 +204,8 @@ func (r *DogRepository) FindAll(filter *models.DogFilterRequest) ([]*models.Dog,
 	return dogs, nil
 }
 
-// GetFeatured returns up to 3 featured dogs that are available
+// GetFeatured returns up to 3 randomly selected featured dogs that are available
+// If more than 3 dogs are featured, a random selection of 3 is returned
 func (r *DogRepository) GetFeatured() ([]*models.Dog, error) {
 	query := `
 		SELECT id, name, breed, size, age, category, photo, photo_thumbnail, special_needs,
@@ -213,7 +215,6 @@ func (r *DogRepository) GetFeatured() ([]*models.Dog, error) {
 		FROM dogs
 		WHERE is_featured = 1 AND is_available = 1
 		ORDER BY name ASC
-		LIMIT 3
 	`
 
 	rows, err := r.db.Query(query)
@@ -222,7 +223,7 @@ func (r *DogRepository) GetFeatured() ([]*models.Dog, error) {
 	}
 	defer rows.Close()
 
-	dogs := []*models.Dog{}
+	allFeatured := []*models.Dog{}
 	for rows.Next() {
 		dog := &models.Dog{}
 		err := rows.Scan(
@@ -251,10 +252,20 @@ func (r *DogRepository) GetFeatured() ([]*models.Dog, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan featured dog: %w", err)
 		}
-		dogs = append(dogs, dog)
+		allFeatured = append(allFeatured, dog)
 	}
 
-	return dogs, nil
+	// If 3 or fewer, return all
+	if len(allFeatured) <= 3 {
+		return allFeatured, nil
+	}
+
+	// Randomly select 3 from all featured dogs
+	rand.Shuffle(len(allFeatured), func(i, j int) {
+		allFeatured[i], allFeatured[j] = allFeatured[j], allFeatured[i]
+	})
+
+	return allFeatured[:3], nil
 }
 
 // SetFeatured sets the featured status for a dog
