@@ -8,8 +8,8 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/tranm/gassigeher/internal/models"
-	"github.com/tranm/gassigeher/internal/testutil"
+	"github.com/tranmh/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/testutil"
 )
 
 // setupTestDB creates a test database
@@ -21,15 +21,68 @@ func setupTestDB(t *testing.T) *sql.DB {
 
 	// Create tables
 	schema := `
+	CREATE TABLE users (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		email TEXT UNIQUE,
+		phone TEXT,
+		password_hash TEXT,
+		experience_level TEXT DEFAULT 'green',
+		is_admin INTEGER DEFAULT 0,
+		is_super_admin INTEGER DEFAULT 0,
+		is_verified INTEGER DEFAULT 0,
+		is_active INTEGER DEFAULT 1,
+		is_deleted INTEGER DEFAULT 0,
+		verification_token TEXT,
+		verification_token_expires TIMESTAMP,
+		password_reset_token TEXT,
+		password_reset_expires TIMESTAMP,
+		profile_photo TEXT,
+		anonymous_id TEXT,
+		terms_accepted_at TIMESTAMP,
+		last_activity_at TIMESTAMP,
+		deactivated_at TIMESTAMP,
+		deactivation_reason TEXT,
+		reactivated_at TIMESTAMP,
+		deleted_at TIMESTAMP,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE dogs (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		breed TEXT,
+		size TEXT,
+		age INTEGER,
+		category TEXT DEFAULT 'green',
+		photo TEXT,
+		photo_thumbnail TEXT,
+		special_needs TEXT,
+		pickup_location TEXT,
+		walk_route TEXT,
+		walk_duration INTEGER,
+		special_instructions TEXT,
+		default_morning_time TEXT,
+		default_evening_time TEXT,
+		is_available INTEGER DEFAULT 1,
+		is_featured INTEGER DEFAULT 0,
+		external_link TEXT,
+		unavailable_reason TEXT,
+		unavailable_since TIMESTAMP,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+
 	CREATE TABLE bookings (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		user_id INTEGER NOT NULL,
 		dog_id INTEGER NOT NULL,
 		date TEXT NOT NULL,
-		walk_type TEXT CHECK(walk_type IN ('morning', 'evening')),
 		scheduled_time TEXT NOT NULL,
 		status TEXT DEFAULT 'scheduled' CHECK(status IN ('scheduled', 'completed', 'cancelled')),
 		completed_at TIMESTAMP,
+		reminder_sent_at TIMESTAMP,
 		user_notes TEXT,
 		admin_cancellation_reason TEXT,
 		requires_approval INTEGER DEFAULT 0,
@@ -39,8 +92,16 @@ func setupTestDB(t *testing.T) *sql.DB {
 		rejection_reason TEXT,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		UNIQUE(dog_id, date, walk_type)
+		UNIQUE(dog_id, date, scheduled_time)
 	);
+
+	-- Insert test users
+	INSERT INTO users (id, name, email) VALUES (1, 'Test User', 'test@example.com');
+	INSERT INTO users (id, name, email) VALUES (2, 'Test User 2', 'test2@example.com');
+
+	-- Insert test dogs
+	INSERT INTO dogs (id, name, breed) VALUES (1, 'Buddy', 'Labrador');
+	INSERT INTO dogs (id, name, breed) VALUES (2, 'Max', 'German Shepherd');
 	`
 
 	if _, err := db.Exec(schema); err != nil {
@@ -60,7 +121,6 @@ func TestBookingRepository_Create(t *testing.T) {
 		UserID:        1,
 		DogID:         1,
 		Date:          "2025-12-01",
-		WalkType:      "morning",
 		ScheduledTime: "09:00",
 	}
 
@@ -89,29 +149,28 @@ func TestBookingRepository_CheckDoubleBooking(t *testing.T) {
 		UserID:        1,
 		DogID:         1,
 		Date:          "2025-12-01",
-		WalkType:      "morning",
 		ScheduledTime: "09:00",
 	}
 	repo.Create(booking)
 
-	// Check for double booking
-	isBooked, err := repo.CheckDoubleBooking(1, "2025-12-01", "morning")
+	// Check for double booking - same scheduled time
+	isBooked, err := repo.CheckDoubleBooking(1, "2025-12-01", "09:00")
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
 
 	if !isBooked {
-		t.Error("Expected dog to be marked as booked")
+		t.Error("Expected dog to be marked as booked for 09:00")
 	}
 
-	// Check different walk type
-	isBooked, err = repo.CheckDoubleBooking(1, "2025-12-01", "evening")
+	// Check different scheduled time - should be available
+	isBooked, err = repo.CheckDoubleBooking(1, "2025-12-01", "15:00")
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
 
 	if isBooked {
-		t.Error("Expected evening slot to be available")
+		t.Error("Expected 15:00 slot to be available")
 	}
 }
 
@@ -127,7 +186,6 @@ func TestBookingRepository_AutoComplete(t *testing.T) {
 		UserID:        1,
 		DogID:         1,
 		Date:          yesterday,
-		WalkType:      "morning",
 		ScheduledTime: "09:00",
 	}
 	repo.Create(booking)
@@ -161,7 +219,6 @@ func TestBookingRepository_Cancel(t *testing.T) {
 			UserID:        1,
 			DogID:         1,
 			Date:          "2025-12-01",
-			WalkType:      "morning",
 			ScheduledTime: "09:00",
 		}
 		repo.Create(booking)
@@ -188,7 +245,6 @@ func TestBookingRepository_Cancel(t *testing.T) {
 			UserID:        2,
 			DogID:         2,
 			Date:          "2025-12-02",
-			WalkType:      "evening",
 			ScheduledTime: "15:00",
 		}
 		repo.Create(booking)
@@ -228,7 +284,6 @@ func TestBookingRepository_FindByID(t *testing.T) {
 			UserID:        1,
 			DogID:         1,
 			Date:          "2025-12-01",
-			WalkType:      "morning",
 			ScheduledTime: "09:00",
 		}
 		repo.Create(booking)
@@ -270,7 +325,6 @@ func TestBookingRepository_FindAll(t *testing.T) {
 		UserID:        1,
 		DogID:         1,
 		Date:          "2025-12-01",
-		WalkType:      "morning",
 		ScheduledTime: "09:00",
 		Status:        "scheduled",
 	}
@@ -280,7 +334,6 @@ func TestBookingRepository_FindAll(t *testing.T) {
 		UserID:        2,
 		DogID:         2,
 		Date:          "2025-12-02",
-		WalkType:      "evening",
 		ScheduledTime: "15:00",
 		Status:        "scheduled",
 	}
@@ -291,7 +344,6 @@ func TestBookingRepository_FindAll(t *testing.T) {
 		UserID:        1,
 		DogID:         1,
 		Date:          yesterday,
-		WalkType:      "morning",
 		ScheduledTime: "09:00",
 		Status:        "completed",
 	}
@@ -371,27 +423,6 @@ func TestBookingRepository_FindAll(t *testing.T) {
 		}
 	})
 
-	t.Run("filter by walk_type", func(t *testing.T) {
-		walkType := "morning"
-		filter := &models.BookingFilterRequest{
-			WalkType: &walkType,
-		}
-
-		bookings, err := repo.FindAll(filter)
-		if err != nil {
-			t.Fatalf("FindAll with walk_type filter failed: %v", err)
-		}
-
-		for _, b := range bookings {
-			if b.WalkType != "morning" {
-				t.Errorf("Expected walk_type 'morning', got %s", b.WalkType)
-			}
-		}
-
-		if len(bookings) != 2 {
-			t.Errorf("Expected 2 morning bookings, got %d", len(bookings))
-		}
-	})
 
 	t.Run("filter by date_from", func(t *testing.T) {
 		dateFrom := "2025-12-01"
@@ -538,7 +569,6 @@ func TestBookingRepository_AddNotes(t *testing.T) {
 		UserID:        1,
 		DogID:         1,
 		Date:          "2025-12-01",
-		WalkType:      "morning",
 		ScheduledTime: "09:00",
 		Status:        "scheduled",
 	}
@@ -570,7 +600,6 @@ func TestBookingRepository_AddNotes(t *testing.T) {
 			UserID:        2,
 			DogID:         2,
 			Date:          "2025-12-02",
-			WalkType:      "evening",
 			ScheduledTime: "16:00",
 			Status:        "scheduled",
 		}
@@ -590,7 +619,6 @@ func TestBookingRepository_AddNotes(t *testing.T) {
 			UserID:        3,
 			DogID:         3,
 			Date:          "2025-12-03",
-			WalkType:      "morning",
 			ScheduledTime: "09:00",
 			Status:        "cancelled",
 		}
@@ -613,7 +641,6 @@ func TestBookingRepository_AddNotes(t *testing.T) {
 			UserID:        4,
 			DogID:         4,
 			Date:          "2025-12-04",
-			WalkType:      "morning",
 			ScheduledTime: "09:00",
 		}
 		repo.Create(completedBooking)
@@ -670,7 +697,6 @@ func TestBookingRepository_GetUpcoming(t *testing.T) {
 		UserID:        userID,
 		DogID:         1,
 		Date:          yesterday,
-		WalkType:      "morning",
 		ScheduledTime: "09:00",
 		Status:        "completed",
 	}
@@ -684,7 +710,6 @@ func TestBookingRepository_GetUpcoming(t *testing.T) {
 		UserID:        userID,
 		DogID:         1,
 		Date:          tomorrow,
-		WalkType:      "morning",
 		ScheduledTime: "09:00",
 		Status:        "scheduled",
 	}
@@ -694,7 +719,6 @@ func TestBookingRepository_GetUpcoming(t *testing.T) {
 		UserID:        userID,
 		DogID:         2,
 		Date:          nextWeek,
-		WalkType:      "evening",
 		ScheduledTime: "15:00",
 		Status:        "scheduled",
 	}
@@ -705,7 +729,6 @@ func TestBookingRepository_GetUpcoming(t *testing.T) {
 		UserID:        2,
 		DogID:         1,
 		Date:          tomorrow,
-		WalkType:      "evening",
 		ScheduledTime: "16:00",
 		Status:        "scheduled",
 	}
@@ -755,7 +778,6 @@ func TestBookingRepository_Update(t *testing.T) {
 		UserID:        1,
 		DogID:         1,
 		Date:          "2025-12-01",
-		WalkType:      "morning",
 		ScheduledTime: "09:00",
 	}
 	repo.Create(booking)
@@ -790,26 +812,11 @@ func TestBookingRepository_Update(t *testing.T) {
 		}
 	})
 
-	t.Run("update walk type", func(t *testing.T) {
-		booking.WalkType = "evening"
-
-		err := repo.Update(booking)
-		if err != nil {
-			t.Fatalf("Update() failed: %v", err)
-		}
-
-		// Verify update
-		updated, _ := repo.FindByID(booking.ID)
-		if updated.WalkType != "evening" {
-			t.Errorf("Expected walk_type 'evening', got %s", updated.WalkType)
-		}
-	})
 
 	t.Run("update non-existent booking", func(t *testing.T) {
 		nonExistent := &models.Booking{
 			ID:            99999,
 			Date:          "2025-12-20",
-			WalkType:      "morning",
 			ScheduledTime: "09:00",
 		}
 
@@ -839,7 +846,6 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 			UserID:        1,
 			DogID:         1,
 			Date:          reminderDate,
-			WalkType:      "morning",
 			ScheduledTime: reminderScheduledTime,
 			Status:        "scheduled",
 		}
@@ -877,7 +883,6 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 			UserID:        2,
 			DogID:         2,
 			Date:          futureDate,
-			WalkType:      "evening",
 			ScheduledTime: futureScheduledTime,
 			Status:        "scheduled",
 		}
@@ -908,7 +913,6 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 			UserID:        3,
 			DogID:         3,
 			Date:          reminderDate,
-			WalkType:      "morning",
 			ScheduledTime: reminderScheduledTime,
 			Status:        "completed",
 			CompletedAt:   &completedTime,
@@ -942,7 +946,6 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 			UserID:        4,
 			DogID:         4,
 			Date:          reminderDate,
-			WalkType:      "evening",
 			ScheduledTime: reminderScheduledTime,
 			Status:        "cancelled",
 		}
@@ -979,7 +982,7 @@ func TestBookingRepository_FindByIDWithDetails(t *testing.T) {
 
 		// Create booking
 		bookingDate := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
-		bookingID := testutil.SeedTestBooking(t, db, userID, dogID, bookingDate, "morning", "09:00", "scheduled")
+		bookingID := testutil.SeedTestBooking(t, db, userID, dogID, bookingDate, "09:00", "scheduled")
 
 		// Find with details
 		booking, err := repo.FindByIDWithDetails(bookingID)
@@ -1039,7 +1042,7 @@ func TestBookingRepository_FindByIDWithDetails(t *testing.T) {
 
 		// Create booking before deletion
 		bookingDate := time.Now().AddDate(0, 0, 2).Format("2006-01-02")
-		bookingID := testutil.SeedTestBooking(t, db, userID, dogID, bookingDate, "evening", "16:00", "scheduled")
+		bookingID := testutil.SeedTestBooking(t, db, userID, dogID, bookingDate, "16:00", "scheduled")
 
 		// Delete user (GDPR anonymization)
 		userRepo := NewUserRepository(db)
@@ -1101,8 +1104,8 @@ func TestGetPendingApprovalBookings_QueryFiltering(t *testing.T) {
 		// Create 5 pending bookings
 		for i := 1; i <= 5; i++ {
 			_, err := db.Exec(`
-				INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status)
-				VALUES (?, ?, ?, 'morning', '10:00', 'scheduled', 'pending')
+				INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, approval_status)
+				VALUES (?, ?, ?, '10:00', 'scheduled', 'pending')
 			`, i, i, "2025-01-30")
 			if err != nil {
 				t.Fatalf("Failed to create pending booking: %v", err)
@@ -1112,8 +1115,8 @@ func TestGetPendingApprovalBookings_QueryFiltering(t *testing.T) {
 		// Create 3 approved bookings
 		for i := 6; i <= 8; i++ {
 			_, err := db.Exec(`
-				INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status, approved_by, approved_at)
-				VALUES (?, ?, ?, 'morning', '10:00', 'scheduled', 'approved', 1, datetime('now'))
+				INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, approval_status, approved_by, approved_at)
+				VALUES (?, ?, ?, '10:00', 'scheduled', 'approved', 1, datetime('now'))
 			`, i, i, "2025-01-31")
 			if err != nil {
 				t.Fatalf("Failed to create approved booking: %v", err)
@@ -1152,8 +1155,8 @@ func TestGetPendingApprovalBookings_QueryFiltering(t *testing.T) {
 		// Create only approved bookings
 		for i := 1; i <= 3; i++ {
 			_, err := db2.Exec(`
-				INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status)
-				VALUES (?, ?, ?, 'morning', '10:00', 'scheduled', 'approved')
+				INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, approval_status)
+				VALUES (?, ?, ?, '10:00', 'scheduled', 'approved')
 			`, i, i, "2025-01-30")
 			if err != nil {
 				t.Fatalf("Failed to create approved booking: %v", err)
@@ -1184,8 +1187,8 @@ func TestGetPendingApprovalBookings_QueryFiltering(t *testing.T) {
 		// Create 2 pending bookings
 		for i := 1; i <= 2; i++ {
 			_, err := db3.Exec(`
-				INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status)
-				VALUES (?, ?, ?, 'morning', '10:00', 'scheduled', 'pending')
+				INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, approval_status)
+				VALUES (?, ?, ?, '10:00', 'scheduled', 'pending')
 			`, i, i, "2025-01-30")
 			if err != nil {
 				t.Fatalf("Failed to create pending booking: %v", err)
@@ -1194,8 +1197,8 @@ func TestGetPendingApprovalBookings_QueryFiltering(t *testing.T) {
 
 		// Create 1 rejected booking
 		_, err := db3.Exec(`
-			INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status, rejection_reason)
-			VALUES (3, 3, '2025-01-30', 'morning', '10:00', 'cancelled', 'rejected', 'Dog not available')
+			INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, approval_status, rejection_reason)
+			VALUES (3, 3, '2025-01-30', '10:00', 'cancelled', 'rejected', 'Dog not available')
 		`)
 		if err != nil {
 			t.Fatalf("Failed to create rejected booking: %v", err)
@@ -1223,8 +1226,8 @@ func TestApproveBooking_StateTransition(t *testing.T) {
 	t.Run("approves pending booking", func(t *testing.T) {
 		// Create pending booking
 		result, err := db.Exec(`
-			INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status)
-			VALUES (1, 1, '2025-01-30', 'morning', '10:00', 'scheduled', 'pending')
+			INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, approval_status)
+			VALUES (1, 1, '2025-01-30', '10:00', 'scheduled', 'pending')
 		`)
 		if err != nil {
 			t.Fatalf("Failed to create pending booking: %v", err)
@@ -1267,8 +1270,8 @@ func TestApproveBooking_StateTransition(t *testing.T) {
 	t.Run("approving already approved booking", func(t *testing.T) {
 		// Create already approved booking
 		result, err := db.Exec(`
-			INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status, approved_by, approved_at)
-			VALUES (2, 2, '2025-01-30', 'morning', '10:00', 'scheduled', 'approved', 1, datetime('now'))
+			INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, approval_status, approved_by, approved_at)
+			VALUES (2, 2, '2025-01-30', '10:00', 'scheduled', 'approved', 1, datetime('now'))
 		`)
 		if err != nil {
 			t.Fatalf("Failed to create approved booking: %v", err)
@@ -1297,8 +1300,8 @@ func TestApproveBooking_StateTransition(t *testing.T) {
 	t.Run("approving rejected booking", func(t *testing.T) {
 		// Create rejected booking
 		result, err := db.Exec(`
-			INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status, rejection_reason)
-			VALUES (3, 3, '2025-01-30', 'morning', '10:00', 'cancelled', 'rejected', 'Not available')
+			INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, approval_status, rejection_reason)
+			VALUES (3, 3, '2025-01-30', '10:00', 'cancelled', 'rejected', 'Not available')
 		`)
 		if err != nil {
 			t.Fatalf("Failed to create rejected booking: %v", err)
@@ -1334,8 +1337,8 @@ func TestRejectBooking_ReasonRequired(t *testing.T) {
 	t.Run("rejects pending booking with reason", func(t *testing.T) {
 		// Create pending booking
 		result, err := db.Exec(`
-			INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status)
-			VALUES (1, 1, '2025-01-30', 'morning', '10:00', 'scheduled', 'pending')
+			INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, approval_status)
+			VALUES (1, 1, '2025-01-30', '10:00', 'scheduled', 'pending')
 		`)
 		if err != nil {
 			t.Fatalf("Failed to create pending booking: %v", err)
@@ -1379,8 +1382,8 @@ func TestRejectBooking_ReasonRequired(t *testing.T) {
 	t.Run("rejects with empty reason", func(t *testing.T) {
 		// Create pending booking
 		result, err := db.Exec(`
-			INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status)
-			VALUES (2, 2, '2025-01-30', 'morning', '10:00', 'scheduled', 'pending')
+			INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, approval_status)
+			VALUES (2, 2, '2025-01-30', '10:00', 'scheduled', 'pending')
 		`)
 		if err != nil {
 			t.Fatalf("Failed to create pending booking: %v", err)
@@ -1402,8 +1405,8 @@ func TestRejectBooking_ReasonRequired(t *testing.T) {
 	t.Run("cannot reject approved booking", func(t *testing.T) {
 		// Create approved booking
 		result, err := db.Exec(`
-			INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status, approved_by, approved_at)
-			VALUES (3, 3, '2025-01-30', 'morning', '10:00', 'scheduled', 'approved', 1, datetime('now'))
+			INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, approval_status, approved_by, approved_at)
+			VALUES (3, 3, '2025-01-30', '10:00', 'scheduled', 'approved', 1, datetime('now'))
 		`)
 		if err != nil {
 			t.Fatalf("Failed to create approved booking: %v", err)
@@ -1432,8 +1435,8 @@ func TestRejectBooking_ReasonRequired(t *testing.T) {
 	t.Run("rejection stores admin ID", func(t *testing.T) {
 		// Create pending booking
 		result, err := db.Exec(`
-			INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, approval_status)
-			VALUES (4, 4, '2025-01-30', 'morning', '10:00', 'scheduled', 'pending')
+			INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, approval_status)
+			VALUES (4, 4, '2025-01-30', '10:00', 'scheduled', 'pending')
 		`)
 		if err != nil {
 			t.Fatalf("Failed to create pending booking: %v", err)

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/tranm/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/models"
 )
 
 // BlockedDateRepository handles blocked date database operations

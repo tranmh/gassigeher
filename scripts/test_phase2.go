@@ -8,9 +8,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/tranm/gassigeher/internal/database"
-	"github.com/tranm/gassigeher/internal/models"
-	"github.com/tranm/gassigeher/internal/repository"
+	"github.com/tranmh/gassigeher/internal/database"
+	"github.com/tranmh/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/repository"
 )
 
 func main() {

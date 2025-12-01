@@ -1,20 +1,26 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
-	"github.com/tranm/gassigeher/internal/config"
-	"github.com/tranm/gassigeher/internal/cron"
-	"github.com/tranm/gassigeher/internal/database"
-	"github.com/tranm/gassigeher/internal/handlers"
-	"github.com/tranm/gassigeher/internal/middleware"
-	"github.com/tranm/gassigeher/internal/repository"
-	"github.com/tranm/gassigeher/internal/services"
+	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/cron"
+	"github.com/tranmh/gassigeher/internal/database"
+	"github.com/tranmh/gassigeher/internal/handlers"
+	"github.com/tranmh/gassigeher/internal/logging"
+	"github.com/tranmh/gassigeher/internal/middleware"
+	"github.com/tranmh/gassigeher/internal/repository"
+	"github.com/tranmh/gassigeher/internal/services"
+	"github.com/tranmh/gassigeher/internal/static"
+	"github.com/tranmh/gassigeher/internal/version"
 )
 
 func main() {
@@ -31,7 +37,25 @@ func main() {
 	if err := godotenv.Load(*envPath); err != nil {
 		log.Fatalf("Error loading .env file from %s: %v", *envPath, err)
 	}
+
+	// Initialize logger with rotation support
+	// Configuration from environment variables with defaults
+	logConfig := &logging.Config{
+		LogDir:         getEnvOrDefault("LOG_DIR", "./logs"),
+		MaxAgeDays:     getEnvIntOrDefault("LOG_MAX_AGE_DAYS", 30),
+		CompressSizeMB: getEnvIntOrDefault("LOG_COMPRESS_SIZE_MB", 10),
+		ConsoleOutput:  getEnvBoolOrDefault("LOG_CONSOLE_OUTPUT", true),
+	}
+
+	logger, err := logging.NewLogger(logConfig)
+	if err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+	defer logger.Close()
+
 	log.Printf("Loaded environment variables from: %s", *envPath)
+	log.Printf("Log files will be written to: %s (retention: %d days, compress > %dMB)",
+		logConfig.LogDir, logConfig.MaxAgeDays, logConfig.CompressSizeMB)
 
 	// Load configuration
 	cfg := config.Load()
@@ -95,9 +119,15 @@ func main() {
 	holidayHandler := handlers.NewHolidayHandler(holidayRepo, holidayService)
 
 	// Start cron service for auto-completion and reminders
-	cronService := cron.NewCronService(db)
+	cronService := cron.NewCronService(db, cfg)
 	cronService.Start()
 	defer cronService.Stop()
+
+	// Version endpoint (public)
+	router.HandleFunc("/api/version", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(version.Get())
+	}).Methods("GET")
 
 	// Public routes
 	router.HandleFunc("/api/auth/register", authHandler.Register).Methods("POST")
@@ -117,6 +147,9 @@ func main() {
 	router.HandleFunc("/api/booking-times/available", bookingTimeHandler.GetAvailableSlots).Methods("GET")
 	router.HandleFunc("/api/booking-times/rules-for-date", bookingTimeHandler.GetRulesForDate).Methods("GET")
 	router.HandleFunc("/api/holidays", holidayHandler.GetHolidays).Methods("GET")
+
+	// Featured dogs (public - for homepage)
+	router.HandleFunc("/api/dogs/featured", dogHandler.GetFeaturedDogs).Methods("GET")
 
 	// Protected routes (authenticated users)
 	protected := router.PathPrefix("/api").Subrouter()
@@ -161,6 +194,7 @@ func main() {
 	admin.HandleFunc("/dogs/{id}", dogHandler.DeleteDog).Methods("DELETE")
 	admin.HandleFunc("/dogs/{id}/photo", dogHandler.UploadDogPhoto).Methods("POST")
 	admin.HandleFunc("/dogs/{id}/availability", dogHandler.ToggleAvailability).Methods("PUT")
+	admin.HandleFunc("/dogs/{id}/featured", dogHandler.SetFeatured).Methods("PUT")
 
 	// Blocked dates management (admin only)
 	admin.HandleFunc("/blocked-dates", blockedDateHandler.CreateBlockedDate).Methods("POST")
@@ -193,15 +227,15 @@ func main() {
 	admin.HandleFunc("/admin/activity", dashboardHandler.GetRecentActivity).Methods("GET")
 
 	// Booking time management (admin only)
-	admin.HandleFunc("/booking-times/rules", bookingTimeHandler.GetRules).Methods("GET")
-	admin.HandleFunc("/booking-times/rules", bookingTimeHandler.UpdateRules).Methods("PUT")
-	admin.HandleFunc("/booking-times/rules", bookingTimeHandler.CreateRule).Methods("POST")
-	admin.HandleFunc("/booking-times/rules/{id}", bookingTimeHandler.DeleteRule).Methods("DELETE")
+	admin.HandleFunc("/admin/booking-times/rules", bookingTimeHandler.GetRules).Methods("GET")
+	admin.HandleFunc("/admin/booking-times/rules", bookingTimeHandler.UpdateRules).Methods("PUT")
+	admin.HandleFunc("/admin/booking-times/rules", bookingTimeHandler.CreateRule).Methods("POST")
+	admin.HandleFunc("/admin/booking-times/rules/{id}", bookingTimeHandler.DeleteRule).Methods("DELETE")
 
 	// Holiday management (admin only)
-	admin.HandleFunc("/holidays", holidayHandler.CreateHoliday).Methods("POST")
-	admin.HandleFunc("/holidays/{id}", holidayHandler.UpdateHoliday).Methods("PUT")
-	admin.HandleFunc("/holidays/{id}", holidayHandler.DeleteHoliday).Methods("DELETE")
+	admin.HandleFunc("/admin/holidays", holidayHandler.CreateHoliday).Methods("POST")
+	admin.HandleFunc("/admin/holidays/{id}", holidayHandler.UpdateHoliday).Methods("PUT")
+	admin.HandleFunc("/admin/holidays/{id}", holidayHandler.DeleteHoliday).Methods("DELETE")
 
 	// Booking approval management (admin only)
 	admin.HandleFunc("/bookings/pending-approvals", bookingHandler.GetPendingApprovals).Methods("GET")
@@ -214,16 +248,28 @@ func main() {
 	superAdmin.HandleFunc("/admin/users/{id}/promote", userHandler.PromoteToAdmin).Methods("POST")
 	superAdmin.HandleFunc("/admin/users/{id}/demote", userHandler.DemoteAdmin).Methods("POST")
 
-	// Uploads directory (user photos, dog photos)
+	// Uploads directory (user photos, dog photos) - must remain on filesystem
 	router.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
+
+	// Get embedded frontend filesystem
+	frontendFS, err := static.FrontendFS()
+	if err != nil {
+		log.Fatalf("Failed to get embedded frontend: %v", err)
+	}
 
 	// Serve specific HTML pages without .html extension
 	router.HandleFunc("/verify", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./frontend/verify.html")
+		serveEmbeddedFile(w, r, frontendFS, "verify.html")
+	}).Methods("GET")
+	router.HandleFunc("/reset-password", func(w http.ResponseWriter, r *http.Request) {
+		serveEmbeddedFile(w, r, frontendFS, "reset-password.html")
+	}).Methods("GET")
+	router.HandleFunc("/forgot-password", func(w http.ResponseWriter, r *http.Request) {
+		serveEmbeddedFile(w, r, frontendFS, "forgot-password.html")
 	}).Methods("GET")
 
-	// Static files
-	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./frontend")))
+	// Static files from embedded frontend
+	router.PathPrefix("/").Handler(http.FileServer(http.FS(frontendFS)))
 
 	// Start server
 	port := os.Getenv("PORT")
@@ -235,4 +281,44 @@ func main() {
 	if err := http.ListenAndServe(":"+port, router); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+// Helper functions for environment variable parsing
+
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+func getEnvIntOrDefault(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
+	}
+	return defaultValue
+}
+
+func getEnvBoolOrDefault(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		if boolValue, err := strconv.ParseBool(value); err == nil {
+			return boolValue
+		}
+	}
+	return defaultValue
+}
+
+// serveEmbeddedFile serves a file from the embedded filesystem
+func serveEmbeddedFile(w http.ResponseWriter, r *http.Request, fsys fs.FS, filename string) {
+	content, err := fs.ReadFile(fsys, filename)
+	if err != nil {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+
+	// Set content type based on extension
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(content)
 }

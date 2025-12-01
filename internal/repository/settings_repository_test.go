@@ -3,7 +3,7 @@ package repository
 import (
 	"testing"
 
-	"github.com/tranm/gassigeher/internal/testutil"
+	"github.com/tranmh/gassigeher/internal/testutil"
 )
 
 // DONE: TestSettingsRepository_Get tests getting a single setting

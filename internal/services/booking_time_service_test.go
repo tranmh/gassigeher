@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tranm/gassigeher/internal/database"
-	"github.com/tranm/gassigeher/internal/models"
-	"github.com/tranm/gassigeher/internal/repository"
-	"github.com/tranm/gassigeher/internal/testutil"
+	"github.com/tranmh/gassigeher/internal/database"
+	"github.com/tranmh/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/repository"
+	"github.com/tranmh/gassigeher/internal/testutil"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -63,10 +63,10 @@ func TestValidateBookingTime_WeekdayBlocked(t *testing.T) {
 		time            string
 		wantErrContains string
 	}{
-		{"Lunch block start", "2025-01-27", "13:00", "Lunch Block"},
-		{"Lunch block middle", "2025-01-27", "13:45", "Lunch Block"},
-		{"Feeding block start", "2025-01-27", "17:00", "Feeding Block"},
-		{"Feeding block middle", "2025-01-27", "17:30", "Feeding Block"},
+		{"Lunch block start", "2025-01-27", "13:00", "Mittagspause"},
+		{"Lunch block middle", "2025-01-27", "13:45", "Mittagspause"},
+		{"Feeding block start", "2025-01-27", "17:00", "Fütterungszeit"},
+		{"Feeding block middle", "2025-01-27", "17:30", "Fütterungszeit"},
 		{"Before opening", "2025-01-27", "08:00", "außerhalb"},
 		{"After closing", "2025-01-27", "20:00", "außerhalb"},
 	}

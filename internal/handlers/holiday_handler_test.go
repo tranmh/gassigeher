@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/tranm/gassigeher/internal/database"
-	"github.com/tranm/gassigeher/internal/models"
-	"github.com/tranm/gassigeher/internal/repository"
-	"github.com/tranm/gassigeher/internal/services"
+	"github.com/tranmh/gassigeher/internal/database"
+	"github.com/tranmh/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/repository"
+	"github.com/tranmh/gassigeher/internal/services"
 )
 
 func setupHolidayHandlerTest(t *testing.T) (*sql.DB, *HolidayHandler, func()) {

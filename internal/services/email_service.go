@@ -263,13 +263,8 @@ func (s *EmailService) SendPasswordResetEmail(to, name, token string) error {
 }
 
 // SendBookingConfirmation sends a booking confirmation email
-func (s *EmailService) SendBookingConfirmation(to, name, dogName, date, walkType, scheduledTime string) error {
+func (s *EmailService) SendBookingConfirmation(to, name, dogName, date, scheduledTime string) error {
 	subject := fmt.Sprintf("Buchungsbestätigung - %s", dogName)
-
-	walkTypeLabel := "Morgen"
-	if walkType == "evening" {
-		walkTypeLabel = "Abend"
-	}
 
 	tmpl := `
 <!DOCTYPE html>
@@ -305,9 +300,6 @@ func (s *EmailService) SendBookingConfirmation(to, name, dogName, date, walkType
                     <span class="label">Datum:</span> {{.Date}}
                 </div>
                 <div class="detail-row">
-                    <span class="label">Spaziergang:</span> {{.WalkType}}
-                </div>
-                <div class="detail-row">
                     <span class="label">Uhrzeit:</span> {{.ScheduledTime}} Uhr
                 </div>
             </div>
@@ -329,7 +321,6 @@ func (s *EmailService) SendBookingConfirmation(to, name, dogName, date, walkType
 		"Name":          name,
 		"DogName":       dogName,
 		"Date":          date,
-		"WalkType":      walkTypeLabel,
 		"ScheduledTime": scheduledTime,
 	}
 	if err := t.Execute(&body, data); err != nil {
@@ -340,13 +331,8 @@ func (s *EmailService) SendBookingConfirmation(to, name, dogName, date, walkType
 }
 
 // SendBookingCancellation sends a booking cancellation confirmation (user-initiated)
-func (s *EmailService) SendBookingCancellation(to, name, dogName, date, walkType string) error {
+func (s *EmailService) SendBookingCancellation(to, name, dogName, date, scheduledTime string) error {
 	subject := fmt.Sprintf("Buchung storniert - %s", dogName)
-
-	walkTypeLabel := "Morgen"
-	if walkType == "evening" {
-		walkTypeLabel = "Abend"
-	}
 
 	tmpl := `
 <!DOCTYPE html>
@@ -382,7 +368,7 @@ func (s *EmailService) SendBookingCancellation(to, name, dogName, date, walkType
                     <span class="label">Datum:</span> {{.Date}}
                 </div>
                 <div class="detail-row">
-                    <span class="label">Spaziergang:</span> {{.WalkType}}
+                    <span class="label">Uhrzeit:</span> {{.ScheduledTime}} Uhr
                 </div>
             </div>
 
@@ -399,10 +385,10 @@ func (s *EmailService) SendBookingCancellation(to, name, dogName, date, walkType
 	t := template.Must(template.New("cancellation").Parse(tmpl))
 	var body bytes.Buffer
 	data := map[string]string{
-		"Name":     name,
-		"DogName":  dogName,
-		"Date":     date,
-		"WalkType": walkTypeLabel,
+		"Name":          name,
+		"DogName":       dogName,
+		"Date":          date,
+		"ScheduledTime": scheduledTime,
 	}
 	if err := t.Execute(&body, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
@@ -412,13 +398,8 @@ func (s *EmailService) SendBookingCancellation(to, name, dogName, date, walkType
 }
 
 // SendAdminCancellation sends an admin cancellation notification
-func (s *EmailService) SendAdminCancellation(to, name, dogName, date, walkType, reason string) error {
+func (s *EmailService) SendAdminCancellation(to, name, dogName, date, scheduledTime, reason string) error {
 	subject := fmt.Sprintf("Deine Buchung wurde storniert - %s", dogName)
-
-	walkTypeLabel := "Morgen"
-	if walkType == "evening" {
-		walkTypeLabel = "Abend"
-	}
 
 	tmpl := `
 <!DOCTYPE html>
@@ -455,7 +436,7 @@ func (s *EmailService) SendAdminCancellation(to, name, dogName, date, walkType, 
                     <span class="label">Datum:</span> {{.Date}}
                 </div>
                 <div class="detail-row">
-                    <span class="label">Spaziergang:</span> {{.WalkType}}
+                    <span class="label">Uhrzeit:</span> {{.ScheduledTime}} Uhr
                 </div>
             </div>
 
@@ -477,11 +458,11 @@ func (s *EmailService) SendAdminCancellation(to, name, dogName, date, walkType, 
 	t := template.Must(template.New("admin_cancel").Parse(tmpl))
 	var body bytes.Buffer
 	data := map[string]string{
-		"Name":     name,
-		"DogName":  dogName,
-		"Date":     date,
-		"WalkType": walkTypeLabel,
-		"Reason":   reason,
+		"Name":          name,
+		"DogName":       dogName,
+		"Date":          date,
+		"ScheduledTime": scheduledTime,
+		"Reason":        reason,
 	}
 	if err := t.Execute(&body, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
@@ -491,13 +472,8 @@ func (s *EmailService) SendAdminCancellation(to, name, dogName, date, walkType, 
 }
 
 // SendBookingReminder sends a reminder 1 hour before the booking
-func (s *EmailService) SendBookingReminder(to, name, dogName, date, walkType, scheduledTime string) error {
+func (s *EmailService) SendBookingReminder(to, name, dogName, date, scheduledTime string) error {
 	subject := fmt.Sprintf("Erinnerung: Gassirunde mit %s in 1 Stunde", dogName)
-
-	walkTypeLabel := "Morgen"
-	if walkType == "evening" {
-		walkTypeLabel = "Abend"
-	}
 
 	tmpl := `
 <!DOCTYPE html>
@@ -533,9 +509,6 @@ func (s *EmailService) SendBookingReminder(to, name, dogName, date, walkType, sc
                     <span class="label">Datum:</span> {{.Date}}
                 </div>
                 <div class="detail-row">
-                    <span class="label">Spaziergang:</span> {{.WalkType}}
-                </div>
-                <div class="detail-row">
                     <span class="label">Uhrzeit:</span> {{.ScheduledTime}} Uhr
                 </div>
             </div>
@@ -556,7 +529,6 @@ func (s *EmailService) SendBookingReminder(to, name, dogName, date, walkType, sc
 		"Name":          name,
 		"DogName":       dogName,
 		"Date":          date,
-		"WalkType":      walkTypeLabel,
 		"ScheduledTime": scheduledTime,
 	}
 	if err := t.Execute(&body, data); err != nil {
@@ -567,18 +539,8 @@ func (s *EmailService) SendBookingReminder(to, name, dogName, date, walkType, sc
 }
 
 // SendBookingMoved sends an email when admin moves a booking
-func (s *EmailService) SendBookingMoved(to, name, dogName, oldDate, oldWalkType, oldTime, newDate, newWalkType, newTime, reason string) error {
+func (s *EmailService) SendBookingMoved(to, name, dogName, oldDate, oldTime, newDate, newTime, reason string) error {
 	subject := fmt.Sprintf("Deine Buchung wurde verschoben - %s", dogName)
-
-	oldWalkLabel := "Morgen"
-	if oldWalkType == "evening" {
-		oldWalkLabel = "Abend"
-	}
-
-	newWalkLabel := "Morgen"
-	if newWalkType == "evening" {
-		newWalkLabel = "Abend"
-	}
 
 	tmpl := `
 <!DOCTYPE html>
@@ -617,9 +579,6 @@ func (s *EmailService) SendBookingMoved(to, name, dogName, oldDate, oldWalkType,
                     <span class="label">Datum:</span> {{.OldDate}}
                 </div>
                 <div class="detail-row">
-                    <span class="label">Spaziergang:</span> {{.OldWalkType}}
-                </div>
-                <div class="detail-row">
                     <span class="label">Uhrzeit:</span> {{.OldTime}} Uhr
                 </div>
             </div>
@@ -631,9 +590,6 @@ func (s *EmailService) SendBookingMoved(to, name, dogName, oldDate, oldWalkType,
                 </div>
                 <div class="detail-row">
                     <span class="label">Datum:</span> {{.NewDate}}
-                </div>
-                <div class="detail-row">
-                    <span class="label">Spaziergang:</span> {{.NewWalkType}}
                 </div>
                 <div class="detail-row">
                     <span class="label">Uhrzeit:</span> {{.NewTime}} Uhr
@@ -658,15 +614,155 @@ func (s *EmailService) SendBookingMoved(to, name, dogName, oldDate, oldWalkType,
 	t := template.Must(template.New("moved").Parse(tmpl))
 	var body bytes.Buffer
 	data := map[string]string{
-		"Name":        name,
-		"DogName":     dogName,
-		"OldDate":     oldDate,
-		"OldWalkType": oldWalkLabel,
-		"OldTime":     oldTime,
-		"NewDate":     newDate,
-		"NewWalkType": newWalkLabel,
-		"NewTime":     newTime,
-		"Reason":      reason,
+		"Name":    name,
+		"DogName": dogName,
+		"OldDate": oldDate,
+		"OldTime": oldTime,
+		"NewDate": newDate,
+		"NewTime": newTime,
+		"Reason":  reason,
+	}
+	if err := t.Execute(&body, data); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return s.SendEmail(to, subject, body.String())
+}
+
+// SendBookingApproved sends a notification when a pending booking is approved by admin
+func (s *EmailService) SendBookingApproved(to, name, dogName, date, scheduledTime string) error {
+	subject := fmt.Sprintf("Buchung genehmigt - %s am %s", dogName, date)
+
+	tmpl := `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #26272b; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #28a745; color: white; padding: 20px; text-align: center; border-radius: 6px 6px 0 0; }
+        .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 6px 6px; }
+        .booking-details { background-color: white; padding: 20px; margin: 20px 0; border-radius: 6px; border-left: 4px solid #28a745; }
+        .detail-row { margin: 10px 0; }
+        .label { font-weight: 600; color: #666; }
+        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✅ Buchung genehmigt!</h1>
+        </div>
+        <div class="content">
+            <p>Hallo {{.Name}},</p>
+            <p>Gute Nachrichten! Ihre Buchungsanfrage wurde genehmigt.</p>
+
+            <div class="booking-details">
+                <h3 style="margin-top: 0;">Buchungsdetails</h3>
+                <div class="detail-row">
+                    <span class="label">Hund:</span> {{.DogName}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Datum:</span> {{.Date}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Uhrzeit:</span> {{.ScheduledTime}} Uhr
+                </div>
+            </div>
+
+            <p>Sie können nun wie geplant mit {{.DogName}} spazieren gehen.</p>
+            <p>Falls Sie den Termin stornieren möchten, tun Sie dies bitte mindestens 12 Stunden im Voraus über Ihr Dashboard.</p>
+        </div>
+        <div class="footer">
+            <p>© 2025 Gassigeher. Alle Rechte vorbehalten.</p>
+        </div>
+    </div>
+</body>
+</html>
+`
+
+	t := template.Must(template.New("approval").Parse(tmpl))
+	var body bytes.Buffer
+	data := map[string]string{
+		"Name":          name,
+		"DogName":       dogName,
+		"Date":          date,
+		"ScheduledTime": scheduledTime,
+	}
+	if err := t.Execute(&body, data); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return s.SendEmail(to, subject, body.String())
+}
+
+// SendBookingRejected sends a notification when a pending booking is rejected by admin
+func (s *EmailService) SendBookingRejected(to, name, dogName, date, scheduledTime, reason string) error {
+	subject := fmt.Sprintf("Buchung abgelehnt - %s am %s", dogName, date)
+
+	tmpl := `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #26272b; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #dc3545; color: white; padding: 20px; text-align: center; border-radius: 6px 6px 0 0; }
+        .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 6px 6px; }
+        .booking-details { background-color: white; padding: 20px; margin: 20px 0; border-radius: 6px; border-left: 4px solid #dc3545; }
+        .reason-box { background-color: #fff3cd; padding: 15px; margin: 20px 0; border-radius: 6px; border-left: 4px solid #ffc107; }
+        .detail-row { margin: 10px 0; }
+        .label { font-weight: 600; color: #666; }
+        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>❌ Buchung abgelehnt</h1>
+        </div>
+        <div class="content">
+            <p>Hallo {{.Name}},</p>
+            <p>Leider mussten wir Ihre Buchungsanfrage ablehnen.</p>
+
+            <div class="booking-details">
+                <h3 style="margin-top: 0;">Buchungsdetails</h3>
+                <div class="detail-row">
+                    <span class="label">Hund:</span> {{.DogName}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Datum:</span> {{.Date}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Uhrzeit:</span> {{.ScheduledTime}} Uhr
+                </div>
+            </div>
+
+            <div class="reason-box">
+                <strong>Begründung:</strong>
+                <p style="margin-bottom: 0;">{{.Reason}}</p>
+            </div>
+
+            <p>Bitte versuchen Sie eine Buchung zu einem anderen Zeitpunkt oder kontaktieren Sie uns bei Fragen.</p>
+        </div>
+        <div class="footer">
+            <p>© 2025 Gassigeher. Alle Rechte vorbehalten.</p>
+        </div>
+    </div>
+</body>
+</html>
+`
+
+	t := template.Must(template.New("rejection").Parse(tmpl))
+	var body bytes.Buffer
+	data := map[string]string{
+		"Name":          name,
+		"DogName":       dogName,
+		"Date":          date,
+		"ScheduledTime": scheduledTime,
+		"Reason":        reason,
 	}
 	if err := t.Execute(&body, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)

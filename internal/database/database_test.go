@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tranm/gassigeher/internal/models"
-	"github.com/tranm/gassigeher/internal/repository"
+	"github.com/tranmh/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/repository"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -165,9 +165,9 @@ func TestExistingDatabaseMigration(t *testing.T) {
 		INSERT INTO dogs (name, category, is_available) VALUES
 		('Test Dog', 'green', 1);
 
-		INSERT INTO bookings (user_id, dog_id, date, scheduled_time, walk_type, status) VALUES
-		(1, 1, '2025-01-27', '10:00', 'morning', 'scheduled'),
-		(1, 1, '2025-01-28', '15:00', 'evening', 'scheduled');
+		INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status) VALUES
+		(1, 1, '2025-01-27', '10:00', 'scheduled'),
+		(1, 1, '2025-01-28', '15:00', 'scheduled');
 	`)
 	if err != nil {
 		t.Fatalf("Failed to insert test data: %v", err)
@@ -319,8 +319,8 @@ func TestForeignKeyConstraints(t *testing.T) {
 		INSERT INTO dogs (id, name, breed, category, is_available) VALUES
 		(1, 'Test Dog', 'Labrador', 'green', 1);
 
-		INSERT INTO bookings (id, user_id, dog_id, date, scheduled_time, walk_type, status, requires_approval, approval_status, approved_by, approved_at) VALUES
-		(1, 2, 1, '2025-01-27', '10:00', 'morning', 'scheduled', 1, 'approved', 1, CURRENT_TIMESTAMP);
+		INSERT INTO bookings (id, user_id, dog_id, date, scheduled_time, status, requires_approval, approval_status, approved_by, approved_at) VALUES
+		(1, 2, 1, '2025-01-27', '10:00', 'scheduled', 1, 'approved', 1, CURRENT_TIMESTAMP);
 	`)
 	if err != nil {
 		t.Fatalf("Failed to insert test data: %v", err)
@@ -431,7 +431,7 @@ func TestUniqueConstraints(t *testing.T) {
 		t.Error("Expected error for duplicate holiday date, got nil")
 	}
 
-	// Test 9.2.2-C: Duplicate booking (dog, date, walk_type)
+	// Test 9.2.2-C: Duplicate booking (dog, date, scheduled_time)
 	// First create test user and dog
 	_, err = db.Exec(`
 		INSERT INTO users (id, name, email, password_hash, terms_accepted_at, experience_level) VALUES
@@ -445,20 +445,20 @@ func TestUniqueConstraints(t *testing.T) {
 	}
 
 	_, err = db.Exec(`
-		INSERT INTO bookings (user_id, dog_id, date, scheduled_time, walk_type) VALUES
-		(1, 1, '2025-01-27', '10:00', 'morning')
+		INSERT INTO bookings (user_id, dog_id, date, scheduled_time) VALUES
+		(1, 1, '2025-01-27', '10:00')
 	`)
 	if err != nil {
 		t.Fatalf("Failed to create first booking: %v", err)
 	}
 
-	// Try to create duplicate booking (same dog, date, walk_type, different user/time)
+	// Try to create duplicate booking (same dog, date, scheduled_time)
 	_, err = db.Exec(`
-		INSERT INTO bookings (user_id, dog_id, date, scheduled_time, walk_type) VALUES
-		(1, 1, '2025-01-27', '11:00', 'morning')
+		INSERT INTO bookings (user_id, dog_id, date, scheduled_time) VALUES
+		(1, 1, '2025-01-27', '10:00')
 	`)
 	if err == nil {
-		t.Error("Expected error for duplicate booking (dog, date, walk_type), got nil")
+		t.Error("Expected error for duplicate booking (dog, date, scheduled_time), got nil")
 	}
 
 	t.Log("✅ Unique constraints test passed")
@@ -600,14 +600,10 @@ func TestIndexEffectiveness(t *testing.T) {
 		if i%10 == 0 {
 			status = "pending"
 		}
-		walkType := "morning"
-		if i%2 == 0 {
-			walkType = "evening"
-		}
 		_, err = db.Exec(`
-			INSERT INTO bookings (user_id, dog_id, date, scheduled_time, walk_type, approval_status) VALUES
-			(1, 1, ?, '10:00', ?, ?)
-		`, time.Now().AddDate(0, 0, i).Format("2006-01-02"), walkType, status)
+			INSERT INTO bookings (user_id, dog_id, date, scheduled_time, approval_status) VALUES
+			(1, 1, ?, '10:00', ?)
+		`, time.Now().AddDate(0, 0, i).Format("2006-01-02"), status)
 		if err != nil {
 			t.Logf("Warning: Failed to insert booking %d: %v", i, err)
 		}

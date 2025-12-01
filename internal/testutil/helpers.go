@@ -9,7 +9,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/tranm/gassigeher/internal/database"
+	"github.com/tranmh/gassigeher/internal/database"
 )
 
 // SetupTestDB creates a test database (default: in-memory SQLite)
@@ -179,12 +179,12 @@ func SeedTestDog(t *testing.T, db *sql.DB, name, breed, category string) int {
 }
 
 // DONE: SeedTestBooking creates a test booking and returns the ID
-func SeedTestBooking(t *testing.T, db *sql.DB, userID, dogID int, date, walkType, scheduledTime, status string) int {
+func SeedTestBooking(t *testing.T, db *sql.DB, userID, dogID int, date, scheduledTime, status string) int {
 	now := time.Now()
 	result, err := db.Exec(`
-		INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`, userID, dogID, date, walkType, scheduledTime, status, now)
+		INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, userID, dogID, date, scheduledTime, status, now)
 
 	if err != nil {
 		t.Fatalf("Failed to seed test booking: %v", err)

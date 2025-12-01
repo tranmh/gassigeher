@@ -127,7 +127,6 @@ For existing deployments:
 ```bash
 # Production .env file
 PORT=8080
-ENVIRONMENT=production
 BASE_URL=https://gassigeher.tierheim-goeppingen.de
 
 # Database

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tranm/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/models"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -48,15 +48,15 @@ func seedBookingTimeRules(t *testing.T, db *sql.DB) {
 		endTime   string
 		isBlocked int
 	}{
-		{"weekday", "Morning Walk", "09:00", "12:00", 0},
-		{"weekday", "Lunch Block", "13:00", "14:00", 1},
-		{"weekday", "Afternoon Walk", "14:00", "16:30", 0},
-		{"weekday", "Feeding Block", "17:00", "18:00", 1},
-		{"weekday", "Evening Walk", "18:00", "19:30", 0},
-		{"weekend", "Morning Walk", "09:00", "12:00", 0},
-		{"weekend", "Feeding Block", "12:00", "13:00", 1},
-		{"weekend", "Lunch Block", "13:00", "14:00", 1},
-		{"weekend", "Afternoon Walk", "14:00", "17:00", 0},
+		{"weekday", "Morgenspaziergang", "09:00", "12:00", 0},
+		{"weekday", "Mittagspause", "13:00", "14:00", 1},
+		{"weekday", "Nachmittagsspaziergang", "14:00", "16:30", 0},
+		{"weekday", "Fütterungszeit", "17:00", "18:00", 1},
+		{"weekday", "Abendspaziergang", "18:00", "19:30", 0},
+		{"weekend", "Morgenspaziergang", "09:00", "12:00", 0},
+		{"weekend", "Fütterungszeit", "12:00", "13:00", 1},
+		{"weekend", "Mittagspause", "13:00", "14:00", 1},
+		{"weekend", "Nachmittagsspaziergang", "14:00", "17:00", 0},
 	}
 
 	for _, r := range rules {
@@ -195,10 +195,10 @@ func TestCreateRule_DuplicateDayTypeAndName(t *testing.T) {
 	seedBookingTimeRules(t, db)
 	repo := NewBookingTimeRepository(db)
 
-	// Try to create duplicate (weekday, Morning Walk)
+	// Try to create duplicate (weekday, Morgenspaziergang)
 	rule := &models.BookingTimeRule{
 		DayType:   "weekday",
-		RuleName:  "Morning Walk",
+		RuleName:  "Morgenspaziergang",
 		StartTime: "08:00",
 		EndTime:   "10:00",
 		IsBlocked: false,

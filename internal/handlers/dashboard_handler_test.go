@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tranm/gassigeher/internal/config"
-	"github.com/tranm/gassigeher/internal/testutil"
+	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/testutil"
 )
 
 // DONE: TestDashboardHandler_GetStats tests getting admin dashboard statistics
@@ -28,8 +28,8 @@ func TestDashboardHandler_GetStats(t *testing.T) {
 	dogID := testutil.SeedTestDog(t, db, "Bella", "Labrador", "green")
 
 	tomorrow := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
-	testutil.SeedTestBooking(t, db, user1ID, dogID, tomorrow, "morning", "09:00", "scheduled")
-	testutil.SeedTestBooking(t, db, user2ID, dogID, tomorrow, "evening", "15:00", "scheduled")
+	testutil.SeedTestBooking(t, db, user1ID, dogID, tomorrow, "09:00", "scheduled")
+	testutil.SeedTestBooking(t, db, user2ID, dogID, tomorrow, "15:00", "scheduled")
 
 	t.Run("admin gets stats", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/admin/stats", nil)
@@ -81,7 +81,7 @@ func TestDashboardHandler_GetRecentActivity(t *testing.T) {
 
 	// Create recent booking
 	today := time.Now().Format("2006-01-02")
-	testutil.SeedTestBooking(t, db, userID, dogID, today, "morning", "09:00", "scheduled")
+	testutil.SeedTestBooking(t, db, userID, dogID, today, "09:00", "scheduled")
 
 	t.Run("admin gets recent activity", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/admin/activity", nil)

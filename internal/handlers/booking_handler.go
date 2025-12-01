@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/tranm/gassigeher/internal/config"
-	"github.com/tranm/gassigeher/internal/middleware"
-	"github.com/tranm/gassigeher/internal/models"
-	"github.com/tranm/gassigeher/internal/repository"
-	"github.com/tranm/gassigeher/internal/services"
+	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/middleware"
+	"github.com/tranmh/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/repository"
+	"github.com/tranmh/gassigeher/internal/services"
 )
 
 // BookingHandler handles booking-related HTTP requests
@@ -165,7 +165,7 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check for double-booking
-	isDoubleBooked, err := h.bookingRepo.CheckDoubleBooking(req.DogID, req.Date, req.WalkType)
+	isDoubleBooked, err := h.bookingRepo.CheckDoubleBooking(req.DogID, req.Date, req.ScheduledTime)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check availability")
 		return
@@ -193,7 +193,6 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		UserID:           userID,
 		DogID:            req.DogID,
 		Date:             req.Date,
-		WalkType:         req.WalkType,
 		ScheduledTime:    req.ScheduledTime,
 		RequiresApproval: requiresApproval,
 	}
@@ -221,7 +220,7 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 
 	// Send confirmation email
 	if user.Email != nil && h.emailService != nil {
-		go h.emailService.SendBookingConfirmation(*user.Email, user.Name, dog.Name, booking.Date, booking.WalkType, booking.ScheduledTime)
+		go h.emailService.SendBookingConfirmation(*user.Email, user.Name, dog.Name, booking.Date, booking.ScheduledTime)
 	}
 
 	respondJSON(w, http.StatusCreated, booking)
@@ -251,10 +250,6 @@ func (h *BookingHandler) ListBookings(w http.ResponseWriter, r *http.Request) {
 
 	if status := r.URL.Query().Get("status"); status != "" {
 		filter.Status = &status
-	}
-
-	if walkType := r.URL.Query().Get("walk_type"); walkType != "" {
-		filter.WalkType = &walkType
 	}
 
 	// Check if this is a calendar view request (needs to see ALL bookings for availability)
@@ -423,10 +418,10 @@ func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) {
 	if booking.User.Email != nil && h.emailService != nil {
 		if isAdmin && req.Reason != nil {
 			// Admin cancelled
-			go h.emailService.SendAdminCancellation(*booking.User.Email, booking.User.Name, booking.Dog.Name, booking.Date, booking.WalkType, *req.Reason)
+			go h.emailService.SendAdminCancellation(*booking.User.Email, booking.User.Name, booking.Dog.Name, booking.Date, booking.ScheduledTime, *req.Reason)
 		} else {
 			// User cancelled
-			go h.emailService.SendBookingCancellation(*booking.User.Email, booking.User.Name, booking.Dog.Name, booking.Date, booking.WalkType)
+			go h.emailService.SendBookingCancellation(*booking.User.Email, booking.User.Name, booking.Dog.Name, booking.Date, booking.ScheduledTime)
 		}
 	}
 
@@ -535,7 +530,6 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 
 	// Store old values for email
 	oldDate := booking.Date
-	oldWalkType := booking.WalkType
 	oldTime := booking.ScheduledTime
 
 	// Check if new date is blocked
@@ -550,7 +544,7 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check for double-booking at new time
-	isDoubleBooked, err := h.bookingRepo.CheckDoubleBooking(booking.DogID, req.Date, req.WalkType)
+	isDoubleBooked, err := h.bookingRepo.CheckDoubleBooking(booking.DogID, req.Date, req.ScheduledTime)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check availability")
 		return
@@ -562,7 +556,6 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 
 	// Update booking
 	booking.Date = req.Date
-	booking.WalkType = req.WalkType
 	booking.ScheduledTime = req.ScheduledTime
 
 	if err := h.bookingRepo.Update(booking); err != nil {
@@ -580,10 +573,8 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 			booking.User.Name,
 			booking.Dog.Name,
 			oldDate,
-			oldWalkType,
 			oldTime,
 			req.Date,
-			req.WalkType,
 			req.ScheduledTime,
 			req.Reason,
 		)
@@ -727,7 +718,19 @@ func (h *BookingHandler) ApprovePendingBooking(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// TODO: Send email notification to user
+	// Send email notification to user
+	if h.emailService != nil {
+		booking, err := h.bookingRepo.FindByIDWithDetails(id)
+		if err == nil && booking != nil && booking.User != nil && booking.User.Email != nil && *booking.User.Email != "" {
+			go h.emailService.SendBookingApproved(
+				*booking.User.Email,
+				booking.User.Name,
+				booking.Dog.Name,
+				booking.Date,
+				booking.ScheduledTime,
+			)
+		}
+	}
 
 	respondJSON(w, http.StatusOK, map[string]string{
 		"message": "Booking approved successfully",
@@ -774,12 +777,25 @@ func (h *BookingHandler) RejectPendingBooking(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Get booking details before rejecting (for email)
+	booking, _ := h.bookingRepo.FindByIDWithDetails(id)
+
 	if err := h.bookingRepo.RejectBooking(id, adminID, req.Reason); err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	// TODO: Send email notification to user with reason
+	// Send email notification to user with reason
+	if h.emailService != nil && booking != nil && booking.User != nil && booking.User.Email != nil && *booking.User.Email != "" {
+		go h.emailService.SendBookingRejected(
+			*booking.User.Email,
+			booking.User.Name,
+			booking.Dog.Name,
+			booking.Date,
+			booking.ScheduledTime,
+			req.Reason,
+		)
+	}
 
 	respondJSON(w, http.StatusOK, map[string]string{
 		"message": "Booking rejected successfully",

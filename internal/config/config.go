@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/tranm/gassigeher/internal/database"
+	"github.com/tranmh/gassigeher/internal/database"
 )
 
 // Config holds the application configuration
@@ -70,9 +70,8 @@ type Config struct {
 	AutoDeactivationDays    int
 
 	// Server
-	Port        string
-	Environment string
-	BaseURL     string // Base URL for email links (e.g., "https://gassigeher.com")
+	Port    string
+	BaseURL string // Base URL for email links (e.g., "https://gassigeher.com")
 }
 
 // Load loads configuration from environment variables
@@ -136,9 +135,8 @@ func Load() *Config {
 		AutoDeactivationDays:    getEnvAsInt("AUTO_DEACTIVATION_DAYS", 365),
 
 		// Server
-		Port:        getEnv("PORT", "8080"),
-		Environment: getEnv("ENVIRONMENT", "development"),
-		BaseURL:     getEnv("BASE_URL", "http://localhost:8080"),
+		Port:    getEnv("PORT", "8080"),
+		BaseURL: getEnv("BASE_URL", "http://localhost:8080"),
 	}
 }
 

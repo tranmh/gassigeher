@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/tranm/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/models"
 )
 
 type BookingTimeRepository struct {

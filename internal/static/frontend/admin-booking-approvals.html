@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buchungs-Genehmigungen - Gassigeher Admin</title>
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <style>
+        .approval-card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid #ffc107;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .approval-card.approved {
+            border-left-color: #28a745;
+            opacity: 0.7;
+        }
+        .approval-card.rejected {
+            border-left-color: #dc3545;
+            opacity: 0.7;
+        }
+        .approval-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .approval-actions button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .btn-approve {
+            background: #28a745;
+            color: white;
+        }
+        .btn-approve:hover {
+            background: #218838;
+        }
+        .btn-reject {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-reject:hover {
+            background: #c82333;
+        }
+        .booking-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+        .booking-info-item {
+            display: flex;
+            flex-direction: column;
+        }
+        .booking-info-item label {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 3px;
+        }
+        .booking-info-item span {
+            font-weight: 600;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .status-badge.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status-badge.approved {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-badge.rejected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        .empty-state h3 {
+            margin-bottom: 10px;
+            color: #82b965;
+        }
+        .filter-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .filter-tab {
+            padding: 10px 20px;
+            background: var(--card-bg);
+            border: 2px solid var(--border-light);
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .filter-tab.active {
+            background: var(--primary-green);
+            color: white;
+            border-color: var(--primary-green);
+        }
+        .filter-tab .count {
+            background: rgba(0,0,0,0.1);
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 5px;
+            font-size: 0.85rem;
+        }
+        .filter-tab.active .count {
+            background: rgba(255,255,255,0.3);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <a href="/" class="logo">Gassigeher Admin</a>
+            <nav id="main-nav">
+                <ul>
+                    <li><a href="/admin-dashboard.html" data-i18n="admin_dashboard.title">Dashboard</a></li>
+                    <li><a href="/admin-dogs.html" data-i18n="dogs.manage_dogs">Hunde</a></li>
+                    <li class="nav-dropdown">
+                        <a href="#">Buchungen</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-bookings.html">📅 Alle Buchungen</a>
+                            <a href="/admin-booking-approvals.html">✓ Genehmigungen</a>
+                            <a href="/admin-booking-times.html">⏰ Buchungszeiten</a>
+                            <a href="/admin-blocked-dates.html">🚫 Gesperrte Tage</a>
+                        </div>
+                    </li>
+                    <li class="nav-dropdown">
+                        <a href="#">Benutzer</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-users.html">👥 Alle Benutzer</a>
+                            <a href="/admin-experience-requests.html">⭐ Level-Anfragen</a>
+                            <a href="/admin-reactivation-requests.html">🔄 Reaktivierungen</a>
+                        </div>
+                    </li>
+                    <li><a href="/admin-settings.html" data-i18n="admin_dashboard.system_settings">Einstellungen</a></li>
+                    <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
+                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+
+    <main style="padding: 40px 0;">
+        <div class="container">
+            <h1 data-i18n="admin.booking_approvals">Buchungs-Genehmigungen</h1>
+            <p style="color: #666; margin-bottom: 30px;">
+                Verwalten Sie Buchungsanfragen, die eine Admin-Genehmigung erfordern (z.B. Vormittagsspaziergänge).
+            </p>
+
+            <div id="alert-container"></div>
+
+            <!-- Filter Tabs -->
+            <div class="filter-tabs">
+                <button class="filter-tab active" data-filter="pending" onclick="setFilter('pending')">
+                    Ausstehend <span class="count" id="pending-count">0</span>
+                </button>
+                <button class="filter-tab" data-filter="approved" onclick="setFilter('approved')">
+                    Genehmigt <span class="count" id="approved-count">0</span>
+                </button>
+                <button class="filter-tab" data-filter="rejected" onclick="setFilter('rejected')">
+                    Abgelehnt <span class="count" id="rejected-count">0</span>
+                </button>
+                <button class="filter-tab" data-filter="all" onclick="setFilter('all')">
+                    Alle
+                </button>
+            </div>
+
+            <!-- Approvals List -->
+            <div id="approvals-list">
+                <div class="empty-state">
+                    <div class="spinner"></div>
+                    <p>Laden...</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Rejection Reason Modal -->
+    <div id="reject-modal" class="modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+        <div class="card" style="max-width: 500px; margin: 20px; padding: 30px;">
+            <h3>Buchung ablehnen</h3>
+            <p style="color: #666; margin-bottom: 20px;">Bitte geben Sie einen Grund fuer die Ablehnung an:</p>
+            <div class="form-group">
+                <label for="reject-reason">Grund *</label>
+                <textarea id="reject-reason" rows="3" required placeholder="z.B. Hund ist an diesem Tag nicht verfuegbar..."></textarea>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="closeRejectModal()">Abbrechen</button>
+                <button class="btn btn-reject" onclick="confirmReject()">Ablehnen</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/nav-menu.js"></script>
+    <script src="/js/i18n.js"></script>
+    <script src="/js/api.js"></script>
+    <script>
+        let allBookings = [];
+        let currentFilter = 'pending';
+        let rejectingBookingId = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!api.isAuthenticated()) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // Check if user is admin
+            try {
+                const userData = await api.getMe();
+                if (!userData.is_admin) {
+                    alert('Zugriff verweigert: Diese Seite ist nur fuer Administratoren zugaenglich.');
+                    window.location.href = '/dashboard.html';
+                    return;
+                }
+            } catch (error) {
+                console.error('Failed to verify admin status:', error);
+                window.location.href = '/dashboard.html';
+                return;
+            }
+
+            await window.i18n.load();
+            window.i18n.updateElement(document.body);
+
+            await loadApprovals();
+
+            // Auto-refresh every 30 seconds
+            setInterval(loadApprovals, 30000);
+        });
+
+        async function loadApprovals() {
+            try {
+                // Get all bookings that require approval
+                const bookings = await api.getBookings({ requires_approval: 'true' });
+                allBookings = bookings.filter(b => b.requires_approval);
+
+                // Update counts
+                const pending = allBookings.filter(b => b.approval_status === 'pending').length;
+                const approved = allBookings.filter(b => b.approval_status === 'approved').length;
+                const rejected = allBookings.filter(b => b.approval_status === 'rejected').length;
+
+                document.getElementById('pending-count').textContent = pending;
+                document.getElementById('approved-count').textContent = approved;
+                document.getElementById('rejected-count').textContent = rejected;
+
+                renderApprovals();
+            } catch (error) {
+                console.error('Failed to load approvals:', error);
+                showAlert('error', 'Fehler beim Laden der Genehmigungen');
+            }
+        }
+
+        function setFilter(filter) {
+            currentFilter = filter;
+
+            // Update tab styles
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.filter === filter);
+            });
+
+            renderApprovals();
+        }
+
+        function renderApprovals() {
+            const container = document.getElementById('approvals-list');
+
+            let filtered = allBookings;
+            if (currentFilter !== 'all') {
+                filtered = allBookings.filter(b => b.approval_status === currentFilter);
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>${getEmptyMessage()}</h3>
+                        <p>${getEmptyDescription()}</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(booking => {
+                const statusClass = booking.approval_status;
+                const statusBadge = getStatusBadge(booking.approval_status);
+
+                return `
+                    <div class="approval-card ${statusClass}">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div>
+                                <h4 style="margin: 0 0 5px 0;">
+                                    ${booking.dog ? booking.dog.name : 'Hund #' + booking.dog_id}
+                                    ${statusBadge}
+                                </h4>
+                                <p style="margin: 0; color: #666; font-size: 0.9rem;">
+                                    Angefragt von: ${booking.user ? booking.user.name : 'User #' + booking.user_id}
+                                </p>
+                            </div>
+                            <span style="font-size: 0.85rem; color: #666;">
+                                Erstellt: ${formatDate(booking.created_at)}
+                            </span>
+                        </div>
+
+                        <div class="booking-info">
+                            <div class="booking-info-item">
+                                <label>Datum</label>
+                                <span>${formatBookingDate(booking.date)}</span>
+                            </div>
+                            <div class="booking-info-item">
+                                <label>Uhrzeit</label>
+                                <span>${booking.scheduled_time} Uhr</span>
+                            </div>
+                            <div class="booking-info-item">
+                                <label>Status</label>
+                                <span>${booking.status}</span>
+                            </div>
+                        </div>
+
+                        ${booking.rejection_reason ? `
+                            <div style="margin-top: 15px; padding: 10px; background: #f8d7da; border-radius: 6px;">
+                                <strong>Ablehnungsgrund:</strong> ${booking.rejection_reason}
+                            </div>
+                        ` : ''}
+
+                        ${booking.approval_status === 'pending' ? `
+                            <div class="approval-actions">
+                                <button class="btn-approve" onclick="approveBooking(${booking.id})">
+                                    Genehmigen
+                                </button>
+                                <button class="btn-reject" onclick="openRejectModal(${booking.id})">
+                                    Ablehnen
+                                </button>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getStatusBadge(status) {
+            const badges = {
+                pending: '<span class="status-badge pending">Ausstehend</span>',
+                approved: '<span class="status-badge approved">Genehmigt</span>',
+                rejected: '<span class="status-badge rejected">Abgelehnt</span>'
+            };
+            return badges[status] || '';
+        }
+
+        function getEmptyMessage() {
+            const messages = {
+                pending: 'Keine ausstehenden Genehmigungen',
+                approved: 'Keine genehmigten Buchungen',
+                rejected: 'Keine abgelehnten Buchungen',
+                all: 'Keine Buchungen mit Genehmigungspflicht'
+            };
+            return messages[currentFilter] || 'Keine Buchungen gefunden';
+        }
+
+        function getEmptyDescription() {
+            const descriptions = {
+                pending: 'Alle Genehmigungsanfragen wurden bearbeitet.',
+                approved: 'Es wurden noch keine Buchungen genehmigt.',
+                rejected: 'Es wurden noch keine Buchungen abgelehnt.',
+                all: 'Keine Buchungen erfordern eine Genehmigung.'
+            };
+            return descriptions[currentFilter] || '';
+        }
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('de-DE', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function formatBookingDate(dateStr) {
+            // Handle ISO date format
+            const datePart = dateStr.split('T')[0];
+            const [year, month, day] = datePart.split('-');
+            return `${day}.${month}.${year}`;
+        }
+
+        async function approveBooking(id) {
+            if (!confirm('Buchung wirklich genehmigen?')) return;
+
+            try {
+                await api.approveBooking(id);
+                showAlert('success', 'Buchung erfolgreich genehmigt!');
+                await loadApprovals();
+            } catch (error) {
+                console.error('Failed to approve booking:', error);
+                showAlert('error', error.message || 'Fehler beim Genehmigen der Buchung');
+            }
+        }
+
+        function openRejectModal(id) {
+            rejectingBookingId = id;
+            document.getElementById('reject-reason').value = '';
+            document.getElementById('reject-modal').style.display = 'flex';
+        }
+
+        function closeRejectModal() {
+            rejectingBookingId = null;
+            document.getElementById('reject-modal').style.display = 'none';
+        }
+
+        async function confirmReject() {
+            const reason = document.getElementById('reject-reason').value.trim();
+            if (!reason) {
+                showAlert('error', 'Bitte geben Sie einen Ablehnungsgrund an');
+                return;
+            }
+
+            try {
+                await api.rejectBooking(rejectingBookingId, reason);
+                closeRejectModal();
+                showAlert('success', 'Buchung wurde abgelehnt');
+                await loadApprovals();
+            } catch (error) {
+                console.error('Failed to reject booking:', error);
+                showAlert('error', error.message || 'Fehler beim Ablehnen der Buchung');
+            }
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('reject-modal');
+            if (event.target === modal) {
+                closeRejectModal();
+            }
+        }
+
+        function showAlert(type, message) {
+            const container = document.getElementById('alert-container');
+            container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => container.innerHTML = '', 5000);
+        }
+    </script>
+</body>
+</html>

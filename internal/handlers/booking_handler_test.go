@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/tranm/gassigeher/internal/config"
-	"github.com/tranm/gassigeher/internal/models"
-	"github.com/tranm/gassigeher/internal/repository"
-	"github.com/tranm/gassigeher/internal/services"
-	"github.com/tranm/gassigeher/internal/testutil"
+	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/repository"
+	"github.com/tranmh/gassigeher/internal/services"
+	"github.com/tranmh/gassigeher/internal/testutil"
 )
 
 // DONE: TestBookingHandler_CreateBooking tests booking creation endpoint
@@ -46,7 +46,6 @@ func TestBookingHandler_CreateBooking(t *testing.T) {
 		reqBody := map[string]interface{}{
 			"dog_id":         dogID,
 			"date":           tomorrow,
-			"walk_type":      "morning",
 			"scheduled_time": "09:00",
 		}
 
@@ -96,7 +95,6 @@ func TestBookingHandler_CreateBooking(t *testing.T) {
 		reqBody := map[string]interface{}{
 			"dog_id":         dogID,
 			"date":           yesterday,
-			"walk_type":      "morning",
 			"scheduled_time": "09:00",
 		}
 
@@ -122,7 +120,6 @@ func TestBookingHandler_CreateBooking(t *testing.T) {
 		reqBody := map[string]interface{}{
 			"dog_id":         dogID,
 			"date":           blockedDate,
-			"walk_type":      "morning",
 			"scheduled_time": "09:00",
 		}
 
@@ -143,14 +140,13 @@ func TestBookingHandler_CreateBooking(t *testing.T) {
 	t.Run("double booking same dog", func(t *testing.T) {
 		// Create first booking
 		date := time.Now().AddDate(0, 0, 3).Format("2006-01-02")
-		testutil.SeedTestBooking(t, db, userID, dogID, date, "morning", "09:00", "scheduled")
+		testutil.SeedTestBooking(t, db, userID, dogID, date, "09:00", "scheduled")
 
-		// Try to create duplicate
+		// Try to create duplicate with same time slot
 		reqBody := map[string]interface{}{
 			"dog_id":         dogID,
 			"date":           date,
-			"walk_type":      "morning",
-			"scheduled_time": "09:30",
+			"scheduled_time": "09:00",
 		}
 
 		body, _ := json.Marshal(reqBody)
@@ -177,7 +173,6 @@ func TestBookingHandler_CreateBooking(t *testing.T) {
 		reqBody := map[string]interface{}{
 			"dog_id":         orangeDogID,
 			"date":           date,
-			"walk_type":      "morning",
 			"scheduled_time": "09:00",
 		}
 
@@ -206,7 +201,6 @@ func TestBookingHandler_CreateBooking(t *testing.T) {
 		reqBody := map[string]interface{}{
 			"dog_id":         dogID,
 			"date":           date,
-			"walk_type":      "evening",
 			"scheduled_time": "15:00",
 		}
 
@@ -241,7 +235,6 @@ func TestBookingHandler_CreateBooking(t *testing.T) {
 			UserID:        userID,
 			DogID:         dogID,
 			Date:          futureDate,
-			WalkType:      "morning",
 			ScheduledTime: "09:00",
 			Status:        "scheduled",
 		}
@@ -252,11 +245,10 @@ func TestBookingHandler_CreateBooking(t *testing.T) {
 		}
 
 		// Second booking attempts same slot (simulates race condition)
-		// This will hit UNIQUE constraint on (dog_id, date, walk_type)
+		// This will hit UNIQUE constraint on (dog_id, date, scheduled_time)
 		reqBody := map[string]interface{}{
 			"dog_id":         dogID,
 			"date":           futureDate,
-			"walk_type":      "morning",
 			"scheduled_time": "09:00",
 		}
 
@@ -308,7 +300,6 @@ func TestBookingHandler_CreateBooking(t *testing.T) {
 		reqBody := map[string]interface{}{
 			"dog_id":         dogID,
 			"date":           futureDate,
-			"walk_type":      "morning",
 			"scheduled_time": "09:00",
 		}
 
@@ -343,7 +334,6 @@ func TestBookingHandler_CreateBooking(t *testing.T) {
 		reqBody := map[string]interface{}{
 			"dog_id":         dogID,
 			"date":           today,
-			"walk_type":      "evening",
 			"scheduled_time": "16:00",
 		}
 
@@ -389,11 +379,11 @@ func TestBookingHandler_ListBookings(t *testing.T) {
 	// Create bookings for user1
 	date1 := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
 	date2 := time.Now().AddDate(0, 0, 2).Format("2006-01-02")
-	testutil.SeedTestBooking(t, db, user1ID, dogID, date1, "morning", "09:00", "scheduled")
-	testutil.SeedTestBooking(t, db, user1ID, dogID, date2, "evening", "15:00", "scheduled")
+	testutil.SeedTestBooking(t, db, user1ID, dogID, date1, "09:00", "scheduled")
+	testutil.SeedTestBooking(t, db, user1ID, dogID, date2, "15:00", "scheduled")
 
 	// Create booking for user2
-	testutil.SeedTestBooking(t, db, user2ID, dogID, date1, "evening", "16:00", "scheduled")
+	testutil.SeedTestBooking(t, db, user2ID, dogID, date1, "16:00", "scheduled")
 
 	t.Run("list user's own bookings", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/bookings", nil)
@@ -451,7 +441,7 @@ func TestBookingHandler_CancelBooking(t *testing.T) {
 
 	// Create booking 2 days in future (beyond 12 hour notice period)
 	twoDaysLater := time.Now().AddDate(0, 0, 2).Format("2006-01-02")
-	bookingID := testutil.SeedTestBooking(t, db, userID, dogID, twoDaysLater, "morning", "09:00", "scheduled")
+	bookingID := testutil.SeedTestBooking(t, db, userID, dogID, twoDaysLater, "09:00", "scheduled")
 
 	t.Run("successful cancellation - admin override", func(t *testing.T) {
 		// Admin can cancel without notice period restrictions
@@ -485,7 +475,7 @@ func TestBookingHandler_CancelBooking(t *testing.T) {
 
 		// Create booking for user1
 		date := time.Now().AddDate(0, 0, 3).Format("2006-01-02")
-		user1Booking := testutil.SeedTestBooking(t, db, userID, dogID, date, "evening", "15:00", "scheduled")
+		user1Booking := testutil.SeedTestBooking(t, db, userID, dogID, date, "15:00", "scheduled")
 
 		// Try to cancel with otherUser context
 		req := httptest.NewRequest("PUT", "/api/bookings/"+fmt.Sprintf("%d", user1Booking)+"/cancel", nil)
@@ -532,7 +522,7 @@ func TestBookingHandler_AddNotes(t *testing.T) {
 	dogID := testutil.SeedTestDog(t, db, "Bella", "Labrador", "green")
 
 	// Create completed booking
-	bookingID := testutil.SeedTestBooking(t, db, userID, dogID, "2025-12-01", "morning", "09:00", "completed")
+	bookingID := testutil.SeedTestBooking(t, db, userID, dogID, "2025-12-01", "09:00", "completed")
 
 	t.Run("successfully add notes to completed booking", func(t *testing.T) {
 		reqBody := map[string]interface{}{
@@ -555,7 +545,7 @@ func TestBookingHandler_AddNotes(t *testing.T) {
 	})
 
 	t.Run("cannot add notes to scheduled booking", func(t *testing.T) {
-		scheduledID := testutil.SeedTestBooking(t, db, userID, dogID, "2025-12-05", "evening", "15:00", "scheduled")
+		scheduledID := testutil.SeedTestBooking(t, db, userID, dogID, "2025-12-05", "15:00", "scheduled")
 
 		reqBody := map[string]interface{}{
 			"notes": "Early notes",
@@ -585,7 +575,7 @@ func TestBookingHandler_GetBooking(t *testing.T) {
 
 	userID := testutil.SeedTestUser(t, db, "user@example.com", "Test User", "green")
 	dogID := testutil.SeedTestDog(t, db, "Bella", "Labrador", "green")
-	bookingID := testutil.SeedTestBooking(t, db, userID, dogID, "2025-12-01", "morning", "09:00", "scheduled")
+	bookingID := testutil.SeedTestBooking(t, db, userID, dogID, "2025-12-01", "09:00", "scheduled")
 
 	t.Run("user can get their own booking", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/bookings/"+fmt.Sprintf("%d", bookingID), nil)
@@ -678,12 +668,11 @@ func TestBookingHandler_MoveBooking(t *testing.T) {
 	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
 	userID := testutil.SeedTestUser(t, db, "user@example.com", "User", "green")
 	dogID := testutil.SeedTestDog(t, db, "Bella", "Labrador", "green")
-	bookingID := testutil.SeedTestBooking(t, db, userID, dogID, "2025-12-01", "morning", "09:00", "scheduled")
+	bookingID := testutil.SeedTestBooking(t, db, userID, dogID, "2025-12-01", "09:00", "scheduled")
 
 	t.Run("admin can move scheduled booking", func(t *testing.T) {
 		reqBody := map[string]string{
 			"date":           "2025-12-05",
-			"walk_type":      "evening",
 			"scheduled_time": "16:00",
 			"reason":         "Dog unavailable on original date",
 		}
@@ -703,7 +692,7 @@ func TestBookingHandler_MoveBooking(t *testing.T) {
 	})
 
 	t.Run("cannot move to blocked date", func(t *testing.T) {
-		bookingID2 := testutil.SeedTestBooking(t, db, userID, dogID, "2025-12-02", "morning", "09:00", "scheduled")
+		bookingID2 := testutil.SeedTestBooking(t, db, userID, dogID, "2025-12-02", "09:00", "scheduled")
 
 		// Block the target date
 		blockedDate := "2025-12-25"
@@ -711,7 +700,6 @@ func TestBookingHandler_MoveBooking(t *testing.T) {
 
 		reqBody := map[string]string{
 			"date":           blockedDate,
-			"walk_type":      "morning",
 			"scheduled_time": "09:00",
 			"reason":         "Move to Christmas",
 		}
@@ -731,15 +719,14 @@ func TestBookingHandler_MoveBooking(t *testing.T) {
 	})
 
 	t.Run("cannot move to double-booked slot", func(t *testing.T) {
-		bookingID3 := testutil.SeedTestBooking(t, db, userID, dogID, "2025-12-03", "morning", "09:00", "scheduled")
+		bookingID3 := testutil.SeedTestBooking(t, db, userID, dogID, "2025-12-03", "09:00", "scheduled")
 
 		// Create another booking that will conflict
 		existingDate := "2025-12-10"
-		testutil.SeedTestBooking(t, db, userID, dogID, existingDate, "morning", "09:00", "scheduled")
+		testutil.SeedTestBooking(t, db, userID, dogID, existingDate, "09:00", "scheduled")
 
 		reqBody := map[string]string{
 			"date":           existingDate,
-			"walk_type":      "morning",
 			"scheduled_time": "09:00",
 			"reason":         "Try to double book",
 		}
@@ -759,11 +746,10 @@ func TestBookingHandler_MoveBooking(t *testing.T) {
 	})
 
 	t.Run("cannot move completed booking", func(t *testing.T) {
-		completedID := testutil.SeedTestBooking(t, db, userID, dogID, "2025-11-01", "morning", "09:00", "completed")
+		completedID := testutil.SeedTestBooking(t, db, userID, dogID, "2025-11-01", "09:00", "completed")
 
 		reqBody := map[string]string{
 			"date":           "2025-12-20",
-			"walk_type":      "evening",
 			"scheduled_time": "16:00",
 			"reason":         "Try to move completed",
 		}
@@ -785,7 +771,6 @@ func TestBookingHandler_MoveBooking(t *testing.T) {
 	t.Run("booking not found", func(t *testing.T) {
 		reqBody := map[string]string{
 			"date":           "2025-12-20",
-			"walk_type":      "morning",
 			"scheduled_time": "09:00",
 			"reason":         "Test",
 		}
@@ -807,7 +792,6 @@ func TestBookingHandler_MoveBooking(t *testing.T) {
 	t.Run("invalid booking ID", func(t *testing.T) {
 		reqBody := map[string]string{
 			"date":           "2025-12-20",
-			"walk_type":      "morning",
 			"scheduled_time": "09:00",
 			"reason":         "Test",
 		}
@@ -844,7 +828,6 @@ func TestBookingHandler_MoveBooking(t *testing.T) {
 	t.Run("missing required field - reason", func(t *testing.T) {
 		reqBody := map[string]string{
 			"date":           "2025-12-20",
-			"walk_type":      "morning",
 			"scheduled_time": "09:00",
 			// Missing reason
 		}
@@ -874,8 +857,8 @@ func TestBookingHandler_GetCalendarData(t *testing.T) {
 	dogID := testutil.SeedTestDog(t, db, "Bella", "Labrador", "green")
 
 	// Create bookings in December 2025
-	testutil.SeedTestBooking(t, db, userID, dogID, "2025-12-01", "morning", "09:00", "scheduled")
-	testutil.SeedTestBooking(t, db, userID, dogID, "2025-12-15", "evening", "16:00", "scheduled")
+	testutil.SeedTestBooking(t, db, userID, dogID, "2025-12-01", "09:00", "scheduled")
+	testutil.SeedTestBooking(t, db, userID, dogID, "2025-12-15", "16:00", "scheduled")
 
 	// Create blocked date
 	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
@@ -1103,7 +1086,6 @@ func TestCreateBooking_TimeValidation(t *testing.T) {
 			reqBody := map[string]interface{}{
 				"dog_id":         dogID,
 				"date":           tc.date,
-				"walk_type":      "morning",
 				"scheduled_time": tc.time,
 			}
 
@@ -1141,14 +1123,14 @@ func TestGetPendingApprovals(t *testing.T) {
 	// Create 5 pending bookings
 	for i := 1; i <= 5; i++ {
 		date := time.Now().AddDate(0, 0, i).Format("2006-01-02")
-		bookingID := testutil.SeedTestBooking(t, db, user1ID, dogID, date, "morning", "10:00", "scheduled")
+		bookingID := testutil.SeedTestBooking(t, db, user1ID, dogID, date, "10:00", "scheduled")
 		db.Exec("UPDATE bookings SET requires_approval = 1, approval_status = 'pending' WHERE id = ?", bookingID)
 	}
 
 	// Create 3 approved bookings (should not appear)
 	for i := 6; i <= 8; i++ {
 		date := time.Now().AddDate(0, 0, i).Format("2006-01-02")
-		bookingID := testutil.SeedTestBooking(t, db, user2ID, dogID, date, "evening", "15:00", "scheduled")
+		bookingID := testutil.SeedTestBooking(t, db, user2ID, dogID, date, "15:00", "scheduled")
 		db.Exec("UPDATE bookings SET requires_approval = 0, approval_status = 'approved' WHERE id = ?", bookingID)
 	}
 
@@ -1212,12 +1194,12 @@ func TestApproveBooking(t *testing.T) {
 
 	// Create pending booking
 	pendingDate := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
-	pendingID := testutil.SeedTestBooking(t, db, userID, dogID, pendingDate, "morning", "10:00", "scheduled")
+	pendingID := testutil.SeedTestBooking(t, db, userID, dogID, pendingDate, "10:00", "scheduled")
 	db.Exec("UPDATE bookings SET requires_approval = 1, approval_status = 'pending' WHERE id = ?", pendingID)
 
 	// Create already approved booking
 	approvedDate := time.Now().AddDate(0, 0, 2).Format("2006-01-02")
-	approvedID := testutil.SeedTestBooking(t, db, userID, dogID, approvedDate, "evening", "15:00", "scheduled")
+	approvedID := testutil.SeedTestBooking(t, db, userID, dogID, approvedDate, "15:00", "scheduled")
 	db.Exec("UPDATE bookings SET requires_approval = 0, approval_status = 'approved' WHERE id = ?", approvedID)
 
 	testCases := []struct {
@@ -1292,12 +1274,12 @@ func TestRejectBooking(t *testing.T) {
 
 	// Create pending booking
 	pendingDate := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
-	pendingID := testutil.SeedTestBooking(t, db, userID, dogID, pendingDate, "morning", "10:00", "scheduled")
+	pendingID := testutil.SeedTestBooking(t, db, userID, dogID, pendingDate, "10:00", "scheduled")
 	db.Exec("UPDATE bookings SET requires_approval = 1, approval_status = 'pending' WHERE id = ?", pendingID)
 
 	// Create approved booking (cannot reject)
 	approvedDate := time.Now().AddDate(0, 0, 2).Format("2006-01-02")
-	approvedID := testutil.SeedTestBooking(t, db, userID, dogID, approvedDate, "evening", "15:00", "scheduled")
+	approvedID := testutil.SeedTestBooking(t, db, userID, dogID, approvedDate, "15:00", "scheduled")
 	db.Exec("UPDATE bookings SET requires_approval = 0, approval_status = 'approved' WHERE id = ?", approvedID)
 
 	testCases := []struct {

@@ -4,13 +4,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tranm/gassigeher/internal/testutil"
+	"github.com/tranmh/gassigeher/internal/testutil"
 )
 
 // DONE: TestCronService_AutoCompleteBookings tests automatic booking completion
 func TestCronService_AutoCompleteBookings(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	cronService := NewCronService(db)
+	cronService := NewCronService(db, nil)
 
 	// Create test user and dog
 	userID := testutil.SeedTestUser(t, db, "test@example.com", "Test User", "green")
@@ -19,23 +19,23 @@ func TestCronService_AutoCompleteBookings(t *testing.T) {
 	t.Run("complete past bookings", func(t *testing.T) {
 		// Create booking from yesterday
 		yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
-		testutil.SeedTestBooking(t, db, userID, dogID, yesterday, "morning", "09:00", "scheduled")
+		testutil.SeedTestBooking(t, db, userID, dogID, yesterday, "09:00", "scheduled")
 
 		// Create booking from last week
 		lastWeek := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
-		testutil.SeedTestBooking(t, db, userID, dogID, lastWeek, "evening", "15:00", "scheduled")
+		testutil.SeedTestBooking(t, db, userID, dogID, lastWeek, "15:00", "scheduled")
 
 		// Create future booking (should not be completed)
 		tomorrow := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
-		futureBookingID := testutil.SeedTestBooking(t, db, userID, dogID, tomorrow, "morning", "09:00", "scheduled")
+		futureBookingID := testutil.SeedTestBooking(t, db, userID, dogID, tomorrow, "09:00", "scheduled")
 
 		// Run auto-complete
 		cronService.autoCompleteBookings()
 
 		// Verify past bookings are completed
 		var yesterdayStatus, lastWeekStatus, futureStatus string
-		db.QueryRow("SELECT status FROM bookings WHERE date = ? AND walk_type = 'morning'", yesterday).Scan(&yesterdayStatus)
-		db.QueryRow("SELECT status FROM bookings WHERE date = ? AND walk_type = 'evening'", lastWeek).Scan(&lastWeekStatus)
+		db.QueryRow("SELECT status FROM bookings WHERE date = ? AND scheduled_time = '09:00'", yesterday).Scan(&yesterdayStatus)
+		db.QueryRow("SELECT status FROM bookings WHERE date = ? AND scheduled_time = '15:00'", lastWeek).Scan(&lastWeekStatus)
 		db.QueryRow("SELECT status FROM bookings WHERE id = ?", futureBookingID).Scan(&futureStatus)
 
 		if yesterdayStatus != "completed" {
@@ -54,7 +54,7 @@ func TestCronService_AutoCompleteBookings(t *testing.T) {
 	t.Run("skip already completed bookings", func(t *testing.T) {
 		// Create already completed booking from past
 		past := time.Now().AddDate(0, 0, -5).Format("2006-01-02")
-		bookingID := testutil.SeedTestBooking(t, db, userID, dogID, past, "morning", "10:00", "completed")
+		bookingID := testutil.SeedTestBooking(t, db, userID, dogID, past, "10:00", "completed")
 
 		// Set completed_at timestamp
 		db.Exec("UPDATE bookings SET completed_at = ? WHERE id = ?", time.Now().AddDate(0, 0, -5), bookingID)
@@ -74,14 +74,14 @@ func TestCronService_AutoCompleteBookings(t *testing.T) {
 	t.Run("skip cancelled bookings", func(t *testing.T) {
 		// Create cancelled booking from past
 		past := time.Now().AddDate(0, 0, -3).Format("2006-01-02")
-		testutil.SeedTestBooking(t, db, userID, dogID, past, "evening", "16:00", "cancelled")
+		testutil.SeedTestBooking(t, db, userID, dogID, past, "16:00", "cancelled")
 
 		// Run auto-complete
 		cronService.autoCompleteBookings()
 
 		// Verify status remains cancelled
 		var status string
-		db.QueryRow("SELECT status FROM bookings WHERE date = ? AND walk_type = 'evening'", past).Scan(&status)
+		db.QueryRow("SELECT status FROM bookings WHERE date = ? AND scheduled_time = '16:00'", past).Scan(&status)
 
 		if status != "cancelled" {
 			t.Errorf("Cancelled booking should remain cancelled, got: %s", status)
@@ -92,7 +92,7 @@ func TestCronService_AutoCompleteBookings(t *testing.T) {
 // DONE: TestCronService_AutoDeactivateInactiveUsers tests automatic user deactivation
 func TestCronService_AutoDeactivateInactiveUsers(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	cronService := NewCronService(db)
+	cronService := NewCronService(db, nil)
 
 	t.Run("deactivate users inactive for 365+ days", func(t *testing.T) {
 		// Create user with old last activity
@@ -185,7 +185,7 @@ func TestCronService_AutoDeactivateInactiveUsers(t *testing.T) {
 func TestCronService_NewCronService(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 
-	service := NewCronService(db)
+	service := NewCronService(db, nil)
 
 	if service == nil {
 		t.Fatal("NewCronService should return non-nil service")

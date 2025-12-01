@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
-	"github.com/tranm/gassigeher/internal/config"
-	"github.com/tranm/gassigeher/internal/testutil"
+	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/testutil"
 )
 
 // DONE: TestDogHandler_ListDogs tests listing dogs with filters

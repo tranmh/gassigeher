@@ -1,4 +1,4 @@
-module github.com/tranm/gassigeher
+module github.com/tranmh/gassigeher
 
 go 1.24.0
 

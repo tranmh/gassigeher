@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
-	"github.com/tranm/gassigeher/internal/config"
-	"github.com/tranm/gassigeher/internal/testutil"
+	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/testutil"
 )
 
 // DONE: TestExperienceRequestHandler_CreateRequest tests creating experience level requests

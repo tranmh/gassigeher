@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tranm/gassigeher/internal/models"
-	"github.com/tranm/gassigeher/internal/repository"
-	"github.com/tranm/gassigeher/internal/testutil"
+	"github.com/tranmh/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/repository"
+	"github.com/tranmh/gassigeher/internal/testutil"
 )
 
 // Test 1.2.1: IsHoliday - Known Holidays

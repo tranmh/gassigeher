@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Systemeinstellungen - Gassigeher Admin</title>
+    <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <a href="/" class="logo">🐕 Gassigeher Admin</a>
+            <nav id="main-nav">
+                <ul>
+                    <li><a href="/admin-dashboard.html" data-i18n="admin_dashboard.title">Dashboard</a></li>
+                    <li><a href="/admin-dogs.html" data-i18n="dogs.manage_dogs">Hunde</a></li>
+                    <li class="nav-dropdown">
+                        <a href="#">Buchungen</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-bookings.html">📅 Alle Buchungen</a>
+                            <a href="/admin-booking-approvals.html">✓ Genehmigungen</a>
+                            <a href="/admin-booking-times.html">⏰ Buchungszeiten</a>
+                            <a href="/admin-blocked-dates.html">🚫 Gesperrte Tage</a>
+                        </div>
+                    </li>
+                    <li class="nav-dropdown">
+                        <a href="#">Benutzer</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-users.html">👥 Alle Benutzer</a>
+                            <a href="/admin-experience-requests.html">⭐ Level-Anfragen</a>
+                            <a href="/admin-reactivation-requests.html">🔄 Reaktivierungen</a>
+                        </div>
+                    </li>
+                    <li><a href="/admin-settings.html" data-i18n="admin_dashboard.system_settings">Einstellungen</a></li>
+                    <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
+                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+
+    <main style="padding: 40px 0;">
+        <div class="container-narrow">
+            <h1 data-i18n="admin_dashboard.system_settings">Systemeinstellungen</h1>
+
+            <div id="alert-container"></div>
+
+            <div class="card">
+                <p data-i18n="admin_dashboard.settings_description">Systemweite Einstellungen verwalten</p>
+
+                <!-- Booking Advance Days -->
+                <div class="form-group">
+                    <label data-i18n="admin_dashboard.booking_advance_days">Buchungsvorlauf (Tage)</label>
+                    <input type="number" id="booking-advance-days" min="1" max="90">
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        Wie viele Tage im Voraus können Benutzer buchen?
+                    </p>
+                    <button class="btn" onclick="updateSetting('booking_advance_days', 'booking-advance-days')" style="margin-top: 10px;">Speichern</button>
+                </div>
+
+                <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;">
+
+                <!-- Cancellation Notice Hours -->
+                <div class="form-group">
+                    <label data-i18n="admin_dashboard.cancellation_notice_hours">Stornierungsfrist (Stunden)</label>
+                    <input type="number" id="cancellation-notice-hours" min="1" max="72">
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        Wie viele Stunden vor dem Spaziergang müssen Benutzer stornieren?
+                    </p>
+                    <button class="btn" onclick="updateSetting('cancellation_notice_hours', 'cancellation-notice-hours')" style="margin-top: 10px;">Speichern</button>
+                </div>
+
+                <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;">
+
+                <!-- Auto Deactivation Days -->
+                <div class="form-group">
+                    <label data-i18n="admin_dashboard.auto_deactivation_days">Auto-Deaktivierung (Tage)</label>
+                    <input type="number" id="auto-deactivation-days" min="30" max="730">
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        Nach wie vielen Tagen Inaktivität werden Benutzer automatisch deaktiviert?
+                    </p>
+                    <button class="btn" onclick="updateSetting('auto_deactivation_days', 'auto-deactivation-days')" style="margin-top: 10px;">Speichern</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/js/nav-menu.js"></script>
+    <script src="/js/i18n.js"></script>
+    <script src="/js/api.js"></script>
+    <script>
+        let settings = {};
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!api.isAuthenticated()) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // Check if user is admin
+            try {
+                const userData = await api.getMe();
+                if (!userData.is_admin) {
+                    alert('Zugriff verweigert: Diese Seite ist nur für Administratoren zugänglich.');
+                    window.location.href = '/dashboard.html';
+                    return;
+                }
+            } catch (error) {
+                console.error('Failed to verify admin status:', error);
+                window.location.href = '/dashboard.html';
+                return;
+            }
+
+            await window.i18n.load();
+
+            // Explicitly update all translations after load
+            console.log('i18n loaded, updating translations...');
+            window.i18n.updateElement(document.body);
+
+            loadSettings();
+        });
+
+        async function loadSettings() {
+            try {
+                const settingsArray = await api.getSettings();
+
+                // Convert array to object for easier access
+                settingsArray.forEach(setting => {
+                    settings[setting.key] = setting.value;
+                });
+
+                // Populate form fields
+                document.getElementById('booking-advance-days').value = settings['booking_advance_days'] || '14';
+                document.getElementById('cancellation-notice-hours').value = settings['cancellation_notice_hours'] || '12';
+                document.getElementById('auto-deactivation-days').value = settings['auto_deactivation_days'] || '365';
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Laden der Einstellungen');
+            }
+        }
+
+        async function updateSetting(key, inputId) {
+            const value = document.getElementById(inputId).value;
+
+            if (!value || value === '') {
+                showAlert('error', 'Wert ist erforderlich');
+                return;
+            }
+
+            try {
+                await api.updateSetting(key, value);
+                showAlert('success', 'Einstellung aktualisiert');
+                settings[key] = value;
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Aktualisieren');
+            }
+        }
+
+        function showAlert(type, message) {
+            const container = document.getElementById('alert-container');
+            container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => container.innerHTML = '', 5000);
+        }
+    </script>
+</body>
+</html>

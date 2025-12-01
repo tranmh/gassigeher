@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tranm/gassigeher/internal/models"
-	"github.com/tranm/gassigeher/internal/testutil"
+	"github.com/tranmh/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/testutil"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -59,7 +59,6 @@ func TestConcurrentBookingCreation(t *testing.T) {
 				DogID:          1,
 				Date:           "2025-01-27",
 				ScheduledTime:  "15:00",
-				WalkType:       "morning",
 				Status:         "scheduled",
 				ApprovalStatus: "approved",
 			}
@@ -85,7 +84,7 @@ func TestConcurrentBookingCreation(t *testing.T) {
 	var count int
 	err = db.QueryRow(`
 		SELECT COUNT(*) FROM bookings
-		WHERE dog_id = 1 AND date = '2025-01-27' AND walk_type = 'morning'
+		WHERE dog_id = 1 AND date = '2025-01-27' AND scheduled_time = '15:00'
 	`).Scan(&count)
 	if err != nil {
 		t.Fatalf("Failed to query bookings: %v", err)
@@ -153,17 +152,11 @@ func TestConcurrentBookingCreation_DifferentTimeSlots(t *testing.T) {
 		wg.Add(1)
 		go func(index int) {
 			defer wg.Done()
-			// Alternate between morning and evening walk types
-			walkType := "morning"
-			if index%2 == 1 {
-				walkType = "evening"
-			}
 			booking := &models.Booking{
 				UserID:         index + 1,
 				DogID:          1,
 				Date:           "2025-01-27",
 				ScheduledTime:  timeSlots[index],
-				WalkType:       walkType,
 				Status:         "scheduled",
 				ApprovalStatus: "approved",
 			}
@@ -179,10 +172,10 @@ func TestConcurrentBookingCreation_DifferentTimeSlots(t *testing.T) {
 
 	wg.Wait()
 
-	// Verify: Only 2 bookings created (1 morning, 1 evening) due to UNIQUE constraint on (dog_id, date, walk_type)
-	// The constraint allows only one booking per walk_type per dog per day
-	if successCount != 2 {
-		t.Errorf("Expected 2 successful bookings (1 morning, 1 evening), got %d", successCount)
+	// Verify: All 20 bookings created since each has a unique scheduled_time
+	// The constraint is on (dog_id, date, scheduled_time), so different times are allowed
+	if successCount != 20 {
+		t.Errorf("Expected 20 successful bookings (all different times), got %d", successCount)
 		for i, err := range errors {
 			if err != nil {
 				t.Logf("  Error at index %d: %v", i, err)
@@ -190,30 +183,18 @@ func TestConcurrentBookingCreation_DifferentTimeSlots(t *testing.T) {
 		}
 	}
 
-	// Verify database has exactly 2 bookings
+	// Verify database has exactly 20 bookings
 	var count int
 	err = db.QueryRow(`SELECT COUNT(*) FROM bookings WHERE dog_id = 1`).Scan(&count)
 	if err != nil {
 		t.Fatalf("Failed to query bookings: %v", err)
 	}
 
-	if count != 2 {
-		t.Errorf("Expected 2 bookings in database (1 morning, 1 evening), got %d", count)
+	if count != 20 {
+		t.Errorf("Expected 20 bookings in database, got %d", count)
 	}
 
-	// Verify one morning and one evening booking
-	var morningCount, eveningCount int
-	db.QueryRow(`SELECT COUNT(*) FROM bookings WHERE dog_id = 1 AND walk_type = 'morning'`).Scan(&morningCount)
-	db.QueryRow(`SELECT COUNT(*) FROM bookings WHERE dog_id = 1 AND walk_type = 'evening'`).Scan(&eveningCount)
-
-	if morningCount != 1 {
-		t.Errorf("Expected 1 morning booking, got %d", morningCount)
-	}
-	if eveningCount != 1 {
-		t.Errorf("Expected 1 evening booking, got %d", eveningCount)
-	}
-
-	t.Logf("Concurrent different slots test: %d attempts, %d success (1 morning, 1 evening)", 20, successCount)
+	t.Logf("Concurrent different slots test: %d attempts, %d success", 20, successCount)
 }
 
 // Test 7.3.1: Concurrent Approval Updates
@@ -244,16 +225,11 @@ func TestConcurrentApprovalUpdates(t *testing.T) {
 
 	// Create 10 pending bookings (use different dogs to satisfy UNIQUE constraint)
 	for i := 1; i <= 10; i++ {
-		walkType := "morning"
-		if i%2 == 0 {
-			walkType = "evening"
-		}
 		booking := &models.Booking{
 			UserID:           1,
 			DogID:            i, // Use different dog IDs to avoid UNIQUE constraint
 			Date:             "2025-01-27",
 			ScheduledTime:    fmt.Sprintf("%02d:00", 8+i),
-			WalkType:         walkType,
 			Status:           "scheduled",
 			ApprovalStatus:   "pending",
 			RequiresApproval: true,
@@ -358,7 +334,6 @@ func BenchmarkConcurrentBookingCreation(b *testing.B) {
 					DogID:          1,
 					Date:           "2025-01-27",
 					ScheduledTime:  fmt.Sprintf("%02d:%02d", 9+(index/4), (index%4)*15),
-					WalkType:       "short",
 					Status:         "scheduled",
 					ApprovalStatus: "approved",
 				}
@@ -405,7 +380,6 @@ func TestBookingCreation_RaceConditions(t *testing.T) {
 					DogID:          1,
 					Date:           time.Now().AddDate(0, 0, index).Format("2006-01-02"),
 					ScheduledTime:  fmt.Sprintf("%02d:00", (index%10)+9),
-					WalkType:       "short",
 					Status:         "scheduled",
 					ApprovalStatus: "approved",
 				}

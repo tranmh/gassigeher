@@ -8,10 +8,10 @@ type Booking struct {
 	UserID                  int        `json:"user_id"`
 	DogID                   int        `json:"dog_id"`
 	Date                    string     `json:"date"` // YYYY-MM-DD format
-	WalkType                string     `json:"walk_type"`
 	ScheduledTime           string     `json:"scheduled_time"` // HH:MM format
 	Status                  string     `json:"status"`
 	CompletedAt             *time.Time `json:"completed_at,omitempty"`
+	ReminderSentAt          *time.Time `json:"reminder_sent_at,omitempty"`
 	UserNotes               *string    `json:"user_notes,omitempty"`
 	AdminCancellationReason *string    `json:"admin_cancellation_reason,omitempty"`
 	CreatedAt               time.Time  `json:"created_at"`
@@ -33,7 +33,6 @@ type Booking struct {
 type CreateBookingRequest struct {
 	DogID         int    `json:"dog_id"`
 	Date          string `json:"date"` // YYYY-MM-DD
-	WalkType      string `json:"walk_type"`
 	ScheduledTime string `json:"scheduled_time"` // HH:MM
 }
 
@@ -49,10 +48,9 @@ type AddNotesRequest struct {
 
 // MoveBookingRequest represents a request to move a booking to a new date/time
 type MoveBookingRequest struct {
-	Date          string  `json:"date"`
-	WalkType      string  `json:"walk_type"`
-	ScheduledTime string  `json:"scheduled_time"`
-	Reason        string  `json:"reason"`
+	Date          string `json:"date"`
+	ScheduledTime string `json:"scheduled_time"`
+	Reason        string `json:"reason"`
 }
 
 // Validate validates the move booking request
@@ -63,10 +61,6 @@ func (r *MoveBookingRequest) Validate() error {
 
 	if _, err := time.Parse("2006-01-02", r.Date); err != nil {
 		return &ValidationError{Field: "date", Message: "Date must be in YYYY-MM-DD format"}
-	}
-
-	if r.WalkType != "morning" && r.WalkType != "evening" {
-		return &ValidationError{Field: "walk_type", Message: "Walk type must be 'morning' or 'evening'"}
 	}
 
 	if r.ScheduledTime == "" {
@@ -86,14 +80,13 @@ func (r *MoveBookingRequest) Validate() error {
 
 // BookingFilterRequest represents filters for listing bookings
 type BookingFilterRequest struct {
-	UserID    *int    `json:"user_id,omitempty"`
-	DogID     *int    `json:"dog_id,omitempty"`
-	DateFrom  *string `json:"date_from,omitempty"`
-	DateTo    *string `json:"date_to,omitempty"`
-	Status    *string `json:"status,omitempty"`
-	WalkType  *string `json:"walk_type,omitempty"`
-	Year      *int    `json:"year,omitempty"`
-	Month     *int    `json:"month,omitempty"`
+	UserID   *int    `json:"user_id,omitempty"`
+	DogID    *int    `json:"dog_id,omitempty"`
+	DateFrom *string `json:"date_from,omitempty"`
+	DateTo   *string `json:"date_to,omitempty"`
+	Status   *string `json:"status,omitempty"`
+	Year     *int    `json:"year,omitempty"`
+	Month    *int    `json:"month,omitempty"`
 }
 
 // CalendarDay represents a day in the calendar with bookings
@@ -124,10 +117,6 @@ func (r *CreateBookingRequest) Validate() error {
 	// Validate date format (YYYY-MM-DD)
 	if _, err := time.Parse("2006-01-02", r.Date); err != nil {
 		return &ValidationError{Field: "date", Message: "Date must be in YYYY-MM-DD format"}
-	}
-
-	if r.WalkType != "morning" && r.WalkType != "evening" {
-		return &ValidationError{Field: "walk_type", Message: "Walk type must be 'morning' or 'evening'"}
 	}
 
 	if r.ScheduledTime == "" {

@@ -12,11 +12,11 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/tranm/gassigeher/internal/config"
-	"github.com/tranm/gassigeher/internal/middleware"
-	"github.com/tranm/gassigeher/internal/models"
-	"github.com/tranm/gassigeher/internal/repository"
-	"github.com/tranm/gassigeher/internal/services"
+	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/middleware"
+	"github.com/tranmh/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/repository"
+	"github.com/tranmh/gassigeher/internal/services"
 )
 
 // DogHandler handles dog-related endpoints
@@ -186,6 +186,7 @@ func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) {
 		SpecialInstructions: req.SpecialInstructions,
 		DefaultMorningTime:  req.DefaultMorningTime,
 		DefaultEveningTime:  req.DefaultEveningTime,
+		ExternalLink:        req.ExternalLink,
 		IsAvailable:         true, // Default to available
 	}
 
@@ -262,6 +263,9 @@ func (h *DogHandler) UpdateDog(w http.ResponseWriter, r *http.Request) {
 	if req.DefaultEveningTime != nil {
 		dog.DefaultEveningTime = req.DefaultEveningTime
 	}
+	if req.ExternalLink != nil {
+		dog.ExternalLink = req.ExternalLink
+	}
 
 	// Update in database
 	if err := h.dogRepo.Update(dog); err != nil {
@@ -320,7 +324,7 @@ func (h *DogHandler) DeleteDog(w http.ResponseWriter, r *http.Request) {
 					booking.User.Name,
 					dog.Name,
 					booking.Date,
-					booking.WalkType,
+					booking.ScheduledTime,
 				)
 			}
 		}
@@ -488,4 +492,66 @@ func (h *DogHandler) GetBreeds(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, breeds)
+}
+
+// GetFeaturedDogs handles GET /api/dogs/featured - get featured dogs for homepage (public)
+func (h *DogHandler) GetFeaturedDogs(w http.ResponseWriter, r *http.Request) {
+	dogs, err := h.dogRepo.GetFeatured()
+	if err != nil {
+		log.Printf("Error fetching featured dogs: %v", err)
+		respondError(w, http.StatusInternalServerError, "Failed to fetch featured dogs")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dogs)
+}
+
+// SetFeatured handles PUT /api/dogs/:id/featured - set featured status (admin only)
+func (h *DogHandler) SetFeatured(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid dog ID")
+		return
+	}
+
+	// Parse request body
+	var req struct {
+		IsFeatured bool `json:"is_featured"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Check if dog exists
+	dog, err := h.dogRepo.FindByID(id)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Database error")
+		return
+	}
+
+	if dog == nil {
+		respondError(w, http.StatusNotFound, "Dog not found")
+		return
+	}
+
+	// Note: No limit on featured dogs - frontend randomly displays 3 from all featured
+	// This gives all featured dogs a chance to be shown to visitors
+
+	// Update featured status
+	if err := h.dogRepo.SetFeatured(id, req.IsFeatured); err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to update featured status")
+		return
+	}
+
+	// Get updated dog
+	dog, err = h.dogRepo.FindByID(id)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to fetch updated dog")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, dog)
 }

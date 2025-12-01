@@ -85,15 +85,15 @@ CREATE INDEX IF NOT EXISTS idx_bookings_approval_status ON bookings(approval_sta
 
 -- Seed default time rules
 INSERT OR IGNORE INTO booking_time_rules (day_type, rule_name, start_time, end_time, is_blocked) VALUES
-('weekday', 'Morning Walk', '09:00', '12:00', 0),
-('weekday', 'Lunch Block', '13:00', '14:00', 1),
-('weekday', 'Afternoon Walk', '14:00', '16:30', 0),
-('weekday', 'Feeding Block', '16:30', '18:00', 1),
-('weekday', 'Evening Walk', '18:00', '19:30', 0),
-('weekend', 'Morning Walk', '09:00', '12:00', 0),
-('weekend', 'Feeding Block', '12:00', '13:00', 1),
-('weekend', 'Lunch Block', '13:00', '14:00', 1),
-('weekend', 'Afternoon Walk', '14:00', '17:00', 0);
+('weekday', 'Morgenspaziergang', '09:00', '12:00', 0),
+('weekday', 'Mittagspause', '13:00', '14:00', 1),
+('weekday', 'Nachmittagsspaziergang', '14:00', '16:30', 0),
+('weekday', 'Fütterungszeit', '16:30', '18:00', 1),
+('weekday', 'Abendspaziergang', '18:00', '19:30', 0),
+('weekend', 'Morgenspaziergang', '09:00', '12:00', 0),
+('weekend', 'Fütterungszeit', '12:00', '13:00', 1),
+('weekend', 'Mittagspause', '13:00', '14:00', 1),
+('weekend', 'Nachmittagsspaziergang', '14:00', '17:00', 0);
 
 -- Add new system settings
 INSERT OR IGNORE INTO system_settings (key, value) VALUES
@@ -154,15 +154,15 @@ CREATE INDEX idx_bookings_approval_status ON bookings(approval_status);
 
 -- Seed default time rules
 INSERT IGNORE INTO booking_time_rules (day_type, rule_name, start_time, end_time, is_blocked) VALUES
-('weekday', 'Morning Walk', '09:00', '12:00', 0),
-('weekday', 'Lunch Block', '13:00', '14:00', 1),
-('weekday', 'Afternoon Walk', '14:00', '16:30', 0),
-('weekday', 'Feeding Block', '16:30', '18:00', 1),
-('weekday', 'Evening Walk', '18:00', '19:30', 0),
-('weekend', 'Morning Walk', '09:00', '12:00', 0),
-('weekend', 'Feeding Block', '12:00', '13:00', 1),
-('weekend', 'Lunch Block', '13:00', '14:00', 1),
-('weekend', 'Afternoon Walk', '14:00', '17:00', 0);
+('weekday', 'Morgenspaziergang', '09:00', '12:00', 0),
+('weekday', 'Mittagspause', '13:00', '14:00', 1),
+('weekday', 'Nachmittagsspaziergang', '14:00', '16:30', 0),
+('weekday', 'Fütterungszeit', '16:30', '18:00', 1),
+('weekday', 'Abendspaziergang', '18:00', '19:30', 0),
+('weekend', 'Morgenspaziergang', '09:00', '12:00', 0),
+('weekend', 'Fütterungszeit', '12:00', '13:00', 1),
+('weekend', 'Mittagspause', '13:00', '14:00', 1),
+('weekend', 'Nachmittagsspaziergang', '14:00', '17:00', 0);
 
 -- Add new system settings
 INSERT IGNORE INTO system_settings (key, value) VALUES
@@ -233,15 +233,15 @@ CREATE INDEX IF NOT EXISTS idx_bookings_approval_status ON bookings(approval_sta
 
 -- Seed default time rules
 INSERT INTO booking_time_rules (day_type, rule_name, start_time, end_time, is_blocked) VALUES
-('weekday', 'Morning Walk', '09:00', '12:00', FALSE),
-('weekday', 'Lunch Block', '13:00', '14:00', TRUE),
-('weekday', 'Afternoon Walk', '14:00', '16:30', FALSE),
-('weekday', 'Feeding Block', '16:30', '18:00', TRUE),
-('weekday', 'Evening Walk', '18:00', '19:30', FALSE),
-('weekend', 'Morning Walk', '09:00', '12:00', FALSE),
-('weekend', 'Feeding Block', '12:00', '13:00', TRUE),
-('weekend', 'Lunch Block', '13:00', '14:00', TRUE),
-('weekend', 'Afternoon Walk', '14:00', '17:00', FALSE)
+('weekday', 'Morgenspaziergang', '09:00', '12:00', FALSE),
+('weekday', 'Mittagspause', '13:00', '14:00', TRUE),
+('weekday', 'Nachmittagsspaziergang', '14:00', '16:30', FALSE),
+('weekday', 'Fütterungszeit', '16:30', '18:00', TRUE),
+('weekday', 'Abendspaziergang', '18:00', '19:30', FALSE),
+('weekend', 'Morgenspaziergang', '09:00', '12:00', FALSE),
+('weekend', 'Fütterungszeit', '12:00', '13:00', TRUE),
+('weekend', 'Mittagspause', '13:00', '14:00', TRUE),
+('weekend', 'Nachmittagsspaziergang', '14:00', '17:00', FALSE)
 ON CONFLICT (day_type, rule_name) DO NOTHING;
 
 -- Add new system settings

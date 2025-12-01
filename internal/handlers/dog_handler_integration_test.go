@@ -17,10 +17,10 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
-	"github.com/tranm/gassigeher/internal/config"
-	"github.com/tranm/gassigeher/internal/models"
-	"github.com/tranm/gassigeher/internal/repository"
-	"github.com/tranm/gassigeher/internal/services"
+	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/repository"
+	"github.com/tranmh/gassigeher/internal/services"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -53,6 +53,8 @@ func setupTestDB(t *testing.T) *sql.DB {
 			is_available INTEGER DEFAULT 1,
 			unavailable_reason TEXT,
 			unavailable_since TIMESTAMP,
+			is_featured INTEGER DEFAULT 0,
+			external_link TEXT,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tranm/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/models"
 	_ "github.com/mattn/go-sqlite3"
 )
 

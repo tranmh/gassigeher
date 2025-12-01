@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tranm/gassigeher/internal/config"
-	"github.com/tranm/gassigeher/internal/database"
-	"github.com/tranm/gassigeher/internal/middleware"
-	"github.com/tranm/gassigeher/internal/models"
-	"github.com/tranm/gassigeher/internal/repository"
+	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
+	"github.com/tranmh/gassigeher/internal/middleware"
+	"github.com/tranmh/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/repository"
 )
 
 // Phase 8: Regression Testing
@@ -108,7 +108,6 @@ func TestRegression_BasicBookingCreation(t *testing.T) {
 		dogID        int
 		date         string
 		time         string
-		walkType     string
 		expectStatus int
 		description  string
 	}{
@@ -118,7 +117,6 @@ func TestRegression_BasicBookingCreation(t *testing.T) {
 			dogID:        1,
 			date:         futureDate,
 			time:         "15:00",
-			walkType:     "evening",
 			expectStatus: http.StatusCreated,
 			description:  "Should succeed if time is within allowed windows",
 		},
@@ -131,7 +129,6 @@ func TestRegression_BasicBookingCreation(t *testing.T) {
 				"dog_id":         tc.dogID,
 				"date":           tc.date,
 				"scheduled_time": tc.time,
-				"walk_type":      tc.walkType,
 			}
 			body, _ := json.Marshal(bookingData)
 
@@ -183,7 +180,6 @@ func TestRegression_ExperienceLevelValidation(t *testing.T) {
 		userID       int
 		dogID        int
 		time         string
-		walkType     string
 		expectStatus int
 		description  string
 	}{
@@ -192,7 +188,6 @@ func TestRegression_ExperienceLevelValidation(t *testing.T) {
 			userID:       1, // Green user
 			dogID:        1, // Green dog
 			time:         "09:00",
-			walkType:     "morning",
 			expectStatus: http.StatusCreated,
 			description:  "Should succeed with matching level",
 		},
@@ -201,7 +196,6 @@ func TestRegression_ExperienceLevelValidation(t *testing.T) {
 			userID:       1, // Green user
 			dogID:        2, // Blue dog
 			time:         "15:00",
-			walkType:     "evening",
 			expectStatus: http.StatusForbidden,
 			description:  "Should fail - insufficient experience level",
 		},
@@ -210,7 +204,6 @@ func TestRegression_ExperienceLevelValidation(t *testing.T) {
 			userID:       2, // Blue user
 			dogID:        3, // Orange dog
 			time:         "09:00",
-			walkType:     "morning",
 			expectStatus: http.StatusForbidden,
 			description:  "Should fail - insufficient experience level",
 		},
@@ -219,7 +212,6 @@ func TestRegression_ExperienceLevelValidation(t *testing.T) {
 			userID:       2, // Blue user
 			dogID:        1, // Green dog
 			time:         "15:00",
-			walkType:     "evening",
 			expectStatus: http.StatusCreated,
 			description:  "Should succeed - blue can access green",
 		},
@@ -228,7 +220,6 @@ func TestRegression_ExperienceLevelValidation(t *testing.T) {
 			userID:       3, // Orange user
 			dogID:        3, // Orange dog
 			time:         "15:00",
-			walkType:     "evening",
 			expectStatus: http.StatusCreated,
 			description:  "Should succeed - orange can access all levels",
 		},
@@ -240,7 +231,6 @@ func TestRegression_ExperienceLevelValidation(t *testing.T) {
 				"dog_id":         tc.dogID,
 				"date":           futureDate,
 				"scheduled_time": tc.time,
-				"walk_type":      tc.walkType,
 			}
 			body, _ := json.Marshal(bookingData)
 
@@ -284,7 +274,6 @@ func TestRegression_DateRestrictions(t *testing.T) {
 		DogID:         1,
 		Date:          existingBookingDate,
 		ScheduledTime: "15:00",
-		WalkType:      "evening",
 		Status:        "scheduled",
 	}); err != nil {
 		t.Fatalf("Failed to create existing booking: %v", err)
@@ -296,7 +285,6 @@ func TestRegression_DateRestrictions(t *testing.T) {
 		dogID        int
 		date         string
 		time         string
-		walkType     string
 		expectStatus int
 		description  string
 	}{
@@ -306,7 +294,6 @@ func TestRegression_DateRestrictions(t *testing.T) {
 			dogID:        1,
 			date:         "2020-01-01",
 			time:         "15:00",
-			walkType:     "evening",
 			expectStatus: http.StatusBadRequest,
 			description:  "Should fail - date in past",
 		},
@@ -316,7 +303,6 @@ func TestRegression_DateRestrictions(t *testing.T) {
 			dogID:        1,
 			date:         time.Now().AddDate(0, 0, 20).Format("2006-01-02"), // 20 days (limit is 14)
 			time:         "15:00",
-			walkType:     "evening",
 			expectStatus: http.StatusBadRequest,
 			description:  "Should fail - beyond advance booking limit",
 		},
@@ -326,7 +312,6 @@ func TestRegression_DateRestrictions(t *testing.T) {
 			dogID:        1,
 			date:         blockedDate,
 			time:         "15:00",
-			walkType:     "evening",
 			expectStatus: http.StatusBadRequest,
 			description:  "Should fail - date is blocked",
 		},
@@ -336,7 +321,6 @@ func TestRegression_DateRestrictions(t *testing.T) {
 			dogID:        1,
 			date:         existingBookingDate,
 			time:         "15:00",
-			walkType:     "evening",
 			expectStatus: http.StatusConflict,
 			description:  "Should fail - dog already booked",
 		},
@@ -348,7 +332,6 @@ func TestRegression_DateRestrictions(t *testing.T) {
 				"dog_id":         tc.dogID,
 				"date":           tc.date,
 				"scheduled_time": tc.time,
-				"walk_type":      tc.walkType,
 			}
 			body, _ := json.Marshal(bookingData)
 
@@ -478,7 +461,6 @@ func TestRegression_UserDashboard(t *testing.T) {
 		DogID:          1,
 		Date:           futureDate,
 		ScheduledTime:  "15:00",
-		WalkType:       "evening",
 		Status:         "scheduled",
 		ApprovalStatus: "approved",
 	})
@@ -489,7 +471,6 @@ func TestRegression_UserDashboard(t *testing.T) {
 		DogID:          1,
 		Date:           pastDate,
 		ScheduledTime:  "15:00",
-		WalkType:       "evening",
 		Status:         "completed",
 		ApprovalStatus: "approved",
 	})

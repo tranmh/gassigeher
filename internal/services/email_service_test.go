@@ -45,10 +45,9 @@ func TestEmailService_BookingConfirmation(t *testing.T) {
 		dogName := "Bella"
 		date := "2025-12-25"
 		time := "09:00"
-		walkType := "Morgenspaziergang"
 
 		// Verify all required booking details would be included
-		requiredElements := []string{dogName, date, time, walkType}
+		requiredElements := []string{dogName, date, time}
 
 		for _, element := range requiredElements {
 			if element == "" {
