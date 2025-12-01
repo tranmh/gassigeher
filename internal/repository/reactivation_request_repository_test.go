@@ -3,8 +3,8 @@ package repository
 import (
 	"testing"
 
-	"github.com/tranm/gassigeher/internal/models"
-	"github.com/tranm/gassigeher/internal/testutil"
+	"github.com/tranmh/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/testutil"
 )
 
 // DONE: TestReactivationRequestRepository_Create tests creating reactivation requests

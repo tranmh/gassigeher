@@ -203,32 +203,13 @@ func configureConnectionPool(db *sql.DB, config *DBConfig) {
 	db.SetConnMaxLifetime(time.Duration(maxLifetime) * time.Minute)
 }
 
-// RunMigrations runs all database migrations
+// RunMigrations runs all database migrations (OLD - backward compatible)
+// This function now delegates to the new migration system
 func RunMigrations(db *sql.DB) error {
-	migrations := []string{
-		createUsersTable,
-		createDogsTable,
-		createBookingsTable,
-		createBlockedDatesTable,
-		createExperienceRequestsTable,
-		createSystemSettingsTable,
-		createReactivationRequestsTable,
-		insertDefaultSettings,
-		addPhotoThumbnailColumn,
-	}
-
-	for i, migration := range migrations {
-		if _, err := db.Exec(migration); err != nil {
-			// Ignore error if column already exists (ALTER TABLE ADD COLUMN error)
-			if i == len(migrations)-1 && (err.Error() == "duplicate column name: photo_thumbnail" ||
-				err.Error() == "SQLSTATE 42S21: duplicate column name: photo_thumbnail") {
-				continue
-			}
-			return fmt.Errorf("migration %d failed: %w", i+1, err)
-		}
-	}
-
-	return nil
+	// Use SQLite dialect by default (for backward compatibility)
+	// If you need other databases, use RunMigrationsWithDialect directly
+	dialect := &SQLiteDialect{}
+	return RunMigrationsWithDialect(db, dialect)
 }
 
 const createUsersTable = `

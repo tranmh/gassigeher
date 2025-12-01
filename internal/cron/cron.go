@@ -6,7 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/tranm/gassigeher/internal/repository"
+	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/repository"
+	"github.com/tranmh/gassigeher/internal/services"
 )
 
 // CronService handles scheduled tasks
@@ -15,16 +17,28 @@ type CronService struct {
 	bookingRepo  *repository.BookingRepository
 	userRepo     *repository.UserRepository
 	settingsRepo *repository.SettingsRepository
+	emailService *services.EmailService
 	stopChan     chan bool
 }
 
 // NewCronService creates a new cron service
-func NewCronService(db *sql.DB) *CronService {
+func NewCronService(db *sql.DB, cfg *config.Config) *CronService {
+	// Initialize email service for reminders (fail gracefully if not configured)
+	var emailService *services.EmailService
+	if cfg != nil {
+		var err error
+		emailService, err = services.NewEmailService(services.ConfigToEmailConfig(cfg))
+		if err != nil {
+			log.Printf("Warning: Email service not available for cron jobs: %v", err)
+		}
+	}
+
 	return &CronService{
 		db:           db,
 		bookingRepo:  repository.NewBookingRepository(db),
 		userRepo:     repository.NewUserRepository(db),
 		settingsRepo: repository.NewSettingsRepository(db),
+		emailService: emailService,
 		stopChan:     make(chan bool),
 	}
 }
@@ -33,15 +47,14 @@ func NewCronService(db *sql.DB) *CronService {
 func (s *CronService) Start() {
 	log.Println("Starting cron service...")
 
-	// Run auto-complete job every hour
-	go s.runPeriodically("Auto-complete bookings", 1*time.Hour, s.autoCompleteBookings)
+	// Run auto-complete job every 15 minutes (allows users to add notes quickly after completion)
+	go s.runPeriodically("Auto-complete bookings", 15*time.Minute, s.autoCompleteBookings)
 
-	// Run auto-deactivation job daily at 3am
+	// Run auto-deactivation job daily at 3am (also runs once on startup)
 	go s.runDaily("Auto-deactivate inactive users", 3, 0, s.autoDeactivateInactiveUsers)
 
 	// Run booking reminder job every 15 minutes
-	// Note: This is a placeholder for future implementation
-	// go s.runPeriodically("Send booking reminders", 15*time.Minute, s.sendBookingReminders)
+	go s.runPeriodically("Send booking reminders", 15*time.Minute, s.sendBookingReminders)
 }
 
 // Stop stops all cron jobs
@@ -80,13 +93,20 @@ func (s *CronService) autoCompleteBookings() {
 
 	if count > 0 {
 		log.Printf("Auto-completed %d booking(s)", count)
+	} else {
+		log.Println("Auto-complete check: no bookings to complete")
 	}
 }
 
-// sendBookingReminders sends reminders for upcoming bookings
-// This is a placeholder for future implementation
+// sendBookingReminders sends reminders for upcoming bookings (1-2 hours before)
 func (s *CronService) sendBookingReminders() {
-	// Get bookings that need reminders (1 hour before)
+	// Check if email service is available
+	if s.emailService == nil {
+		log.Println("Reminder check: email service not configured, skipping")
+		return
+	}
+
+	// Get bookings that need reminders
 	bookings, err := s.bookingRepo.GetForReminders()
 	if err != nil {
 		log.Printf("Error getting bookings for reminders: %v", err)
@@ -94,22 +114,67 @@ func (s *CronService) sendBookingReminders() {
 	}
 
 	if len(bookings) == 0 {
+		log.Println("Reminder check: no reminders to send")
 		return
 	}
 
 	log.Printf("Found %d booking(s) that need reminders", len(bookings))
 
-	// TODO: Send reminder emails
-	// This requires getting user and dog details, then sending email
-	// Will be implemented when email reminder system is fully set up
+	// Send reminder for each booking
+	for _, booking := range bookings {
+		// Skip if user has no email
+		if booking.User == nil || booking.User.Email == nil {
+			log.Printf("Skipping reminder for booking %d: no user email", booking.ID)
+			continue
+		}
+
+		// Skip if dog name is missing
+		dogName := "Unbekannter Hund"
+		if booking.Dog != nil && booking.Dog.Name != "" {
+			dogName = booking.Dog.Name
+		}
+
+		// Format date for German locale (DD.MM.YYYY)
+		formattedDate := booking.Date
+		if t, err := time.Parse("2006-01-02", booking.Date); err == nil {
+			formattedDate = t.Format("02.01.2006")
+		}
+
+		// Send reminder email
+		err := s.emailService.SendBookingReminder(
+			*booking.User.Email,
+			booking.User.Name,
+			dogName,
+			formattedDate,
+			booking.ScheduledTime,
+		)
+
+		if err != nil {
+			log.Printf("Error sending reminder for booking %d: %v", booking.ID, err)
+			continue
+		}
+
+		// Mark reminder as sent
+		if err := s.bookingRepo.MarkReminderSent(booking.ID); err != nil {
+			log.Printf("Error marking reminder sent for booking %d: %v", booking.ID, err)
+			continue
+		}
+
+		log.Printf("Sent reminder for booking %d (user: %s, dog: %s, time: %s %s)",
+			booking.ID, booking.User.Name, dogName, formattedDate, booking.ScheduledTime)
+	}
 }
 
-// runDaily runs a function daily at a specific time
+// runDaily runs a function daily at a specific time (also runs once immediately on startup)
 func (s *CronService) runDaily(name string, hour, minute int, fn func()) {
+	// Run immediately on startup
+	log.Printf("Running daily job on startup: %s", name)
+	fn()
+
 	for {
 		now := time.Now()
 		next := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
-		
+
 		// If we've passed today's scheduled time, schedule for tomorrow
 		if now.After(next) {
 			next = next.Add(24 * time.Hour)

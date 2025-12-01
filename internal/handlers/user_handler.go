@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/tranm/gassigeher/internal/config"
-	"github.com/tranm/gassigeher/internal/middleware"
-	"github.com/tranm/gassigeher/internal/models"
-	"github.com/tranm/gassigeher/internal/repository"
-	"github.com/tranm/gassigeher/internal/services"
+	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/middleware"
+	"github.com/tranmh/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/repository"
+	"github.com/tranmh/gassigeher/internal/services"
 )
 
 // UserHandler handles user-related endpoints

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Level-Anfragen verwalten - Gassigeher Admin</title>
+    <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <a href="/" class="logo">🐕 Gassigeher Admin</a>
+            <nav id="main-nav">
+                <ul>
+                    <li><a href="/admin-dashboard.html" data-i18n="admin_dashboard.title">Dashboard</a></li>
+                    <li><a href="/admin-dogs.html" data-i18n="dogs.manage_dogs">Hunde</a></li>
+                    <li class="nav-dropdown">
+                        <a href="#">Buchungen</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-bookings.html">📅 Alle Buchungen</a>
+                            <a href="/admin-booking-approvals.html">✓ Genehmigungen</a>
+                            <a href="/admin-booking-times.html">⏰ Buchungszeiten</a>
+                            <a href="/admin-blocked-dates.html">🚫 Gesperrte Tage</a>
+                        </div>
+                    </li>
+                    <li class="nav-dropdown">
+                        <a href="#">Benutzer</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-users.html">👥 Alle Benutzer</a>
+                            <a href="/admin-experience-requests.html">⭐ Level-Anfragen</a>
+                            <a href="/admin-reactivation-requests.html">🔄 Reaktivierungen</a>
+                        </div>
+                    </li>
+                    <li><a href="/admin-settings.html" data-i18n="admin_dashboard.system_settings">Einstellungen</a></li>
+                    <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
+                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+
+    <main style="padding: 40px 0;">
+        <div class="container">
+            <h1 data-i18n="admin.manage_experience_requests">Level-Anfragen verwalten</h1>
+
+            <div id="alert-container"></div>
+
+            <!-- Pending Requests -->
+            <div id="requests-list"></div>
+        </div>
+    </main>
+
+    <script src="/js/nav-menu.js"></script>
+    <script src="/js/i18n.js"></script>
+    <script src="/js/api.js"></script>
+    <script>
+        let requests = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!api.isAuthenticated()) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // Check if user is admin
+            try {
+                const userData = await api.getMe();
+                if (!userData.is_admin) {
+                    alert('Zugriff verweigert: Diese Seite ist nur für Administratoren zugänglich.');
+                    window.location.href = '/dashboard.html';
+                    return;
+                }
+            } catch (error) {
+                console.error('Failed to verify admin status:', error);
+                window.location.href = '/dashboard.html';
+                return;
+            }
+
+            await window.i18n.load();
+
+            // Explicitly update all translations after load
+            console.log('i18n loaded, updating translations...');
+            window.i18n.updateElement(document.body);
+
+            loadRequests();
+        });
+
+        async function loadRequests() {
+            try {
+                requests = await api.getExperienceRequests();
+                renderRequests();
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Laden der Anfragen');
+            }
+        }
+
+        function renderRequests() {
+            const container = document.getElementById('requests-list');
+
+            if (requests.length === 0) {
+                container.innerHTML = '<div class="card"><p data-i18n="admin.no_pending_requests">Keine ausstehenden Anfragen</p></div>';
+                return;
+            }
+
+            container.innerHTML = requests.map(request => {
+                const levelLabel = getLevelLabel(request.requested_level);
+                const statusClass = request.status === 'pending' ? 'alert-warning' :
+                                  (request.status === 'approved' ? 'alert-success' : 'alert-error');
+
+                return `
+                    <div class="card" style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                                    <h4 style="margin: 0;">${request.user ? request.user.name : 'User #' + request.user_id}</h4>
+                                    <span class="dog-category-badge ${request.requested_level}">${levelLabel}</span>
+                                </div>
+                                <p style="margin: 5px 0; color: #666;">
+                                    <strong>E-Mail:</strong> ${request.user && request.user.email ? request.user.email : 'N/A'}
+                                </p>
+                                <p style="margin: 5px 0; color: #666;">
+                                    <strong>Aktuelles Level:</strong> ${request.user ? getLevelLabel(request.user.experience_level) : 'N/A'}
+                                </p>
+                                <p style="margin: 5px 0; color: #666;">
+                                    <strong>Beantragt am:</strong> ${new Date(request.created_at).toLocaleDateString('de-DE')}
+                                </p>
+                                ${request.reviewed_at ? `
+                                    <p style="margin: 5px 0; color: #666;">
+                                        <strong>Status:</strong> <span class="alert ${statusClass}" style="padding: 4px 8px; font-size: 0.8rem; margin-left: 5px;">${getStatusLabel(request.status)}</span>
+                                    </p>
+                                ` : ''}
+                                ${request.admin_message ? `
+                                    <p style="margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 4px;">
+                                        <strong>Nachricht:</strong> ${request.admin_message}
+                                    </p>
+                                ` : ''}
+                            </div>
+                            ${request.status === 'pending' ? `
+                                <div style="display: flex; gap: 5px; flex-direction: column; min-width: 120px;">
+                                    <button class="btn btn-sm" onclick="approveRequest(${request.id})">Genehmigen</button>
+                                    <button class="btn btn-danger btn-sm" onclick="denyRequest(${request.id})">Ablehnen</button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getLevelLabel(level) {
+            const labels = { green: 'Grün', blue: 'Blau', orange: 'Orange' };
+            return labels[level] || level;
+        }
+
+        function getStatusLabel(status) {
+            const labels = {
+                pending: 'Ausstehend',
+                approved: 'Genehmigt',
+                denied: 'Abgelehnt'
+            };
+            return labels[status] || status;
+        }
+
+        async function approveRequest(id) {
+            const message = prompt('Optional: Nachricht an den Benutzer:');
+
+            try {
+                await api.approveExperienceRequest(id, message || null);
+                showAlert('success', 'Antrag genehmigt');
+                loadRequests();
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Genehmigen');
+            }
+        }
+
+        async function denyRequest(id) {
+            const message = prompt('Optional: Nachricht an den Benutzer (Grund der Ablehnung):');
+
+            if (!confirm('Möchten Sie diesen Antrag wirklich ablehnen?')) {
+                return;
+            }
+
+            try {
+                await api.denyExperienceRequest(id, message || null);
+                showAlert('success', 'Antrag abgelehnt');
+                loadRequests();
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Ablehnen');
+            }
+        }
+
+        function showAlert(type, message) {
+            const container = document.getElementById('alert-container');
+            container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => container.innerHTML = '', 5000);
+        }
+    </script>
+</body>
+</html>

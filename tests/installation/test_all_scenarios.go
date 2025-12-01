@@ -9,9 +9,9 @@ import (
 
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/tranm/gassigeher/internal/config"
-	"github.com/tranm/gassigeher/internal/database"
-	"github.com/tranm/gassigeher/internal/services"
+	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
+	"github.com/tranmh/gassigeher/internal/services"
 )
 
 func main() {

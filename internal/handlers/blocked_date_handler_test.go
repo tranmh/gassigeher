@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
-	"github.com/tranm/gassigeher/internal/config"
-	"github.com/tranm/gassigeher/internal/testutil"
+	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/testutil"
 )
 
 // DONE: TestBlockedDateHandler_ListBlockedDates tests listing blocked dates
@@ -108,10 +108,17 @@ func TestBlockedDateHandler_CreateBlockedDate(t *testing.T) {
 		var response map[string]interface{}
 		json.Unmarshal(rec.Body.Bytes(), &response)
 
-		blockedDate := response["blocked_date"].(map[string]interface{})
+		if response["blocked_date"] == nil {
+			t.Error("Expected blocked_date in response")
+		}
 
-		if blockedDate["id"] == nil {
+		blockedDate, ok := response["blocked_date"].(map[string]interface{})
+		if !ok || blockedDate["id"] == nil {
 			t.Error("Expected blocked date ID in response")
+		}
+
+		if response["cancelled_bookings"] == nil {
+			t.Error("Expected cancelled_bookings count in response")
 		}
 	})
 

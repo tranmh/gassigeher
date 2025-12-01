@@ -1329,7 +1329,6 @@ describe('Calendar Component', () => {
 ```bash
 # App
 PORT=8080
-ENVIRONMENT=production
 
 # Database
 DATABASE_PATH=/var/gassigeher/data/gassigeher.db

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tranm/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/config"
 	"golang.org/x/crypto/bcrypt"
 )
 

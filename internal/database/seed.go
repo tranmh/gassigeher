@@ -215,22 +215,21 @@ func generateBookings(db *sql.DB) error {
 		Date   time.Time
 		Time   string
 		Status string
-		Type   string
 	}{
-		{2, 1, yesterday, "09:00", "completed", "morning"},
-		{3, 2, today, "14:00", "scheduled", "evening"},
-		{4, 3, tomorrow, "10:30", "scheduled", "morning"},
+		{2, 1, yesterday, "09:00", "completed"},
+		{3, 2, today, "14:00", "scheduled"},
+		{4, 3, tomorrow, "10:30", "scheduled"},
 	}
 
 	now := time.Now()
 	for _, booking := range bookings {
 		_, err := db.Exec(`
 			INSERT INTO bookings (user_id, dog_id, date, scheduled_time,
-				walk_type, status, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+				status, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
 		`, booking.UserID, booking.DogID,
 			booking.Date.Format("2006-01-02"), booking.Time,
-			booking.Type, booking.Status, now, now)
+			booking.Status, now, now)
 		if err != nil {
 			return fmt.Errorf("failed to create booking: %w", err)
 		}

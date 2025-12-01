@@ -7,7 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tranm/gassigeher/internal/services"
+	"github.com/tranmh/gassigeher/internal/logging"
+	"github.com/tranmh/gassigeher/internal/services"
 )
 
 type contextKey string
@@ -16,30 +17,63 @@ const UserIDKey contextKey = "userID"
 const EmailKey contextKey = "email"
 const IsAdminKey contextKey = "isAdmin"
 const IsSuperAdminKey contextKey = "isSuperAdmin" // DONE: Phase 3
+const RequestIDKey contextKey = "requestID"
 
-// LoggingMiddleware logs HTTP requests
-// BUG FIX #13: Sanitize sensitive data from logs
+// LoggingMiddleware logs HTTP requests with comprehensive information
+// Includes: timestamp, request ID, client IP, method, path, status code,
+// duration, bytes in/out, user agent, and user ID (if authenticated)
 func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
-		// Sanitize URL for logging (don't log tokens in query params)
-		sanitizedPath := r.URL.Path
-		if r.URL.RawQuery != "" {
-			// Redact sensitive query parameters
-			if strings.Contains(r.URL.RawQuery, "token") {
-				sanitizedPath += "?token=REDACTED"
-			} else {
-				sanitizedPath += "?" + r.URL.RawQuery
-			}
+		// Generate request ID for tracing
+		requestID := logging.GenerateRequestID()
+
+		// Add request ID to context
+		ctx := context.WithValue(r.Context(), RequestIDKey, requestID)
+		r = r.WithContext(ctx)
+
+		// Wrap response writer to capture status code and bytes
+		wrapped := logging.NewResponseWriter(w)
+
+		// Add request ID to response headers for client-side debugging
+		wrapped.Header().Set("X-Request-ID", requestID)
+
+		// Get request body size
+		var bytesIn int64
+		if r.ContentLength > 0 {
+			bytesIn = r.ContentLength
 		}
 
-		log.Printf("%s %s", r.Method, sanitizedPath)
-		next.ServeHTTP(w, r)
-		log.Printf("Completed in %v", time.Since(start))
+		// Call next handler
+		next.ServeHTTP(wrapped, r)
+
+		// Build log entry
+		entry := &logging.HTTPLogEntry{
+			Timestamp:  start,
+			RequestID:  requestID,
+			Method:     r.Method,
+			Path:       r.URL.Path,
+			Query:      r.URL.RawQuery,
+			StatusCode: wrapped.StatusCode(),
+			Duration:   time.Since(start),
+			BytesIn:    bytesIn,
+			BytesOut:   wrapped.BytesWritten(),
+			ClientIP:   logging.GetClientIP(r),
+			UserAgent:  r.UserAgent(),
+			Referer:    r.Referer(),
+		}
+
+		// Try to get user ID from context (set by AuthMiddleware)
+		if userID, ok := r.Context().Value(UserIDKey).(int); ok {
+			entry.UserID = userID
+		}
+
+		// Log the entry
+		log.Println(entry.Format())
 	})
 }
-// DONE: BUG #13 FIXED - Sensitive data redacted from logs
+// DONE: Enhanced logging with status code, request ID, client IP, etc.
 
 // CORSMiddleware adds CORS headers
 // BUG FIX #1: Restrict CORS to specific origins instead of "*"

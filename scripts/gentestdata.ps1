@@ -132,7 +132,7 @@ $sql = New-Object System.Text.StringBuilder
 
 # Clear existing data in correct order (respecting foreign keys)
 [void]$sql.AppendLine("-- Clear existing data")
-$tables = @("reactivation_requests", "experience_requests", "blocked_dates", "bookings", "dogs", "users", "system_settings")
+$tables = @("reactivation_requests", "experience_requests", "custom_holidays", "feiertage_cache", "booking_time_rules", "blocked_dates", "bookings", "dogs", "users", "system_settings")
 foreach ($table in $tables) {
     [void]$sql.AppendLine("DELETE FROM $table;")
 }
@@ -140,7 +140,7 @@ foreach ($table in $tables) {
 
 # Reset autoincrement sequences
 [void]$sql.AppendLine("-- Reset autoincrement sequences")
-[void]$sql.AppendLine("DELETE FROM sqlite_sequence WHERE name IN ('users', 'dogs', 'bookings', 'blocked_dates', 'experience_requests', 'reactivation_requests');")
+[void]$sql.AppendLine("DELETE FROM sqlite_sequence WHERE name IN ('users', 'dogs', 'bookings', 'blocked_dates', 'experience_requests', 'reactivation_requests', 'booking_time_rules', 'custom_holidays', 'feiertage_cache');")
 [void]$sql.AppendLine("")
 
 # System settings
@@ -148,7 +148,43 @@ foreach ($table in $tables) {
 [void]$sql.AppendLine("INSERT INTO system_settings (key, value) VALUES")
 [void]$sql.AppendLine("('booking_advance_days', '14'),")
 [void]$sql.AppendLine("('cancellation_notice_hours', '12'),")
-[void]$sql.AppendLine("('auto_deactivation_days', '365');")
+[void]$sql.AppendLine("('auto_deactivation_days', '365'),")
+[void]$sql.AppendLine("('morning_walk_requires_approval', 'true'),")
+[void]$sql.AppendLine("('use_feiertage_api', 'true'),")
+[void]$sql.AppendLine("('feiertage_state', 'BW'),")
+[void]$sql.AppendLine("('booking_time_granularity', '15'),")
+[void]$sql.AppendLine("('feiertage_cache_days', '7');")
+[void]$sql.AppendLine("")
+
+# Booking time rules
+[void]$sql.AppendLine("-- Booking time rules (weekday and weekend)")
+[void]$sql.AppendLine("INSERT INTO booking_time_rules (day_type, rule_name, start_time, end_time, is_blocked) VALUES")
+[void]$sql.AppendLine("('weekday', 'Morning Walk', '09:00', '12:00', 0),")
+[void]$sql.AppendLine("('weekday', 'Lunch Block', '13:00', '14:00', 1),")
+[void]$sql.AppendLine("('weekday', 'Afternoon Walk', '14:00', '16:30', 0),")
+[void]$sql.AppendLine("('weekday', 'Feeding Block', '16:30', '18:00', 1),")
+[void]$sql.AppendLine("('weekday', 'Evening Walk', '18:00', '19:30', 0),")
+[void]$sql.AppendLine("('weekend', 'Morning Walk', '09:00', '12:00', 0),")
+[void]$sql.AppendLine("('weekend', 'Feeding Block', '12:00', '13:00', 1),")
+[void]$sql.AppendLine("('weekend', 'Lunch Block', '13:00', '14:00', 1),")
+[void]$sql.AppendLine("('weekend', 'Afternoon Walk', '14:00', '17:00', 0);")
+[void]$sql.AppendLine("")
+
+# Custom holidays (Baden-Württemberg 2025)
+[void]$sql.AppendLine("-- Custom holidays (example Baden-Württemberg holidays for 2025)")
+[void]$sql.AppendLine("INSERT INTO custom_holidays (date, name, is_active, source) VALUES")
+[void]$sql.AppendLine("('2025-01-01', 'Neujahrstag', 1, 'api'),")
+[void]$sql.AppendLine("('2025-01-06', 'Heilige Drei Könige', 1, 'api'),")
+[void]$sql.AppendLine("('2025-04-18', 'Karfreitag', 1, 'api'),")
+[void]$sql.AppendLine("('2025-04-21', 'Ostermontag', 1, 'api'),")
+[void]$sql.AppendLine("('2025-05-01', 'Tag der Arbeit', 1, 'api'),")
+[void]$sql.AppendLine("('2025-05-29', 'Christi Himmelfahrt', 1, 'api'),")
+[void]$sql.AppendLine("('2025-06-09', 'Pfingstmontag', 1, 'api'),")
+[void]$sql.AppendLine("('2025-06-19', 'Fronleichnam', 1, 'api'),")
+[void]$sql.AppendLine("('2025-10-03', 'Tag der Deutschen Einheit', 1, 'api'),")
+[void]$sql.AppendLine("('2025-11-01', 'Allerheiligen', 1, 'api'),")
+[void]$sql.AppendLine("('2025-12-25', 'Erster Weihnachtsfeiertag', 1, 'api'),")
+[void]$sql.AppendLine("('2025-12-26', 'Zweiter Weihnachtsfeiertag', 1, 'api');")
 [void]$sql.AppendLine("")
 
 # Generate users
@@ -261,6 +297,12 @@ $times = @{
 }
 $walkTypes = @('morning', 'evening')
 
+# Helper function to determine if time requires approval (09:00-12:00)
+function Requires-Approval($time) {
+    $hour = [int]$time.Substring(0, 2)
+    return ($hour -ge 9 -and $hour -lt 12)
+}
+
 # Past bookings (completed)
 for ($dayOffset = -14; $dayOffset -lt 0; $dayOffset++) {
     $bookDate = (Get-Date).AddDays($dayOffset).ToString("yyyy-MM-dd")
@@ -291,12 +333,20 @@ for ($dayOffset = -14; $dayOffset -lt 0; $dayOffset++) {
             "NULL"
         }
 
-        [void]$bookingValues.Add("($userId, $dogId, '$bookDate', '$walkType', '$time', 'completed', '$completedAt', $note, '$createdAt')")
+        # Approval fields for completed bookings
+        $requiresApproval = if (Requires-Approval $time) { 1 } else { 0 }
+        $approvalStatus = "'approved'"
+        $approvedBy = if ($requiresApproval -eq 1) { 1 } else { "NULL" }
+        $approvedAt = if ($requiresApproval -eq 1) { "'$createdAt'" } else { "NULL" }
+        $rejectionReason = "NULL"
+
+        [void]$bookingValues.Add("($userId, $dogId, '$bookDate', '$walkType', '$time', 'completed', '$completedAt', $note, '$createdAt', $requiresApproval, $approvalStatus, $approvedBy, $approvedAt, $rejectionReason)")
     }
 }
 
 # Today's bookings
 $todayDate = (Get-Date).ToString("yyyy-MM-dd")
+$pendingApprovalCount = 0
 for ($b = 0; $b -lt 3; $b++) {
     $attempts = 0
     do {
@@ -314,7 +364,23 @@ for ($b = 0; $b -lt 3; $b++) {
     $status = if ($walkType -eq 'morning') { 'completed' } else { 'scheduled' }
     $completedAt = if ($status -eq 'completed') { "'$now'" } else { "NULL" }
 
-    [void]$bookingValues.Add("($userId, $dogId, '$todayDate', '$walkType', '$time', '$status', $completedAt, NULL, '$now')")
+    # Approval fields
+    $requiresApproval = if (Requires-Approval $time) { 1 } else { 0 }
+
+    if ($status -eq 'completed') {
+        # Completed bookings are always approved
+        $approvalStatus = "'approved'"
+        $approvedBy = if ($requiresApproval -eq 1) { 1 } else { "NULL" }
+        $approvedAt = if ($requiresApproval -eq 1) { "'$now'" } else { "NULL" }
+    } else {
+        # Scheduled bookings might be pending approval
+        $approvalStatus = "'approved'"
+        $approvedBy = "NULL"
+        $approvedAt = "NULL"
+    }
+    $rejectionReason = "NULL"
+
+    [void]$bookingValues.Add("($userId, $dogId, '$todayDate', '$walkType', '$time', '$status', $completedAt, NULL, '$now', $requiresApproval, $approvalStatus, $approvedBy, $approvedAt, $rejectionReason)")
 }
 
 # Future bookings
@@ -342,12 +408,41 @@ for ($dayOffset = 1; $dayOffset -le 14; $dayOffset++) {
         $time = $times[$walkType] | Get-Random
         $status = if ((Get-Random -Minimum 1 -Maximum 100) -le 10) { 'cancelled' } else { 'scheduled' }
 
-        [void]$bookingValues.Add("($userId, $dogId, '$bookDate', '$walkType', '$time', '$status', NULL, NULL, '$now')")
+        # Approval fields
+        $requiresApproval = if (Requires-Approval $time) { 1 } else { 0 }
+
+        if ($status -eq 'cancelled') {
+            # Cancelled bookings are approved first
+            $approvalStatus = "'approved'"
+            $approvedBy = "NULL"
+            $approvedAt = "NULL"
+        } elseif ($requiresApproval -eq 1 -and $pendingApprovalCount -lt 2 -and $dayOffset -le 7) {
+            # Create some pending approval bookings (max 2, only in next week)
+            $approvalStatus = "'pending'"
+            $approvedBy = "NULL"
+            $approvedAt = "NULL"
+            $pendingApprovalCount++
+        } elseif ($requiresApproval -eq 1 -and $pendingApprovalCount -eq 2 -and $dayOffset -eq 3) {
+            # Create one rejected booking for testing
+            $approvalStatus = "'rejected'"
+            $approvedBy = 1
+            $approvedAt = "'$now'"
+            $status = 'cancelled' # Rejected bookings are cancelled
+        } else {
+            # Regular approved bookings
+            $approvalStatus = "'approved'"
+            $approvedBy = "NULL"
+            $approvedAt = "NULL"
+        }
+
+        $rejectionReason = if ($approvalStatus -eq "'rejected'") { "'Nicht genügend Personal verfügbar für Vormittagstermine an diesem Tag'" } else { "NULL" }
+
+        [void]$bookingValues.Add("($userId, $dogId, '$bookDate', '$walkType', '$time', '$status', NULL, NULL, '$now', $requiresApproval, $approvalStatus, $approvedBy, $approvedAt, $rejectionReason)")
     }
 }
 
 # Write bookings
-[void]$sql.AppendLine("INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, completed_at, user_notes, created_at) VALUES")
+[void]$sql.AppendLine("INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, completed_at, user_notes, created_at, requires_approval, approval_status, approved_by, approved_at, rejection_reason) VALUES")
 for ($i = 0; $i -lt $bookingValues.Count; $i++) {
     $comma = if ($i -eq $bookingValues.Count - 1) { ";" } else { "," }
     [void]$sql.AppendLine("$($bookingValues[$i])$comma")
@@ -408,13 +503,17 @@ Write-Host "================================================================" -F
 Write-Host ""
 
 Write-Host "Summary:" -ForegroundColor Cyan
-Write-Host "  Users:                 $userCount (1 super admin, 1 inactive)" -ForegroundColor White
-Write-Host "  Dogs:                  $dogCount (2 unavailable)" -ForegroundColor White
+Write-Host "  Users:                     $userCount (1 super admin, 1 inactive)" -ForegroundColor White
+Write-Host "  Dogs:                      $dogCount (2 unavailable)" -ForegroundColor White
 $bookingCountDisplay = $bookingValues.Count
-Write-Host "  Bookings:              $bookingCountDisplay (spanning 28 days)" -ForegroundColor White
+Write-Host "  Bookings:                  $bookingCountDisplay (spanning 28 days)" -ForegroundColor White
+Write-Host "  - Pending Approvals:       ~$pendingApprovalCount morning bookings" -ForegroundColor White
+Write-Host "  - Rejected:                1 booking (with reason)" -ForegroundColor White
 $blockedCountDisplay = $blockedDates.Count
-Write-Host "  Blocked Dates:         $blockedCountDisplay" -ForegroundColor White
-Write-Host "  Experience Requests:   4 (2 pending, 1 approved, 1 denied)" -ForegroundColor White
+Write-Host "  Blocked Dates:             $blockedCountDisplay" -ForegroundColor White
+Write-Host "  Experience Requests:       4 (2 pending, 1 approved, 1 denied)" -ForegroundColor White
+Write-Host "  Booking Time Rules:        9 (weekday/weekend windows)" -ForegroundColor White
+Write-Host "  Custom Holidays:           12 (BW 2025 holidays)" -ForegroundColor White
 Write-Host ""
 
 Write-Host "Login Credentials - all users:" -ForegroundColor Cyan

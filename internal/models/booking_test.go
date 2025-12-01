@@ -16,7 +16,6 @@ func TestCreateBookingRequest_Validate(t *testing.T) {
 			req: CreateBookingRequest{
 				DogID:         1,
 				Date:          "2025-12-01",
-				WalkType:      "morning",
 				ScheduledTime: "09:00",
 			},
 			wantErr: false,
@@ -25,7 +24,6 @@ func TestCreateBookingRequest_Validate(t *testing.T) {
 			name: "Missing dog ID",
 			req: CreateBookingRequest{
 				Date:          "2025-12-01",
-				WalkType:      "morning",
 				ScheduledTime: "09:00",
 			},
 			wantErr: true,
@@ -35,17 +33,6 @@ func TestCreateBookingRequest_Validate(t *testing.T) {
 			req: CreateBookingRequest{
 				DogID:         1,
 				Date:          "01-12-2025",
-				WalkType:      "morning",
-				ScheduledTime: "09:00",
-			},
-			wantErr: true,
-		},
-		{
-			name: "Invalid walk type",
-			req: CreateBookingRequest{
-				DogID:         1,
-				Date:          "2025-12-01",
-				WalkType:      "afternoon",
 				ScheduledTime: "09:00",
 			},
 			wantErr: true,
@@ -55,7 +42,6 @@ func TestCreateBookingRequest_Validate(t *testing.T) {
 			req: CreateBookingRequest{
 				DogID:         1,
 				Date:          "2025-12-01",
-				WalkType:      "morning",
 				ScheduledTime: "25:00",
 			},
 			wantErr: true,
@@ -65,7 +51,6 @@ func TestCreateBookingRequest_Validate(t *testing.T) {
 			req: CreateBookingRequest{
 				DogID:         1,
 				Date:          "",
-				WalkType:      "morning",
 				ScheduledTime: "09:00",
 			},
 			wantErr: true,
@@ -75,7 +60,6 @@ func TestCreateBookingRequest_Validate(t *testing.T) {
 			req: CreateBookingRequest{
 				DogID:         1,
 				Date:          "2025-12-01",
-				WalkType:      "morning",
 				ScheduledTime: "",
 			},
 			wantErr: true,
@@ -83,9 +67,8 @@ func TestCreateBookingRequest_Validate(t *testing.T) {
 		{
 			name: "Missing scheduled time",
 			req: CreateBookingRequest{
-				DogID:    1,
-				Date:     "2025-12-01",
-				WalkType: "evening",
+				DogID: 1,
+				Date:  "2025-12-01",
 			},
 			wantErr: true,
 		},
@@ -94,7 +77,6 @@ func TestCreateBookingRequest_Validate(t *testing.T) {
 			req: CreateBookingRequest{
 				DogID:         -1,
 				Date:          "2025-12-01",
-				WalkType:      "morning",
 				ScheduledTime: "09:00",
 			},
 			wantErr: true,
@@ -104,17 +86,6 @@ func TestCreateBookingRequest_Validate(t *testing.T) {
 			req: CreateBookingRequest{
 				DogID:         0,
 				Date:          "2025-12-01",
-				WalkType:      "morning",
-				ScheduledTime: "09:00",
-			},
-			wantErr: true,
-		},
-		{
-			name: "Empty walk type",
-			req: CreateBookingRequest{
-				DogID:         1,
-				Date:          "2025-12-01",
-				WalkType:      "",
 				ScheduledTime: "09:00",
 			},
 			wantErr: true,
@@ -142,7 +113,6 @@ func TestMoveBookingRequest_Validate(t *testing.T) {
 			name: "Valid request",
 			req: MoveBookingRequest{
 				Date:          "2025-12-01",
-				WalkType:      "evening",
 				ScheduledTime: "17:00",
 				Reason:        "Dog not feeling well",
 			},
@@ -152,7 +122,6 @@ func TestMoveBookingRequest_Validate(t *testing.T) {
 			name: "Valid morning walk",
 			req: MoveBookingRequest{
 				Date:          "2025-12-15",
-				WalkType:      "morning",
 				ScheduledTime: "09:30",
 				Reason:        "Owner request",
 			},
@@ -162,7 +131,6 @@ func TestMoveBookingRequest_Validate(t *testing.T) {
 			name: "Missing reason",
 			req: MoveBookingRequest{
 				Date:          "2025-12-01",
-				WalkType:      "evening",
 				ScheduledTime: "17:00",
 			},
 			wantErr: true,
@@ -171,7 +139,6 @@ func TestMoveBookingRequest_Validate(t *testing.T) {
 			name: "Empty reason",
 			req: MoveBookingRequest{
 				Date:          "2025-12-01",
-				WalkType:      "evening",
 				ScheduledTime: "17:00",
 				Reason:        "",
 			},
@@ -181,7 +148,6 @@ func TestMoveBookingRequest_Validate(t *testing.T) {
 			name: "Invalid date",
 			req: MoveBookingRequest{
 				Date:          "invalid",
-				WalkType:      "evening",
 				ScheduledTime: "17:00",
 				Reason:        "Test",
 			},
@@ -191,7 +157,6 @@ func TestMoveBookingRequest_Validate(t *testing.T) {
 			name: "Empty date",
 			req: MoveBookingRequest{
 				Date:          "",
-				WalkType:      "evening",
 				ScheduledTime: "17:00",
 				Reason:        "Test",
 			},
@@ -201,27 +166,6 @@ func TestMoveBookingRequest_Validate(t *testing.T) {
 			name: "Invalid date format",
 			req: MoveBookingRequest{
 				Date:          "01-12-2025",
-				WalkType:      "evening",
-				ScheduledTime: "17:00",
-				Reason:        "Test",
-			},
-			wantErr: true,
-		},
-		{
-			name: "Invalid walk type",
-			req: MoveBookingRequest{
-				Date:          "2025-12-01",
-				WalkType:      "afternoon",
-				ScheduledTime: "17:00",
-				Reason:        "Test",
-			},
-			wantErr: true,
-		},
-		{
-			name: "Empty walk type",
-			req: MoveBookingRequest{
-				Date:          "2025-12-01",
-				WalkType:      "",
 				ScheduledTime: "17:00",
 				Reason:        "Test",
 			},
@@ -231,7 +175,6 @@ func TestMoveBookingRequest_Validate(t *testing.T) {
 			name: "Empty scheduled time",
 			req: MoveBookingRequest{
 				Date:          "2025-12-01",
-				WalkType:      "evening",
 				ScheduledTime: "",
 				Reason:        "Test",
 			},
@@ -241,7 +184,6 @@ func TestMoveBookingRequest_Validate(t *testing.T) {
 			name: "Invalid time format",
 			req: MoveBookingRequest{
 				Date:          "2025-12-01",
-				WalkType:      "evening",
 				ScheduledTime: "25:00",
 				Reason:        "Test",
 			},
@@ -251,7 +193,6 @@ func TestMoveBookingRequest_Validate(t *testing.T) {
 			name: "Invalid time format 2",
 			req: MoveBookingRequest{
 				Date:          "2025-12-01",
-				WalkType:      "evening",
 				ScheduledTime: "9:00 AM",
 				Reason:        "Test",
 			},

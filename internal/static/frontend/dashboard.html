@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Gassigeher</title>
+    <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <a href="/" class="logo">🐕 Gassigeher</a>
+            <nav id="main-nav">
+                <ul>
+                    <li><a href="/dashboard.html" data-i18n="nav.dashboard">Dashboard</a></li>
+                    <li><a href="/dogs.html" data-i18n="dogs.all_dogs">Hunde</a></li>
+                    <li><a href="/calendar.html" data-i18n="nav.calendar">Kalender</a></li>
+                    <li><a href="/profile.html" style="display: flex; align-items: center; gap: 8px;">
+                        <span id="header-photo" style="width: 32px; height: 32px; border-radius: 50%; background: #ddd; display: inline-flex; align-items: center; justify-content: center; overflow: hidden;">👤</span>
+                        <span data-i18n="nav.profile">Profil</span>
+                    </a></li>
+                    <li id="admin-area-link" style="display: none;"><a href="/admin-dashboard.html" class="area-switcher" data-i18n="nav.admin_area">🔧 Admin-Bereich</a></li>
+                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+
+    <main style="padding: 40px 0;">
+        <div class="container">
+            <h1 data-i18n="dashboard.title">Dashboard</h1>
+
+            <div id="alert-container"></div>
+
+            <!-- Quick Actions -->
+            <div style="margin-bottom: 30px;">
+                <a href="/dogs.html" class="btn" data-i18n="dashboard.view_all_dogs">Alle Hunde anzeigen</a>
+            </div>
+
+            <!-- Upcoming Bookings -->
+            <div class="card">
+                <h2 data-i18n="dashboard.upcoming_walks">Anstehende Spaziergänge</h2>
+                <div id="upcoming-bookings">
+                    <p data-i18n="common.loading">Laden...</p>
+                </div>
+            </div>
+
+            <!-- Past Bookings -->
+            <div class="card">
+                <h2 data-i18n="dashboard.walk_history">Spaziergangshistorie</h2>
+                <div id="past-bookings">
+                    <p data-i18n="common.loading">Laden...</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Booking Modal (for quick booking from dog page) -->
+    <div id="booking-modal" class="modal hidden" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+        <div class="card" style="max-width: 500px; margin: 20px;">
+            <h3 data-i18n="bookings.book_dog">Hund buchen</h3>
+            <form id="booking-form">
+                <div class="form-group">
+                    <label data-i18n="bookings.date">Datum</label>
+                    <input type="date" id="booking-date" required>
+                </div>
+                <div class="form-group">
+                    <label data-i18n="bookings.scheduled_time">Geplante Uhrzeit</label>
+                    <input type="time" id="booking-time" required>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn" data-i18n="bookings.confirm_booking">Buchung bestätigen</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeBookingModal()" data-i18n="common.cancel">Abbrechen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/nav-menu.js"></script>
+    <script src="/js/i18n.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/dog-photo-helpers.js"></script>
+    <script>
+        let currentUser = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!api.isAuthenticated()) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            await window.i18n.load();
+
+            // Explicitly update all translations after load
+            console.log('i18n loaded, updating translations...');
+            window.i18n.updateElement(document.body);
+
+            try {
+                currentUser = await api.getMe();
+                console.log('Current user:', currentUser);
+                updateHeaderPhoto();
+
+                // Show admin area link if user is admin
+                showAdminLinkIfAdmin(currentUser);
+
+                loadUpcomingBookings();
+                loadPastBookings();
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Laden');
+            }
+        });
+
+        function updateHeaderPhoto() {
+            if (currentUser && currentUser.profile_photo) {
+                const headerPhoto = document.getElementById('header-photo');
+                headerPhoto.innerHTML = `<img src="/uploads/${currentUser.profile_photo}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">`;
+            }
+        }
+
+        async function loadUpcomingBookings() {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                console.log('[DASHBOARD DEBUG] Fetching bookings from:', today, 'with status: scheduled');
+                console.log('[DASHBOARD DEBUG] NOT using calendar_view, so should see only MY bookings');
+
+                const bookings = await api.getBookings({
+                    date_from: today,
+                    status: 'scheduled'
+                });
+
+                console.log('[DASHBOARD DEBUG] Received', bookings.length, 'upcoming bookings:');
+                bookings.forEach(b => {
+                    console.log('[DASHBOARD DEBUG] Booking:', {
+                        id: b.id,
+                        dog_id: b.dog_id,
+                        date: b.date,
+                        scheduled_time: b.scheduled_time,
+                        status: b.status,
+                        user_id: b.user_id
+                    });
+                });
+
+                const container = document.getElementById('upcoming-bookings');
+
+                if (bookings.length === 0) {
+                    container.innerHTML = '<p data-i18n="dashboard.no_upcoming_walks">Keine anstehenden Spaziergänge</p>';
+                    return;
+                }
+
+                // Get dog details for each booking
+                const bookingsWithDogs = await Promise.all(
+                    bookings.map(async (booking) => {
+                        try {
+                            const dog = await api.getDog(booking.dog_id);
+                            return { ...booking, dog };
+                        } catch (error) {
+                            return booking;
+                        }
+                    })
+                );
+
+                container.innerHTML = bookingsWithDogs.map(booking => `
+                    <div class="card" style="margin-bottom: 15px; padding: 20px;" data-status="${booking.approval_status || 'approved'}">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div style="flex: 1;">
+                                <h4 style="margin: 0 0 10px 0;">${booking.dog ? booking.dog.name : 'Hund #' + booking.dog_id}</h4>
+                                <p style="margin: 5px 0;">📅 ${booking.date} - ${booking.scheduled_time} Uhr</p>
+
+                                ${booking.approval_status === 'pending' ? `
+                                    <div class="alert alert-warning" style="margin-top: 10px; padding: 10px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
+                                        ⏳ <strong>Warte auf Admin-Genehmigung</strong>
+                                    </div>
+                                ` : ''}
+
+                                ${booking.approval_status === 'rejected' ? `
+                                    <div class="alert alert-danger" style="margin-top: 10px; padding: 10px; background: #f8d7da; border: 1px solid #dc3545; border-radius: 4px;">
+                                        ✗ <strong>Abgelehnt</strong>
+                                        ${booking.rejection_reason ? `<br><small>${booking.rejection_reason}</small>` : ''}
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <button class="btn btn-danger" onclick="cancelBooking(${booking.id})" data-i18n="bookings.cancel_booking">Stornieren</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('upcoming-bookings').innerHTML = `<p class="alert alert-error">${error.message}</p>`;
+            }
+        }
+
+        async function loadPastBookings() {
+            try {
+                const bookings = await api.getBookings({
+                    status: 'completed'
+                });
+
+                const container = document.getElementById('past-bookings');
+
+                if (bookings.length === 0) {
+                    container.innerHTML = '<p>Keine abgeschlossenen Spaziergänge</p>';
+                    return;
+                }
+
+                // Get dog details for each booking
+                const bookingsWithDogs = await Promise.all(
+                    bookings.slice(0, 10).map(async (booking) => {
+                        try {
+                            const dog = await api.getDog(booking.dog_id);
+                            return { ...booking, dog };
+                        } catch (error) {
+                            return booking;
+                        }
+                    })
+                );
+
+                container.innerHTML = bookingsWithDogs.map(booking => `
+                    <div class="card" style="margin-bottom: 15px; padding: 15px;">
+                        <h4 style="margin: 0 0 10px 0;">${booking.dog ? booking.dog.name : 'Hund #' + booking.dog_id}</h4>
+                        <p style="margin: 5px 0; font-size: 0.9rem; color: #666;">
+                            📅 ${booking.date} - ${booking.scheduled_time} Uhr
+                        </p>
+                        ${booking.user_notes ? `<p style="margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 4px;"><strong>Notizen:</strong> ${booking.user_notes}</p>` : ''}
+                        ${!booking.user_notes ? `<button class="btn" style="margin-top: 10px; padding: 8px 16px;" onclick="addNotes(${booking.id})">Notizen hinzufügen</button>` : ''}
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('past-bookings').innerHTML = `<p class="alert alert-error">${error.message}</p>`;
+            }
+        }
+
+        async function cancelBooking(id) {
+            if (!confirm('Sind Sie sicher, dass Sie diese Buchung stornieren möchten?')) {
+                return;
+            }
+
+            try {
+                await api.cancelBooking(id);
+                showAlert('success', 'Buchung erfolgreich storniert');
+                loadUpcomingBookings();
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Stornieren');
+            }
+        }
+
+        async function addNotes(bookingId) {
+            const notes = prompt('Notizen zu diesem Spaziergang:');
+            if (!notes) return;
+
+            try {
+                await api.addBookingNotes(bookingId, notes);
+                showAlert('success', 'Notizen hinzugefügt');
+                loadPastBookings();
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Hinzufügen der Notizen');
+            }
+        }
+
+        function showAlert(type, message) {
+            const container = document.getElementById('alert-container');
+            container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => container.innerHTML = '', 5000);
+        }
+    </script>
+</body>
+</html>

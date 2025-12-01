@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tranm/gassigeher/internal/services"
+	"github.com/tranmh/gassigeher/internal/services"
 )
 
 // DONE: TestAuthMiddleware tests JWT authentication middleware

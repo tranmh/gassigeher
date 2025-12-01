@@ -8,11 +8,11 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
-	"github.com/tranm/gassigeher/internal/config"
-	"github.com/tranm/gassigeher/internal/middleware"
-	"github.com/tranm/gassigeher/internal/models"
-	"github.com/tranm/gassigeher/internal/repository"
-	"github.com/tranm/gassigeher/internal/services"
+	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/middleware"
+	"github.com/tranmh/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/repository"
+	"github.com/tranmh/gassigeher/internal/services"
 )
 
 // BlockedDateHandler handles blocked date-related HTTP requests
@@ -131,11 +131,11 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
 
 		// Send cancellation email (in goroutine, don't block)
 		if h.emailService != nil && user.Email != nil {
-			go func(userEmail, userName, dogName, date, walkType, reason string) {
-				if err := h.emailService.SendAdminCancellation(userEmail, userName, dogName, date, walkType, reason); err != nil {
+			go func(userEmail, userName, dogName, date, scheduledTime, reason string) {
+				if err := h.emailService.SendAdminCancellation(userEmail, userName, dogName, date, scheduledTime, reason); err != nil {
 					fmt.Printf("Warning: Failed to send cancellation email to %s: %v\n", userEmail, err)
 				}
-			}(*user.Email, user.Name, dog.Name, booking.Date, booking.WalkType, cancellationReason)
+			}(*user.Email, user.Name, dog.Name, booking.Date, booking.ScheduledTime, cancellationReason)
 		}
 	}
 

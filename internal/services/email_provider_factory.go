@@ -5,7 +5,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/tranm/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/config"
 )
 
 // NewEmailProvider creates an email provider based on configuration

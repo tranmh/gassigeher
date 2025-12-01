@@ -35,9 +35,17 @@ fi
 echo ""
 
 echo "[3/4] Building application..."
-if go build -o gassigeher ./cmd/server; then
+# Get version info for ldflags
+VERSION="1.0"
+GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS="-X github.com/tranmh/gassigeher/internal/version.Version=${VERSION}"
+LDFLAGS="${LDFLAGS} -X github.com/tranmh/gassigeher/internal/version.GitCommit=${GIT_COMMIT}"
+LDFLAGS="${LDFLAGS} -X github.com/tranmh/gassigeher/internal/version.BuildTime=${BUILD_TIME}"
+
+if go build -ldflags "${LDFLAGS}" -o gassigeher ./cmd/server; then
     chmod +x gassigeher
-    echo -e "${GREEN}[OK] Build successful: gassigeher (pure Go SQLite)${NC}"
+    echo -e "${GREEN}[OK] Build successful: gassigeher v${VERSION} (${GIT_COMMIT})${NC}"
 else
     echo -e "${RED}[ERROR] Build failed${NC}"
     exit 1

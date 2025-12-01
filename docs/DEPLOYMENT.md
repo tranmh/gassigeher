@@ -153,7 +153,6 @@ Choose configuration based on your database:
 ```bash
 # Application
 PORT=8080
-ENVIRONMENT=production
 
 # Database - SQLite
 DB_TYPE=sqlite
@@ -200,7 +199,6 @@ AUTO_DEACTIVATION_DAYS=365
 ```bash
 # Application
 PORT=8080
-ENVIRONMENT=production
 
 # Database - MySQL
 DB_TYPE=mysql
@@ -256,7 +254,6 @@ AUTO_DEACTIVATION_DAYS=365
 ```bash
 # Application
 PORT=8080
-ENVIRONMENT=production
 
 # Database - PostgreSQL
 DB_TYPE=postgres

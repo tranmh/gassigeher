@@ -54,7 +54,20 @@ Generates comprehensive test data for the Gassigeher application, including user
 
 **What Gets Generated:**
 
-- **System Settings**: Default booking/cancellation rules
+- **System Settings**: Default booking/cancellation rules + booking time settings
+  - `booking_advance_days`, `cancellation_notice_hours`, `auto_deactivation_days`
+  - `morning_walk_requires_approval`, `use_feiertage_api`, `feiertage_state`
+  - `booking_time_granularity`, `feiertage_cache_days`
+
+- **Booking Time Rules** (9 rules):
+  - Weekday: Morning (09:00-12:00), Lunch Block (13:00-14:00), Afternoon (14:00-16:30), Feeding Block (16:30-18:00), Evening (18:00-19:30)
+  - Weekend/Holiday: Morning (09:00-12:00), Feeding Block (12:00-13:00), Lunch Block (13:00-14:00), Afternoon (14:00-17:00)
+
+- **Custom Holidays** (12 holidays):
+  - Baden-Württemberg public holidays for 2025
+  - Includes Neujahrstag, Heilige Drei Könige, Ostern, Pfingsten, Weihnachten, etc.
+  - All marked as active and from 'api' source
+
 - **Users** (12 total):
   - 1 super admin user (from SUPER_ADMIN_EMAIL env var, ID=1)
   - 4 green-level users (beginner walkers)
@@ -77,6 +90,11 @@ Generates comprehensive test data for the Gassigeher application, including user
   - **Future**: 3-6 bookings/day for next 14 days (pending + some cancelled)
   - Mix of morning/afternoon walk types
   - ~10% cancellation rate for future bookings
+  - **Approval Workflow**:
+    - Morning bookings (09:00-12:00) require approval
+    - ~2 bookings with 'pending' approval status (for admin review)
+    - 1 booking with 'rejected' status (with German rejection reason)
+    - All other bookings auto-approved
 
 - **Walk Notes**: Added to ~60% of completed bookings
   - Realistic German comments about each walk
@@ -128,19 +146,29 @@ Sample User Logins:
    - Cancellation workflow
    - Auto-completion of past bookings
 
-3. **User Lifecycle**
+3. **Booking Time Restrictions** (NEW)
+   - Time window validation (weekday vs weekend/holiday rules)
+   - Blocked time periods (lunch, feeding times)
+   - Morning walk approval workflow (pending, approved, rejected)
+   - Holiday detection and weekend schedule application
+   - 15-minute time slot granularity
+
+4. **User Lifecycle**
    - Active users with recent activity
    - Inactive users (365+ days old)
    - Deleted accounts (GDPR anonymization)
    - Experience level progression requests
 
-4. **Admin Workflows**
+5. **Admin Workflows**
    - Reviewing experience requests
    - Managing dogs (available/unavailable)
    - Viewing booking statistics
    - Managing blocked dates
+   - Approving/rejecting morning walk bookings (NEW)
+   - Managing booking time rules (NEW)
+   - Managing custom holidays (NEW)
 
-5. **Walk History & Notes**
+6. **Walk History & Notes**
    - Completed bookings with/without notes
    - Historical activity tracking
    - User engagement metrics

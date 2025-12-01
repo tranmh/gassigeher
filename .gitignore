@@ -22,6 +22,9 @@ scripts/testdata.sql
 # Uploads directory
 uploads/
 
+# Log files
+logs/
+
 # Coverage reports
 coverage.out
 

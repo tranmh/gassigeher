@@ -36,6 +36,10 @@ func SetupTestDBWithType(t *testing.T, dbType string) *sql.DB {
 		}
 		dialect = database.NewSQLiteDialect()
 
+		// Set max connections to 1 to avoid issues with in-memory databases
+		// (each connection would get its own database otherwise)
+		db.SetMaxOpenConns(1)
+
 		// Apply SQLite settings (PRAGMA foreign_keys, etc.)
 		if err := dialect.ApplySettings(db); err != nil {
 			t.Fatalf("Failed to apply SQLite settings: %v", err)
@@ -174,12 +178,12 @@ func SeedTestDog(t *testing.T, db *sql.DB, name, breed, category string) int {
 }
 
 // DONE: SeedTestBooking creates a test booking and returns the ID
-func SeedTestBooking(t *testing.T, db *sql.DB, userID, dogID int, date, walkType, scheduledTime, status string) int {
+func SeedTestBooking(t *testing.T, db *sql.DB, userID, dogID int, date, scheduledTime, status string) int {
 	now := time.Now()
 	result, err := db.Exec(`
-		INSERT INTO bookings (user_id, dog_id, date, walk_type, scheduled_time, status, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`, userID, dogID, date, walkType, scheduledTime, status, now)
+		INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, userID, dogID, date, scheduledTime, status, now)
 
 	if err != nil {
 		t.Fatalf("Failed to seed test booking: %v", err)
