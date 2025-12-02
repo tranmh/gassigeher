@@ -30,17 +30,17 @@ Key areas of concern:
 ## Bug #1: Race Condition in Double-Booking Check
 
 **Description:**
-The `CreateBooking` handler checks for double-bookings using `CheckDoubleBooking` followed by `Create`, but this is not atomic. Between the check and the insert, another request could create a booking for the same dog/time slot, resulting in double-bookings. While there's a UNIQUE constraint that will catch this at the database level (lines 211-214), the race window still exists and the error handling relies on string matching which is database-specific.
+The `CreateBooking` handler checks for double-bookings using `CheckDoubleBooking` followed by `Create`, but this is not atomic. Between the check and the insert, another request could create a booking for the same dog/time slot, resulting in double-bookings. While there's a UNIQUE constraint that will catch this at the database level (lines 210-214), the race window still exists and the error handling relies on string matching which is database-specific.
 
 **Location:**
 - File: `internal/handlers/booking_handler.go`
 - Function: `CreateBooking`
-- Lines: 168-217
+- Lines: 168, 207-216
 
 **Steps to Reproduce:**
-1. Two users simultaneously attempt to book the same dog for the same date/walk_type
+1. Two users simultaneously attempt to book the same dog for the same date/scheduled_time
 2. Both requests pass the `CheckDoubleBooking` check (line 168)
-3. Both attempt to insert via `Create` (line 208)
+3. Both attempt to insert via `Create` (line 207)
 4. One succeeds, one fails with UNIQUE constraint violation
 5. Expected: Both requests should be handled gracefully with proper error messages
 6. Actual: Relies on string matching "UNIQUE constraint" in error message, which may vary across databases
@@ -53,7 +53,7 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
     // ... existing validation code ...
 
 -   // Check for double-booking
--   isDoubleBooked, err := h.bookingRepo.CheckDoubleBooking(req.DogID, req.Date, req.WalkType)
+-   isDoubleBooked, err := h.bookingRepo.CheckDoubleBooking(req.DogID, req.Date, req.ScheduledTime)
 -   if err != nil {
 -       respondError(w, http.StatusInternalServerError, "Failed to check availability")
 -       return
@@ -158,15 +158,16 @@ Multiple handlers return different error messages that reveal system state to po
 **Location:**
 - File: `internal/handlers/reactivation_request_handler.go`
 - Function: `CreateRequest`
-- Lines: 64-74
+- Lines: 64-84, 97
 
 **Steps to Reproduce:**
 1. Attacker sends reactivation request with email "victim@example.com"
-2. If user doesn't exist: "If your account exists and is deactivated, a request has been sent"
+2. If user doesn't exist: "If your account exists and is deactivated, a request has been sent" (line 66)
 3. If user exists and is active: "Your account is already active" (line 72)
-4. If user exists and is deactivated: Request is created
-5. Expected: Uniform response regardless of account state
-6. Actual: Different responses reveal account existence and status
+4. If user exists and has pending request: "You already have a pending request" (line 83)
+5. If user exists and is deactivated: "Reactivation request submitted" (line 97)
+6. Expected: Uniform response regardless of account state
+7. Actual: Different responses reveal account existence and status
 
 **Fix:**
 Return uniform responses for all cases:
@@ -232,13 +233,13 @@ The `UploadPhoto` and `UploadDogPhoto` handlers validate file extensions but don
 - Lines: 210-215
 - File: `internal/handlers/dog_handler.go`
 - Function: `UploadDogPhoto`
-- Lines: 402-407
+- Lines: 406-411
 
 **Steps to Reproduce:**
 1. Attacker creates malicious PHP file: `<?php system($_GET['cmd']); ?>`
 2. Rename file to `malicious.jpg`
 3. Upload via POST /api/users/photo or POST /api/dogs/:id/photo
-4. Extension check passes (line 211-215)
+4. Extension check passes (line 211-215 or 407-410)
 5. File is saved to uploads directory
 6. Expected: File content should be validated as actual image
 7. Actual: Any file with .jpg/.jpeg/.png extension is accepted
@@ -302,18 +303,18 @@ Apply same fix to `dog_handler.go` UploadDogPhoto function.
 ## Bug #5: Missing Authorization Check in AddNotes
 
 **Description:**
-The `AddNotes` handler checks if the booking belongs to the user (line 473) but doesn't verify that the user is still active or hasn't been deleted. A deactivated or deleted user could still add notes to their completed bookings if they have a valid JWT token from before deactivation.
+The `AddNotes` handler checks if the booking belongs to the user (line 468) but doesn't verify that the user is still active or hasn't been deleted. A deactivated or deleted user could still add notes to their completed bookings if they have a valid JWT token from before deactivation.
 
 **Location:**
 - File: `internal/handlers/booking_handler.go`
 - Function: `AddNotes`
-- Lines: 437-491
+- Lines: 432-486
 
 **Steps to Reproduce:**
 1. User completes a booking and gets JWT token
 2. Admin deactivates user account
 3. User uses old JWT token to call PUT /api/bookings/:id/notes
-4. Authorization check passes (line 473) because booking.UserID matches
+4. Authorization check passes (line 468) because booking.UserID matches
 5. Notes are added successfully
 6. Expected: Deactivated users should not be able to add notes
 7. Actual: Old JWT tokens still work after deactivation
@@ -356,7 +357,7 @@ Apply similar fix to other protected endpoints that don't check user active stat
 ## Bug #6: SQL Injection Risk in Dashboard Activity Feed
 
 **Description:**
-The `GetRecentActivity` handler constructs activity messages using string concatenation (line 130, 132, 136) with dog names directly from the database. If a dog name contains special characters or is maliciously crafted, it could break the JSON response or lead to XSS when displayed in the frontend.
+The `GetRecentActivity` handler constructs activity messages using string concatenation (line 130, 133, 136) with dog names directly from the database. If a dog name contains special characters or is maliciously crafted, it could break the JSON response or lead to XSS when displayed in the frontend.
 
 **Location:**
 - File: `internal/handlers/dashboard_handler.go`
@@ -488,12 +489,12 @@ func (h *SettingsHandler) UpdateSetting(w http.ResponseWriter, r *http.Request) 
 ## Bug #8: Goroutine Leak in Email Sending
 
 **Description:**
-Multiple handlers launch email sending in goroutines (e.g., line 224 in booking_handler.go, line 219 in auth_handler.go) without any timeout or error recovery. If the email service hangs or takes a very long time, these goroutines will accumulate, potentially causing memory leaks and resource exhaustion.
+Multiple handlers launch email sending in goroutines (e.g., line 223 in booking_handler.go, line 419 in auth_handler.go) without any timeout or error recovery. If the email service hangs or takes a very long time, these goroutines will accumulate, potentially causing memory leaks and resource exhaustion.
 
 **Location:**
 - File: `internal/handlers/booking_handler.go`
 - Function: `CreateBooking`
-- Lines: 222-225
+- Lines: 222-224
 - Also affects: Multiple handlers that send emails in goroutines
 
 **Steps to Reproduce:**
@@ -518,7 +519,7 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 
     // Send confirmation email
     if user.Email != nil && h.emailService != nil {
--       go h.emailService.SendBookingConfirmation(*user.Email, user.Name, dog.Name, booking.Date, booking.WalkType, booking.ScheduledTime)
+-       go h.emailService.SendBookingConfirmation(*user.Email, user.Name, dog.Name, booking.Date, booking.ScheduledTime)
 +       go func() {
 +           ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 +           defer cancel()
@@ -528,7 +529,7 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 +           go func() {
 +               done <- h.emailService.SendBookingConfirmation(
 +                   *user.Email, user.Name, dog.Name,
-+                   booking.Date, booking.WalkType, booking.ScheduledTime,
++                   booking.Date, booking.ScheduledTime,
 +               )
 +           }()
 +
@@ -625,71 +626,27 @@ authRouter.Use(middleware.RateLimitMiddleware(10, time.Minute)) // 10 requests p
 
 ## Bug #10: Incorrect Date Comparison in Booking Validation
 
+**STATUS: CODE MODIFIED - ALREADY FIXED**
+
 **Description:**
-The `CreateBooking` handler compares booking dates in UTC (line 132) but the scheduled time validation later doesn't account for timezone differences. A user in a different timezone could book a time that appears valid in their timezone but is invalid in the server's timezone.
+The `CreateBooking` handler previously had issues comparing booking dates in UTC but the scheduled time validation didn't account for timezone differences. However, the code now shows a BUGFIX comment at line 123 indicating this was already addressed. The current implementation (lines 123-138) uses UTC consistently for date comparisons.
 
 **Location:**
 - File: `internal/handlers/booking_handler.go`
 - Function: `CreateBooking`
 - Lines: 123-138
 
-**Steps to Reproduce:**
-1. Server is in CET timezone (UTC+1)
-2. User in PST timezone (UTC-8) tries to book today at 10:00 AM their time
-3. Date comparison uses UTC (line 132), so "today" is different
-4. Expected: System should consistently handle timezones
-5. Actual: Date comparison is in UTC but time validation may not be
+**Current Status:**
+The bug has been fixed. The code now uses UTC timezone consistently for date parsing and comparison (lines 132-138). There may still be a minor edge case with same-day bookings where the scheduled time validation could be improved, but the core timezone issue is resolved.
 
-**Fix:**
-This is actually already partially fixed in the code (lines 123-138 use UTC consistently), but the comment indicates this was a bugfix. The current implementation is correct. However, there's still a potential issue with scheduled time validation:
-
-```diff
-func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
-    // ... existing validation ...
-
-    // BUGFIX #4: Check if date is in the past with consistent timezone handling
-    // Parse date in UTC to match how dates are stored
-    bookingDate, parseErr := time.Parse("2006-01-02", req.Date)
-    if parseErr != nil {
-        respondError(w, http.StatusBadRequest, "Invalid date format")
-        return
-    }
-
-    // Compare dates in UTC, not local timezone
-    now := time.Now().UTC()
-    today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-
-    if bookingDate.Before(today) {
-        respondError(w, http.StatusBadRequest, "Cannot book dates in the past")
-        return
-    }
-
-+   // For today's bookings, also check if the time has passed
-+   if bookingDate.Equal(today) {
-+       // Parse scheduled time and combine with date
-+       timeStr := req.ScheduledTime
-+       bookingDateTime, err := time.Parse("2006-01-02 15:04", req.Date + " " + timeStr)
-+       if err != nil {
-+           respondError(w, http.StatusBadRequest, "Invalid time format")
-+           return
-+       }
-+
-+       if bookingDateTime.Before(now) {
-+           respondError(w, http.StatusBadRequest, "Cannot book times in the past")
-+           return
-+       }
-+   }
-
-    // ... rest of function ...
-}
-```
+**Note:** This issue appears to have been previously identified and fixed, as indicated by the "BUGFIX #4" comment in the code.
 
 ---
 
 ## Bug #11: Unvalidated Admin Promotion/Demotion
 
 **Description:**
-The `PromoteToAdmin` and `DemoteAdmin` handlers in `user_handler.go` check if the target user is a Super Admin (lines 503-505, 564-567) but don't verify that the target user exists, is verified, or is active before promoting. An admin could promote a deleted or unverified account to admin status.
+The `PromoteToAdmin` and `DemoteAdmin` handlers in `user_handler.go` check if the target user is a Super Admin (lines 503-506, 564-567) but don't verify that the target user exists, is verified, or is active before promoting. An admin could promote a deleted or unverified account to admin status.
 
 **Location:**
 - File: `internal/handlers/user_handler.go`
@@ -760,18 +717,18 @@ func (h *UserHandler) PromoteToAdmin(w http.ResponseWriter, r *http.Request) {
 ## Bug #12: Missing Cleanup in Photo Upload Failure
 
 **Description:**
-The `UploadDogPhoto` handler processes and saves photos (line 421) before updating the database (line 431). If the database update fails, the orphaned photo files remain on disk, wasting storage space. While there's cleanup code (lines 432-434), it only runs if database update fails, not if the response fails to send.
+The `UploadDogPhoto` handler processes and saves photos (line 425) before updating the database (line 435). If the database update fails, the orphaned photo files remain on disk, wasting storage space. While there's cleanup code (lines 436-439), it only runs if database update fails, not if the response fails to send.
 
 **Location:**
 - File: `internal/handlers/dog_handler.go`
 - Function: `UploadDogPhoto`
-- Lines: 421-442
+- Lines: 424-447
 
 **Steps to Reproduce:**
 1. Admin uploads photo for dog ID 1
-2. Photo is processed and saved to disk (line 421)
+2. Photo is processed and saved to disk (line 425)
 3. Database update fails due to constraint violation
-4. Cleanup runs and deletes the files (lines 432-434)
+4. Cleanup runs and deletes the files (lines 436-439)
 5. Admin retries with same photo
 6. Photo is processed again and saved with new filename
 7. Expected: No orphaned files
@@ -851,17 +808,17 @@ func (h *DogHandler) UploadDogPhoto(w http.ResponseWriter, r *http.Request) {
 ## Bug #13: Potential Path Traversal in Dog Photo Deletion
 
 **Description:**
-The `UploadDogPhoto` handler deletes old photos using paths from the database (lines 410-418). If a malicious admin previously set a photo path to "../../etc/passwd", the deletion could affect files outside the upload directory. While this requires admin privileges, it's still a security risk.
+The `UploadDogPhoto` handler deletes old photos using paths from the database (lines 414-421). If a malicious admin previously set a photo path to "../../etc/passwd", the deletion could affect files outside the upload directory. While this requires admin privileges, it's still a security risk.
 
 **Location:**
 - File: `internal/handlers/dog_handler.go`
 - Function: `UploadDogPhoto`
-- Lines: 409-418
+- Lines: 413-422
 
 **Steps to Reproduce:**
 1. Malicious admin updates dog photo path in database to "../../../etc/important-file"
 2. Admin uploads new photo for the same dog
-3. Old photo deletion code runs (line 417): `os.Remove(oldPath)`
+3. Old photo deletion code runs (line 421): `os.Remove(oldPath)`
 4. Expected: Only files in upload directory should be deletable
 5. Actual: Path traversal could delete arbitrary files
 
@@ -916,7 +873,7 @@ The booking handlers (Cancel, MoveBooking, AddNotes) don't check the approval st
 **Location:**
 - File: `internal/handlers/booking_handler.go`
 - Function: `CancelBooking`, `MoveBooking`, `AddNotes`
-- Lines: 316-434, 494-593, 437-491
+- Lines: 312-429, 489-584, 432-486
 
 **Steps to Reproduce:**
 1. User creates morning walk booking (requires approval)
@@ -994,7 +951,7 @@ func (h *BookingHandler) AddNotes(w http.ResponseWriter, r *http.Request) {
 ## Bug #15: Email Goroutine Error Not Logged in Blocked Date Handler
 
 **Description:**
-The `CreateBlockedDate` handler sends cancellation emails in a goroutine (lines 133-139) but uses an anonymous function with its own error logging. However, if the goroutine panics or fails to start, there's no recovery mechanism, potentially leaving users unnotified of cancellations.
+The `CreateBlockedDate` handler sends cancellation emails in a goroutine (lines 134-138) but uses an anonymous function with its own error logging. However, if the goroutine panics or fails to start, there's no recovery mechanism, potentially leaving users unnotified of cancellations.
 
 **Location:**
 - File: `internal/handlers/blocked_date_handler.go`
@@ -1024,17 +981,17 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
 
         // Send cancellation email (in goroutine, don't block)
         if h.emailService != nil && user.Email != nil {
-            go func(userEmail, userName, dogName, date, walkType, reason string) {
+            go func(userEmail, userName, dogName, date, scheduledTime, reason string) {
 +               defer func() {
 +                   if r := recover(); r != nil {
 +                       log.Printf("ERROR: Email goroutine panic: %v", r)
 +                   }
 +               }()
 +
-                if err := h.emailService.SendAdminCancellation(userEmail, userName, dogName, date, walkType, reason); err != nil {
+                if err := h.emailService.SendAdminCancellation(userEmail, userName, dogName, date, scheduledTime, reason); err != nil {
                     fmt.Printf("Warning: Failed to send cancellation email to %s: %v\n", userEmail, err)
                 }
-            }(*user.Email, user.Name, dog.Name, booking.Date, booking.WalkType, cancellationReason)
+            }(*user.Email, user.Name, dog.Name, booking.Date, booking.ScheduledTime, cancellationReason)
         }
     }
 
@@ -1051,7 +1008,7 @@ Apply similar fix to all email-sending goroutines in other handlers.
 - **Critical:** 3 bugs (SQL injection potential, information disclosure, authorization bypass)
 - **High:** 5 bugs (race conditions, missing transactions, insufficient validation, goroutine leaks, path traversal)
 - **Medium:** 5 bugs (missing validation, error handling gaps, approval status checks, cleanup issues)
-- **Low:** 2 bugs (timezone edge cases, missing panic recovery)
+- **Low:** 2 bugs (timezone edge cases - FIXED, missing panic recovery)
 
 ---
 

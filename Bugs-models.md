@@ -4,6 +4,8 @@
 **Directory Analyzed:** `internal/models`
 **Files Analyzed:** 17 files
 **Bugs Found:** 13 bugs
+**Verification Date:** 2025-12-01
+**Verification Status:** All 13 bugs verified as still present in codebase
 
 ---
 
@@ -31,6 +33,8 @@ The `internal/models` directory contains critical validation logic for all data 
 
 ## Bug #1: Missing Email Format Validation in RegisterRequest
 
+**Status:** ✅ VERIFIED - Code unchanged, bug still present
+
 **Description:**
 The `RegisterRequest.Validate()` method only checks if email is non-empty but does not validate the email format. This allows invalid email addresses like "notanemail", "user@", "@domain.com", "user @domain.com" to pass validation. This can cause:
 - Failed email deliveries (verification emails won't arrive)
@@ -42,6 +46,13 @@ The `RegisterRequest.Validate()` method only checks if email is non-empty but do
 - File: `internal/models/user.go`
 - Function: `RegisterRequest.Validate()`
 - Lines: 110-133
+
+**Verified Code (Lines 114-116):**
+```go
+if strings.TrimSpace(r.Email) == "" {
+    return errors.New("E-Mail ist erforderlich")
+}
+```
 
 **Steps to Reproduce:**
 1. Create a RegisterRequest with email = "notanemail" (no @ sign)
@@ -83,6 +94,8 @@ Add email format validation using a regex pattern:
 
 ## Bug #2: Missing Email Validation in UpdateProfileRequest
 
+**Status:** ✅ VERIFIED - Code unchanged, bug still present
+
 **Description:**
 The `UpdateProfileRequest.Validate()` method checks if the email is non-empty when provided, but doesn't validate the email format. This allows users to change their email to an invalid address, causing the same issues as Bug #1.
 
@@ -90,6 +103,13 @@ The `UpdateProfileRequest.Validate()` method checks if the email is non-empty wh
 - File: `internal/models/user.go`
 - Function: `UpdateProfileRequest.Validate()`
 - Lines: 136-149
+
+**Verified Code (Lines 140-142):**
+```go
+if u.Email != nil && strings.TrimSpace(*u.Email) == "" {
+    return errors.New("E-Mail darf nicht leer sein")
+}
+```
 
 **Steps to Reproduce:**
 1. Create an UpdateProfileRequest with Email = pointer to "invalid@"
@@ -118,6 +138,8 @@ Use the same email validation function:
 
 ## Bug #3: Phone Regex Accepts Invalid Patterns
 
+**Status:** ✅ VERIFIED - Code unchanged, bug still present
+
 **Description:**
 The phone validation regex `^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}$` is overly permissive and accepts invalid patterns such as:
 - "1" (single digit)
@@ -132,6 +154,11 @@ These are clearly not valid phone numbers but pass validation.
 - File: `internal/models/user.go`
 - Function: `ValidatePhone()`
 - Lines: 95-107
+
+**Verified Code (Line 95):**
+```go
+var phoneRegex = regexp.MustCompile(`^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}$`)
+```
 
 **Steps to Reproduce:**
 1. Call `ValidatePhone("1")`
@@ -170,6 +197,8 @@ Use a stricter regex that enforces minimum length and proper format:
 
 ## Bug #4: No Validation Methods for Dog Models
 
+**Status:** ✅ VERIFIED - Code unchanged, bug still present
+
 **Description:**
 The `CreateDogRequest` and `UpdateDogRequest` structs have no `Validate()` methods. Validation is performed manually in the handler (`internal/handlers/dog_handler.go` lines 154-173), but the `UpdateDogRequest` has NO validation at all. This means:
 - Invalid enum values for Size and Category can bypass validation in updates
@@ -182,7 +211,9 @@ This violates the single responsibility principle and creates inconsistent valid
 **Location:**
 - File: `internal/models/dog.go`
 - Structs: `CreateDogRequest`, `UpdateDogRequest`
-- Lines: 32-61
+- Lines: 33-65
+
+**Verified:** No `Validate()` methods exist in the file after line 83
 
 **Steps to Reproduce:**
 1. Create an UpdateDogRequest with Category = "invalid"
@@ -263,6 +294,8 @@ Add Validate() methods to both request types:
 
 ## Bug #5: Missing Age Validation for Dogs
 
+**Status:** ✅ VERIFIED - Code unchanged, bug still present
+
 **Description:**
 Even when validation is added to Dog models (Bug #4), the current handler code (lines 175-190 in dog_handler.go) does not validate age. The `CreateDogRequest` accepts `Age int` with no constraints, allowing:
 - Negative ages (Age = -5)
@@ -274,7 +307,9 @@ This causes data integrity issues and display problems in the UI.
 **Location:**
 - File: `internal/models/dog.go`
 - Struct: `CreateDogRequest`
-- Field: `Age` (line 36)
+- Field: `Age` (line 38)
+
+**Verified:** Field is `Age int` with no validation constraints
 
 **Steps to Reproduce:**
 1. Create a CreateDogRequest with Age = -5
@@ -294,6 +329,8 @@ if r.Age < 0 || r.Age > 30 {
 
 ## Bug #6: Settings Validation Accepts Whitespace-Only Values
 
+**Status:** ✅ VERIFIED - Code unchanged, bug still present
+
 **Description:**
 The `UpdateSettingRequest.Validate()` method checks `if r.Value == ""` but doesn't trim whitespace. This allows settings to be updated with whitespace-only values like "   " or "\t\t", which are effectively empty but pass validation. This is confirmed by the test in `settings_test.go` line 52 which documents this as current behavior.
 
@@ -303,6 +340,24 @@ System settings like `booking_advance_days`, `cancellation_notice_hours`, and `a
 - File: `internal/models/settings.go`
 - Function: `UpdateSettingRequest.Validate()`
 - Lines: 18-24
+
+**Verified Code (Line 19):**
+```go
+if r.Value == "" {
+    return &ValidationError{Field: "value", Message: "Value is required"}
+}
+```
+
+**Verified Test (settings_test.go, line 48-53):**
+```go
+{
+    name: "Whitespace only value",
+    req: UpdateSettingRequest{
+        Value: "   ",
+    },
+    wantErr: false, // Current implementation only checks for empty string, not whitespace
+},
+```
 
 **Steps to Reproduce:**
 1. Create UpdateSettingRequest with Value = "   " (3 spaces)
@@ -342,6 +397,8 @@ Update the test to expect this behavior:
 
 ## Bug #7: BookingTimeRule End Time Comparison Bug
 
+**Status:** ✅ VERIFIED - Code unchanged, bug still present
+
 **Description:**
 The `BookingTimeRule.Validate()` method uses string comparison `r.EndTime <= r.StartTime` (line 37) to validate that end time is after start time. This works for most cases but fails for times that cross lexicographic boundaries.
 
@@ -358,6 +415,13 @@ More critically, the error message says "end_time must be after start_time" but 
 - File: `internal/models/booking_time_rule.go`
 - Function: `BookingTimeRule.Validate()`
 - Lines: 36-39
+
+**Verified Code (Lines 37-39):**
+```go
+if r.EndTime <= r.StartTime {
+    return fmt.Errorf("end_time must be after start_time")
+}
+```
 
 **Steps to Reproduce:**
 1. Create BookingTimeRule with StartTime = "10:00", EndTime = "10:00"
@@ -405,6 +469,8 @@ Parse times and compare semantically:
 
 ## Bug #8: Missing Validation for CustomHoliday Source Field
 
+**Status:** ✅ VERIFIED - Code unchanged, bug still present
+
 **Description:**
 The `CustomHoliday.Validate()` method checks that Source is either "api" or "admin" (line 33), but the validation is case-sensitive. If someone passes "API" or "Admin" (capitalized), validation will fail. This is inconsistent with how other enum validations work and could cause integration issues if the holiday API returns differently-cased values.
 
@@ -414,6 +480,13 @@ More critically, there's no validation that prevents both values from being inva
 - File: `internal/models/custom_holiday.go`
 - Function: `CustomHoliday.Validate()`
 - Lines: 18-38
+
+**Verified Code (Lines 33-35):**
+```go
+if h.Source != "api" && h.Source != "admin" {
+    return fmt.Errorf("source must be 'api' or 'admin'")
+}
+```
 
 **Steps to Reproduce:**
 1. Create CustomHoliday with Source = "API" (uppercase)
@@ -458,6 +531,8 @@ Make source validation case-insensitive and check it early:
 
 ## Bug #9: Password Strength Validation is Too Weak
 
+**Status:** ✅ VERIFIED - Code unchanged, bug still present
+
 **Description:**
 The `RegisterRequest.Validate()` method only checks that password is at least 8 characters (line 123-125). This is insufficient for a production system handling sensitive user data. Weak passwords are easily cracked and pose a security risk.
 
@@ -473,9 +548,19 @@ Missing checks:
 - Function: `RegisterRequest.Validate()`
 - Lines: 120-128
 
+**Verified Code (Lines 120-125):**
+```go
+if r.Password == "" {
+    return errors.New("Passwort ist erforderlich")
+}
+if len(r.Password) < 8 {
+    return errors.New("Passwort muss mindestens 8 Zeichen lang sein")
+}
+```
+
 **Steps to Reproduce:**
 1. Create RegisterRequest with Password = "aaaaaaaa" (8 'a's)
-2. Call Validate()
+2. Call `Validate()`
 3. Expected: Validation error (password too weak)
 4. Actual: Validation passes
 
@@ -533,6 +618,8 @@ Implement proper password strength validation:
 
 ## Bug #10: ResetPasswordRequest Missing Password Validation
 
+**Status:** ✅ VERIFIED - Code unchanged, bug still present
+
 **Description:**
 The `ResetPasswordRequest` struct (lines 74-78 in user.go) has no `Validate()` method. This means password reset can set weak passwords that bypass the registration validation. Users could reset their password to "12345678" even though registration would reject it.
 
@@ -542,6 +629,8 @@ This is a security vulnerability and creates inconsistent password policies.
 - File: `internal/models/user.go`
 - Struct: `ResetPasswordRequest`
 - Lines: 74-78
+
+**Verified:** No `Validate()` method exists for this struct
 
 **Steps to Reproduce:**
 1. Create ResetPasswordRequest with Password = "12345678" (weak)
@@ -575,6 +664,8 @@ Add Validate() method with same password strength checks:
 
 ## Bug #11: ChangePasswordRequest Missing Password Validation
 
+**Status:** ✅ VERIFIED - Code unchanged, bug still present
+
 **Description:**
 Similar to Bug #10, the `ChangePasswordRequest` struct (lines 81-85) has no `Validate()` method. Users can change their password to weak passwords, bypassing security requirements.
 
@@ -582,6 +673,8 @@ Similar to Bug #10, the `ChangePasswordRequest` struct (lines 81-85) has no `Val
 - File: `internal/models/user.go`
 - Struct: `ChangePasswordRequest`
 - Lines: 81-85
+
+**Verified:** No `Validate()` method exists for this struct
 
 **Steps to Reproduce:**
 1. Create ChangePasswordRequest with NewPassword = "password" (weak)
@@ -617,6 +710,8 @@ Add Validate() method:
 
 ## Bug #12: Missing Validation for ForgotPasswordRequest
 
+**Status:** ✅ VERIFIED - Code unchanged, bug still present
+
 **Description:**
 The `ForgotPasswordRequest` struct (lines 69-71) has no `Validate()` method. While the impact is lower (it just sends an email), this allows invalid emails to pass through, wasting resources attempting to send emails to malformed addresses.
 
@@ -624,6 +719,8 @@ The `ForgotPasswordRequest` struct (lines 69-71) has no `Validate()` method. Whi
 - File: `internal/models/user.go`
 - Struct: `ForgotPasswordRequest`
 - Lines: 69-71
+
+**Verified:** No `Validate()` method exists for this struct
 
 **Steps to Reproduce:**
 1. Create ForgotPasswordRequest with Email = "notanemail"
@@ -644,6 +741,8 @@ Add Validate() method:
 
 ## Bug #13: Missing Validation for LoginRequest
 
+**Status:** ✅ VERIFIED - Code unchanged, bug still present
+
 **Description:**
 The `LoginRequest` struct (lines 51-54) has no `Validate()` method. While the handler likely checks for empty fields, having validation at the model level ensures consistency and prevents future bugs if handlers are modified.
 
@@ -653,6 +752,8 @@ Additionally, login attempts with malformed emails could be used for timing atta
 - File: `internal/models/user.go`
 - Struct: `LoginRequest`
 - Lines: 51-54
+
+**Verified:** No `Validate()` method exists for this struct
 
 **Steps to Reproduce:**
 1. Create LoginRequest with Email = "" or Password = ""

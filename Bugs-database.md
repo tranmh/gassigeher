@@ -31,6 +31,8 @@ The `internal/database` directory contains the multi-database support system (SQ
 
 **Severity:** CRITICAL
 
+**STATUS: VERIFIED - Code unchanged at lines 115**
+
 **Description:**
 The `seed.go` file uses `math/rand` with `rand.Seed(time.Now().UnixNano())` for generating passwords. This is cryptographically insecure and produces predictable passwords. An attacker who knows the approximate server start time can predict the generated Super Admin password, leading to complete system compromise.
 
@@ -125,6 +127,8 @@ func generateSecurePassword(length int) string {
 
 **Severity:** HIGH
 
+**STATUS: VERIFIED - Duplicate constants still present at lines 215-354**
+
 **Description:**
 The `database.go` file contains hardcoded SQL table definitions (lines 215-354) that duplicate the migration files (`001_*.go`, `002_*.go`, etc.). These are never executed because `RunMigrations()` now delegates to `RunMigrationsWithDialect()`. This creates confusion and a maintenance hazard where schema changes might be made to the wrong location.
 
@@ -184,6 +188,8 @@ func RunMigrations(db *sql.DB) error {
 ## Bug #3: Missing Index on bookings.user_id in SQLite and PostgreSQL
 
 **Severity:** HIGH
+
+**STATUS: VERIFIED - Indexes missing from migration 003, present only in migration 012 for SQLite**
 
 **Description:**
 Migration `012_booking_times.go` adds indexes on `bookings(user_id)` and `bookings(dog_id)` for SQLite after recreating the table (lines 80-82), but these indexes are missing from the original `003_create_bookings_table.go` for all databases. MySQL and PostgreSQL in migration 012 don't add these indexes. This causes inconsistent query performance across databases when filtering bookings by user or dog.
@@ -257,6 +263,8 @@ CREATE TABLE IF NOT EXISTS bookings (
 
 **Severity:** HIGH
 
+**STATUS: VERIFIED - Foreign keys lack ON DELETE actions at reported locations**
+
 **Description:**
 In `004_create_blocked_dates_table.go` and several other tables, foreign keys reference `users(id)` without specifying `ON DELETE` action. When a user (admin) who created blocked dates is deleted, the foreign key constraint will prevent deletion or cause unexpected behavior depending on database default behavior (which varies between SQLite, MySQL, PostgreSQL).
 
@@ -265,6 +273,8 @@ In `004_create_blocked_dates_table.go` and several other tables, foreign keys re
 - Lines: 15, 25, 35 (all databases)
 - File: `internal/database/005_create_experience_requests_table.go`
 - Lines: 19 (reviewed_by foreign key lacks ON DELETE SET NULL)
+- File: `internal/database/007_create_reactivation_requests_table.go`
+- Lines: 18, 33, 48 (reviewed_by foreign key lacks ON DELETE SET NULL)
 
 **Steps to Reproduce:**
 1. Create blocked date as admin user (user_id = 5)
@@ -310,6 +320,8 @@ Similarly for `005_create_experience_requests_table.go` line 19 and `007_create_
 
 **Severity:** CRITICAL (if used incorrectly)
 
+**STATUS: VERIFIED - Code unchanged at lines 80-84**
+
 **Description:**
 The `PostgreSQLDialect.GetPlaceholder()` returns `"?"` instead of `"$1"`, `"$2"`, etc., relying on the `lib/pq` driver to convert automatically. However, this only works when using `database/sql` package. If code directly constructs SQL strings using `GetPlaceholder(position)`, the SQL will be invalid for PostgreSQL. The comment admits this workaround (lines 80-84) but it's a design flaw that breaks the abstraction.
 
@@ -354,6 +366,8 @@ Then update all repository code to properly use positional placeholders, OR add 
 ## Bug #6: Migration 010 Creates Partial Unique Index but MySQL Cannot Enforce Uniqueness
 
 **Severity:** MEDIUM
+
+**STATUS: VERIFIED - Code unchanged, MySQL lacks IF NOT EXISTS at lines 26-27**
 
 **Description:**
 Migration `010_add_admin_flags.go` attempts to ensure only one super admin exists using a partial unique index on `is_super_admin`. SQLite and PostgreSQL support `WHERE is_super_admin = 1/TRUE` (lines 18, 42), but MySQL doesn't support partial indexes. The comment on line 29 admits this, saying "enforced in application logic" - but there's no such enforcement in the codebase. Multiple super admins can be created on MySQL.
@@ -413,6 +427,8 @@ Add similar check in admin handlers before allowing super admin promotion.
 
 **Severity:** MEDIUM
 
+**STATUS: VERIFIED - Code unchanged at lines 98-100**
+
 **Description:**
 In `database.go`, `configureConnectionPool()` is skipped for SQLite (line 98-100), which is correct. However, if someone later adds `SetMaxOpenConns()` calls for SQLite, it can cause database locking issues. SQLite performs best with `SetMaxOpenConns(1)` for write-heavy workloads, but the code doesn't explicitly set this - it relies on Go's default.
 
@@ -457,6 +473,8 @@ Explicitly configure SQLite connection settings:
 ## Bug #8: Missing Error Handling in Migration Retry Logic
 
 **Severity:** MEDIUM
+
+**STATUS: VERIFIED - Code unchanged at lines 74-83**
 
 **Description:**
 In `migrations.go` lines 74-83, when a migration fails with "already exists" error, the code catches it and marks the migration as applied. However, if `markMigrationAsApplied()` fails (line 78-80), the error is returned but the migration execution continues with the next migration. This can lead to inconsistent migration state where a migration is partially applied but not recorded.
@@ -505,30 +523,30 @@ if isAlreadyExistsError(err, dialect) {
 
 **Severity:** MEDIUM
 
-**Description:**
-The `seed.go` file's `generateBookings()` function (lines 226-231) inserts bookings with only legacy fields, not the new approval workflow fields added in migration 012. For bookings that require approval (morning walks), these fields should be populated. The seed data creates bookings with `requires_approval = 0` by default, which is inconsistent with the system settings.
+**STATUS: CODE MODIFIED - NEEDS REVERIFICATION**
+
+The seed data generation has been modified. The booking structure at lines 212-222 no longer includes a `Type` field, and the INSERT statement at lines 226-232 does not include `walk_type` or any approval-related columns. This is different from what was reported.
+
+**Original Issue:**
+The `seed.go` file's `generateBookings()` function (lines 226-231) inserts bookings with only legacy fields, not the new approval workflow fields added in migration 012.
+
+**Current Code Status:**
+- Lines 212-222: Booking struct defines UserID, DogID, Date, Time, Status (no Type/walk_type field)
+- Lines 226-232: INSERT statement does NOT include walk_type or approval fields
+- Migration 012 added: requires_approval, approval_status, approved_by, approved_at, rejection_reason
+
+**Impact:**
+- Seed bookings will fail INSERT due to missing NOT NULL column `walk_type`
+- Seed data cannot be generated successfully after migration 012
+- Test environment setup is broken
 
 **Location:**
 - File: `internal/database/seed.go`
 - Function: `generateBookings`
-- Lines: 226-231
+- Lines: 212-232
 
-**Steps to Reproduce:**
-1. Fresh database installation
-2. Seed data runs, creates 3 bookings
-3. Query: `SELECT * FROM bookings WHERE walk_type = 'morning'`
-4. Observe: `requires_approval = 0`, `approval_status = 'approved'`
-5. Check system settings: `morning_walk_requires_approval = 'true'`
-6. Inconsistency: Morning booking exists without approval flag set
-
-**Impact:**
-- Inconsistent seed data state
-- Test bookings bypass approval workflow
-- May cause confusion during testing
-- Doesn't accurately represent production data
-
-**Fix:**
-Update seed data to include approval fields:
+**Recommended Fix:**
+Update seed data to include all required fields from migration 012:
 
 ```diff
 func generateBookings(db *sql.DB) error {
@@ -542,13 +560,13 @@ func generateBookings(db *sql.DB) error {
 		Date   time.Time
 		Time   string
 		Status string
-		Type   string
++		WalkType string
 +		RequiresApproval int
 +		ApprovalStatus   string
 	}{
--		{2, 1, yesterday, "09:00", "completed", "morning"},
--		{3, 2, today, "14:00", "scheduled", "evening"},
--		{4, 3, tomorrow, "10:30", "scheduled", "morning"},
+-		{2, 1, yesterday, "09:00", "completed"},
+-		{3, 2, today, "14:00", "scheduled"},
+-		{4, 3, tomorrow, "10:30", "scheduled"},
 +		{2, 1, yesterday, "09:00", "completed", "morning", 1, "approved"},
 +		{3, 2, today, "14:00", "scheduled", "evening", 0, "approved"},
 +		{4, 3, tomorrow, "10:30", "scheduled", "morning", 1, "pending"},
@@ -558,16 +576,16 @@ func generateBookings(db *sql.DB) error {
 	for _, booking := range bookings {
 		_, err := db.Exec(`
 -			INSERT INTO bookings (user_id, dog_id, date, scheduled_time,
--				walk_type, status, created_at, updated_at)
--			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+-				status, created_at, updated_at)
+-			VALUES (?, ?, ?, ?, ?, ?, ?)
 +			INSERT INTO bookings (user_id, dog_id, date, scheduled_time,
 +				walk_type, status, requires_approval, approval_status,
 +				created_at, updated_at)
 +			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`, booking.UserID, booking.DogID,
 			booking.Date.Format("2006-01-02"), booking.Time,
--			booking.Type, booking.Status, now, now)
-+			booking.Type, booking.Status, booking.RequiresApproval,
+-			booking.Status, now, now)
++			booking.WalkType, booking.Status, booking.RequiresApproval,
 +			booking.ApprovalStatus, now, now)
 		if err != nil {
 			return fmt.Errorf("failed to create booking: %w", err)
@@ -580,6 +598,8 @@ func generateBookings(db *sql.DB) error {
 ## Bug #10: MySQL Insert Syntax Error in Migration 010
 
 **Severity:** MEDIUM
+
+**STATUS: VERIFIED - MySQL version lacks IF NOT EXISTS at lines 26-27**
 
 **Description:**
 In migration `010_add_admin_flags.go` line 26, MySQL version uses `CREATE INDEX` without `IF NOT EXISTS`, but in migration `012_booking_times.go` line 153, it correctly uses `CREATE INDEX IF NOT EXISTS`. Inconsistent syntax may cause migration 010 to fail on re-run if indexes already exist.
@@ -630,6 +650,8 @@ ALTER TABLE users ADD COLUMN is_super_admin TINYINT(1) DEFAULT 0;
 
 **Severity:** LOW
 
+**STATUS: VERIFIED - Column order differs between migrations**
+
 **Description:**
 In migration `003_create_bookings_table.go`, the column order differs between databases:
 - SQLite: `date, walk_type, scheduled_time` (lines 13-15)
@@ -637,13 +659,13 @@ In migration `003_create_bookings_table.go`, the column order differs between da
 - PostgreSQL: `date, walk_type, scheduled_time` (lines 51-53)
 
 But in migration `012_booking_times.go`, SQLite recreates the table with:
-- SQLite: `date, scheduled_time, walk_type` (lines 52-54)
+- SQLite: `date, scheduled_time, walk_type` (lines 51-53)
 
 This column order change is cosmetic but creates confusion and makes schema comparison difficult. Column order shouldn't change between migrations.
 
 **Location:**
 - File: `internal/database/003_create_bookings_table.go` (all databases)
-- File: `internal/database/012_booking_times.go` (SQLite lines 52-54)
+- File: `internal/database/012_booking_times.go` (SQLite lines 51-53)
 
 **Steps to Reproduce:**
 1. Compare schema of bookings table across migrations

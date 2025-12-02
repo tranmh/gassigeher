@@ -34,6 +34,8 @@ The services directory contains critical business logic for authentication, emai
 
 ## Bug #1: JWT Secret Weakness - Production Deployment with Default Secret
 
+**STATUS: CODE UNCHANGED - BUG STILL PRESENT**
+
 **Severity:** CRITICAL
 
 **Description:**
@@ -84,6 +86,8 @@ Additionally, add startup validation in main.go to fail fast with helpful error 
 
 ## Bug #2: Race Condition in Email Template Execution
 
+**STATUS: CODE UNCHANGED - BUG STILL PRESENT**
+
 **Severity:** CRITICAL
 
 **Description:**
@@ -92,7 +96,7 @@ Email templates are executed using `template.Must(template.New("name").Parse(tmp
 **Location:**
 - File: `internal/services/email_service.go`
 - Function: All `Send*` functions
-- Lines: 74-840 (multiple instances)
+- Lines: 117, 193, 252, 318, 385, 458, 526, 614, 685, 758, 842, 918 (multiple instances)
 
 **Steps to Reproduce:**
 1. Trigger 10 concurrent booking confirmations via API (e.g., stress test with 10 users)
@@ -159,6 +163,8 @@ This eliminates the race condition by parsing templates once and protecting conc
 
 ## Bug #3: HTML Template Injection in User-Provided Data
 
+**STATUS: CODE UNCHANGED - BUG STILL PRESENT**
+
 **Severity:** HIGH
 
 **Description:**
@@ -167,7 +173,7 @@ User-provided data (name, dogName, reason, message) is directly inserted into HT
 **Location:**
 - File: `internal/services/email_service.go`
 - Functions: `SendBookingConfirmation`, `SendAdminCancellation`, `SendExperienceLevelApproved`, etc.
-- Lines: 266-840 (multiple functions)
+- Lines: 266-936 (multiple functions)
 
 **Steps to Reproduce:**
 1. User registers with name: `<script>alert('XSS')</script>`
@@ -211,6 +217,8 @@ Apply this sanitization to ALL user-provided data before inserting into template
 ---
 
 ## Bug #4: Missing JWT Expiration Validation on Generation
+
+**STATUS: CODE UNCHANGED - BUG STILL PRESENT**
 
 **Severity:** HIGH
 
@@ -268,6 +276,8 @@ func (s *AuthService) GenerateJWT(userID int, email string, isAdmin bool, isSupe
 
 ## Bug #5: Timing Attack Vulnerability in CheckPassword
 
+**STATUS: CODE UNCHANGED - BUG STILL PRESENT**
+
 **Severity:** HIGH
 
 **Description:**
@@ -308,6 +318,8 @@ This ensures all password checks take approximately the same time, preventing us
 ---
 
 ## Bug #6: Weak Password Validation - No Special Character Requirement
+
+**STATUS: CODE UNCHANGED - BUG STILL PRESENT**
 
 **Severity:** MEDIUM
 
@@ -389,6 +401,8 @@ func (s *AuthService) ValidatePassword(password string) error {
 ---
 
 ## Bug #7: Email Provider Initialization Without Connection Validation
+
+**STATUS: CODE UNCHANGED - BUG STILL PRESENT**
 
 **Severity:** HIGH
 
@@ -498,6 +512,8 @@ Apply similar test for Gmail provider by attempting to fetch user profile or sen
 
 ## Bug #8: Holiday API Call Without Timeout Configuration
 
+**STATUS: CODE UNCHANGED - BUG STILL PRESENT**
+
 **Severity:** MEDIUM
 
 **Description:**
@@ -558,6 +574,8 @@ func (s *HolidayService) FetchAndCacheHolidays(year int) error {
 
 ## Bug #9: Missing Error Handling for Goroutine Email Sends
 
+**STATUS: CODE UNCHANGED - BUG STILL PRESENT**
+
 **Severity:** MEDIUM
 
 **Description:**
@@ -608,6 +626,8 @@ func (eq *EmailQueue) QueueEmail(job EmailJob) {
 ---
 
 ## Bug #10: Base64 Encoding Implementation Bug
+
+**STATUS: CODE UNCHANGED - BUG STILL PRESENT**
 
 **Severity:** LOW
 
@@ -665,6 +685,8 @@ This eliminates potential encoding bugs and follows best practices of using vett
 ---
 
 ## Bug #11: Booking Time Validation Logic Error
+
+**STATUS: CODE UNCHANGED - BUG STILL PRESENT**
 
 **Severity:** MEDIUM
 
@@ -752,6 +774,8 @@ Document clearly in the UI and admin guide whether time windows are inclusive or
 
 ## Bug #12: Image Service Race Condition on Concurrent Photo Uploads
 
+**STATUS: CODE UNCHANGED - BUG STILL PRESENT**
+
 **Severity:** MEDIUM
 
 **Description:**
@@ -799,6 +823,8 @@ This ensures only one photo upload can process per dog at a time, preventing fil
 ---
 
 ## Bug #13: Super Admin Password File Race Condition
+
+**STATUS: CODE UNCHANGED - BUG STILL PRESENT**
 
 **Severity:** LOW
 
@@ -881,6 +907,8 @@ This uses file locking and atomic writes to prevent corruption in multi-instance
 ---
 
 ## Bug #14: Quoted-Printable Encoding Bug with CRLF
+
+**STATUS: CODE UNCHANGED - BUG STILL PRESENT**
 
 **Severity:** LOW
 
@@ -973,7 +1001,7 @@ This properly handles both Unix (\n) and Windows (\r\n) line endings.
 - **Critical:** 3 bugs (JWT secret weakness, race condition in email templates, template injection)
 - **High:** 4 bugs (JWT expiration validation, timing attack, password validation, email provider initialization)
 - **Medium:** 6 bugs (holiday API timeout, goroutine error handling, booking time logic, image upload race, time validation)
-- **Low:** 1 bug (base64 encoding, super admin file race, quoted-printable encoding)
+- **Low:** 3 bugs (base64 encoding, super admin file race, quoted-printable encoding)
 
 ---
 
