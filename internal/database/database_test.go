@@ -10,7 +10,7 @@ import (
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // Test 9.1.1: Fresh Database Migration
@@ -107,7 +107,7 @@ func TestExistingDatabaseMigration(t *testing.T) {
 	defer os.Remove(tmpFile)
 
 	// Open database
-	db, err := sql.Open("sqlite3", tmpFile)
+	db, err := sql.Open("sqlite", tmpFile)
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}

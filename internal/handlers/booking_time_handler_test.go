@@ -17,7 +17,7 @@ import (
 
 func setupBookingTimeHandlerTest(t *testing.T) (*sql.DB, *BookingTimeHandler, func()) {
 	// Create in-memory test database
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}

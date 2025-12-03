@@ -8,7 +8,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 	"github.com/tranmh/gassigeher/internal/database"
 )
 
@@ -30,8 +30,7 @@ func SetupTestDBWithType(t *testing.T, dbType string) *sql.DB {
 	switch dbType {
 	case "sqlite", "":
 		// Use in-memory SQLite for fast testing
-		// Each connection gets its own isolated in-memory database
-		db, err = sql.Open("sqlite3", "file::memory:?mode=memory")
+		db, err = sql.Open("sqlite", ":memory:")
 		if err != nil {
 			t.Fatalf("Failed to open SQLite test database: %v", err)
 		}

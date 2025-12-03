@@ -23,10 +23,10 @@ module.exports = defineConfig({
 
   use: {
     // Base URL for all tests
-    baseURL: 'http://localhost:8080',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:8080',
 
     // Browser options
-    headless: false,  // See browser during local dev
+    headless: process.env.CI ? true : false,  // See browser during local dev
     viewport: { width: 1920, height: 1080 },
 
     // Screenshots and videos
@@ -70,7 +70,8 @@ module.exports = defineConfig({
   // DATABASE_PATH=./e2e-tests/test.db
   // PORT=8080
   // JWT_SECRET=test-jwt-secret-for-e2e-only-do-not-use-in-production
-  // SUPER_ADMIN_EMAIL=admin@test.com
+  // SUPER_ADMIN_EMAIL=admin@tierheim-goeppingen.de
+  // SKIP_SEED=true (required! global-setup.js manages test data)
   // Run: ./gassigeher.exe in separate terminal
 
   // webServer disabled for local testing - start server manually
@@ -95,8 +96,8 @@ module.exports = defineConfig({
   // Global setup/teardown - DISABLED FOR NOW
   // Run tests against existing server with existing database
   // Start server manually: go run cmd/server/main.go OR ./gassigeher.exe
-  // globalSetup: require.resolve('./global-setup.js'),
-  // globalTeardown: require.resolve('./global-teardown.js'),
+  globalSetup: require.resolve('./global-setup.js'),
+  globalTeardown: require.resolve('./global-teardown.js'),
 });
 
 // DONE: Playwright configuration created with desktop + mobile projects

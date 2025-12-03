@@ -312,7 +312,7 @@ func TestDialectFactory_Integration(t *testing.T) {
 // TestConfigureConnectionPool tests connection pool configuration
 func TestConfigureConnectionPool(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test_pool.db")
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	require.NoError(t, err)
 	defer db.Close()
 

@@ -1,0 +1,59 @@
+name: cd
+
+on:
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
+    branches: [master]
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create data directory
+        run: New-Item -ItemType Directory -Force -Path data
+      - name: Create uploads directory
+        run: New-Item -ItemType Directory -Force -Path uploads
+      - name: Backup database
+        run: Copy-Item -Path "./data/gassigeher.db" -Destination "./data/gassigeher.db.backup" -ErrorAction SilentlyContinue
+        continue-on-error: true
+      - name: Tag current image as previous
+        run: podman tag gassigeher:latest gassigeher:previous
+        continue-on-error: true
+      - name: Build image
+        run: podman build -t gassigeher:latest .
+      - name: Remove old container
+        run: podman rm -f gassigeher
+        continue-on-error: true
+      - name: Run new container
+        run: podman run -d --name gassigeher -p 8888:8888 -v ./data:/app/data:Z -v ./uploads:/app/uploads:Z -e DATABASE_PATH=/app/data/gassigeher.db -e JWT_SECRET=${{ secrets.JWT_SECRET }} -e SUPER_ADMIN_EMAIL=${{ secrets.SUPER_ADMIN_EMAIL }} -e BASE_URL=${{ secrets.BASE_URL }} gassigeher:latest
+      - name: Verify container running
+        id: verify
+        run: |
+          Start-Sleep -Seconds 5
+          $response = Invoke-WebRequest -Uri "http://localhost:8888/api/health" -UseBasicParsing
+          if ($response.StatusCode -ne 200) { exit 1 }
+      - name: Node.js Setup
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: |
+          npm ci
+          npx playwright install chromium --with-deps
+        working-directory: e2e-tests
+      - name: Run playwright
+        run: npm test
+        working-directory: e2e-tests
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:8888
+      - name: Rollback
+        if: failure()
+        run: |
+          podman rm -f gassigeher
+          Copy-Item -Path "./data/gassigeher.db.backup" -Destination "./data/gassigeher.db" -ErrorAction SilentlyContinue
+          podman run -d --name gassigeher -p 8888:8888 -v ./data:/app/data:Z -v ./uploads:/app/uploads:Z -e DATABASE_PATH=/app/data/gassigeher.db -e JWT_SECRET=${{ secrets.JWT_SECRET }} -e SUPER_ADMIN_EMAIL=${{ secrets.SUPER_ADMIN_EMAIL }} -e BASE_URL=${{ secrets.BASE_URL }} gassigeher:previous
+

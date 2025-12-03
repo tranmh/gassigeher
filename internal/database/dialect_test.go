@@ -45,7 +45,7 @@ func TestSQLiteDialect(t *testing.T) {
 	})
 
 	t.Run("DriverName", func(t *testing.T) {
-		assert.Equal(t, "sqlite3", dialect.GetDriverName())
+		assert.Equal(t, "sqlite", dialect.GetDriverName())
 	})
 
 	t.Run("AutoIncrement", func(t *testing.T) {

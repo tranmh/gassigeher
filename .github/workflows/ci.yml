@@ -1,0 +1,116 @@
+name: ci
+
+on: push
+
+jobs:
+  test-chromium-desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with: 
+          go-version: 1.24
+      - name: Run tests
+        run: go test ./...
+      - name: Node.js Setup
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install build dependencies
+        run: sudo apt-get install -y build-essential python3
+      - name: Install dependencies
+        run: npm ci
+        working-directory: e2e-tests
+      - name: Install browser
+        run: npx playwright install chromium --with-deps
+        working-directory: e2e-tests
+      - name: Start Go-server
+        run: |
+          go build -o gassigeher ./cmd/server
+          DATABASE_PATH=./e2e-tests/test.db JWT_SECRET=test SUPER_ADMIN_EMAIL=admin@tierheim-goeppingen.de PORT=8080 SKIP_SEED=true ./gassigeher &
+      - name: Wait for server
+        run: |
+          for i in {1..30}; do
+            curl -s http://localhost:8080/api/health && break
+            sleep 2
+          done
+          curl -sf http://localhost:8080/api/health
+      - name: Run playwright
+        run: npm test -- --project=chromium-desktop
+        working-directory: e2e-tests
+  test-mobile-iphone:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with: 
+          go-version: 1.24
+      - name: Run tests
+        run: go test ./...
+      - name: Node.js Setup
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install build dependencies
+        run: sudo apt-get install -y build-essential python3
+      - name: Install dependencies
+        run: npm ci
+        working-directory: e2e-tests
+      - name: Install browser
+        run: npx playwright install webkit --with-deps
+        working-directory: e2e-tests
+      - name: Start Go-server
+        run: |
+          go build -o gassigeher ./cmd/server
+          DATABASE_PATH=./e2e-tests/test.db JWT_SECRET=test SUPER_ADMIN_EMAIL=admin@tierheim-goeppingen.de PORT=8080 SKIP_SEED=true ./gassigeher &
+      - name: Wait for server
+        run: |
+          for i in {1..30}; do
+            curl -s http://localhost:8080/api/health && break
+            sleep 2
+          done
+          curl -sf http://localhost:8080/api/health
+      - name: Run playwright
+        run: npm test -- --project=mobile-iphone
+        working-directory: e2e-tests
+  test-mobile-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with: 
+          go-version: 1.24
+      - name: Run tests
+        run: go test ./...
+      - name: Node.js Setup
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install build dependencies
+        run: sudo apt-get install -y build-essential python3
+      - name: Install dependencies
+        run: npm ci
+        working-directory: e2e-tests
+      - name: Install browser
+        run: npx playwright install chromium --with-deps
+        working-directory: e2e-tests
+      - name: Start Go-server
+        run: |
+          go build -o gassigeher ./cmd/server
+          DATABASE_PATH=./e2e-tests/test.db JWT_SECRET=test SUPER_ADMIN_EMAIL=admin@tierheim-goeppingen.de PORT=8080 SKIP_SEED=true ./gassigeher &
+      - name: Wait for server
+        run: |
+          for i in {1..30}; do
+            curl -s http://localhost:8080/api/health && break
+            sleep 2
+          done
+          curl -sf http://localhost:8080/api/health
+      - name: Run playwright
+        run: npm test -- --project=mobile-android
+        working-directory: e2e-tests

@@ -19,7 +19,7 @@ import (
 
 // setupSecurityTest creates a test database and handler
 func setupSecurityTest(t *testing.T) (*sql.DB, *BookingTimeHandler, *HolidayHandler, func()) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}

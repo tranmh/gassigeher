@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/tranmh/gassigeher/internal/models"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // setupTestDBForHolidays creates a test database with custom_holidays and feiertage_cache tables
 func setupTestDBForHolidays(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
@@ -568,7 +568,7 @@ func TestCacheExpiration_7Days(t *testing.T) {
 // Test 7.1.1: Holiday Lookup Performance Benchmark
 // Purpose: Verify holiday check is fast with index
 func BenchmarkIsHoliday(b *testing.B) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		b.Fatalf("Failed to open test database: %v", err)
 	}
@@ -606,7 +606,7 @@ func BenchmarkIsHoliday(b *testing.B) {
 
 // Test 7.1.1: Holiday Lookup Performance with Large Dataset
 func BenchmarkIsHoliday_LargeDataset(b *testing.B) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		b.Fatalf("Failed to open test database: %v", err)
 	}
@@ -644,7 +644,7 @@ func BenchmarkIsHoliday_LargeDataset(b *testing.B) {
 
 // Test 7.1.1: Year Holiday List Performance
 func BenchmarkGetHolidaysByYear(b *testing.B) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		b.Fatalf("Failed to open test database: %v", err)
 	}

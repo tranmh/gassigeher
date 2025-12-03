@@ -11,7 +11,7 @@ import (
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
 	"github.com/tranmh/gassigeher/internal/testutil"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // Test 1.1.1: ValidateBookingTime - Weekday Allowed Times
@@ -321,7 +321,7 @@ func containsTimeSlot(slice []string, item string) bool {
 // Purpose: Verify time slot generation is fast
 func BenchmarkGetAvailableTimeSlots(b *testing.B) {
 	// Use the benchmark itself as a testing.T-compatible interface
-	db, _ := sql.Open("sqlite3", ":memory:")
+	db, _ := sql.Open("sqlite", ":memory:")
 	defer db.Close()
 
 	// Setup database (manual migration to avoid T dependency)
@@ -343,7 +343,7 @@ func BenchmarkGetAvailableTimeSlots(b *testing.B) {
 
 // Test 7.1.2: Available Slots Generation for Weekend
 func BenchmarkGetAvailableTimeSlots_Weekend(b *testing.B) {
-	db, _ := sql.Open("sqlite3", ":memory:")
+	db, _ := sql.Open("sqlite", ":memory:")
 	defer db.Close()
 
 	dialect := database.NewSQLiteDialect()
@@ -365,7 +365,7 @@ func BenchmarkGetAvailableTimeSlots_Weekend(b *testing.B) {
 // Test 7.1.3: Booking Validation Performance
 // Purpose: Verify booking validation completes quickly
 func BenchmarkValidateBookingTime(b *testing.B) {
-	db, _ := sql.Open("sqlite3", ":memory:")
+	db, _ := sql.Open("sqlite", ":memory:")
 	defer db.Close()
 
 	dialect := database.NewSQLiteDialect()
@@ -386,7 +386,7 @@ func BenchmarkValidateBookingTime(b *testing.B) {
 
 // Test 7.1.3: Booking Validation with Holiday Check
 func BenchmarkValidateBookingTime_WithHolidayCheck(b *testing.B) {
-	db, _ := sql.Open("sqlite3", ":memory:")
+	db, _ := sql.Open("sqlite", ":memory:")
 	defer db.Close()
 
 	dialect := database.NewSQLiteDialect()

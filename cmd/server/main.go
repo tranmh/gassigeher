@@ -30,7 +30,12 @@ func main() {
 
 	// Check if the .env file exists
 	if _, err := os.Stat(*envPath); os.IsNotExist(err) {
-		log.Fatalf("Error: .env file not found at path: %s", *envPath)
+		log.Printf("No .env found, using env vars")
+	} else {
+		if err := godotenv.Load(*envPath); err != nil {
+			log.Fatalf("Error loading .env: %v", err)
+		}
+		log.Printf("Loaded from: %s", *envPath)
 	}
 
 	// Load environment variables from specified path
@@ -106,6 +111,8 @@ func main() {
 	experienceHandler := handlers.NewExperienceRequestHandler(db, cfg)
 	reactivationHandler := handlers.NewReactivationRequestHandler(db, cfg)
 	dashboardHandler := handlers.NewDashboardHandler(db, cfg)
+	healthHandler := handlers.NewHealthHandler()
+	router.HandleFunc("/api/health", healthHandler.Health).Methods("GET")
 
 	// Initialize booking time repositories and services
 	bookingTimeRepo := repository.NewBookingTimeRepository(db)

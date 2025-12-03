@@ -56,7 +56,7 @@ func TestMigrationRegistry(t *testing.T) {
 func TestRunMigrations_SQLite(t *testing.T) {
 	// Create temporary SQLite database
 	dbPath := filepath.Join(t.TempDir(), "test_migrations.db")
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -103,7 +103,7 @@ func TestRunMigrations_SQLite(t *testing.T) {
 // TestRunMigrations_Idempotent tests that migrations can be run multiple times
 func TestRunMigrations_Idempotent(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test_idempotent.db")
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -134,7 +134,7 @@ func TestRunMigrations_Idempotent(t *testing.T) {
 // TestGetMigrationStatus tests migration status reporting
 func TestGetMigrationStatus(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test_status.db")
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -161,7 +161,7 @@ func TestGetMigrationStatus(t *testing.T) {
 // TestMigrationRunner_HandlesDuplicateColumn tests graceful handling of duplicate column errors
 func TestMigrationRunner_HandlesDuplicateColumn(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test_duplicate.db")
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -302,7 +302,7 @@ func TestCreateSchemaMigrationsTable(t *testing.T) {
 			name:    "SQLite",
 			dialect: NewSQLiteDialect(),
 			setup: func(t *testing.T) *sql.DB {
-				db, err := sql.Open("sqlite3", filepath.Join(t.TempDir(), "test.db"))
+				db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "test.db"))
 				require.NoError(t, err)
 				return db
 			},
@@ -378,7 +378,7 @@ func TestMigrationOrder(t *testing.T) {
 // TestMigrationRunner_PartialApplication tests applying migrations incrementally
 func TestMigrationRunner_PartialApplication(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test_partial.db")
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -440,7 +440,7 @@ func TestIsAlreadyExistsError(t *testing.T) {
 // TestMigrationRunner_CreatesForeignKeys tests that foreign keys are created properly
 func TestMigrationRunner_CreatesForeignKeys(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test_fk.db")
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -465,7 +465,7 @@ func TestMigrationRunner_CreatesForeignKeys(t *testing.T) {
 // TestMigrationRunner_CreatesIndexes tests that indexes are created
 func TestMigrationRunner_CreatesIndexes(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test_indexes.db")
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	require.NoError(t, err)
 	defer db.Close()
 

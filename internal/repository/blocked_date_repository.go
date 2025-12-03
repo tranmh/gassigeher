@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+	"strings"
 
 	"github.com/tranmh/gassigeher/internal/models"
 )
@@ -35,7 +36,7 @@ func (r *BlockedDateRepository) Create(blockedDate *models.BlockedDate) error {
 
 	if err != nil {
 		// Check for unique constraint violation
-		if err.Error() == "UNIQUE constraint failed: blocked_dates.date" {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed: blocked_dates.date") {
 			return fmt.Errorf("date is already blocked")
 		}
 		return fmt.Errorf("failed to create blocked date: %w", err)

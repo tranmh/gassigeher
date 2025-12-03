@@ -21,7 +21,7 @@ func (d *SQLiteDialect) Name() string {
 
 // GetDriverName returns the Go driver name for sql.Open()
 func (d *SQLiteDialect) GetDriverName() string {
-	return "sqlite3"
+	return "sqlite"
 }
 
 // GetAutoIncrement returns the auto-increment syntax for primary keys

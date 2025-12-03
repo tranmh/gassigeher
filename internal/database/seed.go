@@ -21,8 +21,15 @@ type TestUser struct {
 
 // SeedDatabase generates initial seed data for first-time installations
 // Only runs if users table is empty
+// Set SKIP_SEED=true to skip (useful for E2E tests that manage their own data)
 // DONE
 func SeedDatabase(db *sql.DB, superAdminEmail string) error {
+	// 0. Check if seeding is disabled (for E2E tests)
+	if os.Getenv("SKIP_SEED") == "true" {
+		log.Println("SKIP_SEED=true, skipping seed data generation")
+		return nil
+	}
+
 	// 1. Check if users table is empty
 	var count int
 	err := db.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)

@@ -23,7 +23,7 @@ import (
 
 // setupRegressionTest creates a test database with necessary tables and seed data
 func setupRegressionTest(t *testing.T) (*sql.DB, func()) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}

@@ -1,4 +1,4 @@
-const { chromium } = require('@playwright/test');
+const { chromium, webkit, firefox } = require('@playwright/test');
 
 /**
  * Authentication fixture
@@ -36,13 +36,23 @@ async function logout(page) {
 async function setupAdminAuth() {
   console.log('🔐 Setting up admin authentication...');
 
-  const browser = await chromium.launch();
+  let browser;
+  try {
+    browser = await chromium.launch();
+  } catch {
+    try {
+      browser = await webkit.launch();
+    } catch {
+      browser = await firefox.launch();
+    }
+  }
+
   const context = await browser.newContext();
   const page = await context.newPage();
 
   try {
     await page.goto('http://localhost:8080/login.html');
-    await page.fill('#email', 'admin@test.com');
+    await page.fill('#email', 'admin@tierheim-goeppingen.de');
     await page.fill('#password', 'test123');
     await page.click('button[type="submit"]');
 

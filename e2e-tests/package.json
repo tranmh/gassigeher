@@ -12,11 +12,18 @@
     "report": "playwright show-report",
     "install:browsers": "playwright install chromium"
   },
-  "keywords": ["e2e", "playwright", "testing"],
+  "keywords": [
+    "e2e",
+    "playwright",
+    "testing"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
     "@playwright/test": "^1.40.0",
     "sqlite3": "^5.1.6"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.4.6"
   }
 }

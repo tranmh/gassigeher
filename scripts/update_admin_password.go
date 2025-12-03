@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"log"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -23,7 +23,7 @@ func main() {
 	fmt.Println("Password hash for 'test123':", hashStr)
 
 	// Update database
-	db, err := sql.Open("sqlite3", "../gassigeher.db")
+	db, err := sql.Open("sqlite", "../gassigeher.db")
 	if err != nil {
 		log.Fatal("Failed to open database:", err)
 	}

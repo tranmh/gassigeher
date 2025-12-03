@@ -7,7 +7,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"      // CGO-based SQLite (faster, but requires CGO)
+	// _ "modernc.org/sqlite"      // CGO-based SQLite (faster, but requires CGO) - DISABLED for Windows
 	_ "modernc.org/sqlite"               // Pure Go SQLite (slower, but cross-compiles easily)
 )
 

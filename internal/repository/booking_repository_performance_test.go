@@ -9,7 +9,7 @@ import (
 
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/testutil"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // ========================================
@@ -301,7 +301,7 @@ func TestConcurrentApprovalUpdates(t *testing.T) {
 
 // Benchmark: Concurrent Booking Creation Performance
 func BenchmarkConcurrentBookingCreation(b *testing.B) {
-	db, _ := sql.Open("sqlite3", ":memory:")
+	db, _ := sql.Open("sqlite", ":memory:")
 	defer db.Close()
 
 	// Setup schema

@@ -1,12 +1,12 @@
-const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { setupAdminAuth } = require('./fixtures/auth');
+const { setupTestData } = require('./setup-test-data');
 
 /**
  * Global setup for E2E tests
  * Runs once before all tests
- * Uses existing gentestdata.ps1 script for realistic test data
+ * Uses setup-test-data.js for test data
  */
 module.exports = async (config) => {
   console.log('');
@@ -17,13 +17,6 @@ module.exports = async (config) => {
 
   try {
     const testDbPath = path.resolve(__dirname, 'test.db');
-
-    // Step 1: Delete existing test database
-    console.log('📦 Setting up test database...');
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-      console.log('   ✅ Deleted existing test.db');
-    }
 
     // Step 2: Wait for server to create database
     console.log('⏳ Waiting for server to create database...');
@@ -38,28 +31,11 @@ module.exports = async (config) => {
     }
     console.log('   ✅ Database created by server');
 
-    // Step 3: Generate test data using existing PowerShell script
-    console.log('🌱 Generating test data using gentestdata.ps1...');
+    // Step 3: Generate test data
+    console.log('🌱 Generating test data...');
     console.log('');
 
-    const scriptPath = path.resolve(__dirname, '../scripts/gentestdata.ps1');
-    const command = `powershell -ExecutionPolicy Bypass -File "${scriptPath}" -DatabasePath "${testDbPath}"`;
-
-    try {
-      execSync(command, {
-        stdio: 'inherit',
-        cwd: path.resolve(__dirname, '..'),
-        env: {
-          ...process.env,
-          SUPER_ADMIN_EMAIL: 'admin@test.com',
-        }
-      });
-      console.log('');
-      console.log('   ✅ Test data generated successfully');
-    } catch (error) {
-      console.error('   ❌ Failed to generate test data:', error.message);
-      throw error;
-    }
+    setupTestData(testDbPath)
 
     // Step 4: Pre-authenticate admin user
     console.log('🔐 Pre-authenticating admin user...');
@@ -78,8 +54,5 @@ module.exports = async (config) => {
     throw error;
   }
 };
-
-// DONE: Global setup updated to use existing gentestdata.ps1 script
-
 
 // DONE: Global setup runs once before all tests
