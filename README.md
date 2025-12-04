@@ -652,4 +652,12 @@ This is a complete application following the implementation plan. Each phase bui
 
 ## License
 
-© 2025 Gassigeher. All rights reserved.
+This project is licensed under the **GNU General Public License v3.0** (GPL-3.0).
+
+Copyright © 2025 Minh Cuong Tran
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+See the [LICENSE](LICENSE) file for the full license text.
