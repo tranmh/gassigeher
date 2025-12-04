@@ -660,4 +660,4 @@ This program is free software: you can redistribute it and/or modify it under th
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 
-See the [LICENSE](LICENSE) file for the full license text.
+See the [gpl-3.0.txt](gpl-3.0.txt) file for the full license text.
