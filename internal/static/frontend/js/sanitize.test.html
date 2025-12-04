@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>XSS Security Tests - Sanitization</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-suite {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-case {
+            margin: 15px 0;
+            padding: 15px;
+            border-left: 4px solid #ccc;
+            background: #fafafa;
+        }
+        .test-case.pass {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        .test-case.fail {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        .test-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .test-input {
+            background: #fff;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+            word-break: break-all;
+        }
+        .test-output {
+            background: #fff;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+        .summary {
+            margin-top: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+        .summary.all-pass {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #28a745;
+        }
+        .summary.has-fail {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #dc3545;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px 0;
+            font-size: 1em;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔒 XSS Security Tests - Sanitization</h1>
+    <p>These tests verify that user-controlled content is properly escaped to prevent XSS attacks.</p>
+
+    <button onclick="runAllTests()">Run All Tests</button>
+    <button onclick="location.reload()">Reset</button>
+
+    <div id="test-results"></div>
+
+    <script src="/js/sanitize.js"></script>
+    <script>
+        let testResults = [];
+
+        class TestCase {
+            constructor(title, description) {
+                this.title = title;
+                this.description = description;
+                this.passed = true;
+                this.assertions = [];
+            }
+
+            assert(condition, message) {
+                if (!condition) {
+                    this.passed = false;
+                }
+                this.assertions.push({
+                    condition,
+                    message
+                });
+            }
+
+            assertEqual(actual, expected, message) {
+                const pass = actual === expected;
+                if (!pass) {
+                    this.passed = false;
+                }
+                this.assertions.push({
+                    condition: pass,
+                    message: message + ` (expected: "${expected}", got: "${actual}")`
+                });
+            }
+
+            assertNotContains(text, substring, message) {
+                const pass = !text.includes(substring);
+                if (!pass) {
+                    this.passed = false;
+                }
+                this.assertions.push({
+                    condition: pass,
+                    message: message + ` (should not contain: "${substring}")`
+                });
+            }
+        }
+
+        // Test Suite 1: Basic HTML Escaping
+        function testBasicHTMLEscaping() {
+            const test = new TestCase(
+                'Bug #2.1: Basic HTML Special Characters Are Escaped',
+                'User names with HTML special characters should be escaped'
+            );
+
+            const xssPayload = '<img src=x onerror=alert("XSS")>';
+            const result = sanitizeHTML(xssPayload);
+
+            test.assertNotContains(result, '<img', 'Should escape opening bracket');
+            test.assertNotContains(result, 'onerror', 'Should escape attribute');
+            test.assertEqual(result, '&lt;img src=x onerror=alert(&quot;XSS&quot;)&gt;', 'Should properly escape entire payload');
+
+            testResults.push(test);
+        }
+
+        // Test Suite 2: Script Tag Injection
+        function testScriptTagInjection() {
+            const test = new TestCase(
+                'Bug #2.2: Script Tags Are Neutralized',
+                'User-controlled content with <script> tags should be escaped'
+            );
+
+            const xssPayload = '<script>alert("XSS")</script>';
+            const result = sanitizeHTML(xssPayload);
+
+            test.assertNotContains(result, '<script', 'Should escape script tags');
+            test.assertNotContains(result, '</script>', 'Should escape closing script tag');
+
+            testResults.push(test);
+        }
+
+        // Test Suite 3: Event Handler Injection
+        function testEventHandlerInjection() {
+            const test = new TestCase(
+                'Bug #2.3: Event Handlers Are Escaped',
+                'User names with event handlers should be escaped'
+            );
+
+            const payloads = [
+                '<img src=x onerror=alert("XSS")>',
+                '<body onload=alert("XSS")>',
+                '<div onclick=alert("XSS")>',
+                '"><svg/onload=alert("XSS")>'
+            ];
+
+            payloads.forEach(payload => {
+                const result = sanitizeHTML(payload);
+                test.assertNotContains(result, 'onerror=', 'Should escape onerror handler');
+                test.assertNotContains(result, 'onload=', 'Should escape onload handler');
+                test.assertNotContains(result, 'onclick=', 'Should escape onclick handler');
+            });
+
+            testResults.push(test);
+        }
+
+        // Test Suite 4: JavaScript Protocol
+        function testJavaScriptProtocol() {
+            const test = new TestCase(
+                'Bug #2.4: JavaScript Protocol URLs Are Escaped',
+                'User names with javascript: protocol should be escaped'
+            );
+
+            const xssPayload = '<a href="javascript:alert(\'XSS\')">Click me</a>';
+            const result = sanitizeHTML(xssPayload);
+
+            test.assertNotContains(result, 'javascript:', 'Should escape javascript: protocol');
+            test.assertNotContains(result, '<a href', 'Should escape anchor tag');
+
+            testResults.push(test);
+        }
+
+        // Test Suite 5: Data URIs
+        function testDataURIInjection() {
+            const test = new TestCase(
+                'Bug #2.5: Data URIs Are Escaped',
+                'User names with data: URIs should be escaped'
+            );
+
+            const xssPayload = '<img src="data:text/html,<script>alert(\'XSS\')</script>">';
+            const result = sanitizeHTML(xssPayload);
+
+            test.assertNotContains(result, 'data:', 'Should escape data: URI');
+            test.assertNotContains(result, '<img', 'Should escape img tag');
+
+            testResults.push(test);
+        }
+
+        // Test Suite 6: HTML Entity Encoding
+        function testHTMLEntityEncoding() {
+            const test = new TestCase(
+                'Bug #2.6: Double-Encoded Payloads Are Handled',
+                'Encoded XSS payloads should remain safe after processing'
+            );
+
+            const xssPayload = '&lt;img src=x onerror=alert("XSS")&gt;';
+            const result = sanitizeHTML(xssPayload);
+
+            // Should not execute the script
+            test.assertNotContains(result, '<img', 'Should not decode dangerous tags');
+
+            testResults.push(test);
+        }
+
+        // Test Suite 7: Admin Panel User Names (Real-world scenario)
+        function testAdminPanelUserNames() {
+            const test = new TestCase(
+                'Bug #2.7: Admin Panel User Names Are Safe',
+                'User names in admin panel should be XSS-safe'
+            );
+
+            const maliciousUserName = '"><script>alert("Admin Hacked")</script><span class="';
+            const result = sanitizeHTML(maliciousUserName);
+
+            test.assertNotContains(result, '<script>', 'Should escape script tags in user name');
+            test.assertNotContains(result, 'alert(', 'Should escape JavaScript functions');
+            test.assertEqual(
+                result,
+                '&quot;&gt;&lt;script&gt;alert(&quot;Admin Hacked&quot;)&lt;/script&gt;&lt;span class=&quot;',
+                'Should properly escape malicious user name'
+            );
+
+            testResults.push(test);
+        }
+
+        // Test Suite 8: Email Fields
+        function testEmailFieldXSS() {
+            const test = new TestCase(
+                'Bug #2.8: Email Fields Are Safe',
+                'Email addresses with XSS payloads should be escaped'
+            );
+
+            const maliciousEmail = 'user@example.com"><img src=x onerror=alert("XSS")>';
+            const result = sanitizeHTML(maliciousEmail);
+
+            test.assertNotContains(result, '<img', 'Should escape img tag in email');
+            test.assertNotContains(result, 'onerror', 'Should escape event handler in email');
+
+            testResults.push(test);
+        }
+
+        // Test Suite 9: Phone Numbers
+        function testPhoneNumberXSS() {
+            const test = new TestCase(
+                'Bug #2.9: Phone Numbers Are Safe',
+                'Phone numbers with XSS payloads should be escaped'
+            );
+
+            const maliciousPhone = '+49 123 456789<svg onload=alert("XSS")>';
+            const result = sanitizeHTML(maliciousPhone);
+
+            test.assertNotContains(result, '<svg', 'Should escape svg tag in phone');
+            test.assertNotContains(result, 'onload', 'Should escape event handler in phone');
+
+            testResults.push(test);
+        }
+
+        // Test Suite 10: Deactivation Reasons
+        function testDeactivationReasonsXSS() {
+            const test = new TestCase(
+                'Bug #2.10: Deactivation Reasons Are Safe',
+                'Deactivation reasons with XSS payloads should be escaped'
+            );
+
+            const maliciousReason = 'Violates ToS<iframe src="javascript:alert(\'XSS\')"></iframe>';
+            const result = sanitizeHTML(maliciousReason);
+
+            test.assertNotContains(result, '<iframe', 'Should escape iframe tag');
+            test.assertNotContains(result, 'javascript:', 'Should escape javascript protocol');
+
+            testResults.push(test);
+        }
+
+        // Test Suite 11: Normal Data Should Pass Through
+        function testNormalDataPreservation() {
+            const test = new TestCase(
+                'Bug #2.11: Normal Data Is Preserved',
+                'Regular user input should be preserved safely'
+            );
+
+            const normalNames = [
+                'John Doe',
+                'Maria García',
+                'François Dupont',
+                "O'Brien",
+                'Smith, Jr.'
+            ];
+
+            normalNames.forEach(name => {
+                const result = sanitizeHTML(name);
+                test.assertEqual(result, name, `Name "${name}" should be preserved`);
+            });
+
+            testResults.push(test);
+        }
+
+        // Test Suite 12: Empty and Null Values
+        function testEmptyAndNullValues() {
+            const test = new TestCase(
+                'Bug #2.12: Empty and Null Values Are Handled',
+                'Empty strings and null values should be handled safely'
+            );
+
+            test.assertEqual(sanitizeHTML(''), '', 'Empty string should return empty string');
+            test.assertEqual(sanitizeHTML(null), '', 'Null should return empty string');
+            test.assertEqual(sanitizeHTML(undefined), '', 'Undefined should return empty string');
+            test.assertEqual(sanitizeHTML(0), '0', 'Zero should be converted to string');
+            test.assertEqual(sanitizeHTML(false), 'false', 'False should be converted to string');
+
+            testResults.push(test);
+        }
+
+        // Test Suite 13: SVG/XML Injection
+        function testSVGXMLInjection() {
+            const test = new TestCase(
+                'Bug #2.13: SVG and XML Injections Are Escaped',
+                'SVG and XML payloads should be escaped'
+            );
+
+            const svgPayload = '<svg><animate attributeName="href" values="javascript:alert(\'XSS\')" />';
+            const result = sanitizeHTML(svgPayload);
+
+            test.assertNotContains(result, '<svg>', 'Should escape SVG tags');
+            test.assertNotContains(result, 'javascript:', 'Should escape JavaScript protocol in SVG');
+
+            testResults.push(test);
+        }
+
+        // Run all tests
+        function runAllTests() {
+            testResults = [];
+
+            testBasicHTMLEscaping();
+            testScriptTagInjection();
+            testEventHandlerInjection();
+            testJavaScriptProtocol();
+            testDataURIInjection();
+            testHTMLEntityEncoding();
+            testAdminPanelUserNames();
+            testEmailFieldXSS();
+            testPhoneNumberXSS();
+            testDeactivationReasonsXSS();
+            testNormalDataPreservation();
+            testEmptyAndNullValues();
+            testSVGXMLInjection();
+
+            displayResults();
+        }
+
+        // Display test results
+        function displayResults() {
+            const container = document.getElementById('test-results');
+            container.innerHTML = '';
+
+            let passCount = 0;
+            let failCount = 0;
+
+            testResults.forEach((test, index) => {
+                const testDiv = document.createElement('div');
+                testDiv.className = `test-suite`;
+
+                const statusClass = test.passed ? 'pass' : 'fail';
+                const statusText = test.passed ? '✓ PASS' : '✗ FAIL';
+                statusClass && testDiv.classList.add(statusClass);
+
+                let html = `
+                    <h3>${statusText} - ${test.title}</h3>
+                    <p style="margin: 5px 0; color: #666;">${test.description}</p>
+                `;
+
+                test.assertions.forEach(assertion => {
+                    const assertClass = assertion.condition ? 'pass' : 'fail';
+                    html += `
+                        <div class="test-case ${assertClass}">
+                            <div class="test-title">${assertion.condition ? '✓' : '✗'} ${assertion.message}</div>
+                        </div>
+                    `;
+                });
+
+                testDiv.innerHTML = html;
+                container.appendChild(testDiv);
+
+                if (test.passed) passCount++;
+                else failCount++;
+            });
+
+            // Summary
+            const summary = document.createElement('div');
+            const allPass = failCount === 0;
+            summary.className = `summary ${allPass ? 'all-pass' : 'has-fail'}`;
+            summary.textContent = `Results: ${passCount} passed, ${failCount} failed out of ${testResults.length} tests`;
+            container.appendChild(summary);
+        }
+
+        // Auto-run on load
+        window.addEventListener('load', () => {
+            runAllTests();
+        });
+    </script>
+</body>
+</html>

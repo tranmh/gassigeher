@@ -2,6 +2,7 @@ package cron
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"strconv"
 	"time"
@@ -232,5 +233,11 @@ func (s *CronService) autoDeactivateInactiveUsers() {
 		}
 
 		log.Printf("Auto-deactivated user %d (inactive for %d days)", user.ID, days)
+
+		// Send email notification about deactivation
+		if s.emailService != nil && user.Email != nil {
+			reason := fmt.Sprintf("Keine Aktivität seit %d Tagen", days)
+			go s.emailService.SendAccountDeactivated(*user.Email, user.Name, reason)
+		}
 	}
 }

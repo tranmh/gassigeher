@@ -384,6 +384,7 @@
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/dog-photo-helpers.js"></script>
+    <script src="/js/sanitize.js"></script>
     <script>
         let allDogs = [];
         let bookings = [];
@@ -571,6 +572,7 @@
                 </div>`;
             }
 
+            const safeDogName = sanitizeHTML(dog.name);
             const bookedTimes = data.dogBookings.map(b => b.scheduled_time);
             const hasBookings = bookedTimes.length > 0;
 
@@ -582,13 +584,13 @@
                 });
                 content += '<div class="walk-type available">+ Weitere Zeiten</div>';
 
-                return `<div class="calendar-cell booked" onclick="quickBook(${dog.id}, '${date}')" title="Klicken zum Buchen: ${dog.name} am ${formatDateGerman(date)}">
+                return `<div class="calendar-cell booked" onclick="quickBook(${dog.id}, '${date}')" title="Klicken zum Buchen: ${safeDogName} am ${formatDateGerman(date)}">
                     ${content}
                 </div>`;
             }
 
             // Fully available
-            return `<div class="calendar-cell available" onclick="quickBook(${dog.id}, '${date}')" title="Klicken zum Buchen: ${dog.name} am ${formatDateGerman(date)}">
+            return `<div class="calendar-cell available" onclick="quickBook(${dog.id}, '${date}')" title="Klicken zum Buchen: ${safeDogName} am ${formatDateGerman(date)}">
                 <div class="walk-type available">✅ Verfügbar</div>
                 <div style="font-size: 0.7rem; color: var(--text-gray);">Alle Zeiten frei</div>
             </div>`;

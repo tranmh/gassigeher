@@ -33,10 +33,13 @@ function getDogPhotoUrl(dog, useThumbnail = false, useCategoryPlaceholder = true
  * @returns {string} - Alt text for image
  */
 function getDogPhotoAlt(dog) {
+    const safeName = typeof sanitizeHTML !== 'undefined' ? sanitizeHTML(dog.name) : dog.name;
+    const safeBreed = typeof sanitizeHTML !== 'undefined' ? sanitizeHTML(dog.breed) : dog.breed;
+
     if (dog.photo) {
-        return `${dog.name} (${dog.breed})`;
+        return `${safeName} (${safeBreed})`;
     }
-    return `Kein Foto für ${dog.name}`;
+    return `Kein Foto für ${safeName}`;
 }
 
 /**
@@ -183,6 +186,7 @@ function preloadCriticalDogImages(dogs, count = 3) {
 function getCalendarDogCell(dog) {
     const photoUrl = getDogPhotoUrl(dog, true, true); // Use thumbnail
     const altText = getDogPhotoAlt(dog);
+    const safeDogName = typeof sanitizeHTML !== 'undefined' ? sanitizeHTML(dog.name) : dog.name;
 
     const categoryEmoji = {
         'green': '🟢',
@@ -208,7 +212,7 @@ function getCalendarDogCell(dog) {
              class="calendar-dog-photo"
              loading="lazy">
         <div>
-            <div style="font-weight: 700; font-size: 1rem; color: var(--text-dark);">${dog.name}</div>
+            <div style="font-weight: 700; font-size: 1rem; color: var(--text-dark);">${safeDogName}</div>
             <span style="display: inline-block; font-size: 0.7rem; padding: 2px 8px; background: ${categoryColor}; border-radius: 4px; margin-top: 4px;">
                 ${categoryEmoji} ${categoryLabel}
             </span>

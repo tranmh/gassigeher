@@ -103,6 +103,7 @@
     <script src="/js/nav-menu.js"></script>
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
+    <script src="/js/sanitize.js"></script>
     <script>
         let bookings = [];
         let dogs = {};
@@ -198,6 +199,9 @@
 
             container.innerHTML = bookings.map(booking => {
                 const dog = dogs[booking.dog_id] || { name: `Hund #${booking.dog_id}` };
+                const safeDogName = sanitizeHTML(dog.name);
+                const safeCancellationReason = booking.admin_cancellation_reason ? sanitizeHTML(booking.admin_cancellation_reason) : '';
+                const safeUserNotes = booking.user_notes ? sanitizeHTML(booking.user_notes) : '';
                 const statusClass = booking.status === 'cancelled' ? 'alert-error' : (booking.status === 'completed' ? 'alert-success' : 'alert-info');
 
                 return `
@@ -205,7 +209,7 @@
                         <div style="display: flex; justify-content: space-between; align-items: start;">
                             <div style="flex: 1;">
                                 <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
-                                    <h4 style="margin: 0;">${dog.name}</h4>
+                                    <h4 style="margin: 0;">${safeDogName}</h4>
                                     <span class="alert ${statusClass}" style="padding: 4px 12px; font-size: 0.8rem; margin: 0;">${getStatusLabel(booking.status)}</span>
                                 </div>
                                 <p style="margin: 5px 0; color: #666;">
@@ -214,8 +218,8 @@
                                 <p style="margin: 5px 0;">
                                     📅 ${booking.date} - ${booking.scheduled_time} Uhr
                                 </p>
-                                ${booking.admin_cancellation_reason ? `<p style="margin: 10px 0; padding: 10px; background: #fff3cd; border-radius: 4px;"><strong>Stornierungsgrund:</strong> ${booking.admin_cancellation_reason}</p>` : ''}
-                                ${booking.user_notes ? `<p style="margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 4px;"><strong>Notizen:</strong> ${booking.user_notes}</p>` : ''}
+                                ${booking.admin_cancellation_reason ? `<p style="margin: 10px 0; padding: 10px; background: #fff3cd; border-radius: 4px;"><strong>Stornierungsgrund:</strong> ${safeCancellationReason}</p>` : ''}
+                                ${booking.user_notes ? `<p style="margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 4px;"><strong>Notizen:</strong> ${safeUserNotes}</p>` : ''}
                             </div>
                             ${booking.status === 'scheduled' ? `
                                 <div style="display: flex; gap: 5px; flex-direction: column; min-width: 120px;">
@@ -291,12 +295,13 @@
                 table.innerHTML = '';
 
                 pendingBookings.forEach(booking => {
+                    const safeDogName = booking.dog_name ? sanitizeHTML(booking.dog_name) : `Hund #${booking.dog_id}`;
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${booking.date}</td>
                         <td>${booking.scheduled_time}</td>
                         <td>User #${booking.user_id}</td>
-                        <td>${booking.dog_name || `Hund #${booking.dog_id}`}</td>
+                        <td>${safeDogName}</td>
                         <td>
                             <button class="btn btn-sm" onclick="approveBooking(${booking.id})">✓ Genehmigen</button>
                             <button class="btn btn-danger btn-sm" style="margin-left: 5px;" onclick="rejectBooking(${booking.id})">✗ Ablehnen</button>

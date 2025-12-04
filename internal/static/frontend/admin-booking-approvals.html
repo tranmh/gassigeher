@@ -215,6 +215,7 @@
     <script src="/js/nav-menu.js"></script>
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
+    <script src="/js/sanitize.js"></script>
     <script>
         let allBookings = [];
         let currentFilter = 'pending';
@@ -301,6 +302,9 @@
             }
 
             container.innerHTML = filtered.map(booking => {
+                const safeDogName = booking.dog ? sanitizeHTML(booking.dog.name) : `Hund #${booking.dog_id}`;
+                const safeUserName = booking.user ? sanitizeHTML(booking.user.name) : `User #${booking.user_id}`;
+                const safeRejectionReason = booking.rejection_reason ? sanitizeHTML(booking.rejection_reason) : '';
                 const statusClass = booking.approval_status;
                 const statusBadge = getStatusBadge(booking.approval_status);
 
@@ -309,11 +313,11 @@
                         <div style="display: flex; justify-content: space-between; align-items: start;">
                             <div>
                                 <h4 style="margin: 0 0 5px 0;">
-                                    ${booking.dog ? booking.dog.name : 'Hund #' + booking.dog_id}
+                                    ${safeDogName}
                                     ${statusBadge}
                                 </h4>
                                 <p style="margin: 0; color: #666; font-size: 0.9rem;">
-                                    Angefragt von: ${booking.user ? booking.user.name : 'User #' + booking.user_id}
+                                    Angefragt von: ${safeUserName}
                                 </p>
                             </div>
                             <span style="font-size: 0.85rem; color: #666;">
@@ -338,7 +342,7 @@
 
                         ${booking.rejection_reason ? `
                             <div style="margin-top: 15px; padding: 10px; background: #f8d7da; border-radius: 6px;">
-                                <strong>Ablehnungsgrund:</strong> ${booking.rejection_reason}
+                                <strong>Ablehnungsgrund:</strong> ${safeRejectionReason}
                             </div>
                         ` : ''}
 
