@@ -172,6 +172,7 @@
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/dog-photo-helpers.js"></script>
+    <script src="/js/sanitize.js"></script>
     <script>
         let currentDogs = [];
         let userLevel = 'green';
@@ -336,6 +337,10 @@
             container.innerHTML = currentDogs.map(dog => {
                 const canAccess = canUserAccessDog(userLevel, dog.category);
                 const isUnavailable = !dog.is_available;
+                const safeDogName = sanitizeHTML(dog.name);
+                const safeDogBreed = sanitizeHTML(dog.breed);
+                const safeUnavailableReason = dog.unavailable_reason ? sanitizeHTML(dog.unavailable_reason) : 'Nicht verfügbar';
+                const safeSpecialNeeds = dog.special_needs ? sanitizeHTML(dog.special_needs) : '';
                 const externalLinkHtml = dog.external_link
                     ? `<a href="${dog.external_link}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" style="display: inline-block; margin-top: 10px; color: var(--primary-green); text-decoration: none; font-weight: 500; font-size: 0.9rem;">mehr über mich &rarr;</a>`
                     : '';
@@ -344,14 +349,14 @@
                     <div class="dog-card ${!canAccess ? 'locked' : ''} ${isUnavailable ? 'unavailable' : ''}"
                          onclick="${canAccess && !isUnavailable ? `viewDog(${dog.id})` : ''}"
                          style="${!canAccess || isUnavailable ? 'cursor: not-allowed;' : 'cursor: pointer;'}">
-                        ${isUnavailable ? `<div class="dog-unavailable-banner">${dog.unavailable_reason || 'Nicht verfügbar'}</div>` : ''}
+                        ${isUnavailable ? `<div class="dog-unavailable-banner">${safeUnavailableReason}</div>` : ''}
                         ${!canAccess ? '<div class="dog-locked-banner">🔒 Level erforderlich</div>' : ''}
                         ${getDogPhotoHtml(dog, true, 'dog-card-image', true, true)}
                         <div class="dog-card-body">
                             <div class="dog-category-badge ${dog.category}">${getCategoryLabel(dog.category)}</div>
-                            <h3 class="dog-card-title">${dog.name}</h3>
-                            <p class="dog-card-info">${dog.breed} • ${getSizeLabel(dog.size)} • ${dog.age} Jahre</p>
-                            ${dog.special_needs ? `<p class="dog-card-info" style="color: var(--warning-orange); font-size: 0.8rem;">⚠️ ${dog.special_needs}</p>` : ''}
+                            <h3 class="dog-card-title">${safeDogName}</h3>
+                            <p class="dog-card-info">${safeDogBreed} • ${getSizeLabel(dog.size)} • ${dog.age} Jahre</p>
+                            ${dog.special_needs ? `<p class="dog-card-info" style="color: var(--warning-orange); font-size: 0.8rem;">⚠️ ${safeSpecialNeeds}</p>` : ''}
                             ${!canAccess ? `<p class="dog-card-info" style="color: #666; font-size: 0.8rem; margin-top: 10px;">Erfordert ${getCategoryLabel(dog.category)} Level</p>` : ''}
                             ${externalLinkHtml}
                         </div>
@@ -395,7 +400,8 @@
             document.getElementById('booking-form').reset();
 
             // Set modal title
-            document.getElementById('modal-title').textContent = `Spaziergang buchen - ${dog.name}`;
+            const safeDogName = sanitizeHTML(dog.name);
+            document.getElementById('modal-title').textContent = `Spaziergang buchen - ${safeDogName}`;
 
             // Set dog ID
             document.getElementById('booking-dog-id').value = dogId;
@@ -463,7 +469,8 @@
 
                 // Set modal title
                 console.log('[DEBUG] Setting modal title:', dog.name);
-                document.getElementById('modal-title').textContent = `Spaziergang buchen - ${dog.name}`;
+                const safeDogName = sanitizeHTML(dog.name);
+                document.getElementById('modal-title').textContent = `Spaziergang buchen - ${safeDogName}`;
 
                 // Set dog ID
                 console.log('[DEBUG] Setting dog ID');

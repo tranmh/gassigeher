@@ -96,6 +96,7 @@
 
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
+    <script src="/js/sanitize.js"></script>
     <script>
         // Custom toggle menu function for index.html (handles both public and authenticated nav)
         function toggleMenu() {
@@ -201,6 +202,9 @@
 
                 // Render dog cards
                 grid.innerHTML = dogs.map(dog => {
+                    const safeDogName = sanitizeHTML(dog.name);
+                    const safeDogBreed = sanitizeHTML(dog.breed);
+
                     const categoryColors = {
                         green: '#82b965',
                         blue: '#4a90e2',
@@ -221,10 +225,10 @@
                     return `
                         <div class="card" style="text-align: center; padding: 20px;">
                             <div style="width: 150px; height: 150px; margin: 0 auto 15px; border-radius: 50%; overflow: hidden; border: 4px solid ${categoryColors[dog.category] || '#82b965'};">
-                                <img src="${photoUrl}" alt="${dog.name}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='/assets/images/placeholders/dog-placeholder.svg'">
+                                <img src="${photoUrl}" alt="${safeDogName}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='/assets/images/placeholders/dog-placeholder.svg'">
                             </div>
-                            <h3 style="margin: 0 0 10px 0; color: var(--text-dark);">${dog.name}</h3>
-                            <p style="margin: 0 0 10px 0; color: var(--text-gray);">${dog.breed} · ${dog.age} ${dog.age === 1 ? 'Jahr' : 'Jahre'}</p>
+                            <h3 style="margin: 0 0 10px 0; color: var(--text-dark);">${safeDogName}</h3>
+                            <p style="margin: 0 0 10px 0; color: var(--text-gray);">${safeDogBreed} · ${dog.age} ${dog.age === 1 ? 'Jahr' : 'Jahre'}</p>
                             <span style="display: inline-block; padding: 4px 12px; border-radius: var(--border-radius); background: ${categoryColors[dog.category] || '#82b965'}; color: white; font-size: 0.85rem;">
                                 ${categoryLabels[dog.category] || 'Anfänger'}
                             </span>

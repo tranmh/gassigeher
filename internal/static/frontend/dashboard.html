@@ -82,6 +82,7 @@
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/dog-photo-helpers.js"></script>
+    <script src="/js/sanitize.js"></script>
     <script>
         let currentUser = null;
 
@@ -161,11 +162,16 @@
                     })
                 );
 
-                container.innerHTML = bookingsWithDogs.map(booking => `
+                container.innerHTML = bookingsWithDogs.map(booking => {
+                    const dogName = booking.dog ? sanitizeHTML(booking.dog.name) : `Hund #${booking.dog_id}`;
+                    const safeRejectionReason = booking.rejection_reason ? sanitizeHTML(booking.rejection_reason) : '';
+                    const safeUserNotes = booking.user_notes ? sanitizeHTML(booking.user_notes) : '';
+
+                    return `
                     <div class="card" style="margin-bottom: 15px; padding: 20px;" data-status="${booking.approval_status || 'approved'}">
                         <div style="display: flex; justify-content: space-between; align-items: start;">
                             <div style="flex: 1;">
-                                <h4 style="margin: 0 0 10px 0;">${booking.dog ? booking.dog.name : 'Hund #' + booking.dog_id}</h4>
+                                <h4 style="margin: 0 0 10px 0;">${dogName}</h4>
                                 <p style="margin: 5px 0;">📅 ${booking.date} - ${booking.scheduled_time} Uhr</p>
 
                                 ${booking.approval_status === 'pending' ? `
@@ -177,14 +183,15 @@
                                 ${booking.approval_status === 'rejected' ? `
                                     <div class="alert alert-danger" style="margin-top: 10px; padding: 10px; background: #f8d7da; border: 1px solid #dc3545; border-radius: 4px;">
                                         ✗ <strong>Abgelehnt</strong>
-                                        ${booking.rejection_reason ? `<br><small>${booking.rejection_reason}</small>` : ''}
+                                        ${booking.rejection_reason ? `<br><small>${safeRejectionReason}</small>` : ''}
                                     </div>
                                 ` : ''}
                             </div>
                             <button class="btn btn-danger" onclick="cancelBooking(${booking.id})" data-i18n="bookings.cancel_booking">Stornieren</button>
                         </div>
                     </div>
-                `).join('');
+                `;
+                }).join('');
             } catch (error) {
                 document.getElementById('upcoming-bookings').innerHTML = `<p class="alert alert-error">${error.message}</p>`;
             }
@@ -215,16 +222,21 @@
                     })
                 );
 
-                container.innerHTML = bookingsWithDogs.map(booking => `
+                container.innerHTML = bookingsWithDogs.map(booking => {
+                    const pastDogName = booking.dog ? sanitizeHTML(booking.dog.name) : `Hund #${booking.dog_id}`;
+                    const pastUserNotes = booking.user_notes ? sanitizeHTML(booking.user_notes) : '';
+
+                    return `
                     <div class="card" style="margin-bottom: 15px; padding: 15px;">
-                        <h4 style="margin: 0 0 10px 0;">${booking.dog ? booking.dog.name : 'Hund #' + booking.dog_id}</h4>
+                        <h4 style="margin: 0 0 10px 0;">${pastDogName}</h4>
                         <p style="margin: 5px 0; font-size: 0.9rem; color: #666;">
                             📅 ${booking.date} - ${booking.scheduled_time} Uhr
                         </p>
-                        ${booking.user_notes ? `<p style="margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 4px;"><strong>Notizen:</strong> ${booking.user_notes}</p>` : ''}
+                        ${booking.user_notes ? `<p style="margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 4px;"><strong>Notizen:</strong> ${pastUserNotes}</p>` : ''}
                         ${!booking.user_notes ? `<button class="btn" style="margin-top: 10px; padding: 8px 16px;" onclick="addNotes(${booking.id})">Notizen hinzufügen</button>` : ''}
                     </div>
-                `).join('');
+                `;
+                }).join('');
             } catch (error) {
                 document.getElementById('past-bookings').innerHTML = `<p class="alert alert-error">${error.message}</p>`;
             }

@@ -91,8 +91,9 @@ type UpdateProfileRequest struct {
 	Phone *string `json:"phone,omitempty"`
 }
 
-// Phone number validation regex - supports international formats
-var phoneRegex = regexp.MustCompile(`^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}$`)
+// Phone regex: allows digits, country code, separators, and balanced parentheses
+// Supports formats like: 0123456789, +49 123456789, (0123) 456789, 0123-456789
+var phoneRegex = regexp.MustCompile(`^\+?[\s\-\.]?(?:\()?[0-9]{1,4}(?:\))?[\s\-\.]?[0-9]{1,4}[\s\-\.]?[0-9]{3,}[\s\-\.]?[0-9]{0,4}$`)
 
 // ValidatePhone validates a phone number format
 func ValidatePhone(phone string) error {
@@ -100,6 +101,32 @@ func ValidatePhone(phone string) error {
 	if phone == "" {
 		return errors.New("Telefonnummer ist erforderlich")
 	}
+
+	// Remove all spaces, hyphens, dots for length check
+	digitsOnly := strings.Map(func(r rune) rune {
+		if r >= '0' && r <= '9' {
+			return r
+		}
+		return -1
+	}, phone)
+
+	// Minimum 7 digits required
+	if len(digitsOnly) < 7 {
+		return errors.New("Telefonnummer muss mindestens 7 Ziffern enthalten")
+	}
+
+	// Check for balanced parentheses
+	openParen := strings.Count(phone, "(")
+	closeParen := strings.Count(phone, ")")
+	if openParen != closeParen {
+		return errors.New("Ungültige Telefonnummer. Bitte verwenden Sie ein gültiges Format (z.B. 0123 456789 oder +49 123 456789)")
+	}
+
+	// Check that phone doesn't end with separator
+	if len(phone) > 0 && (phone[len(phone)-1] == '-' || phone[len(phone)-1] == '.' || phone[len(phone)-1] == ' ') {
+		return errors.New("Ungültige Telefonnummer. Bitte verwenden Sie ein gültiges Format (z.B. 0123 456789 oder +49 123 456789)")
+	}
+
 	if !phoneRegex.MatchString(phone) {
 		return errors.New("Ungültige Telefonnummer. Bitte verwenden Sie ein gültiges Format (z.B. 0123 456789 oder +49 123 456789)")
 	}
