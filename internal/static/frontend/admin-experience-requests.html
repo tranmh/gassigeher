@@ -55,6 +55,7 @@
     <script src="/js/nav-menu.js"></script>
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
+    <script src="/js/sanitize.js"></script>
     <script>
         let requests = [];
 
@@ -105,6 +106,9 @@
             }
 
             container.innerHTML = requests.map(request => {
+                const safeUserName = request.user ? sanitizeHTML(request.user.name) : `User #${request.user_id}`;
+                const safeEmail = request.user && request.user.email ? sanitizeHTML(request.user.email) : 'N/A';
+                const safeAdminMessage = request.admin_message ? sanitizeHTML(request.admin_message) : '';
                 const levelLabel = getLevelLabel(request.requested_level);
                 const statusClass = request.status === 'pending' ? 'alert-warning' :
                                   (request.status === 'approved' ? 'alert-success' : 'alert-error');
@@ -114,11 +118,11 @@
                         <div style="display: flex; justify-content: space-between; align-items: start;">
                             <div style="flex: 1;">
                                 <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
-                                    <h4 style="margin: 0;">${request.user ? request.user.name : 'User #' + request.user_id}</h4>
+                                    <h4 style="margin: 0;">${safeUserName}</h4>
                                     <span class="dog-category-badge ${request.requested_level}">${levelLabel}</span>
                                 </div>
                                 <p style="margin: 5px 0; color: #666;">
-                                    <strong>E-Mail:</strong> ${request.user && request.user.email ? request.user.email : 'N/A'}
+                                    <strong>E-Mail:</strong> ${safeEmail}
                                 </p>
                                 <p style="margin: 5px 0; color: #666;">
                                     <strong>Aktuelles Level:</strong> ${request.user ? getLevelLabel(request.user.experience_level) : 'N/A'}
@@ -133,7 +137,7 @@
                                 ` : ''}
                                 ${request.admin_message ? `
                                     <p style="margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 4px;">
-                                        <strong>Nachricht:</strong> ${request.admin_message}
+                                        <strong>Nachricht:</strong> ${safeAdminMessage}
                                     </p>
                                 ` : ''}
                             </div>

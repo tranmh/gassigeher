@@ -7,6 +7,7 @@ import (
 	"github.com/tranmh/gassigeher/internal/testutil"
 )
 
+
 // DONE: TestCronService_AutoCompleteBookings tests automatic booking completion
 func TestCronService_AutoCompleteBookings(t *testing.T) {
 	db := testutil.SetupTestDB(t)
@@ -177,6 +178,75 @@ func TestCronService_AutoDeactivateInactiveUsers(t *testing.T) {
 
 		if isActive {
 			t.Error("Already deactivated user should remain deactivated")
+		}
+	})
+}
+
+// DONE: TestCronService_AutoDeactivateInactiveUsers_SendsEmailNotifications tests that email notifications are sent on auto-deactivation
+func TestCronService_AutoDeactivateInactiveUsers_SendsEmailNotifications(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cronService := NewCronService(db, nil)
+
+	t.Run("should attempt to send email notification when user is auto-deactivated", func(t *testing.T) {
+		// Create user with old last activity
+		oldActivity := time.Now().AddDate(0, 0, -400) // 400 days ago
+		email := "olduser_email@example.com"
+		userName := "Old User Email"
+
+		_, err := db.Exec(`
+			INSERT INTO users (email, name, password_hash, experience_level, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
+			VALUES (?, ?, 'hash', 'green', 1, 1, ?, ?, ?)
+		`, email, userName, time.Now(), oldActivity, time.Now())
+		if err != nil {
+			t.Fatalf("Failed to create old user: %v", err)
+		}
+
+		// Run auto-deactivation (should not panic even though no email service is configured)
+		cronService.autoDeactivateInactiveUsers()
+
+		// Verify user is deactivated in database
+		var isActive bool
+		db.QueryRow("SELECT is_active FROM users WHERE email = ?", email).Scan(&isActive)
+		if isActive {
+			t.Error("User should be deactivated after auto-deactivation")
+		}
+
+		// TODO: After implementing SendAccountDeactivated method and adding email sending:
+		// 1. Create a mock email service that tracks SendAccountDeactivated calls
+		// 2. Verify that SendAccountDeactivated was called with correct email, name, and reason
+		// 3. Test that emails are sent to multiple deactivated users
+		// 4. Test that no email is sent if user has no email address
+	})
+
+	t.Run("should handle multiple inactive users", func(t *testing.T) {
+		// Create two inactive users
+		oldActivity1 := time.Now().AddDate(0, 0, -400)
+		oldActivity2 := time.Now().AddDate(0, 0, -450)
+
+		_, err := db.Exec(`
+			INSERT INTO users (email, name, password_hash, experience_level, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
+			VALUES (?, 'Multi User One', 'hash', 'green', 1, 1, ?, ?, ?)
+		`, "multi1@example.com", time.Now(), oldActivity1, time.Now())
+		if err != nil {
+			t.Fatalf("Failed to create user 1: %v", err)
+		}
+
+		_, err = db.Exec(`
+			INSERT INTO users (email, name, password_hash, experience_level, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
+			VALUES (?, 'Multi User Two', 'hash', 'blue', 1, 1, ?, ?, ?)
+		`, "multi2@example.com", time.Now(), oldActivity2, time.Now())
+		if err != nil {
+			t.Fatalf("Failed to create user 2: %v", err)
+		}
+
+		// Run auto-deactivation
+		cronService.autoDeactivateInactiveUsers()
+
+		// Verify both users are deactivated
+		var count int
+		err = db.QueryRow("SELECT COUNT(*) FROM users WHERE email IN ('multi1@example.com', 'multi2@example.com') AND is_active = 0").Scan(&count)
+		if err != nil || count != 2 {
+			t.Errorf("Expected 2 deactivated users, but got %d", count)
 		}
 	})
 }

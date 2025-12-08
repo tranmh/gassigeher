@@ -73,6 +73,7 @@
     <script src="/js/nav-menu.js"></script>
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
+    <script src="/js/sanitize.js"></script>
     <script>
         let users = [];
         let currentUser = null;
@@ -137,6 +138,12 @@
                 const statusLabel = user.is_active ? 'Aktiv' : 'Inaktiv';
                 const levelLabel = getLevelLabel(user.experience_level);
 
+                // Sanitize user data to prevent XSS
+                const safeName = sanitizeHTML(user.name);
+                const safeEmail = sanitizeHTML(user.email || 'N/A');
+                const safePhone = sanitizeHTML(user.phone || 'N/A');
+                const safeReason = user.deactivation_reason ? sanitizeHTML(user.deactivation_reason) : '';
+
                 // Determine role badge
                 let roleBadge = '';
                 if (user.is_super_admin) {
@@ -152,16 +159,16 @@
                         <div style="display: flex; justify-content: space-between; align-items: start;">
                             <div style="flex: 1;">
                                 <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
-                                    <h4 style="margin: 0;">${user.name}</h4>
+                                    <h4 style="margin: 0;">${safeName}</h4>
                                     <span class="alert ${statusClass}" style="padding: 4px 12px; font-size: 0.8rem; margin: 0;">${statusLabel}</span>
                                     <span class="dog-category-badge ${user.experience_level}" style="font-size: 0.8rem;">${levelLabel}</span>
                                     ${roleBadge}
                                 </div>
                                 <p style="margin: 5px 0; color: #666;">
-                                    <strong>E-Mail:</strong> ${user.email || 'N/A'}
+                                    <strong>E-Mail:</strong> ${safeEmail}
                                 </p>
                                 <p style="margin: 5px 0; color: #666;">
-                                    <strong>Telefon:</strong> ${user.phone || 'N/A'}
+                                    <strong>Telefon:</strong> ${safePhone}
                                 </p>
                                 <p style="margin: 5px 0; color: #666;">
                                     <strong>Letzte Aktivität:</strong> ${user.last_activity_at ? new Date(user.last_activity_at).toLocaleDateString('de-DE') : 'N/A'}
@@ -171,7 +178,7 @@
                                 </p>
                                 ${user.deactivated_at && user.deactivation_reason ? `
                                     <p style="margin: 10px 0; padding: 10px; background: #fff3cd; border-radius: 4px;">
-                                        <strong>Deaktivierungsgrund:</strong> ${user.deactivation_reason}
+                                        <strong>Deaktivierungsgrund:</strong> ${safeReason}
                                     </p>
                                 ` : ''}
                             </div>
@@ -186,9 +193,9 @@
 
                                 ${currentUser && currentUser.is_super_admin && !user.is_super_admin ? `
                                     ${user.is_admin ? `
-                                        <button class="btn btn-warning btn-sm" onclick="demoteAdmin(${user.id}, '${user.name.replace(/'/g, "\\'")}')">Admin entfernen</button>
+                                        <button class="btn btn-warning btn-sm" onclick="demoteAdmin(${user.id}, '${safeName.replace(/'/g, "\\'")}')">Admin entfernen</button>
                                     ` : `
-                                        <button class="btn btn-secondary btn-sm" onclick="promoteToAdmin(${user.id}, '${user.name.replace(/'/g, "\\'")}')">Zu Admin ernennen</button>
+                                        <button class="btn btn-secondary btn-sm" onclick="promoteToAdmin(${user.id}, '${safeName.replace(/'/g, "\\'")}')">Zu Admin ernennen</button>
                                     `}
                                 ` : ''}
                             </div>

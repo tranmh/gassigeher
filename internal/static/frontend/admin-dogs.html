@@ -133,6 +133,7 @@
     <script src="/js/api.js"></script>
     <script src="/js/dog-photo-helpers.js"></script>
     <script src="/js/dog-photo.js"></script>
+    <script src="/js/sanitize.js"></script>
     <script>
         let currentDogs = [];
 
@@ -212,15 +213,20 @@
                 return;
             }
 
-            container.innerHTML = currentDogs.map(dog => `
+            container.innerHTML = currentDogs.map(dog => {
+                const safeDogName = sanitizeHTML(dog.name);
+                const safeUnavailableReason = dog.unavailable_reason ? sanitizeHTML(dog.unavailable_reason) : 'Nicht verfügbar';
+                const safeDogBreed = sanitizeHTML(dog.breed);
+
+                return `
                 <div class="dog-card ${!dog.is_available ? 'unavailable' : ''}">
-                    ${!dog.is_available ? `<div class="dog-unavailable-banner">${dog.unavailable_reason || 'Nicht verfügbar'}</div>` : ''}
+                    ${!dog.is_available ? `<div class="dog-unavailable-banner">${safeUnavailableReason}</div>` : ''}
                     ${dog.is_featured ? `<div class="dog-featured-badge" title="Auf Startseite angezeigt">⭐</div>` : ''}
                     ${getDogPhotoHtml(dog, false, 'dog-card-image', true, true)}
                     <div class="dog-card-body">
                         <div class="dog-category-badge ${dog.category}">${getCategoryLabel(dog.category)}</div>
-                        <h3 class="dog-card-title">${dog.name}</h3>
-                        <p class="dog-card-info">${dog.breed} • ${getSizeLabel(dog.size)} • ${dog.age} Jahre</p>
+                        <h3 class="dog-card-title">${safeDogName}</h3>
+                        <p class="dog-card-info">${safeDogBreed} • ${getSizeLabel(dog.size)} • ${dog.age} Jahre</p>
                         <div style="display: flex; gap: 5px; margin-top: 10px;">
                             <button class="btn" style="flex: 1; padding: 8px;" onclick="editDog(${dog.id})">✏️</button>
                             <button class="btn ${dog.is_featured ? 'btn-warning' : 'btn-secondary'}" style="flex: 1; padding: 8px;" onclick="toggleFeatured(${dog.id}, ${!dog.is_featured})" title="${dog.is_featured ? 'Von Startseite entfernen' : 'Auf Startseite anzeigen'}">
@@ -233,7 +239,8 @@
                         </div>
                     </div>
                 </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         function getCategoryLabel(category) {
