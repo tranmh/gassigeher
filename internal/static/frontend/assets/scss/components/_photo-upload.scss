@@ -1,0 +1,92 @@
+// ============================================================================
+// Photo Upload Component
+// ============================================================================
+// Photo upload zone, preview, and progress styles
+
+@use '../abstracts' as *;
+
+// ----------------------------------------------------------------------------
+// Photo Upload Zone
+// ----------------------------------------------------------------------------
+.photo-upload-zone {
+  border: $border-width dashed $primary-green;
+  border-radius: $border-radius;
+  padding: 30px;
+  text-align: center;
+  cursor: pointer;
+  @include transition(all);
+  background: $warm-cream;
+  position: relative;
+  min-height: $photo-upload-min-height;
+  @include flex-center;
+
+  &:hover {
+    background: rgba(130, 185, 101, 0.05);
+    border-color: $secondary-green;
+  }
+
+  &.drag-over {
+    background: rgba(130, 185, 101, 0.1);
+    border-color: $secondary-green;
+    border-style: solid;
+    transform: scale(1.02);
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Upload Prompt
+// ----------------------------------------------------------------------------
+.upload-prompt {
+  @include flex-column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.upload-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 15px;
+}
+
+.upload-hint {
+  font-size: 0.85rem;
+  color: $text-gray;
+  margin: 5px 0;
+}
+
+// ----------------------------------------------------------------------------
+// Photo Preview
+// ----------------------------------------------------------------------------
+.photo-preview {
+  position: relative;
+  max-width: $photo-preview-max-width;
+  margin: 0 auto;
+  width: 100%;
+
+  &.hidden {
+    display: none;
+  }
+
+  img {
+    width: 100%;
+    max-height: $photo-preview-max-height;
+    object-fit: contain;
+    border-radius: $border-radius;
+    @include shadow-md;
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Responsive
+// ----------------------------------------------------------------------------
+@include mobile {
+  .photo-upload-zone {
+    padding: 20px;
+    min-height: 150px;
+  }
+
+  .upload-icon {
+    font-size: 36px;
+  }
+}

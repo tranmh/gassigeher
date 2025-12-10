@@ -1,0 +1,32 @@
+// ============================================================================
+// Filters Component
+// ============================================================================
+// Filter bar and filter controls
+
+@use '../abstracts' as *;
+
+// ----------------------------------------------------------------------------
+// Filter Bar
+// ----------------------------------------------------------------------------
+.filter-bar {
+  background: $card-bg;
+  padding: $spacing-lg;
+  border-radius: $border-radius;
+  margin-bottom: $spacing-lg;
+  @include shadow-sm;
+  border: $border-width solid $border-light;
+}
+
+// ----------------------------------------------------------------------------
+// Filter Row
+// ----------------------------------------------------------------------------
+.filter-row {
+  display: flex;
+  gap: $spacing-md;
+  flex-wrap: wrap;
+
+  > * {
+    flex: 1;
+    min-width: 200px;
+  }
+}

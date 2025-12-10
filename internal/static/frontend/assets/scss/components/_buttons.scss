@@ -1,0 +1,106 @@
+// ============================================================================
+// Buttons Component
+// ============================================================================
+// All button styles and variants
+
+@use '../abstracts' as *;
+
+// ----------------------------------------------------------------------------
+// Base Button
+// ----------------------------------------------------------------------------
+.btn {
+  @include btn-base;
+  @include btn-gradient($primary-green, $secondary-green);
+  @include shadow-green;
+
+  &:hover {
+    @include shadow-green-hover;
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Button Sizes
+// ----------------------------------------------------------------------------
+.btn-sm {
+  padding: $btn-padding-sm;
+  font-size: $btn-font-size-sm;
+}
+
+.btn-small {
+  padding: $btn-padding-sm;
+  font-size: $btn-font-size-sm;
+}
+
+// ----------------------------------------------------------------------------
+// Button Variants
+// ----------------------------------------------------------------------------
+.btn-secondary {
+  @include btn-gradient($accent-blue, #3a7bc8);
+  @include shadow-md;
+  box-shadow: $shadow-blue;
+
+  &:hover {
+    box-shadow: 0 6px 16px rgba(74, 144, 226, 0.4);
+  }
+}
+
+.btn-danger {
+  @include btn-gradient($error-red, #c82333);
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+
+  &:hover {
+    box-shadow: 0 6px 16px rgba(231, 76, 60, 0.4);
+  }
+}
+
+.btn-warning {
+  @include btn-gradient($warning-orange, #e08a00);
+  box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
+
+  &:hover {
+    box-shadow: 0 6px 16px rgba(243, 156, 18, 0.4);
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Button Modifiers
+// ----------------------------------------------------------------------------
+.btn-block {
+  width: 100%;
+}
+
+// ----------------------------------------------------------------------------
+// Special Buttons
+// ----------------------------------------------------------------------------
+.btn-remove-preview {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  @include transition(all);
+  color: $text-dark;
+
+  &:hover {
+    background: $error-red;
+    color: white;
+    transform: scale(1.1);
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Responsive
+// ----------------------------------------------------------------------------
+@include mobile {
+  .btn {
+    width: 100%;
+    margin-bottom: $spacing-sm;
+  }
+}

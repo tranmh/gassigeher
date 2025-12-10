@@ -1,0 +1,210 @@
+// ============================================================================
+// Dog Cards Component
+// ============================================================================
+// Specialized card styles for dog listings
+
+@use '../abstracts' as *;
+
+// ----------------------------------------------------------------------------
+// Dog Card Grid
+// ----------------------------------------------------------------------------
+.dog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: $spacing-lg;
+  margin: $spacing-xl 0;
+}
+
+// ----------------------------------------------------------------------------
+// Dog Card
+// ----------------------------------------------------------------------------
+.dog-card {
+  background: $card-bg;
+  border-radius: $border-radius;
+  overflow: hidden;
+  @include shadow-md;
+  @include transition(transform, box-shadow, border-color);
+  border: $border-width solid $border-light;
+  position: relative;
+
+  &:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 8px 24px rgba(130, 185, 101, 0.2);
+    border-color: $primary-green;
+  }
+
+  &.unavailable {
+    opacity: 0.7;
+    background: #f5f5f5;
+  }
+
+  &.locked {
+    opacity: 0.6;
+    position: relative;
+
+    &::after {
+      content: '';
+      @include absolute-fill;
+      background: rgba(255, 255, 255, 0.3);
+      pointer-events: none;
+    }
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Dog Card Image
+// ----------------------------------------------------------------------------
+.dog-card-image {
+  width: 100%;
+  height: $dog-card-image-height;
+  object-fit: cover;
+  background: $light-bg;
+  @include transition(transform, opacity);
+  @include fade-in;
+
+  &.no-animation {
+    opacity: 1;
+    transition: none;
+  }
+
+  .dog-card:hover & {
+    transform: scale(1.05);
+  }
+}
+
+.dog-card-thumbnail {
+  width: 100%;
+  height: $dog-card-image-height;
+  object-fit: cover;
+  border-radius: $border-radius $border-radius 0 0;
+}
+
+.dog-card-image-wrapper {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  overflow: hidden;
+  border-radius: $border-radius;
+
+  img {
+    @include cover-image;
+  }
+}
+
+.dog-card-image[data-priority="high"] {
+  content-visibility: auto;
+}
+
+// ----------------------------------------------------------------------------
+// Dog Card Body
+// ----------------------------------------------------------------------------
+.dog-card-body {
+  padding: $spacing-md;
+}
+
+.dog-card-title {
+  font-size: $font-size-h5;
+  font-weight: $font-weight-semibold;
+  margin-bottom: $spacing-xs;
+}
+
+.dog-card-info {
+  font-size: $font-size-small;
+  color: $text-gray;
+  margin-bottom: $spacing-xs;
+}
+
+// ----------------------------------------------------------------------------
+// Dog Card Banners
+// ----------------------------------------------------------------------------
+.dog-unavailable-banner {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: $spacing-sm;
+  text-align: center;
+  font-size: $font-size-small;
+  font-weight: $font-weight-semibold;
+}
+
+.dog-locked-banner {
+  background-color: #fff3cd;
+  color: #856404;
+  padding: $spacing-sm;
+  text-align: center;
+  font-size: $font-size-small;
+  font-weight: $font-weight-semibold;
+}
+
+// ----------------------------------------------------------------------------
+// Calendar Dog Photo
+// ----------------------------------------------------------------------------
+.calendar-dog-photo {
+  width: $dog-card-thumbnail-size;
+  height: $dog-card-thumbnail-size;
+  border-radius: 50%;
+  object-fit: cover;
+  border: $border-width solid $border-light;
+  margin-right: 8px;
+}
+
+.calendar-dog-name-cell {
+  @include flex-center;
+  gap: 8px;
+}
+
+// ----------------------------------------------------------------------------
+// Current Photo Display
+// ----------------------------------------------------------------------------
+.current-photo-display {
+  @include flex-between;
+  gap: 20px;
+  padding: $spacing-md;
+  background: $warm-cream;
+  border-radius: $border-radius;
+  border: 1px solid $border-light;
+}
+
+.current-dog-photo {
+  width: 150px;
+  height: 150px;
+  object-fit: cover;
+  border-radius: $border-radius;
+  @include shadow-md;
+}
+
+.photo-actions {
+  @include flex-column;
+  gap: 10px;
+  flex: 1;
+}
+
+// ----------------------------------------------------------------------------
+// Responsive
+// ----------------------------------------------------------------------------
+@include mobile {
+  .current-photo-display {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .current-dog-photo {
+    width: 120px;
+    height: 120px;
+  }
+
+  .photo-actions {
+    width: 100%;
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Accessibility
+// ----------------------------------------------------------------------------
+@include reduce-motion {
+  .dog-card-image {
+    transition: none;
+  }
+
+  .dog-card-image-container {
+    animation: none;
+  }
+}

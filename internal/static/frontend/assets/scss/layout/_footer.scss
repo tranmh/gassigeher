@@ -1,0 +1,32 @@
+// ============================================================================
+// Footer Layout
+// ============================================================================
+// Footer styles
+
+@use '../abstracts' as *;
+
+// ----------------------------------------------------------------------------
+// Footer
+// ----------------------------------------------------------------------------
+footer {
+  @include gradient-footer;
+  color: $text-white;
+  padding: $spacing-xl 0;
+  text-align: center;
+  margin-top: $spacing-xl;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+
+  p {
+    margin: 0;
+    font-size: $font-size-small;
+  }
+
+  a {
+    color: $accent-orange;
+    font-weight: $font-weight-semibold;
+
+    &:hover {
+      color: $primary-green;
+    }
+  }
+}

@@ -1,0 +1,64 @@
+// ============================================================================
+// Spinner Component
+// ============================================================================
+// Loading spinner animations
+
+@use '../abstracts' as *;
+
+// ----------------------------------------------------------------------------
+// Spinner Animation
+// ----------------------------------------------------------------------------
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Base Spinner
+// ----------------------------------------------------------------------------
+.spinner {
+  border: $spinner-border-width solid $border-light;
+  border-top: $spinner-border-width solid $primary-green;
+  border-radius: 50%;
+  width: $spinner-size;
+  height: $spinner-size;
+  animation: spin 1s linear infinite;
+  margin: 20px auto;
+}
+
+// ----------------------------------------------------------------------------
+// Loading Overlay
+// ----------------------------------------------------------------------------
+.loading-overlay {
+  @include overlay;
+
+  .spinner {
+    border-color: rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    width: $spinner-size-lg;
+    height: $spinner-size-lg;
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Upload Progress Overlay
+// ----------------------------------------------------------------------------
+.upload-progress-overlay {
+  position: fixed;
+  @include absolute-fill;
+  background: rgba(0, 0, 0, 0.7);
+  display: none;
+  @include flex-center;
+  z-index: $z-index-toast;
+}
+
+.upload-progress {
+  background: $text-dark;
+  padding: 30px 50px;
+  border-radius: $border-radius;
+  text-align: center;
+}

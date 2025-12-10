@@ -1,0 +1,62 @@
+// ============================================================================
+// Hero Section Layout
+// ============================================================================
+// Hero banner for homepage and landing pages
+
+@use '../abstracts' as *;
+
+// ----------------------------------------------------------------------------
+// Hero Section
+// ----------------------------------------------------------------------------
+.hero {
+  @include gradient-accent;
+  color: $text-white;
+  padding: 80px 0;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    @include absolute-fill;
+    background: radial-gradient(
+      circle at 20% 50%,
+      rgba(255, 140, 66, 0.2) 0%,
+      transparent 50%
+    );
+    pointer-events: none;
+  }
+
+  h1 {
+    font-size: 3rem;
+    margin-bottom: $spacing-md;
+    position: relative;
+    @include text-shadow;
+  }
+
+  p {
+    font-size: 1.25rem;
+    margin-bottom: $spacing-xl;
+    position: relative;
+  }
+
+  .btn {
+    margin: 0 $spacing-sm;
+    position: relative;
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Responsive
+// ----------------------------------------------------------------------------
+@include mobile {
+  .hero {
+    h1 {
+      font-size: 2rem;
+    }
+
+    p {
+      font-size: 1rem;
+    }
+  }
+}

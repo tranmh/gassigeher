@@ -1,0 +1,49 @@
+// ============================================================================
+// Gassigeher - Main SASS Entry Point
+// ============================================================================
+// Dog Walking Booking System
+// Based on Tierheim Göppingen color scheme
+//
+// Architecture:
+// - 7-1 Pattern (abstracts, base, components, layout, pages, themes, vendors)
+// - BEM methodology for component classes
+// - Mobile-first responsive design
+// - Design tokens via CSS custom properties (variables)
+
+// ----------------------------------------------------------------------------
+// 1. Abstracts
+// ----------------------------------------------------------------------------
+// Variables, mixins, functions - no CSS output
+@use 'abstracts';
+
+// ----------------------------------------------------------------------------
+// 2. Base
+// ----------------------------------------------------------------------------
+// Reset, typography, utilities - foundational styles
+@use 'base';
+
+// ----------------------------------------------------------------------------
+// 3. Layout
+// ----------------------------------------------------------------------------
+// Major layout components (header, footer, navigation, containers)
+@use 'layout';
+
+// ----------------------------------------------------------------------------
+// 4. Components
+// ----------------------------------------------------------------------------
+// Reusable UI components (buttons, cards, forms, etc.)
+@use 'components';
+
+// ----------------------------------------------------------------------------
+// 5. Pages
+// ----------------------------------------------------------------------------
+// Page-specific styles (currently empty - all styles are component-based)
+@use 'pages';
+
+// ----------------------------------------------------------------------------
+// Build Information
+// ----------------------------------------------------------------------------
+// Compiled from SASS to CSS
+// Build command: npm run sass
+// Watch mode: npm run sass:watch
+// Production: npm run sass:prod

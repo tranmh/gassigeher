@@ -1,0 +1,61 @@
+// ============================================================================
+// Features Component
+// ============================================================================
+// Feature grid and feature cards for homepage
+
+@use '../abstracts' as *;
+
+// ----------------------------------------------------------------------------
+// Features Grid
+// ----------------------------------------------------------------------------
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: $spacing-xl;
+  margin: $spacing-xl 0;
+}
+
+// ----------------------------------------------------------------------------
+// Feature Card
+// ----------------------------------------------------------------------------
+.feature {
+  text-align: center;
+  padding: $spacing-xl;
+  background: $card-bg;
+  border-radius: $border-radius;
+  @include shadow-sm;
+  @include transition(all);
+  border: $border-width solid $border-light;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 16px rgba(130, 185, 101, 0.15);
+    border-color: $primary-green;
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Feature Icon
+// ----------------------------------------------------------------------------
+.feature-icon {
+  font-size: 3rem;
+  margin-bottom: $spacing-md;
+  display: inline-block;
+  padding: 20px;
+  @include gradient-accent;
+  border-radius: 50%;
+  color: white;
+  width: 80px;
+  height: 80px;
+  line-height: 80px;
+  @include shadow-green;
+}
+
+// ----------------------------------------------------------------------------
+// Responsive
+// ----------------------------------------------------------------------------
+@include mobile {
+  .features {
+    grid-template-columns: 1fr;
+  }
+}

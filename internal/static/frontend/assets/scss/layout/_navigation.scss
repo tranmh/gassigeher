@@ -1,0 +1,178 @@
+// ============================================================================
+// Navigation Layout
+// ============================================================================
+// Navigation menu, dropdowns, and mobile menu
+
+@use '../abstracts' as *;
+
+// ----------------------------------------------------------------------------
+// Main Navigation
+// ----------------------------------------------------------------------------
+nav {
+  ul {
+    display: flex;
+    list-style: none;
+    gap: $spacing-lg;
+  }
+
+  a {
+    color: $text-white;
+    font-weight: $font-weight-normal;
+    @include transition(all);
+
+    &:hover {
+      color: $accent-orange;
+      transform: translateY(-2px);
+    }
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Navigation Dropdown
+// ----------------------------------------------------------------------------
+.nav-dropdown {
+  position: relative;
+
+  > a {
+    @include flex-center;
+    gap: 4px;
+
+    &::after {
+      content: '▾';
+      font-size: 0.7rem;
+      opacity: 0.8;
+    }
+  }
+}
+
+.nav-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  @include gradient-header;
+  min-width: 200px;
+  border-radius: $border-radius;
+  box-shadow: $shadow-xl;
+  z-index: $z-index-dropdown;
+  padding: 8px 0;
+  margin-top: 8px;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 8px solid transparent;
+    border-bottom-color: $header-bg;
+  }
+
+  a {
+    display: block;
+    padding: 10px 16px;
+    color: $text-white;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    @include transition-fast(background);
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.15);
+      transform: none;
+    }
+  }
+}
+
+.nav-dropdown:hover .nav-dropdown-menu,
+.nav-dropdown.active .nav-dropdown-menu {
+  display: block;
+}
+
+// ----------------------------------------------------------------------------
+// Mobile Navigation
+// ----------------------------------------------------------------------------
+@include mobile {
+  nav {
+    position: fixed;
+    top: 0;
+    left: -$nav-mobile-width;
+    width: $nav-mobile-width;
+    height: 100vh;
+    background: linear-gradient(180deg, $header-bg 0%, $primary-green 100%);
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+    @include transition(left);
+    z-index: $z-index-modal;
+    overflow-y: auto;
+    padding-top: 60px;
+
+    &.active {
+      left: 0;
+    }
+
+    ul {
+      flex-direction: column;
+      text-align: left;
+      gap: 0;
+      padding: $spacing-md;
+
+      li {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+        &:last-child {
+          border-bottom: none;
+        }
+      }
+    }
+
+    a {
+      display: block;
+      padding: $spacing-md;
+      @include transition-fast(background);
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.1);
+        transform: none;
+      }
+    }
+  }
+
+  // Mobile dropdown adjustments
+  .nav-dropdown-menu {
+    position: static;
+    transform: none;
+    box-shadow: none;
+    margin-top: 0;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 0;
+
+    &::before {
+      display: none;
+    }
+
+    a {
+      padding-left: 32px;
+    }
+  }
+
+  .nav-dropdown > a::after {
+    margin-left: auto;
+  }
+
+  // Navigation overlay
+  .nav-overlay {
+    display: none;
+    position: fixed;
+    @include absolute-fill;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: $z-index-modal-overlay;
+
+    &.active {
+      display: block;
+    }
+  }
+}

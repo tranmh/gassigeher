@@ -1,0 +1,15 @@
+{
+  "name": "gassigeher",
+  "version": "1.0.0",
+  "description": "Dog Walking Booking System - Frontend Build Tools",
+  "private": true,
+  "scripts": {
+    "sass": "sass internal/static/frontend/assets/scss:internal/static/frontend/assets/css --no-source-map",
+    "sass:watch": "sass internal/static/frontend/assets/scss:internal/static/frontend/assets/css --watch --no-source-map",
+    "sass:prod": "sass internal/static/frontend/assets/scss:internal/static/frontend/assets/css --style=compressed --no-source-map",
+    "build": "npm run sass:prod"
+  },
+  "devDependencies": {
+    "sass": "^1.69.5"
+  }
+}

@@ -1,0 +1,43 @@
+// ============================================================================
+// Alerts Component
+// ============================================================================
+// Alert messages and notifications
+
+@use '../abstracts' as *;
+
+// ----------------------------------------------------------------------------
+// Base Alert
+// ----------------------------------------------------------------------------
+.alert {
+  padding: $spacing-md;
+  border-radius: $border-radius;
+  margin-bottom: $spacing-lg;
+  border-left: 4px solid;
+}
+
+// ----------------------------------------------------------------------------
+// Alert Variants
+// ----------------------------------------------------------------------------
+.alert-success {
+  background-color: #d4edda;
+  border-color: $success-green;
+  color: #155724;
+}
+
+.alert-error {
+  background-color: #f8d7da;
+  border-color: $error-red;
+  color: #721c24;
+}
+
+.alert-warning {
+  background-color: #fff3cd;
+  border-color: $warning-orange;
+  color: #856404;
+}
+
+.alert-info {
+  background-color: #d1ecf1;
+  border-color: $info-blue;
+  color: #0c5460;
+}

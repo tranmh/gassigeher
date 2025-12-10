@@ -1,0 +1,65 @@
+// ============================================================================
+// Skeleton Loading Component
+// ============================================================================
+// Skeleton loaders for content placeholders
+
+@use '../abstracts' as *;
+
+// ----------------------------------------------------------------------------
+// Skeleton Animation
+// ----------------------------------------------------------------------------
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Base Skeleton
+// ----------------------------------------------------------------------------
+.skeleton {
+  @include skeleton-loading;
+  border-radius: $border-radius;
+}
+
+// ----------------------------------------------------------------------------
+// Skeleton Variants
+// ----------------------------------------------------------------------------
+.skeleton-text {
+  height: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.skeleton-title {
+  height: 1.5rem;
+  width: 60%;
+  margin-bottom: 1rem;
+}
+
+// ----------------------------------------------------------------------------
+// Image Container Skeleton
+// ----------------------------------------------------------------------------
+.dog-card-image-container {
+  position: relative;
+  @include skeleton-loading;
+  border-radius: $border-radius;
+  overflow: hidden;
+
+  &.loaded {
+    background: none;
+    animation: none;
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Accessibility - Reduce Motion
+// ----------------------------------------------------------------------------
+@include reduce-motion {
+  .skeleton,
+  .dog-card-image-container {
+    animation: none;
+  }
+}

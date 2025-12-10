@@ -1,0 +1,47 @@
+// ============================================================================
+// Badges Component
+// ============================================================================
+// Badge styles for categories and featured items
+
+@use '../abstracts' as *;
+
+// ----------------------------------------------------------------------------
+// Base Badge
+// ----------------------------------------------------------------------------
+.dog-category-badge {
+  @include badge-base;
+  margin-bottom: $spacing-sm;
+}
+
+// ----------------------------------------------------------------------------
+// Category Badge Variants
+// ----------------------------------------------------------------------------
+.dog-category-badge.green {
+  @include badge-gradient(#d4edda, #c3e6cb, #155724, #b1dfbb);
+}
+
+.dog-category-badge.blue {
+  @include badge-gradient(#d1ecf1, #bee5eb, #0c5460, #a8dadc);
+}
+
+.dog-category-badge.orange {
+  @include badge-gradient(#fff3cd, #ffe69c, #856404, #ffd966);
+}
+
+// ----------------------------------------------------------------------------
+// Featured Badge
+// ----------------------------------------------------------------------------
+.dog-featured-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: linear-gradient(135deg, $warning-orange 0%, #e08a00 100%);
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  @include flex-center;
+  font-size: 1rem;
+  box-shadow: $shadow-orange;
+  z-index: 5;
+}
