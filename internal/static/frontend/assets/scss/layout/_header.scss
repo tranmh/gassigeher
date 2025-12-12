@@ -19,6 +19,7 @@ header {
 
   .container {
     @include flex-between;
+    gap: $spacing-lg;
   }
 }
 
@@ -29,6 +30,7 @@ header {
   font-size: 1.5rem;
   font-weight: $font-weight-semibold;
   color: $text-white;
+  white-space: nowrap;
   @include text-shadow;
 }
 

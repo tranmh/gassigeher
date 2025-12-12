@@ -18,6 +18,7 @@ nav {
   a {
     color: $text-white;
     font-weight: $font-weight-normal;
+    white-space: nowrap;
     @include transition(all);
 
     &:hover {
