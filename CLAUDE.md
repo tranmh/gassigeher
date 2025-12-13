@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Gassigeher is a **complete production-ready** dog walking booking system for animal shelters. Built with Go backend (supports SQLite, MySQL, PostgreSQL) and Vanilla JavaScript frontend. All 10 implementation phases are complete.
+Gassigeher is a **complete production-ready** dog walking booking system for animal shelters. Built with Go 1.24+ backend (supports SQLite, MySQL, PostgreSQL) and Vanilla JavaScript frontend. All 10 implementation phases complete.
 
-**Status**: ✅ Production ready, fully functional, deployment package included.
+**Status**: ✅ Production ready | 71 API endpoints | 26 pages | 18 email types | 305+ tests | GDPR-compliant
 
 > **Essential Reading**:
 > - [ImplementationPlan.md](docs/ImplementationPlan.md) - Complete architecture, all 10 phases
-> - [API.md](docs/API.md) - All 50+ endpoints with request/response examples
+> - [API.md](docs/API.md) - All 71 endpoints with request/response examples
 > - [DEPLOYMENT.md](docs/DEPLOYMENT.md) - Production deployment steps
 
 ---
@@ -70,34 +70,33 @@ go test ./... -coverprofile=coverage.out
 go tool cover -html=coverage.out
 ```
 
-**Current Coverage:**
-- Auth service: 18.7% (7 tests passing)
-- Models: 50% (9 tests passing)
-- Repository: 6.3% (4 tests passing)
+**Current Coverage:** 305+ tests passing across all packages (handlers, models, repository, services, middleware, database)
 
 ## Architecture Overview
 
 ### Three-Layer Backend Architecture
 
-**1. Handlers** (`internal/handlers/`)
+**1. Handlers** (`internal/handlers/`) - 14 handler files
 - HTTP request/response handling
 - Input validation
 - Context extraction (user_id, is_admin)
 - Calls services/repositories
 - **Pattern**: Each handler owns its dependencies (repos, services, config)
 
-**2. Repositories** (`internal/repository/`)
+**2. Repositories** (`internal/repository/`) - 12 repository files
 - Direct database operations
 - SQL query construction
 - No business logic
 - **Pattern**: One repository per model, returns models only
 
 **3. Services** (`internal/services/`)
-- Business logic (auth, email)
+- Business logic (auth, email, holidays, booking times)
 - Independent of HTTP layer
 - **AuthService**: JWT, password hashing, token generation
 - **EmailService**: Multi-provider email (Gmail API, SMTP), HTML templates
 - **EmailProvider Interface**: Pluggable email providers (Gmail, SMTP)
+- **HolidayService**: German public holiday API integration with caching
+- **BookingTimeService**: Configurable time slots, approval workflow
 
 ### Request Flow
 
@@ -227,6 +226,25 @@ Critical for auto-deactivation (365-day inactivity default):
 - Method: `userRepo.UpdateLastActivity(userID)`
 - **Must call after any user action that counts as "activity"**
 
+### Booking Time Rules
+
+Configurable time slots managed via `BookingTimeService`:
+- **Day types**: weekday, weekend, holiday
+- **Time slots**: Morning, afternoon, evening with configurable start/end times
+- **Blocked periods**: Feeding times, rest periods
+- **Approval workflow**: Certain times may require admin approval
+- Admin configures via `admin-settings.html`
+- API: `GET/PUT /api/booking-times/rules`, `GET /api/booking-times/available-slots`
+
+### German Holiday Integration
+
+Holiday detection via `HolidayService`:
+- Uses feiertage-api.de for German public holidays
+- Caches results in `feiertage_cache` table
+- Default state: BW (Baden-Württemberg), configurable
+- Custom holidays can be added by admin
+- Holidays use weekend booking rules by default
+
 ### Booking Validation Chain
 
 When creating bookings, validate in this order:
@@ -242,9 +260,9 @@ When creating bookings, validate in this order:
 ### Cron Jobs
 
 Three automated jobs in `internal/cron/cron.go`:
-1. **Auto-complete**: Runs hourly via `runPeriodically()`
-2. **Auto-deactivate**: Runs daily at 3am via `runDaily()`
-3. **Reminders**: Placeholder exists, currently disabled
+1. **Auto-complete**: Runs every 15 minutes, marks past bookings as completed
+2. **Booking reminders**: Runs every 15 minutes, sends email 1-2 hours before walks
+3. **Auto-deactivate**: Runs daily at 3am, deactivates inactive users
 
 Started in `main.go`:
 ```go
@@ -288,15 +306,18 @@ After load, call: `window.i18n.updateElement(element)`
 
 ### Database Migrations
 
-Auto-run on startup in `database/database.go`:
-- Migrations in `RunMigrations()` function
+Auto-run on startup via migration system in `internal/database/`:
+- 21 migrations defined in `internal/database/00X_*.go` files
+- Each migration has SQL for all three databases (SQLite, MySQL, PostgreSQL)
+- Creates 11 tables with indexes
+- Schema versioning via `schema_migrations` table
 - Idempotent (safe to run multiple times)
-- Creates all 7 tables with indexes
 
 **When modifying schema:**
-1. Add migration to `RunMigrations()`
-2. Use `IF NOT EXISTS` for safety
-3. Test with fresh database (delete gassigeher.db)
+1. Create new migration file in `internal/database/`
+2. Add SQL for all three databases
+3. Use `IF NOT EXISTS` for safety
+4. Test with fresh database (delete gassigeher.db)
 
 ## Common Tasks
 
@@ -322,10 +343,10 @@ Auto-run on startup in `database/database.go`:
 ### Add New Admin Page
 
 1. **Create HTML file**: `frontend/admin-<name>.html`
-2. **Copy navigation** from any existing admin page (8-item nav)
+2. **Copy navigation** from any existing admin page
 3. **Add translations** for new features
 4. **Add route** to `cmd/server/main.go` under `admin` subrouter if needed
-5. **Update navigation** in all 8 admin pages to include new page
+5. **Update navigation** in all admin pages to include new page
 
 ## Important Conventions
 
@@ -671,6 +692,19 @@ See **[Database_Selection_Guide.md](docs/Database_Selection_Guide.md)** for deta
 
 ## Database Schema Key Points
 
+### Tables (11 total)
+- `users` - User accounts with first_name, last_name, experience level
+- `dogs` - Dog info with is_featured, external_link, photo fields
+- `bookings` - Walk bookings with approval workflow
+- `blocked_dates` - Admin-blocked dates (global or per-dog)
+- `experience_requests` - User level promotion requests
+- `reactivation_requests` - Account reactivation requests
+- `system_settings` - Configurable system settings
+- `booking_time_rules` - Configurable time slots per day type
+- `custom_holidays` - Custom and API-fetched holidays
+- `feiertage_cache` - German holiday API cache
+- `schema_migrations` - Migration version tracking
+
 ### Users Table GDPR Fields
 - `is_deleted` - Flag for deleted accounts
 - `anonymous_id` - Generated on deletion (e.g., "anonymous_user_1234567890")
@@ -681,7 +715,7 @@ See **[Database_Selection_Guide.md](docs/Database_Selection_Guide.md)** for deta
 ### Unique Constraints
 - `users.email` - UNIQUE (but can be NULL after deletion)
 - `bookings(dog_id, date, walk_type)` - Prevents double-booking
-- `blocked_dates.date` - One block per date
+- `blocked_dates.date` - One block per date (global) or per dog_id
 
 ## Frontend Structure
 
@@ -691,9 +725,9 @@ See **[Database_Selection_Guide.md](docs/Database_Selection_Guide.md)** for deta
 
 **Protected pages**: dogs.html, dashboard.html, profile.html
 
-**Admin pages**: admin-dashboard.html, admin-dogs.html, admin-bookings.html, admin-blocked-dates.html, admin-experience-requests.html, admin-users.html, admin-reactivation-requests.html, admin-settings.html
+**Admin pages** (10 pages): admin-dashboard.html, admin-dogs.html, admin-bookings.html, admin-blocked-dates.html, admin-experience-requests.html, admin-users.html, admin-reactivation-requests.html, admin-settings.html, admin-holidays.html, admin-booking-times.html
 
-**Pattern**: All admin pages have identical 9-item navigation header.
+**Pattern**: All admin pages have unified navigation header.
 
 ### No Build Step
 
@@ -857,13 +891,13 @@ Tests are in `*_test.go` files co-located with code.
 
 **Entry point:** `cmd/server/main.go`
 - Initializes all handlers
-- Registers all routes (50+ endpoints)
+- Registers all routes (71 endpoints)
 - Starts cron service
 - Applies middleware chain
 
 **Database setup:** `internal/database/database.go`
-- Auto-migration on startup
-- Creates 7 tables with indexes
+- Auto-migration on startup (21 migrations)
+- Creates 11 tables with indexes
 
 **Auth middleware:** `internal/middleware/middleware.go`
 - JWT validation
@@ -884,15 +918,18 @@ Tests are in `*_test.go` files co-located with code.
 
 ## Color Scheme (Tierheim Göppingen)
 
-Defined in `frontend/assets/css/main.css`:
+Defined in `frontend/assets/css/main.css` (compiled from SCSS):
 - Primary green: `#82b965`
 - Dark background: `#26272b`
 - Dark gray: `#33363b`
+- Border radius: `6px`
 - System fonts only: Arial, sans-serif (no external fonts)
+
+**Styling**: Uses SCSS/SASS for modular styling, compiled to CSS
 
 ## German-Only UI
 
-All user-facing text in German via `frontend/i18n/de.json` (300+ translations).
+All user-facing text in German via `frontend/i18n/de.json` (400+ translations).
 
 **When adding features:**
 1. Add keys to `de.json`
@@ -930,12 +967,20 @@ Cron service is **always running** when server is up (started in main.go).
 3. Access repositories via `s.bookingRepo`, `s.userRepo`, etc.
 
 **Existing jobs:**
-- Auto-complete bookings: Every hour
+- Auto-complete bookings: Every 15 minutes
+- Booking reminders: Every 15 minutes (1-2 hours before walk)
 - Auto-deactivate users: Daily at 3:00 AM
 
 ## Email Templates
 
-Located in `internal/services/email_service.go` and `email_account.go`.
+Located in `internal/services/email_service.go` and `email_account.go`. **18 email types** total.
+
+**Email types:**
+- Authentication: verification, welcome, password reset
+- Bookings: confirmation, reminder, cancellation, approval/rejection, moved
+- Experience: level approved/denied
+- Account: deactivated, reactivated, deletion confirmation
+- Auto-deactivation: warning and notification
 
 **Pattern:**
 ```go
@@ -960,27 +1005,39 @@ Complete production deployment package in `deploy/` folder:
 
 See **DEPLOYMENT.md** for step-by-step production deployment guide.
 
+### Production Features
+
+- **Standalone binary**: Frontend embedded via `go:embed`
+- **Health check**: `GET /api/health` for monitoring
+- **Version info**: `GET /api/version` with build-time injection
+- **CLI parameter**: `-env /path/to/custom.env` for config location
+- **Configurable BASE_URL**: No hardcoded localhost URLs
+
 ## Repository Organization
 
 ```
 cmd/server/main.go              # Entry point
 internal/
   config/                        # Env var loading
-  cron/                         # Automated jobs
-  database/                     # Migrations
-  handlers/                     # HTTP handlers (12 files)
+  cron/                         # Automated jobs (3 cron tasks)
+  database/                     # Migrations (21 migration files)
+  handlers/                     # HTTP handlers (14 files)
+  logging/                      # Production logging with rotation
   middleware/                   # Auth, security, logging
-  models/                       # Data structures (10 files)
-  repository/                   # Database ops (9 files)
-  services/                     # Business logic (auth, email)
+  models/                       # Data structures
+  repository/                   # Database ops (12 files)
+  services/                     # Business logic (auth, email, holidays, booking times)
+  static/frontend/              # Embedded frontend files
+  version/                      # Build version information
 frontend/
-  assets/css/main.css           # All styles (500+ lines)
-  i18n/de.json                  # German translations (300+ strings)
+  assets/css/main.css           # All styles (compiled from SCSS)
+  i18n/de.json                  # German translations (400+ strings)
   js/api.js                     # API client wrapper
   js/i18n.js                    # Translation system
-  [23 HTML pages]               # Complete UI
+  [26 HTML pages]               # Complete UI
 deploy/                         # Production configs
-[6 documentation files]         # Comprehensive guides
+docs/                           # 15 documentation files
+uploads/                        # User and dog photos
 ```
 
 ## Notes for Future Development
@@ -1046,16 +1103,16 @@ Before making changes, read:
 
 | Document | Lines | Purpose |
 |----------|-------|---------|
-| [README.md](README.md) | 500+ | Project overview, setup, quick start |
+| [README.md](README.md) | 800+ | Project overview, setup, quick start |
 | [ImplementationPlan.md](docs/ImplementationPlan.md) | 1,500+ | Architecture, all 10 phases, database schema |
-| [API.md](docs/API.md) | 600+ | Complete REST API reference |
-| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | 400+ | Production deployment guide |
+| [API.md](docs/API.md) | 600+ | Complete REST API reference (71 endpoints) |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | 600+ | Production deployment guide |
 | [USER_GUIDE.md](docs/USER_GUIDE.md) | 350+ | User manual (German) |
 | [ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md) | 500+ | Administrator handbook |
 | [PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md) | 500+ | Executive summary |
-| [CLAUDE.md](CLAUDE.md) | 400+ | This file - AI development guide |
+| [CLAUDE.md](CLAUDE.md) | 1,000+ | This file - AI development guide |
 
-**Total**: 6,150+ lines of documentation across 9 files
+**Total**: 9,500+ lines of documentation across 15 files
 
 **Navigation**: See [DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md) for quick access guide
 

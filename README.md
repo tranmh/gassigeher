@@ -1,10 +1,10 @@
 # Gassigeher - Dog Walking Booking System
 
-**Status**: 🎉 **100% COMPLETE** | ✅ **PRODUCTION READY** | 🚀 **READY TO DEPLOY**
+**Status**: **100% COMPLETE** | **PRODUCTION READY** | **READY TO DEPLOY**
 
 A complete, production-ready web-based dog walking booking system built with Go and Vanilla JavaScript.
 
-**Implementation**: All 10 phases complete | 50+ API endpoints | 23 pages | 17 email types | GDPR-compliant
+**Implementation**: All 10 phases complete | 71 API endpoints | 26 pages | 18 email types | GDPR-compliant
 
 ---
 
@@ -16,7 +16,7 @@ git clone <repository-url>
 cd gassigeher
 cp .env.example .env
 
-# 2. Configure .env (add your Gmail API credentials)
+# 2. Configure .env (set SUPER_ADMIN_EMAIL and optionally email provider)
 nano .env
 
 # 3. Build and run
@@ -35,41 +35,64 @@ For production deployment, see **[DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
 
 ### User Features
 - User registration with email verification and welcome email
+- **Registration password requirement** - Shelter-provided code to prevent unauthorized registrations
 - JWT-based authentication with secure password requirements
 - Self-service password reset and change
-- Profile management with photo upload
+- Profile management with photo upload (first name, last name, phone, email)
 - Email re-verification on email change
-- Experience level system (Green → Blue → Orange)
+- Experience level system (Green → Orange → Blue)
 - Dog browsing with filters and search
+- **Featured dogs** on homepage with random selection
+- **External dog links** to shelter website for more information
 - Booking system with date/time selection
+- **Configurable booking time slots** for weekdays and weekends
+- **German holiday integration** - Automatic recognition of public holidays
 - View and manage bookings (upcoming and past)
 - Add notes to completed walks
 - Cancel bookings with notice period
+- **Booking reminders** - Email notifications 1-2 hours before walks
 - Request experience level promotions
 - GDPR-compliant account deletion
+- **WhatsApp group integration** - Easy onboarding to shelter's WhatsApp community
 - German UI with mobile-first responsive design
 
 ### Admin Features
 - Comprehensive admin dashboard with real-time statistics
-- Dog management (CRUD, photos, availability toggle)
+- Dog management (CRUD, photos, featured status, external links)
+- **Dog-specific date blocking** - Block dates for individual dogs
 - Booking management (view all, cancel, move)
-- Block dates with reasons
-- User management (activate/deactivate accounts)
+- **Booking approval workflow** - Approve/deny bookings for certain time slots
+- **Booking time rules** - Configure allowed/blocked time slots per day type
+- **Custom holiday management** - Add custom holidays
+- Block dates with reasons (global or per-dog)
+- User management (activate/deactivate accounts, edit names)
 - Experience level request approval workflow
 - Reactivation request management
+- **Configurable site logo** - Change site branding via settings
+- **Registration password management** - Control who can register
+- **WhatsApp group settings** - Enable/configure community link
 - System settings configuration
 - Recent activity feed
 - Unified admin navigation
 
 ### System Features
-- Automatic walk completion via cron jobs
-- Automatic user deactivation after 1 year inactivity
-- Email notifications for all major actions (17 types)
+- **Multi-provider email support** - Gmail API or SMTP (Strato, Office365, etc.)
+- **BCC admin copy** - Audit trail for all emails
+- Automatic walk completion via cron jobs (every 15 minutes)
+- **Automatic booking reminders** via cron jobs
+- Automatic user deactivation after configurable inactivity period
+- Email notifications for all major actions (18 types)
+- **German public holiday API** (feiertage-api.de) with caching
 - Experience-based access control
 - Double-booking prevention
 - Booking validation rules
 - Security headers and XSS protection
-- Comprehensive test suite
+- **Standalone binary deployment** - Frontend embedded in executable
+- **Version info display** in footer with build-time injection
+- **Health check endpoint** for monitoring
+- **CLI parameter for .env path** - Custom config file location
+- **Configurable BASE_URL** - No hardcoded localhost URLs
+- Comprehensive test suite (305+ tests)
 
 ## Tech Stack
 
@@ -79,11 +102,13 @@ For production deployment, see **[DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
 - gorilla/mux router
 - JWT authentication
 - bcrypt password hashing
-- Gmail API for emails
+- Multi-provider email (Gmail API, SMTP)
+- Embedded frontend (go:embed)
 
 **Frontend:**
 - Vanilla JavaScript (ES6+)
 - HTML5 & CSS3
+- **SCSS/SASS** for modular styling
 - Custom i18n system
 - No external dependencies
 
@@ -96,31 +121,23 @@ gassigeher/
 │       └── main.go           # Application entry point
 ├── internal/
 │   ├── config/               # Configuration management
-│   ├── database/             # Database setup and migrations
-│   ├── handlers/             # HTTP request handlers
+│   ├── cron/                 # Scheduled jobs (auto-complete, reminders, deactivation)
+│   ├── database/             # Database setup and migrations (21 migrations)
+│   ├── handlers/             # HTTP request handlers (14 handlers)
+│   ├── logging/              # Production logging with rotation
 │   ├── middleware/           # Auth, logging, CORS middleware
 │   ├── models/               # Data models
-│   ├── repository/           # Database operations
-│   └── services/             # Business logic (auth, email)
-├── frontend/
-│   ├── assets/
-│   │   └── css/              # Stylesheets
-│   ├── i18n/                 # Translation files
-│   ├── js/                   # JavaScript modules
-│   ├── index.html            # Landing page
-│   ├── login.html            # Login page
-│   ├── register.html         # Registration page
-│   ├── verify.html           # Email verification
-│   ├── forgot-password.html  # Password reset request
-│   ├── reset-password.html   # Password reset
-│   └── terms.html            # Terms & Conditions
-├── migrations/               # Database migrations
+│   ├── repository/           # Database operations (12 repositories)
+│   ├── services/             # Business logic (auth, email, holidays, booking times)
+│   ├── static/               # Embedded frontend files
+│   │   └── frontend/         # HTML, JS, CSS, i18n
+│   └── version/              # Build version information
+├── docs/                     # Documentation files
+├── deploy/                   # Production deployment configs
 ├── uploads/                  # User and dog photos
 ├── .env                      # Environment variables
 ├── .env.example              # Environment template
 ├── go.mod                    # Go dependencies
-├── go.sum                    # Go dependencies checksums
-├── ImplementationPlan.md     # Complete implementation plan
 └── README.md                 # This file
 ```
 
@@ -129,8 +146,7 @@ gassigeher/
 ### 1. Prerequisites
 
 - Go 1.24 or higher
-- SQLite3
-- Gmail account (for email notifications)
+- SQLite3 (default), MySQL, or PostgreSQL
 
 ### 2. Clone and Install
 
@@ -150,29 +166,46 @@ cp .env.example .env
 Edit `.env` and set your configuration, especially:
 - `JWT_SECRET`: Generate a secure random string
 - `SUPER_ADMIN_EMAIL`: Your Super Admin email address (for first-time setup)
-- Gmail API credentials (see below)
+- `BASE_URL`: Your production URL (e.g., "https://gassigeher.yourdomain.com")
+- Email provider credentials (see Email Configuration below)
 
 **Important:** On first run, the system will automatically:
 - Create a Super Admin account with the email from `SUPER_ADMIN_EMAIL`
 - Generate a secure random password
 - Display credentials in console and save to `SUPER_ADMIN_CREDENTIALS.txt`
+- Generate a unique registration password (shown in admin settings)
 - Create sample data (3 users, 5 dogs, 3 bookings)
 
-### 4. Gmail API Setup
+### 4. Email Configuration
 
-To enable email notifications:
+The application supports two email providers:
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing
-3. Enable Gmail API
-4. Create OAuth 2.0 credentials
-5. Download credentials and get:
-   - Client ID
-   - Client Secret
-   - Refresh Token (use OAuth Playground or your app to generate)
-6. Add these to your `.env` file
+**Option A: Gmail API (Recommended)**
+```bash
+EMAIL_PROVIDER=gmail
+GMAIL_CLIENT_ID=your-client-id
+GMAIL_CLIENT_SECRET=your-client-secret
+GMAIL_REFRESH_TOKEN=your-refresh-token
+GMAIL_FROM_EMAIL=noreply@yourdomain.com
+```
 
-**Note:** For development, you can skip Gmail setup. The app will run but emails won't be sent.
+**Option B: SMTP (Any Provider)**
+```bash
+EMAIL_PROVIDER=smtp
+SMTP_HOST=smtp.strato.de       # or smtp.office365.com, etc.
+SMTP_PORT=465                   # 465 for SSL, 587 for TLS
+SMTP_USERNAME=your-email@domain.com
+SMTP_PASSWORD=your-password
+SMTP_FROM_EMAIL=your-email@domain.com
+SMTP_USE_SSL=true              # or SMTP_USE_TLS=true for port 587
+```
+
+**Optional: BCC Admin Copy**
+```bash
+EMAIL_BCC_ADMIN=admin@yourdomain.com  # Receive copies of all emails
+```
+
+**Note:** For development, you can skip email setup. The app will run but emails won't be sent.
 
 ### 5. Build and Test
 
@@ -212,6 +245,11 @@ Linux/Mac:
 ./gassigeher
 ```
 
+**Custom .env file:**
+```bash
+./gassigeher -env /path/to/custom.env
+```
+
 The server will start on `http://localhost:8080`
 
 ### 7. Custom Port
@@ -227,7 +265,7 @@ PORT=3000 ./gassigeher
 ## API Endpoints
 
 ### Authentication (Public)
-- `POST /api/auth/register` - Register new user
+- `POST /api/auth/register` - Register new user (requires registration password)
 - `POST /api/auth/verify-email` - Verify email with token
 - `POST /api/auth/login` - Login and get JWT token
 - `POST /api/auth/forgot-password` - Request password reset
@@ -238,7 +276,7 @@ PORT=3000 ./gassigeher
 
 ### Users (Protected)
 - `GET /api/users/me` - Get current user profile
-- `PUT /api/users/me` - Update profile (name, email, phone)
+- `PUT /api/users/me` - Update profile (email, phone)
 - `POST /api/users/me/photo` - Upload profile photo
 - `DELETE /api/users/me` - Delete account (GDPR anonymization)
 
@@ -246,11 +284,12 @@ PORT=3000 ./gassigeher
 - `GET /api/dogs` - List all dogs with filters (breed, size, age, category, availability, search)
 - `GET /api/dogs/:id` - Get dog details
 - `GET /api/dogs/breeds` - Get all dog breeds
+- `GET /api/dogs/featured` - Get featured dogs for homepage
 
 ### Dogs (Admin Only)
 - `POST /api/dogs` - Create new dog
 - `PUT /api/dogs/:id` - Update dog
-- `DELETE /api/dogs/:id` - Delete dog (prevents if future bookings exist)
+- `DELETE /api/dogs/:id` - Delete dog (cancels future bookings)
 - `POST /api/dogs/:id/photo` - Upload dog photo
 - `PUT /api/dogs/:id/availability` - Toggle dog availability (health status)
 
@@ -264,12 +303,26 @@ PORT=3000 ./gassigeher
 
 ### Bookings (Admin Only)
 - `PUT /api/bookings/:id/move` - Move booking to new date/time
+- `GET /api/bookings/pending-approval` - List bookings awaiting approval
+- `PUT /api/bookings/:id/approve` - Approve booking
+- `PUT /api/bookings/:id/reject` - Reject booking
+
+### Booking Time Rules (Admin Only)
+- `GET /api/booking-times/rules` - Get all time rules
+- `PUT /api/booking-times/rules` - Update time rules
+- `GET /api/booking-times/available-slots` - Get available time slots for a date
+
+### Holidays (Admin Only)
+- `GET /api/holidays` - List all holidays
+- `POST /api/holidays` - Add custom holiday
+- `DELETE /api/holidays/:id` - Delete holiday
+- `POST /api/holidays/fetch` - Fetch holidays from API
 
 ### Blocked Dates (Protected - Read)
 - `GET /api/blocked-dates` - List all blocked dates
 
 ### Blocked Dates (Admin Only)
-- `POST /api/blocked-dates` - Block a date
+- `POST /api/blocked-dates` - Block a date (globally or per-dog)
 - `DELETE /api/blocked-dates/:id` - Unblock a date
 
 ### Experience Requests (Protected)
@@ -291,20 +344,28 @@ PORT=3000 ./gassigeher
 ### User Management (Admin Only)
 - `GET /api/users` - List all users with filters (active/inactive)
 - `GET /api/users/:id` - Get user by ID
+- `PUT /api/users/:id` - Update user (name, email, phone)
 - `PUT /api/users/:id/activate` - Activate user account
 - `PUT /api/users/:id/deactivate` - Deactivate user account
+- `PUT /api/users/:id/promote` - Promote user to admin
+- `PUT /api/users/:id/demote` - Demote admin to user
 
 ### System Settings (Admin Only)
 - `GET /api/settings` - Get all settings
 - `PUT /api/settings/:key` - Update setting value
+- `GET /api/settings/registration-password` - Get registration password
 
 ### Admin Dashboard (Admin Only)
 - `GET /api/admin/stats` - Get dashboard statistics
 - `GET /api/admin/activity` - Get recent activity feed
 
+### System (Public)
+- `GET /api/health` - Health check endpoint
+- `GET /api/version` - Get version information
+
 ## Database
 
-The application supports **three database backends** with automatic migrations and feature parity across all options:
+The application supports **three database backends** with automatic migrations and feature parity:
 
 ### Supported Databases
 
@@ -381,41 +442,48 @@ See **[PostgreSQL_Setup_Guide.md](docs/PostgreSQL_Setup_Guide.md)** for complete
 See **[Database_Selection_Guide.md](docs/Database_Selection_Guide.md)** for detailed comparison.
 
 ### Tables Created (All Databases)
-- `users` - User accounts and profiles
-- `dogs` - Dog information
-- `bookings` - Walk bookings
-- `blocked_dates` - Admin-blocked dates
+- `users` - User accounts and profiles (with first_name, last_name)
+- `dogs` - Dog information (with is_featured, external_link)
+- `bookings` - Walk bookings (with approval workflow)
+- `blocked_dates` - Admin-blocked dates (global or per-dog)
 - `experience_requests` - User level promotion requests
 - `reactivation_requests` - Account reactivation requests
 - `system_settings` - Configurable system settings
+- `booking_time_rules` - Configurable time slots
+- `custom_holidays` - Custom and API-fetched holidays
+- `feiertage_cache` - Holiday API cache
 - `schema_migrations` - Migration version tracking
 
-All migrations run automatically on application startup.
+All 21 migrations run automatically on application startup.
 
 ## Implementation Status
 
-### 🎉 ALL PHASES COMPLETE (10 of 10) ✅
+### ALL PHASES COMPLETE (10 of 10)
 
-- ✅ **Phase 1**: Foundation (Auth, Database, Email)
-- ✅ **Phase 2**: Dog Management (CRUD, Photos, Categories)
-- ✅ **Phase 3**: Booking System (Create, View, Cancel, Auto-complete)
-- ✅ **Phase 4**: Blocked Dates & Admin Actions (Block dates, Move bookings)
-- ✅ **Phase 5**: Experience Levels (Request, Approve, Deny workflow)
-- ✅ **Phase 6**: User Profiles & Photos (Edit, Upload, Email re-verification)
-- ✅ **Phase 7**: Account Management & GDPR (Delete, Deactivate, Reactivate)
-- ✅ **Phase 8**: Admin Dashboard & Reports (Stats, Activity, Settings)
-- ✅ **Phase 9**: Polish & Testing (Test suite, Security, Documentation)
-- ✅ **Phase 10**: Deployment (Production setup, Documentation)
+- **Phase 1**: Foundation (Auth, Database, Email)
+- **Phase 2**: Dog Management (CRUD, Photos, Categories)
+- **Phase 3**: Booking System (Create, View, Cancel, Auto-complete)
+- **Phase 4**: Blocked Dates & Admin Actions (Block dates, Move bookings)
+- **Phase 5**: Experience Levels (Request, Approve, Deny workflow)
+- **Phase 6**: User Profiles & Photos (Edit, Upload, Email re-verification)
+- **Phase 7**: Account Management & GDPR (Delete, Deactivate, Reactivate)
+- **Phase 8**: Admin Dashboard & Reports (Stats, Activity, Settings)
+- **Phase 9**: Polish & Testing (Test suite, Security, Documentation)
+- **Phase 10**: Deployment (Production setup, Documentation)
 
-**Status: PRODUCTION READY** 🚀
+**Status: PRODUCTION READY**
 
 ### Current Coverage
-- **Backend Tests**: Foundational structure in place
-  - Auth service: 18.7% coverage (7 tests passing)
-  - Models: 50% coverage (validation tests)
-  - Repository: 6.3% coverage (booking tests)
+- **Backend Tests**: 305+ tests passing
+  - Handlers: Comprehensive coverage
+  - Models: Validation tests
+  - Repository: CRUD and edge cases
+  - Services: Auth, email, holidays, booking times
+  - Middleware: Auth, security
+  - Database: Migrations, dialect
 - **Frontend**: Manual testing complete for all features
 - **Security**: Headers, XSS protection, password validation
+- **CI/CD**: GitHub Actions with Playwright E2E tests
 
 See [ImplementationPlan.md](docs/ImplementationPlan.md) for complete phase details.
 
@@ -438,17 +506,23 @@ See [ImplementationPlan.md](docs/ImplementationPlan.md) for complete phase detai
 - Change Super Admin password by editing `SUPER_ADMIN_CREDENTIALS.txt` and restarting
 
 **Becoming an Admin:**
-1. Register as a regular user
+1. Register as a regular user (requires registration password from shelter)
 2. Ask the Super Admin to promote you via "Benutzerverwaltung" page
 3. Super Admin clicks "Zu Admin ernennen" on your account
 4. You immediately gain admin access
 
-**Note:** The old `ADMIN_EMAILS` environment variable is no longer used.
-
 ### Experience Level System
 - **Green (Beginner)**: Default for all new users, can book green-category dogs
-- **Blue (Experienced)**: Requires admin approval, can book green and blue dogs
-- **Orange (Dedicated)**: Requires admin approval, can book all dogs
+- **Orange (Intermediate)**: Requires admin approval, can book green and orange dogs
+- **Blue (Experienced)**: Requires admin approval, can book all dogs
+
+### Booking Time Rules
+The system supports configurable time slots:
+- **Weekday slots**: Morning, afternoon, evening walks
+- **Weekend slots**: Different timing for weekends
+- **Blocked periods**: Feeding times, rest periods
+- **Holiday handling**: Uses German public holiday API
+- **Approval workflow**: Certain times may require admin approval
 
 ### Testing
 
@@ -467,6 +541,9 @@ go tool cover -html=coverage.out
 - Booking advance: 14 days
 - Cancellation notice: 12 hours
 - Auto-deactivation: 365 days (1 year)
+- Booking time granularity: 15 minutes
+- Morning walks require approval: true
+- German state for holidays: BW (Baden-Württemberg)
 
 These can be adjusted by admins in the settings page.
 
@@ -474,42 +551,52 @@ These can be adjusted by admins in the settings page.
 
 The application runs the following automated tasks:
 
-1. **Auto-complete Bookings** (every hour)
+1. **Auto-complete Bookings** (every 15 minutes)
    - Marks past scheduled bookings as completed
    - Updates booking status automatically
 
-2. **Auto-deactivate Inactive Users** (daily at 3:00 AM)
+2. **Send Booking Reminders** (every 15 minutes)
+   - Sends email reminders 1-2 hours before walks
+   - Tracks sent reminders to prevent duplicates
+
+3. **Auto-deactivate Inactive Users** (daily at 3:00 AM)
    - Checks for users inactive beyond configured period
    - Deactivates accounts with "auto_inactivity" reason
    - Sends notification emails
 
 ### Email Notifications
 
-The system sends 17 types of email notifications:
+The system sends 18 types of email notifications:
 
 **Authentication:**
 1. Email verification link
-2. Welcome email after verification
+2. Welcome email after verification (with optional WhatsApp link)
 3. Password reset link
 
 **Bookings:**
 4. Booking confirmation
-5. Booking reminder (1 hour before)
+5. Booking reminder (1-2 hours before)
 6. User cancellation confirmation
 7. Admin cancellation notification
+8. Booking approval notification
+9. Booking rejection notification
 
 **Admin Actions:**
-8. Booking moved notification
+10. Booking moved notification
 
 **Experience Levels:**
-9. Level promotion approved
-10. Level promotion denied
+11. Level promotion approved
+12. Level promotion denied
 
 **Account Lifecycle:**
-11. Account deactivated notification
-12. Account reactivated notification
-13. Reactivation request denied
-14. Account deletion confirmation
+13. Account deactivated notification
+14. Account reactivated notification
+15. Reactivation request denied
+16. Account deletion confirmation
+
+**Auto-deactivation:**
+17. Auto-deactivation warning
+18. Auto-deactivation notification
 
 All emails use HTML templates with inline CSS for consistent branding.
 
@@ -520,8 +607,9 @@ The application implements multiple security measures:
 - **Authentication**: JWT tokens with configurable expiration
 - **Password Security**: bcrypt hashing with cost factor 12
 - **Password Requirements**: Min 8 chars, uppercase, lowercase, number
+- **Registration Password**: Shelter-controlled access code
 - **Email Verification**: Required before account activation
-- **Admin Authorization**: Config-based, not database-stored
+- **Admin Authorization**: Database-stored, managed via UI
 - **Security Headers**:
   - X-Frame-Options: DENY (clickjacking protection)
   - X-Content-Type-Options: nosniff (MIME sniffing protection)
@@ -531,10 +619,11 @@ The application implements multiple security measures:
 - **File Upload Validation**: Type and size checks
 - **SQL Injection Protection**: Parameterized queries throughout
 - **GDPR Compliance**: Right to deletion, data anonymization
+- **XSS Protection**: HTML escaping in user name rendering
 
 ## Documentation
 
-**📚 Complete documentation suite: 9,500+ lines across 15 comprehensive guides**
+**Complete documentation suite: 9,500+ lines across 15 comprehensive guides**
 
 See **[DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md)** for navigation guide.
 
@@ -542,14 +631,14 @@ See **[DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md)** for navigation gui
 
 | Document | Lines | Purpose | Audience |
 |----------|-------|---------|----------|
-| **[README.md](README.md)** | 600+ | Project overview, setup, API list | Developers |
+| **[README.md](README.md)** | 800+ | Project overview, setup, API list | Developers |
 | **[ImplementationPlan.md](docs/ImplementationPlan.md)** | 1,500+ | Complete architecture & all 10 phases | Technical Leads |
 | **[API.md](docs/API.md)** | 600+ | Complete REST API reference with examples | Developers/Integrators |
 | **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** | 600+ | Production deployment (SQLite, MySQL, PostgreSQL) | DevOps/System Admins |
 | **[USER_GUIDE.md](docs/USER_GUIDE.md)** | 350+ | How to use the application (German) | End Users |
 | **[ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md)** | 500+ | Administrator operations manual | Administrators |
 | **[PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md)** | 500+ | Executive summary & statistics | Stakeholders |
-| **[CLAUDE.md](CLAUDE.md)** | 500+ | AI assistant development guide | AI Developers |
+| **[CLAUDE.md](CLAUDE.md)** | 600+ | AI assistant development guide | AI Developers |
 | **[DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md)** | 200+ | Documentation navigation | Everyone |
 
 ### Database Documentation
@@ -562,16 +651,25 @@ See **[DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md)** for navigation gui
 | **[MultiDatabase_Testing_Guide.md](docs/MultiDatabase_Testing_Guide.md)** | 300+ | Testing across all database backends | Developers/QA |
 | **[DatabasesSupportPlan.md](docs/DatabasesSupportPlan.md)** | 2,300+ | Complete multi-database implementation plan | Technical Leads |
 
+### Email Documentation
+
+| Document | Purpose |
+|----------|---------|
+| **[Email_Provider_Selection_Guide.md](docs/Email_Provider_Selection_Guide.md)** | Choosing between Gmail API and SMTP |
+| **[SMTP_Setup_Guides.md](docs/SMTP_Setup_Guides.md)** | Setup guides for various SMTP providers |
+
 **Not sure where to start?** See [DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md).
 
 ## Getting Started Guide
 
 ### For Users
-1. Visit the application URL
-2. Click "Registrieren" to create an account
-3. Verify your email (check inbox)
-4. Login and start browsing dogs
-5. Book your first walk!
+1. Get registration password from the animal shelter
+2. Visit the application URL
+3. Click "Registrieren" to create an account
+4. Enter registration password and your details
+5. Verify your email (check inbox)
+6. Login and join WhatsApp group (if enabled)
+7. Start browsing dogs and book your first walk!
 
 **Read**: [USER_GUIDE.md](docs/USER_GUIDE.md) for complete instructions.
 
@@ -583,7 +681,13 @@ See **[DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md)** for navigation gui
 3. Note the Super Admin credentials displayed in console
 4. Credentials also saved in `SUPER_ADMIN_CREDENTIALS.txt`
 5. Login with those credentials
-6. You'll be redirected to admin dashboard
+6. Go to settings to configure:
+   - Site logo
+   - Registration password (share with users)
+   - WhatsApp group link
+   - Booking time rules
+   - Holidays
+7. Add dogs and start managing bookings
 
 **Additional Administrators:**
 1. Register and verify as normal user
@@ -596,7 +700,7 @@ See **[DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md)** for navigation gui
 ### For Developers
 1. Clone repository
 2. Copy `.env.example` to `.env`
-3. Configure Gmail API (or skip for development)
+3. Configure email provider (or skip for development)
 4. Run `./bat.sh` (Linux/Mac) or `bat.bat` (Windows)
 5. Visit `http://localhost:8080`
 
@@ -607,7 +711,7 @@ See **[DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md)** for navigation gui
 2. Follow [DEPLOYMENT.md](docs/DEPLOYMENT.md) step-by-step
 3. Configure SSL with Let's Encrypt
 4. Setup automated backups
-5. Monitor and maintain
+5. Monitor via `/api/health` endpoint
 
 **Read**: [DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete production setup.
 
@@ -615,34 +719,41 @@ See **[DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md)** for navigation gui
 
 | Category | Count |
 |----------|-------|
-| **Implementation Phases** | 10/10 (100%) ✅ |
-| **Backend Files** | 40+ Go files |
-| **Frontend Pages** | 23 HTML pages |
-| **API Endpoints** | 50+ REST endpoints |
-| **Database Tables** | 7 with indexes |
-| **Email Templates** | 17 HTML templates |
-| **Test Cases** | 20+ (all passing) |
-| **German Translations** | 300+ strings |
-| **Documentation Files** | 8 guides (1,500+ lines) |
+| **Implementation Phases** | 10/10 (100%) |
+| **Backend Files** | 131 Go files |
+| **Frontend Pages** | 26 HTML pages |
+| **API Endpoints** | 71 REST endpoints |
+| **Database Tables** | 11 with indexes |
+| **Database Migrations** | 21 |
+| **Email Templates** | 18 HTML templates |
+| **Test Cases** | 305+ (all passing) |
+| **German Translations** | 400+ strings |
+| **Documentation Files** | 15 guides |
 | **Deployment Configs** | 3 production files |
-| **Security Measures** | 10+ implemented |
+| **Security Measures** | 12+ implemented |
 | **Cron Jobs** | 3 automated tasks |
 
 ## Complete Feature List
 
-**✅ Implemented (40+ features)**:
-User registration • Email verification • JWT authentication • Password reset • Profile management • Photo uploads • Experience levels (Green/Blue/Orange) • Level promotions • Dog browsing • Advanced filters • Dog booking • Booking cancellation • Booking notes • Dashboard • GDPR account deletion • Auto-deactivation • Reactivation workflow • Admin dashboard • Dog management • Availability toggle • Booking management • Move bookings • Block dates • User management • Experience approvals • System settings • Real-time statistics • Activity feed • Email notifications (17 types) • Auto-completion • Security headers • German i18n • Mobile-responsive design • Terms & privacy pages
+**Implemented (60+ features)**:
+User registration with password • Email verification • JWT authentication • Password reset • Profile management (first/last name) • Photo uploads • Experience levels (Green/Orange/Blue) • Level promotions • Dog browsing • Featured dogs • External dog links • Advanced filters • Dog booking • Booking approval workflow • Configurable time slots • Holiday integration • Booking cancellation • Booking notes • Booking reminders • Dashboard • GDPR account deletion • Auto-deactivation with notification • Reactivation workflow • Admin dashboard • Dog management • Dog-specific blocking • Availability toggle • Booking management • Move bookings • Block dates (global/per-dog) • User management • Admin promotion/demotion • Experience approvals • Registration password • Site logo configuration • WhatsApp integration • System settings • Real-time statistics • Activity feed • Email notifications (18 types) • Multi-provider email (Gmail/SMTP) • BCC admin copy • Auto-completion • Security headers • German i18n • Mobile-responsive design • SCSS modular styling • Terms & privacy pages • Embedded frontend • Version display • Health check • CI/CD pipeline • E2E testing
 
 ## What Makes Gassigeher Special
 
 1. **Complete GDPR Compliance**: Full anonymization on deletion with legal email confirmation
-2. **Experience-Based Access**: Progressive skill system (Green→Blue→Orange) with admin approvals
-3. **Automated Lifecycle**: Auto-deactivation after 1 year, reactivation workflow
-4. **Health Management**: Quick dog availability toggle for vet visits, sickness
-5. **Comprehensive Admin Tools**: 8 admin pages with unified navigation
-6. **Zero Frontend Dependencies**: Pure vanilla JavaScript, instant page loads
-7. **Email-First Communication**: 17 HTML email types for all actions
-8. **Production-Ready**: Complete deployment package with systemd, nginx, backups
+2. **Experience-Based Access**: Progressive skill system (Green→Orange→Blue) with admin approvals
+3. **Flexible Time Management**: Configurable booking slots with holiday awareness
+4. **Multi-Provider Email**: Gmail API or any SMTP server with audit trail
+5. **Controlled Registration**: Shelter-provided password prevents unauthorized sign-ups
+6. **WhatsApp Integration**: Easy community onboarding for new users
+7. **Dog-Specific Blocking**: Block dates for individual dogs (vet visits, etc.)
+8. **Automated Lifecycle**: Auto-deactivation with warnings, reactivation workflow
+9. **Health Management**: Quick dog availability toggle with reasons
+10. **Comprehensive Admin Tools**: 10 admin pages with unified navigation
+11. **Zero Frontend Dependencies**: Pure vanilla JavaScript, instant page loads
+12. **Standalone Deployment**: Single binary with embedded frontend
+13. **Email-First Communication**: 18 HTML email types for all actions
+14. **Production-Ready**: Complete deployment package with systemd, nginx, backups, CI/CD
 
 ## Contributing
 
