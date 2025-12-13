@@ -1161,4 +1161,56 @@ textarea.error {
   }
 }
 
+/* ============================================
+   Logo Banner - Site-wide logo above navigation
+   ============================================ */
+
+.logo-banner {
+  background-color: #ffffff;
+  text-align: center;
+  padding: 15px 0;
+  border-bottom: 1px solid #e1e8e5;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.logo-banner-link {
+  display: inline-block;
+  text-decoration: none;
+}
+
+.logo-banner-img {
+  max-height: 80px;
+  max-width: 90%;
+  width: auto;
+  height: auto;
+  transition: opacity 0.3s ease;
+}
+
+.logo-banner-img:hover {
+  opacity: 0.9;
+}
+
+/* Tablet responsive */
+@media (max-width: 768px) {
+  .logo-banner {
+    padding: 10px 15px;
+  }
+
+  .logo-banner-img {
+    max-height: 60px;
+    max-width: 85%;
+  }
+}
+
+/* Mobile responsive */
+@media (max-width: 480px) {
+  .logo-banner {
+    padding: 8px 10px;
+  }
+
+  .logo-banner-img {
+    max-height: 50px;
+  }
+}
+
 /*# sourceMappingURL=main.css.map */

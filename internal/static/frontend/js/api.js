@@ -260,6 +260,22 @@ class API {
         return this.request('PUT', `/settings/${key}`, { value });
     }
 
+    // LOGO ENDPOINTS
+
+    async getLogo() {
+        return this.request('GET', '/settings/logo');
+    }
+
+    async uploadLogo(file) {
+        const formData = new FormData();
+        formData.append('logo', file);
+        return this.uploadFile('/settings/logo', formData);
+    }
+
+    async resetLogo() {
+        return this.request('DELETE', '/settings/logo');
+    }
+
     // EXPERIENCE REQUEST ENDPOINTS
 
     async createExperienceRequest(requestedLevel) {

@@ -158,6 +158,9 @@ func main() {
 	// Featured dogs (public - for homepage)
 	router.HandleFunc("/api/dogs/featured", dogHandler.GetFeaturedDogs).Methods("GET")
 
+	// Site logo (public - for displaying logo on all pages)
+	router.HandleFunc("/api/settings/logo", settingsHandler.GetLogo).Methods("GET")
+
 	// Protected routes (authenticated users)
 	protected := router.PathPrefix("/api").Subrouter()
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
@@ -213,6 +216,8 @@ func main() {
 	// System settings (admin only)
 	admin.HandleFunc("/settings", settingsHandler.GetAllSettings).Methods("GET")
 	admin.HandleFunc("/settings/{key}", settingsHandler.UpdateSetting).Methods("PUT")
+	admin.HandleFunc("/settings/logo", settingsHandler.UploadLogo).Methods("POST")
+	admin.HandleFunc("/settings/logo", settingsHandler.ResetLogo).Methods("DELETE")
 
 	// Experience requests management (admin only)
 	admin.HandleFunc("/experience-requests/{id}/approve", experienceHandler.ApproveRequest).Methods("PUT")

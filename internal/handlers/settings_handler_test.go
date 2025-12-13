@@ -3,8 +3,16 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"image"
+	"image/color"
+	"image/jpeg"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/gorilla/mux"
@@ -235,3 +243,393 @@ func TestSettingsHandler_UpdateSetting(t *testing.T) {
 		}
 	})
 }
+
+// createTestJPEG creates a test JPEG image in memory
+func createTestJPEG(width, height int) *bytes.Buffer {
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			img.Set(x, y, color.RGBA{uint8(x % 256), uint8(y % 256), 128, 255})
+		}
+	}
+	buf := new(bytes.Buffer)
+	jpeg.Encode(buf, img, &jpeg.Options{Quality: 85})
+	return buf
+}
+
+// createMultipartRequest creates a multipart form request with a file
+func createMultipartRequest(method, url, fieldName, fileName string, fileContent []byte) (*http.Request, error) {
+	body := new(bytes.Buffer)
+	writer := multipart.NewWriter(body)
+
+	part, err := writer.CreateFormFile(fieldName, fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = io.Copy(part, bytes.NewReader(fileContent))
+	if err != nil {
+		return nil, err
+	}
+
+	err = writer.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	req := httptest.NewRequest(method, url, body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	return req, nil
+}
+
+// TestSettingsHandler_GetLogo tests the public logo endpoint
+func TestSettingsHandler_GetLogo(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+		UploadDir:          t.TempDir(),
+	}
+	handler := NewSettingsHandler(db, cfg)
+
+	t.Run("returns default logo URL when no custom logo", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/settings/logo", nil)
+		rec := httptest.NewRecorder()
+
+		handler.GetLogo(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", rec.Code)
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		logoURL, ok := response["logo_url"].(string)
+		if !ok {
+			t.Fatal("Expected logo_url in response")
+		}
+
+		// Should be the default Tierheim logo
+		expectedDefault := "https://www.tierheim-goeppingen.de/wp-content/uploads/2017/04/Logo_4c_homepagebanner3.png"
+		if logoURL != expectedDefault {
+			t.Errorf("Expected default logo URL, got %s", logoURL)
+		}
+	})
+
+	t.Run("returns custom logo URL when uploaded", func(t *testing.T) {
+		// Update the setting to a custom path (with /uploads/ prefix as stored by UploadLogo)
+		db.Exec("UPDATE system_settings SET value = ? WHERE key = ?", "/uploads/settings/site_logo.jpg", "site_logo")
+
+		// Create the actual logo file
+		settingsDir := filepath.Join(cfg.UploadDir, "settings")
+		os.MkdirAll(settingsDir, 0755)
+		logoPath := filepath.Join(settingsDir, "site_logo.jpg")
+		os.WriteFile(logoPath, []byte("fake logo content"), 0644)
+
+		req := httptest.NewRequest("GET", "/api/settings/logo", nil)
+		rec := httptest.NewRecorder()
+
+		handler.GetLogo(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", rec.Code)
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		logoURL, ok := response["logo_url"].(string)
+		if !ok {
+			t.Fatal("Expected logo_url in response")
+		}
+
+		// Should be the uploads path
+		if logoURL != "/uploads/settings/site_logo.jpg" {
+			t.Errorf("Expected custom logo URL '/uploads/settings/site_logo.jpg', got %s", logoURL)
+		}
+	})
+
+	t.Run("no authentication required", func(t *testing.T) {
+		// Reset to default
+		db.Exec("UPDATE system_settings SET value = ? WHERE key = ?",
+			"https://www.tierheim-goeppingen.de/wp-content/uploads/2017/04/Logo_4c_homepagebanner3.png", "site_logo")
+
+		// Request without any auth context
+		req := httptest.NewRequest("GET", "/api/settings/logo", nil)
+		rec := httptest.NewRecorder()
+
+		handler.GetLogo(rec, req)
+
+		// Should still work
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200 (no auth required), got %d", rec.Code)
+		}
+	})
+}
+
+// TestSettingsHandler_UploadLogo tests logo upload endpoint
+func TestSettingsHandler_UploadLogo(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	uploadDir := t.TempDir()
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+		UploadDir:          uploadDir,
+	}
+	handler := NewSettingsHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
+
+	t.Run("admin can upload logo", func(t *testing.T) {
+		// Create test image
+		imgBuf := createTestJPEG(800, 100)
+
+		req, err := createMultipartRequest("POST", "/api/settings/logo", "logo", "test-logo.jpg", imgBuf.Bytes())
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UploadLogo(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		// Should return new logo URL
+		logoURL, ok := response["logo_url"].(string)
+		if !ok {
+			t.Fatal("Expected logo_url in response")
+		}
+
+		if logoURL != "/uploads/settings/site_logo.jpg" {
+			t.Errorf("Expected '/uploads/settings/site_logo.jpg', got %s", logoURL)
+		}
+
+		// Verify file exists
+		logoPath := filepath.Join(uploadDir, "settings", "site_logo.jpg")
+		if _, err := os.Stat(logoPath); os.IsNotExist(err) {
+			t.Error("Logo file was not created")
+		}
+
+		// Verify database updated (with /uploads/ prefix)
+		var dbValue string
+		db.QueryRow("SELECT value FROM system_settings WHERE key = ?", "site_logo").Scan(&dbValue)
+		if dbValue != "/uploads/settings/site_logo.jpg" {
+			t.Errorf("Database not updated, got value: %s", dbValue)
+		}
+	})
+
+	// Note: In production, RequireAdmin middleware handles authorization.
+	// The handler itself doesn't check admin status, so we test the happy path behavior.
+	// The middleware test would verify 403 for non-admins.
+
+	t.Run("invalid image rejected", func(t *testing.T) {
+		req, err := createMultipartRequest("POST", "/api/settings/logo", "logo", "test.txt", []byte("not an image"))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UploadLogo(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400 for invalid image, got %d", rec.Code)
+		}
+	})
+
+	t.Run("missing file rejected", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/api/settings/logo", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UploadLogo(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400 for missing file, got %d", rec.Code)
+		}
+	})
+
+	// Note: File size validation is handled by ParseMultipartForm with MaxUploadSizeMB config.
+	// In tests, the default config may not have a strict limit set.
+	// Production deployments should configure MaxUploadSizeMB appropriately.
+}
+
+// TestSettingsHandler_ResetLogo tests logo reset endpoint
+func TestSettingsHandler_ResetLogo(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	uploadDir := t.TempDir()
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+		UploadDir:          uploadDir,
+	}
+	handler := NewSettingsHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
+
+	// Setup: create a custom logo
+	settingsDir := filepath.Join(uploadDir, "settings")
+	os.MkdirAll(settingsDir, 0755)
+	logoPath := filepath.Join(settingsDir, "site_logo.jpg")
+	os.WriteFile(logoPath, []byte("custom logo content"), 0644)
+	db.Exec("UPDATE system_settings SET value = ? WHERE key = ?", "/uploads/settings/site_logo.jpg", "site_logo")
+
+	t.Run("admin can reset logo to default", func(t *testing.T) {
+		req := httptest.NewRequest("DELETE", "/api/settings/logo", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ResetLogo(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		// Should return default logo URL
+		logoURL, ok := response["logo_url"].(string)
+		if !ok {
+			t.Fatal("Expected logo_url in response")
+		}
+
+		expectedDefault := "https://www.tierheim-goeppingen.de/wp-content/uploads/2017/04/Logo_4c_homepagebanner3.png"
+		if logoURL != expectedDefault {
+			t.Errorf("Expected default URL, got %s", logoURL)
+		}
+
+		// Verify database updated
+		var dbValue string
+		db.QueryRow("SELECT value FROM system_settings WHERE key = ?", "site_logo").Scan(&dbValue)
+		if dbValue != expectedDefault {
+			t.Errorf("Database not reset to default, got value: %s", dbValue)
+		}
+
+		// Verify custom file deleted
+		if _, err := os.Stat(logoPath); !os.IsNotExist(err) {
+			t.Error("Custom logo file was not deleted")
+		}
+	})
+
+	// Note: In production, RequireAdmin middleware handles authorization.
+	// The handler itself doesn't check admin status, so we test the happy path behavior.
+
+	t.Run("reset is idempotent", func(t *testing.T) {
+		// Reset again (logo already at default)
+		req := httptest.NewRequest("DELETE", "/api/settings/logo", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ResetLogo(rec, req)
+
+		// Should succeed even when already at default
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200 for idempotent reset, got %d", rec.Code)
+		}
+	})
+}
+
+// TestSettingsHandler_LogoWorkflow tests the complete logo upload/get/reset workflow
+func TestSettingsHandler_LogoWorkflow(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	uploadDir := t.TempDir()
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+		UploadDir:          uploadDir,
+	}
+	handler := NewSettingsHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
+
+	defaultLogo := "https://www.tierheim-goeppingen.de/wp-content/uploads/2017/04/Logo_4c_homepagebanner3.png"
+
+	// Step 1: Get default logo
+	t.Run("Step 1: Get default logo", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/settings/logo", nil)
+		rec := httptest.NewRecorder()
+		handler.GetLogo(rec, req)
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		if response["logo_url"] != defaultLogo {
+			t.Errorf("Expected default logo, got %v", response["logo_url"])
+		}
+	})
+
+	// Step 2: Upload custom logo
+	t.Run("Step 2: Upload custom logo", func(t *testing.T) {
+		imgBuf := createTestJPEG(600, 80)
+		req, _ := createMultipartRequest("POST", "/api/settings/logo", "logo", "custom.jpg", imgBuf.Bytes())
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UploadLogo(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Upload failed: %s", rec.Body.String())
+		}
+	})
+
+	// Step 3: Get custom logo
+	t.Run("Step 3: Get custom logo", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/settings/logo", nil)
+		rec := httptest.NewRecorder()
+		handler.GetLogo(rec, req)
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		if response["logo_url"] != "/uploads/settings/site_logo.jpg" {
+			t.Errorf("Expected custom logo path, got %v", response["logo_url"])
+		}
+	})
+
+	// Step 4: Reset to default
+	t.Run("Step 4: Reset to default", func(t *testing.T) {
+		req := httptest.NewRequest("DELETE", "/api/settings/logo", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ResetLogo(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Reset failed: %s", rec.Body.String())
+		}
+	})
+
+	// Step 5: Verify back to default
+	t.Run("Step 5: Verify back to default", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/settings/logo", nil)
+		rec := httptest.NewRecorder()
+		handler.GetLogo(rec, req)
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		if response["logo_url"] != defaultLogo {
+			t.Errorf("Expected default logo after reset, got %v", response["logo_url"])
+		}
+	})
+}
+
+// Suppress unused import warning
+var _ = fmt.Sprintf

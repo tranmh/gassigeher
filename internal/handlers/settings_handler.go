@@ -4,12 +4,15 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
+	"github.com/tranmh/gassigeher/internal/services"
 )
 
 // SettingsHandler handles system settings-related HTTP requests
@@ -17,6 +20,7 @@ type SettingsHandler struct {
 	db           *sql.DB
 	cfg          *config.Config
 	settingsRepo *repository.SettingsRepository
+	imageService *services.ImageService
 }
 
 // NewSettingsHandler creates a new settings handler
@@ -25,6 +29,7 @@ func NewSettingsHandler(db *sql.DB, cfg *config.Config) *SettingsHandler {
 		db:           db,
 		cfg:          cfg,
 		settingsRepo: repository.NewSettingsRepository(db),
+		imageService: services.NewImageService(cfg.UploadDir),
 	}
 }
 
@@ -84,4 +89,84 @@ func (h *SettingsHandler) UpdateSetting(w http.ResponseWriter, r *http.Request) 
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"message": "Setting updated successfully"})
+}
+
+// Default logo URL (Tierheim Goeppingen)
+const defaultLogoURL = "https://www.tierheim-goeppingen.de/wp-content/uploads/2017/04/Logo_4c_homepagebanner3.png"
+
+// GetLogo returns the current logo URL (public endpoint, no auth required)
+func (h *SettingsHandler) GetLogo(w http.ResponseWriter, r *http.Request) {
+	setting, err := h.settingsRepo.Get("site_logo")
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to get logo setting")
+		return
+	}
+
+	logoURL := defaultLogoURL
+	if setting != nil && setting.Value != "" {
+		logoURL = setting.Value
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"logo_url": logoURL})
+}
+
+// UploadLogo handles uploading a custom site logo (admin only)
+func (h *SettingsHandler) UploadLogo(w http.ResponseWriter, r *http.Request) {
+	// Parse multipart form with max size limit
+	maxSize := int64(h.cfg.MaxUploadSizeMB) << 20
+	if err := r.ParseMultipartForm(maxSize); err != nil {
+		respondError(w, http.StatusBadRequest, "File too large or invalid form data")
+		return
+	}
+
+	// Get file from form
+	file, header, err := r.FormFile("logo")
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "No file uploaded")
+		return
+	}
+	defer file.Close()
+
+	// Validate file type by extension
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" {
+		respondError(w, http.StatusBadRequest, "Only JPEG and PNG files are allowed")
+		return
+	}
+
+	// Process and save logo
+	logoPath, err := h.imageService.ProcessLogo(file)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to process logo")
+		return
+	}
+
+	// Update setting with local path (prefixed with /uploads/)
+	localURL := "/uploads/" + logoPath
+	if err := h.settingsRepo.Update("site_logo", localURL); err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to update logo setting")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{
+		"message":  "Logo uploaded successfully",
+		"logo_url": localURL,
+	})
+}
+
+// ResetLogo resets the site logo to the default (admin only)
+func (h *SettingsHandler) ResetLogo(w http.ResponseWriter, r *http.Request) {
+	// Delete custom logo file (if exists)
+	h.imageService.DeleteLogo()
+
+	// Reset setting to default URL
+	if err := h.settingsRepo.Update("site_logo", defaultLogoURL); err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to reset logo setting")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{
+		"message":  "Logo reset to default",
+		"logo_url": defaultLogoURL,
+	})
 }

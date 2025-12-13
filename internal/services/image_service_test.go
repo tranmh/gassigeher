@@ -544,3 +544,379 @@ func contains(s, substr string) bool {
 		(len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
 		len(s) > 2*len(substr) && contains(s[1:], substr))))
 }
+
+// TestImageService_ProcessLogo tests logo processing
+func TestImageService_ProcessLogo(t *testing.T) {
+	tempDir := t.TempDir()
+	service := NewImageService(tempDir)
+
+	tests := []struct {
+		name         string
+		imageWidth   int
+		imageHeight  int
+		format       string
+		expectedExt  string // Expected file extension
+		expectError  bool
+		validateFunc func(t *testing.T, logoPath string)
+	}{
+		{
+			name:        "Process wide banner PNG logo (preserves transparency)",
+			imageWidth:  1500,
+			imageHeight: 150,
+			format:      "png",
+			expectedExt: ".png",
+			expectError: false,
+			validateFunc: func(t *testing.T, logoPath string) {
+				fullPath := filepath.Join(tempDir, logoPath)
+
+				// Check file exists
+				if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+					t.Errorf("Logo file does not exist: %s", fullPath)
+				}
+
+				// Check dimensions (should be <= 1200x200)
+				img, err := imaging.Open(fullPath)
+				if err != nil {
+					t.Fatalf("Failed to open logo: %v", err)
+				}
+				bounds := img.Bounds()
+				if bounds.Dx() > LogoMaxWidth || bounds.Dy() > LogoMaxHeight {
+					t.Errorf("Logo too large: %dx%d, expected max %dx%d",
+						bounds.Dx(), bounds.Dy(), LogoMaxWidth, LogoMaxHeight)
+				}
+
+				// Check it's a PNG (preserves transparency)
+				if filepath.Ext(fullPath) != ".png" {
+					t.Errorf("Expected PNG extension for PNG input, got: %s", filepath.Ext(fullPath))
+				}
+			},
+		},
+		{
+			name:        "Process tall JPEG logo (should resize)",
+			imageWidth:  500,
+			imageHeight: 500,
+			format:      "jpeg",
+			expectedExt: ".jpg",
+			expectError: false,
+			validateFunc: func(t *testing.T, logoPath string) {
+				fullPath := filepath.Join(tempDir, logoPath)
+
+				img, err := imaging.Open(fullPath)
+				if err != nil {
+					t.Fatalf("Failed to open logo: %v", err)
+				}
+				bounds := img.Bounds()
+
+				// Should be resized to fit within LogoMaxHeight
+				if bounds.Dy() > LogoMaxHeight {
+					t.Errorf("Logo height too large: %d, expected max %d",
+						bounds.Dy(), LogoMaxHeight)
+				}
+
+				// Check it's a JPEG
+				if filepath.Ext(fullPath) != ".jpg" {
+					t.Errorf("Expected JPEG extension for JPEG input, got: %s", filepath.Ext(fullPath))
+				}
+			},
+		},
+		{
+			name:        "Process very large JPEG logo",
+			imageWidth:  3000,
+			imageHeight: 500,
+			format:      "jpeg",
+			expectedExt: ".jpg",
+			expectError: false,
+			validateFunc: func(t *testing.T, logoPath string) {
+				fullPath := filepath.Join(tempDir, logoPath)
+
+				img, err := imaging.Open(fullPath)
+				if err != nil {
+					t.Fatalf("Failed to open logo: %v", err)
+				}
+				bounds := img.Bounds()
+
+				// Should be resized to fit within LogoMaxWidth
+				if bounds.Dx() > LogoMaxWidth {
+					t.Errorf("Logo width too large: %d, expected max %d",
+						bounds.Dx(), LogoMaxWidth)
+				}
+			},
+		},
+		{
+			name:        "Process small PNG logo (no upscaling)",
+			imageWidth:  200,
+			imageHeight: 50,
+			format:      "png",
+			expectedExt: ".png",
+			expectError: false,
+			validateFunc: func(t *testing.T, logoPath string) {
+				fullPath := filepath.Join(tempDir, logoPath)
+
+				img, err := imaging.Open(fullPath)
+				if err != nil {
+					t.Fatalf("Failed to open logo: %v", err)
+				}
+				bounds := img.Bounds()
+
+				// Should NOT be upscaled
+				if bounds.Dx() > 200 || bounds.Dy() > 50 {
+					t.Errorf("Logo was upscaled: %dx%d, original was 200x50",
+						bounds.Dx(), bounds.Dy())
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create test image
+			buf, err := createTestImage(tt.imageWidth, tt.imageHeight, tt.format)
+			if err != nil {
+				t.Fatalf("Failed to create test image: %v", err)
+			}
+
+			file := createMultipartFile(buf)
+
+			// Process the logo
+			logoPath, err := service.ProcessLogo(file)
+
+			if tt.expectError {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			// Validate path format (PNG stays PNG, JPEG stays JPEG)
+			expectedPath := "settings/site_logo" + tt.expectedExt
+			if logoPath != expectedPath {
+				t.Errorf("Expected path '%s', got %s", expectedPath, logoPath)
+			}
+
+			// Run custom validation
+			if tt.validateFunc != nil {
+				tt.validateFunc(t, logoPath)
+			}
+		})
+	}
+}
+
+// TestImageService_ProcessLogo_InvalidInput tests error cases for logo processing
+func TestImageService_ProcessLogo_InvalidInput(t *testing.T) {
+	tempDir := t.TempDir()
+	service := NewImageService(tempDir)
+
+	t.Run("Invalid image data", func(t *testing.T) {
+		buf := bytes.NewBuffer([]byte("not an image"))
+		file := createMultipartFile(buf)
+
+		_, err := service.ProcessLogo(file)
+		if err == nil {
+			t.Error("Expected error for invalid image data")
+		}
+	})
+
+	t.Run("Corrupted JPEG", func(t *testing.T) {
+		buf := bytes.NewBuffer([]byte("\xFF\xD8\xFF\xE0\x00\x10JFIF"))
+		file := createMultipartFile(buf)
+
+		_, err := service.ProcessLogo(file)
+		if err == nil {
+			t.Error("Expected error for corrupted JPEG")
+		}
+	})
+}
+
+// TestImageService_DeleteLogo tests logo deletion
+func TestImageService_DeleteLogo(t *testing.T) {
+	tempDir := t.TempDir()
+	service := NewImageService(tempDir)
+
+	// Create settings directory and test logo files (both formats)
+	settingsDir := filepath.Join(tempDir, "settings")
+	os.MkdirAll(settingsDir, 0755)
+
+	logoPathJPG := filepath.Join(settingsDir, "site_logo.jpg")
+	logoPathPNG := filepath.Join(settingsDir, "site_logo.png")
+
+	t.Run("Delete existing JPG logo", func(t *testing.T) {
+		// Create dummy JPG logo file
+		os.WriteFile(logoPathJPG, []byte("test jpg logo content"), 0644)
+
+		err := service.DeleteLogo()
+		if err != nil {
+			t.Fatalf("Delete failed: %v", err)
+		}
+
+		// Verify file is deleted
+		if _, err := os.Stat(logoPathJPG); !os.IsNotExist(err) {
+			t.Error("JPG Logo file still exists")
+		}
+	})
+
+	t.Run("Delete existing PNG logo", func(t *testing.T) {
+		// Create dummy PNG logo file
+		os.WriteFile(logoPathPNG, []byte("test png logo content"), 0644)
+
+		err := service.DeleteLogo()
+		if err != nil {
+			t.Fatalf("Delete failed: %v", err)
+		}
+
+		// Verify file is deleted
+		if _, err := os.Stat(logoPathPNG); !os.IsNotExist(err) {
+			t.Error("PNG Logo file still exists")
+		}
+	})
+
+	t.Run("Delete both JPG and PNG logos", func(t *testing.T) {
+		// Create both files
+		os.WriteFile(logoPathJPG, []byte("test jpg"), 0644)
+		os.WriteFile(logoPathPNG, []byte("test png"), 0644)
+
+		err := service.DeleteLogo()
+		if err != nil {
+			t.Fatalf("Delete failed: %v", err)
+		}
+
+		// Verify both files are deleted
+		if _, err := os.Stat(logoPathJPG); !os.IsNotExist(err) {
+			t.Error("JPG Logo file still exists")
+		}
+		if _, err := os.Stat(logoPathPNG); !os.IsNotExist(err) {
+			t.Error("PNG Logo file still exists")
+		}
+	})
+
+	t.Run("Delete non-existent logo (idempotent)", func(t *testing.T) {
+		// Delete again should not error
+		err := service.DeleteLogo()
+		if err != nil {
+			t.Errorf("Delete should be idempotent: %v", err)
+		}
+	})
+}
+
+// TestImageService_ProcessLogo_Overwrites tests that uploading a new logo overwrites the old one
+func TestImageService_ProcessLogo_Overwrites(t *testing.T) {
+	tempDir := t.TempDir()
+	service := NewImageService(tempDir)
+
+	t.Run("Overwrite JPEG with JPEG", func(t *testing.T) {
+		// Upload first JPEG logo
+		buf1, _ := createTestImage(400, 100, "jpeg")
+		file1 := createMultipartFile(buf1)
+		path1, err := service.ProcessLogo(file1)
+		if err != nil {
+			t.Fatalf("First upload failed: %v", err)
+		}
+
+		if path1 != "settings/site_logo.jpg" {
+			t.Errorf("Expected JPG path, got %s", path1)
+		}
+
+		// Upload second JPEG logo (different size)
+		buf2, _ := createTestImage(800, 150, "jpeg")
+		file2 := createMultipartFile(buf2)
+		path2, err := service.ProcessLogo(file2)
+		if err != nil {
+			t.Fatalf("Second upload failed: %v", err)
+		}
+
+		// Same path for same format
+		if path1 != path2 {
+			t.Errorf("Expected same path for same format, got %s and %s", path1, path2)
+		}
+	})
+
+	t.Run("Overwrite JPEG with PNG (deletes old JPG)", func(t *testing.T) {
+		settingsDir := filepath.Join(tempDir, "settings")
+		jpgPath := filepath.Join(settingsDir, "site_logo.jpg")
+		pngPath := filepath.Join(settingsDir, "site_logo.png")
+
+		// Upload JPEG first
+		buf1, _ := createTestImage(400, 100, "jpeg")
+		file1 := createMultipartFile(buf1)
+		_, err := service.ProcessLogo(file1)
+		if err != nil {
+			t.Fatalf("JPEG upload failed: %v", err)
+		}
+
+		// Verify JPG exists
+		if _, err := os.Stat(jpgPath); os.IsNotExist(err) {
+			t.Fatal("JPG file should exist")
+		}
+
+		// Upload PNG (should delete JPG)
+		buf2, _ := createTestImage(600, 120, "png")
+		file2 := createMultipartFile(buf2)
+		path2, err := service.ProcessLogo(file2)
+		if err != nil {
+			t.Fatalf("PNG upload failed: %v", err)
+		}
+
+		// New path should be PNG
+		if path2 != "settings/site_logo.png" {
+			t.Errorf("Expected PNG path, got %s", path2)
+		}
+
+		// JPG should be deleted
+		if _, err := os.Stat(jpgPath); !os.IsNotExist(err) {
+			t.Error("Old JPG file should be deleted")
+		}
+
+		// PNG should exist
+		if _, err := os.Stat(pngPath); os.IsNotExist(err) {
+			t.Error("PNG file should exist")
+		}
+	})
+
+	t.Run("Overwrite PNG with JPEG (deletes old PNG)", func(t *testing.T) {
+		settingsDir := filepath.Join(tempDir, "settings")
+		jpgPath := filepath.Join(settingsDir, "site_logo.jpg")
+		pngPath := filepath.Join(settingsDir, "site_logo.png")
+
+		// Clean up first
+		service.DeleteLogo()
+
+		// Upload PNG first
+		buf1, _ := createTestImage(400, 100, "png")
+		file1 := createMultipartFile(buf1)
+		_, err := service.ProcessLogo(file1)
+		if err != nil {
+			t.Fatalf("PNG upload failed: %v", err)
+		}
+
+		// Verify PNG exists
+		if _, err := os.Stat(pngPath); os.IsNotExist(err) {
+			t.Fatal("PNG file should exist")
+		}
+
+		// Upload JPEG (should delete PNG)
+		buf2, _ := createTestImage(600, 120, "jpeg")
+		file2 := createMultipartFile(buf2)
+		path2, err := service.ProcessLogo(file2)
+		if err != nil {
+			t.Fatalf("JPEG upload failed: %v", err)
+		}
+
+		// New path should be JPEG
+		if path2 != "settings/site_logo.jpg" {
+			t.Errorf("Expected JPEG path, got %s", path2)
+		}
+
+		// PNG should be deleted
+		if _, err := os.Stat(pngPath); !os.IsNotExist(err) {
+			t.Error("Old PNG file should be deleted")
+		}
+
+		// JPEG should exist
+		if _, err := os.Stat(jpgPath); os.IsNotExist(err) {
+			t.Error("JPEG file should exist")
+		}
+	})
+}

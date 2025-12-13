@@ -84,9 +84,50 @@
                     <button class="btn" onclick="updateSetting('auto_deactivation_days', 'auto-deactivation-days')" style="margin-top: 10px;">Speichern</button>
                 </div>
             </div>
+
+            <!-- Site Logo Section -->
+            <div class="card" style="margin-top: 30px;">
+                <h2>Website-Logo</h2>
+                <p style="font-size: 0.85rem; color: #666; margin-bottom: 20px;">
+                    Laden Sie ein benutzerdefiniertes Logo hoch oder verwenden Sie das Standard-Logo.
+                </p>
+
+                <!-- Current Logo Preview -->
+                <div class="form-group">
+                    <label>Aktuelles Logo</label>
+                    <div id="logo-preview-container" style="margin: 15px 0; text-align: center; padding: 20px; background: #f9f9f9; border-radius: 8px; border: 1px solid #e1e8e5;">
+                        <img id="current-logo-preview"
+                             src=""
+                             alt="Aktuelles Logo"
+                             style="max-height: 80px; max-width: 100%; height: auto;">
+                    </div>
+                </div>
+
+                <!-- Upload Zone -->
+                <div class="form-group">
+                    <label>Neues Logo hochladen</label>
+                    <div id="logo-upload-zone" style="border: 2px dashed #ccc; border-radius: 8px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s ease; background: #fafafa;">
+                        <div id="logo-upload-prompt">
+                            <span style="font-size: 2rem; display: block; margin-bottom: 10px;">🖼️</span>
+                            <p style="margin: 0; font-weight: 600; color: #333;">Logo hochladen</p>
+                            <p style="margin: 5px 0 0; font-size: 0.85rem; color: #666;">Klicken oder Datei hierher ziehen</p>
+                            <p style="margin: 5px 0 0; font-size: 0.8rem; color: #999;">JPEG oder PNG, max. 5 MB</p>
+                        </div>
+                        <input type="file" id="logo-file-input" accept=".jpg,.jpeg,.png" style="display: none;">
+                    </div>
+                </div>
+
+                <!-- Reset Button -->
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-secondary" onclick="resetLogoToDefault()">
+                        Standard-Logo verwenden
+                    </button>
+                </div>
+            </div>
         </div>
     </main>
 
+    <script src="/js/logo-banner.js"></script>
     <script src="/js/nav-menu.js"></script>
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
@@ -120,6 +161,8 @@
             window.i18n.updateElement(document.body);
 
             loadSettings();
+            loadCurrentLogo();
+            setupLogoUpload();
         });
 
         async function loadSettings() {
@@ -161,6 +204,92 @@
             const container = document.getElementById('alert-container');
             container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
             setTimeout(() => container.innerHTML = '', 5000);
+        }
+
+        // Logo Management Functions
+
+        async function loadCurrentLogo() {
+            try {
+                const data = await api.getLogo();
+                document.getElementById('current-logo-preview').src = data.logo_url;
+            } catch (error) {
+                console.error('Error loading logo:', error);
+                // Use default logo on error
+                document.getElementById('current-logo-preview').src = 'https://www.tierheim-goeppingen.de/wp-content/uploads/2017/04/Logo_4c_homepagebanner3.png';
+            }
+        }
+
+        function setupLogoUpload() {
+            const uploadZone = document.getElementById('logo-upload-zone');
+            const fileInput = document.getElementById('logo-file-input');
+
+            // Click to upload
+            uploadZone.addEventListener('click', () => fileInput.click());
+
+            // File selected
+            fileInput.addEventListener('change', async (e) => {
+                if (e.target.files.length > 0) {
+                    await uploadLogo(e.target.files[0]);
+                    fileInput.value = ''; // Reset input
+                }
+            });
+
+            // Drag and drop
+            uploadZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadZone.style.borderColor = '#82b965';
+                uploadZone.style.background = '#f0f7ed';
+            });
+
+            uploadZone.addEventListener('dragleave', () => {
+                uploadZone.style.borderColor = '#ccc';
+                uploadZone.style.background = '#fafafa';
+            });
+
+            uploadZone.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                uploadZone.style.borderColor = '#ccc';
+                uploadZone.style.background = '#fafafa';
+                if (e.dataTransfer.files.length > 0) {
+                    await uploadLogo(e.dataTransfer.files[0]);
+                }
+            });
+        }
+
+        async function uploadLogo(file) {
+            // Validate file type
+            if (!file.type.match(/^image\/(jpeg|png)$/)) {
+                showAlert('error', 'Nur JPEG und PNG Dateien sind erlaubt');
+                return;
+            }
+
+            // Validate file size (5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                showAlert('error', 'Datei ist zu gross (max. 5 MB)');
+                return;
+            }
+
+            try {
+                const result = await api.uploadLogo(file);
+                showAlert('success', 'Logo erfolgreich hochgeladen');
+                document.getElementById('current-logo-preview').src = result.logo_url;
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Hochladen des Logos');
+            }
+        }
+
+        async function resetLogoToDefault() {
+            if (!confirm('Möchten Sie das Logo auf das Standard-Logo zurücksetzen?')) {
+                return;
+            }
+
+            try {
+                const result = await api.resetLogo();
+                showAlert('success', 'Logo auf Standard zurückgesetzt');
+                document.getElementById('current-logo-preview').src = result.logo_url;
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Zurücksetzen des Logos');
+            }
         }
     </script>
 </body>

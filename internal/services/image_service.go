@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
+	"image/png"
 	"io"
 	"mime/multipart"
 	"os"
@@ -20,10 +21,12 @@ type ImageService struct {
 
 // Image processing constants
 const (
-	MaxImageWidth   = 800 // Max width for full-size image
-	MaxImageHeight  = 800 // Max height for full-size image
-	ThumbnailSize   = 300 // Thumbnail dimensions (square max)
-	JPEGQuality     = 85  // JPEG compression quality (1-100)
+	MaxImageWidth   = 800  // Max width for full-size image
+	MaxImageHeight  = 800  // Max height for full-size image
+	ThumbnailSize   = 300  // Thumbnail dimensions (square max)
+	JPEGQuality     = 85   // JPEG compression quality (1-100)
+	LogoMaxWidth    = 1200 // Max width for site logo
+	LogoMaxHeight   = 200  // Max height for site logo (banner format)
 )
 
 // NewImageService creates a new image service
@@ -116,6 +119,24 @@ func (s *ImageService) saveJPEG(img image.Image, path string, quality int) error
 	return nil
 }
 
+// savePNG saves an image as PNG (preserves transparency)
+func (s *ImageService) savePNG(img image.Image, path string) error {
+	// Create output file
+	outFile, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer outFile.Close()
+
+	// Encode as PNG (lossless, preserves transparency)
+	encoder := png.Encoder{CompressionLevel: png.BestCompression}
+	if err := encoder.Encode(outFile, img); err != nil {
+		return fmt.Errorf("failed to encode PNG: %w", err)
+	}
+
+	return nil
+}
+
 // DeleteDogPhotos deletes both full-size and thumbnail photos for a dog
 // Does not return error if files don't exist (idempotent)
 func (s *ImageService) DeleteDogPhotos(dogID int) error {
@@ -157,4 +178,82 @@ func (s *ImageService) ResizeAndCompress(img image.Image, maxWidth, maxHeight, q
 // photoRelPath should be the relative path stored in database (e.g., "dogs/dog_5_full.jpg")
 func (s *ImageService) GetDogPhotoPath(photoRelPath string) string {
 	return filepath.Join(s.uploadDir, photoRelPath)
+}
+
+// ProcessLogo processes an uploaded site logo image
+// Returns the relative path (e.g., "settings/site_logo.png" or "settings/site_logo.jpg")
+// PNG files are preserved as PNG to maintain transparency
+func (s *ImageService) ProcessLogo(file multipart.File) (string, error) {
+	// Reset file pointer to beginning
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return "", fmt.Errorf("failed to seek file: %w", err)
+	}
+
+	// Detect image format by reading header bytes
+	header := make([]byte, 8)
+	if _, err := file.Read(header); err != nil {
+		return "", fmt.Errorf("failed to read file header: %w", err)
+	}
+
+	// Reset file pointer again after reading header
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return "", fmt.Errorf("failed to seek file: %w", err)
+	}
+
+	// Check if PNG (PNG magic bytes: 137 80 78 71 13 10 26 10)
+	isPNG := header[0] == 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47
+
+	// Decode the uploaded image
+	img, err := imaging.Decode(file)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode image: %w", err)
+	}
+
+	// Create settings directory if it doesn't exist
+	settingsDir := filepath.Join(s.uploadDir, "settings")
+	if err := os.MkdirAll(settingsDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create settings directory: %w", err)
+	}
+
+	// Delete existing logo files first (both .jpg and .png)
+	s.DeleteLogo()
+
+	// Resize to fit banner dimensions
+	resized := s.resizeImage(img, LogoMaxWidth, LogoMaxHeight)
+
+	// Save in original format to preserve transparency for PNGs
+	var filename string
+	var filePath string
+
+	if isPNG {
+		filename = "site_logo.png"
+		filePath = filepath.Join(settingsDir, filename)
+		if err := s.savePNG(resized, filePath); err != nil {
+			return "", fmt.Errorf("failed to save logo: %w", err)
+		}
+	} else {
+		filename = "site_logo.jpg"
+		filePath = filepath.Join(settingsDir, filename)
+		if err := s.saveJPEG(resized, filePath, JPEGQuality); err != nil {
+			return "", fmt.Errorf("failed to save logo: %w", err)
+		}
+	}
+
+	// Return relative path
+	return filepath.Join("settings", filename), nil
+}
+
+// DeleteLogo removes the custom site logo file (both .jpg and .png variants)
+// Does not return error if files don't exist (idempotent)
+func (s *ImageService) DeleteLogo() error {
+	settingsDir := filepath.Join(s.uploadDir, "settings")
+
+	// Delete both possible logo files
+	for _, ext := range []string{".jpg", ".png"} {
+		logoPath := filepath.Join(settingsDir, "site_logo"+ext)
+		if err := os.Remove(logoPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to delete logo: %w", err)
+		}
+	}
+	return nil
 }
