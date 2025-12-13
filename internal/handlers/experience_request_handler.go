@@ -215,7 +215,7 @@ func (h *ExperienceRequestHandler) ApproveRequest(w http.ResponseWriter, r *http
 
 	// Send email notification
 	if user.Email != nil && h.emailService != nil {
-		go h.emailService.SendExperienceLevelApproved(*user.Email, user.Name, experienceRequest.RequestedLevel, req.Message)
+		go h.emailService.SendExperienceLevelApproved(*user.Email, user.FirstName, experienceRequest.RequestedLevel, req.Message)
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"message": "Request approved"})
@@ -277,7 +277,7 @@ func (h *ExperienceRequestHandler) DenyRequest(w http.ResponseWriter, r *http.Re
 
 	// Send email notification
 	if user.Email != nil && h.emailService != nil {
-		go h.emailService.SendExperienceLevelDenied(*user.Email, user.Name, experienceRequest.RequestedLevel, req.Message)
+		go h.emailService.SendExperienceLevelDenied(*user.Email, user.FirstName, experienceRequest.RequestedLevel, req.Message)
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"message": "Request denied"})

@@ -321,7 +321,7 @@ func (h *DogHandler) DeleteDog(w http.ResponseWriter, r *http.Request) {
 			if h.emailService != nil && booking.User != nil && booking.User.Email != nil && *booking.User.Email != "" {
 				go h.emailService.SendBookingCancellation(
 					*booking.User.Email,
-					booking.User.Name,
+					booking.User.FirstName,
 					dog.Name,
 					booking.Date,
 					booking.ScheduledTime,

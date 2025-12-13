@@ -17,7 +17,8 @@ func TestUserRepository_Create(t *testing.T) {
 	t.Run("successful creation", func(t *testing.T) {
 		email := "test@example.com"
 		user := &models.User{
-			Name:            "Test User",
+			FirstName:       "Test",
+			LastName:        "User",
 			Email:           &email,
 			Phone:           stringPtr("+49 123 456789"),
 			PasswordHash:    stringPtr("hashed_password"),
@@ -41,7 +42,8 @@ func TestUserRepository_Create(t *testing.T) {
 	t.Run("duplicate email", func(t *testing.T) {
 		email := "duplicate@example.com"
 		user1 := &models.User{
-			Name:            "User 1",
+			FirstName:       "User",
+			LastName:        "One",
 			Email:           &email,
 			PasswordHash:    stringPtr("hash"),
 			ExperienceLevel: "green",
@@ -53,7 +55,8 @@ func TestUserRepository_Create(t *testing.T) {
 
 		// Try to create another user with same email
 		user2 := &models.User{
-			Name:            "User 2",
+			FirstName:       "User",
+			LastName:        "Two",
 			Email:           &email,
 			PasswordHash:    stringPtr("hash"),
 			ExperienceLevel: "green",
@@ -89,8 +92,8 @@ func TestUserRepository_FindByEmail(t *testing.T) {
 			t.Errorf("Expected email %s, got %v", testEmail, user.Email)
 		}
 
-		if user.Name != "Find Me" {
-			t.Errorf("Expected name 'Find Me', got %s", user.Name)
+		if user.FullName() != "Find Me" {
+			t.Errorf("Expected name 'Find Me', got %s", user.FullName())
 		}
 	})
 
@@ -226,8 +229,8 @@ func TestUserRepository_DeleteAccount(t *testing.T) {
 			t.Fatalf("Failed to find deleted user: %v", err)
 		}
 
-		if user.Name != "Deleted User" {
-			t.Errorf("Expected name 'Deleted User', got %s", user.Name)
+		if user.FullName() != "Deleted User" {
+			t.Errorf("Expected name 'Deleted User', got %s", user.FullName())
 		}
 
 		if user.Email != nil {
@@ -632,9 +635,11 @@ func TestUserRepository_Update(t *testing.T) {
 		}
 
 		// Update fields
-		newName := "Updated Name"
+		newFirstName := "Updated"
+		newLastName := "Name"
 		newPhone := "+49 987 654321"
-		user.Name = newName
+		user.FirstName = newFirstName
+		user.LastName = newLastName
 		user.Phone = &newPhone
 		user.ExperienceLevel = "blue"
 
@@ -650,8 +655,12 @@ func TestUserRepository_Update(t *testing.T) {
 			t.Fatalf("Failed to find updated user: %v", err)
 		}
 
-		if updated.Name != newName {
-			t.Errorf("Expected name '%s', got '%s'", newName, updated.Name)
+		if updated.FirstName != newFirstName {
+			t.Errorf("Expected first name '%s', got '%s'", newFirstName, updated.FirstName)
+		}
+
+		if updated.LastName != newLastName {
+			t.Errorf("Expected last name '%s', got '%s'", newLastName, updated.LastName)
 		}
 
 		if updated.Phone == nil || *updated.Phone != newPhone {
@@ -728,7 +737,8 @@ func TestUserRepository_Update(t *testing.T) {
 		email := "nonexistent@example.com"
 		user := &models.User{
 			ID:              99999,
-			Name:            "Nonexistent",
+			FirstName:       "Nonexistent",
+			LastName:        "User",
 			Email:           &email,
 			ExperienceLevel: "green",
 		}

@@ -70,6 +70,39 @@
         </div>
     </main>
 
+    <!-- Edit User Modal -->
+    <div id="edit-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Benutzer bearbeiten</h3>
+                <button class="modal-close" onclick="closeEditModal()">&times;</button>
+            </div>
+            <form id="edit-form" onsubmit="saveUser(event)">
+                <input type="hidden" id="edit-user-id">
+                <div class="form-group">
+                    <label for="edit-first-name">Vorname *</label>
+                    <input type="text" id="edit-first-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-last-name">Nachname *</label>
+                    <input type="text" id="edit-last-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-email">E-Mail *</label>
+                    <input type="email" id="edit-email" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-phone">Telefon</label>
+                    <input type="tel" id="edit-phone">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Abbrechen</button>
+                    <button type="submit" class="btn">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="/js/logo-banner.js"></script>
     <script src="/js/nav-menu.js"></script>
     <script src="/js/i18n.js"></script>
@@ -140,7 +173,9 @@
                 const levelLabel = getLevelLabel(user.experience_level);
 
                 // Sanitize user data to prevent XSS
-                const safeName = sanitizeHTML(user.name);
+                const safeFirstName = sanitizeHTML(user.first_name || '');
+                const safeLastName = sanitizeHTML(user.last_name || '');
+                const safeName = `${safeFirstName} ${safeLastName}`.trim();
                 const safeEmail = sanitizeHTML(user.email || 'N/A');
                 const safePhone = sanitizeHTML(user.phone || 'N/A');
                 const safeReason = user.deactivation_reason ? sanitizeHTML(user.deactivation_reason) : '';
@@ -184,6 +219,9 @@
                                 ` : ''}
                             </div>
                             <div style="display: flex; gap: 5px; flex-direction: column; min-width: 150px;">
+                                ${!user.is_deleted ? `
+                                    <button class="btn btn-secondary btn-sm" onclick="showEditModal(${user.id})">Bearbeiten</button>
+                                ` : ''}
                                 ${!user.is_admin && !user.is_super_admin && user.is_active ? `
                                     <button class="btn btn-danger btn-sm" onclick="deactivateUser(${user.id})">Deaktivieren</button>
                                 ` : user.is_active && !user.is_super_admin ? `
@@ -274,6 +312,56 @@
             }
         }
 
+        function showEditModal(userId) {
+            const user = users.find(u => u.id === userId);
+            if (!user) {
+                showAlert('error', 'Benutzer nicht gefunden');
+                return;
+            }
+
+            document.getElementById('edit-user-id').value = user.id;
+            document.getElementById('edit-first-name').value = user.first_name || '';
+            document.getElementById('edit-last-name').value = user.last_name || '';
+            document.getElementById('edit-email').value = user.email || '';
+            document.getElementById('edit-phone').value = user.phone || '';
+
+            document.getElementById('edit-modal').style.display = 'flex';
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-modal').style.display = 'none';
+            document.getElementById('edit-form').reset();
+        }
+
+        async function saveUser(event) {
+            event.preventDefault();
+
+            const userId = parseInt(document.getElementById('edit-user-id').value);
+            const data = {
+                first_name: document.getElementById('edit-first-name').value.trim(),
+                last_name: document.getElementById('edit-last-name').value.trim(),
+                email: document.getElementById('edit-email').value.trim(),
+                phone: document.getElementById('edit-phone').value.trim() || null
+            };
+
+            try {
+                await api.adminUpdateUser(userId, data);
+                showAlert('success', 'Benutzer erfolgreich aktualisiert');
+                closeEditModal();
+                loadUsers();
+            } catch (error) {
+                console.error('Error updating user:', error);
+                showAlert('error', error.message || 'Fehler beim Aktualisieren des Benutzers');
+            }
+        }
+
+        // Close modal on overlay click
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                closeEditModal();
+            }
+        });
+
         function showAlert(type, message) {
             const container = document.getElementById('alert-container');
             container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
@@ -298,6 +386,62 @@
             border-radius: var(--border-radius);
             font-size: 0.8rem;
             font-weight: bold;
+        }
+
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: var(--border-radius);
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
         }
     </style>
 </body>

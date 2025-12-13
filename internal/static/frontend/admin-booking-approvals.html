@@ -304,7 +304,7 @@
 
             container.innerHTML = filtered.map(booking => {
                 const safeDogName = booking.dog ? sanitizeHTML(booking.dog.name) : `Hund #${booking.dog_id}`;
-                const safeUserName = booking.user ? sanitizeHTML(booking.user.name) : `User #${booking.user_id}`;
+                const safeUserName = booking.user ? sanitizeHTML(`${booking.user.first_name || ''} ${booking.user.last_name || ''}`.trim()) : `User #${booking.user_id}`;
                 const safeRejectionReason = booking.rejection_reason ? sanitizeHTML(booking.rejection_reason) : '';
                 const statusClass = booking.approval_status;
                 const statusBadge = getStatusBadge(booking.approval_status);

@@ -330,7 +330,7 @@ func (r *BookingRepository) GetForReminders() ([]*models.Booking, error) {
 	query := `
 		SELECT b.id, b.user_id, b.dog_id, b.date, b.scheduled_time, b.status,
 		       b.completed_at, b.user_notes, b.admin_cancellation_reason, b.created_at, b.updated_at,
-		       u.name as user_name, u.email as user_email,
+		       u.first_name as user_first_name, u.last_name as user_last_name, u.email as user_email,
 		       d.name as dog_name
 		FROM bookings b
 		LEFT JOIN users u ON b.user_id = u.id
@@ -354,7 +354,7 @@ func (r *BookingRepository) GetForReminders() ([]*models.Booking, error) {
 			User: &models.User{},
 			Dog:  &models.Dog{},
 		}
-		var userName, userEmail, dogName sql.NullString
+		var userFirstName, userLastName, userEmail, dogName sql.NullString
 
 		err := rows.Scan(
 			&booking.ID,
@@ -368,7 +368,8 @@ func (r *BookingRepository) GetForReminders() ([]*models.Booking, error) {
 			&booking.AdminCancellationReason,
 			&booking.CreatedAt,
 			&booking.UpdatedAt,
-			&userName,
+			&userFirstName,
+			&userLastName,
 			&userEmail,
 			&dogName,
 		)
@@ -377,8 +378,11 @@ func (r *BookingRepository) GetForReminders() ([]*models.Booking, error) {
 		}
 
 		// Populate user details
-		if userName.Valid {
-			booking.User.Name = userName.String
+		if userFirstName.Valid {
+			booking.User.FirstName = userFirstName.String
+		}
+		if userLastName.Valid {
+			booking.User.LastName = userLastName.String
 		}
 		if userEmail.Valid {
 			email := userEmail.String
@@ -433,7 +437,7 @@ func (r *BookingRepository) FindByIDWithDetails(id int) (*models.Booking, error)
 		SELECT
 			b.id, b.user_id, b.dog_id, b.date, b.scheduled_time, b.status,
 			b.completed_at, b.user_notes, b.admin_cancellation_reason, b.created_at, b.updated_at,
-			u.name as user_name, u.email as user_email, u.phone as user_phone,
+			u.first_name as user_first_name, u.last_name as user_last_name, u.email as user_email, u.phone as user_phone,
 			d.name as dog_name, d.breed, d.size, d.age
 		FROM bookings b
 		LEFT JOIN users u ON b.user_id = u.id
@@ -446,7 +450,7 @@ func (r *BookingRepository) FindByIDWithDetails(id int) (*models.Booking, error)
 		Dog:  &models.Dog{},
 	}
 
-	var userName, userEmail, userPhone sql.NullString
+	var userFirstName, userLastName, userEmail, userPhone sql.NullString
 	var dogName, breed, size string
 	var age int
 
@@ -462,7 +466,8 @@ func (r *BookingRepository) FindByIDWithDetails(id int) (*models.Booking, error)
 		&booking.AdminCancellationReason,
 		&booking.CreatedAt,
 		&booking.UpdatedAt,
-		&userName,
+		&userFirstName,
+		&userLastName,
 		&userEmail,
 		&userPhone,
 		&dogName,
@@ -480,10 +485,15 @@ func (r *BookingRepository) FindByIDWithDetails(id int) (*models.Booking, error)
 	}
 
 	// Populate user details
-	if userName.Valid {
-		booking.User.Name = userName.String
+	if userFirstName.Valid {
+		booking.User.FirstName = userFirstName.String
 	} else {
-		booking.User.Name = "Deleted User"
+		booking.User.FirstName = "Deleted"
+	}
+	if userLastName.Valid {
+		booking.User.LastName = userLastName.String
+	} else {
+		booking.User.LastName = "User"
 	}
 	if userEmail.Valid {
 		email := userEmail.String
@@ -510,7 +520,7 @@ func (r *BookingRepository) GetPendingApprovalBookings() ([]*models.Booking, err
 		       b.status, b.completed_at, b.user_notes, b.admin_cancellation_reason,
 		       b.created_at, b.updated_at,
 		       b.requires_approval, b.approval_status, b.approved_by, b.approved_at, b.rejection_reason,
-		       u.name as user_name, u.email as user_email, u.phone as user_phone,
+		       u.first_name as user_first_name, u.last_name as user_last_name, u.email as user_email, u.phone as user_phone,
 		       d.name as dog_name, d.breed, d.size, d.age
 		FROM bookings b
 		JOIN users u ON b.user_id = u.id
@@ -537,7 +547,8 @@ func (r *BookingRepository) GetPendingApprovalBookings() ([]*models.Booking, err
 		var userEmail, userPhone sql.NullString
 		var approvedBy sql.NullInt64
 		var requiresApproval int
-		var userName, dogName, breed string
+		var userFirstName, userLastName sql.NullString
+		var dogName, breed string
 		var size sql.NullString
 		var age sql.NullInt64
 
@@ -547,7 +558,7 @@ func (r *BookingRepository) GetPendingApprovalBookings() ([]*models.Booking, err
 			&booking.Status, &completedAt, &userNotes, &adminCancellationReason,
 			&booking.CreatedAt, &booking.UpdatedAt,
 			&requiresApproval, &booking.ApprovalStatus, &approvedBy, &approvedAt, &rejectionReason,
-			&userName, &userEmail, &userPhone,
+			&userFirstName, &userLastName, &userEmail, &userPhone,
 			&dogName, &breed, &size, &age,
 		)
 		if err != nil {
@@ -583,7 +594,12 @@ func (r *BookingRepository) GetPendingApprovalBookings() ([]*models.Booking, err
 
 		// Populate user details
 		booking.User.ID = booking.UserID
-		booking.User.Name = userName
+		if userFirstName.Valid {
+			booking.User.FirstName = userFirstName.String
+		}
+		if userLastName.Valid {
+			booking.User.LastName = userLastName.String
+		}
 		if userEmail.Valid {
 			email := userEmail.String
 			booking.User.Email = &email

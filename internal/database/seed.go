@@ -13,10 +13,11 @@ import (
 
 // TestUser holds test user credentials for display
 type TestUser struct {
-	Name     string
-	Email    string
-	Password string
-	Level    string
+	FirstName string
+	LastName  string
+	Email     string
+	Password  string
+	Level     string
 }
 
 // SeedDatabase generates initial seed data for first-time installations
@@ -59,11 +60,11 @@ func SeedDatabase(db *sql.DB, superAdminEmail string) error {
 	now := time.Now()
 	_, err = db.Exec(`
 		INSERT INTO users (
-			id, name, email, password_hash, experience_level,
+			id, first_name, last_name, email, password_hash, experience_level,
 			is_admin, is_super_admin, is_verified, is_active,
 			terms_accepted_at, last_activity_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, 1, "Super Admin", superAdminEmail, string(hashedPassword), "orange",
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, 1, "Super", "Admin", superAdminEmail, string(hashedPassword), "orange",
 		true, true, true, true, now, now, now, now)
 
 	if err != nil {
@@ -145,9 +146,9 @@ func generateSecurePassword(length int) string {
 // DONE
 func generateTestUsers(db *sql.DB) ([]TestUser, error) {
 	users := []TestUser{
-		{Name: "Test Walker (Green)", Email: "green-walker@test.com", Level: "green"},
-		{Name: "Test Walker (Blue)", Email: "blue-walker@test.com", Level: "blue"},
-		{Name: "Test Walker (Orange)", Email: "orange-walker@test.com", Level: "orange"},
+		{FirstName: "Test", LastName: "Walker (Green)", Email: "green-walker@test.com", Level: "green"},
+		{FirstName: "Test", LastName: "Walker (Blue)", Email: "blue-walker@test.com", Level: "blue"},
+		{FirstName: "Test", LastName: "Walker (Orange)", Email: "orange-walker@test.com", Level: "orange"},
 	}
 
 	now := time.Now()
@@ -159,11 +160,11 @@ func generateTestUsers(db *sql.DB) ([]TestUser, error) {
 		}
 
 		_, err = db.Exec(`
-			INSERT INTO users (name, email, password_hash, experience_level,
+			INSERT INTO users (first_name, last_name, email, password_hash, experience_level,
 				is_admin, is_super_admin, is_verified, is_active,
 				terms_accepted_at, last_activity_at, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, users[i].Name, users[i].Email, string(hashedPassword), users[i].Level,
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, users[i].FirstName, users[i].LastName, users[i].Email, string(hashedPassword), users[i].Level,
 			false, false, true, true, now, now, now, now)
 
 		if err != nil {
@@ -337,7 +338,7 @@ func printSetupComplete(superAdminEmail, superAdminPassword string, testUsers []
 	fmt.Println()
 	fmt.Println("TEST USER CREDENTIALS:")
 	for i, user := range testUsers {
-		fmt.Printf("  %d. %s / %s\n", i+1, user.Email, user.Password)
+		fmt.Printf("  %d. %s %s / %s / %s\n", i+1, user.FirstName, user.LastName, user.Email, user.Password)
 	}
 	fmt.Println()
 	fmt.Println("IMPORTANT:")

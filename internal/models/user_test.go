@@ -159,7 +159,8 @@ func TestRegisterRequest_Validate(t *testing.T) {
 		{
 			name: "Valid registration request",
 			req: RegisterRequest{
-				Name:                 "John Doe",
+				FirstName:            "John",
+				LastName:             "Doe",
 				Email:                "john@example.com",
 				Phone:                "0123 456789",
 				Password:             "securePass123",
@@ -172,7 +173,8 @@ func TestRegisterRequest_Validate(t *testing.T) {
 		{
 			name: "Invalid phone format",
 			req: RegisterRequest{
-				Name:                 "John Doe",
+				FirstName:            "John",
+				LastName:             "Doe",
 				Email:                "john@example.com",
 				Phone:                "123",
 				Password:             "securePass123",
@@ -183,9 +185,10 @@ func TestRegisterRequest_Validate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "Empty name",
+			name: "Empty first name",
 			req: RegisterRequest{
-				Name:                 "",
+				FirstName:            "",
+				LastName:             "Doe",
 				Email:                "john@example.com",
 				Phone:                "0123 456789",
 				Password:             "securePass123",
@@ -198,7 +201,8 @@ func TestRegisterRequest_Validate(t *testing.T) {
 		{
 			name: "Empty email",
 			req: RegisterRequest{
-				Name:                 "John Doe",
+				FirstName:            "John",
+				LastName:             "Doe",
 				Email:                "",
 				Phone:                "0123 456789",
 				Password:             "securePass123",
@@ -211,7 +215,8 @@ func TestRegisterRequest_Validate(t *testing.T) {
 		{
 			name: "Password too short",
 			req: RegisterRequest{
-				Name:                 "John Doe",
+				FirstName:            "John",
+				LastName:             "Doe",
 				Email:                "john@example.com",
 				Phone:                "0123 456789",
 				Password:             "short",
@@ -224,7 +229,8 @@ func TestRegisterRequest_Validate(t *testing.T) {
 		{
 			name: "Passwords don't match",
 			req: RegisterRequest{
-				Name:                 "John Doe",
+				FirstName:            "John",
+				LastName:             "Doe",
 				Email:                "john@example.com",
 				Phone:                "0123 456789",
 				Password:             "securePass123",
@@ -237,7 +243,8 @@ func TestRegisterRequest_Validate(t *testing.T) {
 		{
 			name: "Terms not accepted",
 			req: RegisterRequest{
-				Name:                 "John Doe",
+				FirstName:            "John",
+				LastName:             "Doe",
 				Email:                "john@example.com",
 				Phone:                "0123 456789",
 				Password:             "securePass123",
@@ -250,7 +257,8 @@ func TestRegisterRequest_Validate(t *testing.T) {
 		{
 			name: "Empty registration password",
 			req: RegisterRequest{
-				Name:                 "John Doe",
+				FirstName:            "John",
+				LastName:             "Doe",
 				Email:                "john@example.com",
 				Phone:                "0123 456789",
 				Password:             "securePass123",
@@ -263,7 +271,8 @@ func TestRegisterRequest_Validate(t *testing.T) {
 		{
 			name: "Invalid registration password format",
 			req: RegisterRequest{
-				Name:                 "John Doe",
+				FirstName:            "John",
+				LastName:             "Doe",
 				Email:                "john@example.com",
 				Phone:                "0123 456789",
 				Password:             "securePass123",
@@ -286,11 +295,11 @@ func TestRegisterRequest_Validate(t *testing.T) {
 }
 
 // TestUpdateProfileRequest_Validate tests UpdateProfileRequest validation
+// Note: Name field was removed - users can no longer update their name
 func TestUpdateProfileRequest_Validate(t *testing.T) {
 	phone1 := "0123 456789"
-	phone2 := "123"  // Invalid
+	phone2 := "123" // Invalid
 	email1 := "new@example.com"
-	name1 := "New Name"
 	emptyString := ""
 
 	tests := []struct {
@@ -327,23 +336,8 @@ func TestUpdateProfileRequest_Validate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "Valid name update",
-			req: UpdateProfileRequest{
-				Name: &name1,
-			},
-			wantErr: false,
-		},
-		{
-			name: "Empty name update",
-			req: UpdateProfileRequest{
-				Name: &emptyString,
-			},
-			wantErr: true,
-		},
-		{
 			name: "Multiple valid updates",
 			req: UpdateProfileRequest{
-				Name:  &name1,
 				Email: &email1,
 				Phone: &phone1,
 			},

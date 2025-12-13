@@ -146,12 +146,27 @@ func cleanPostgreSQLTestDB(t *testing.T, db *sql.DB) {
 }
 
 // DONE: SeedTestUser creates a test user and returns the ID
+// Name is split: first word = first_name, rest = last_name
 func SeedTestUser(t *testing.T, db *sql.DB, email, name, level string) int {
 	now := time.Now()
+
+	// Split name into first_name and last_name
+	firstName := name
+	lastName := ""
+	parts := splitName(name)
+	if len(parts) > 0 {
+		firstName = parts[0]
+		if len(parts) > 1 {
+			lastName = parts[1]
+		}
+	}
+
+	// Note: We still include the legacy 'name' column for backward compatibility
+	// with the database schema until a migration drops it
 	result, err := db.Exec(`
-		INSERT INTO users (email, name, phone, password_hash, experience_level, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
-		VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?, ?)
-	`, email, name, "+49 123 456789", "test_hash", level, now, now, now)
+		INSERT INTO users (email, name, first_name, last_name, phone, password_hash, experience_level, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?)
+	`, email, name, firstName, lastName, "+49 123 456789", "test_hash", level, now, now, now)
 
 	if err != nil {
 		t.Fatalf("Failed to seed test user: %v", err)
@@ -159,6 +174,41 @@ func SeedTestUser(t *testing.T, db *sql.DB, email, name, level string) int {
 
 	id, _ := result.LastInsertId()
 	return int(id)
+}
+
+// splitName splits a name into first and last name parts
+func splitName(name string) []string {
+	parts := []string{}
+	current := ""
+	for _, r := range name {
+		if r == ' ' {
+			if current != "" {
+				parts = append(parts, current)
+				current = ""
+			}
+		} else {
+			current += string(r)
+		}
+	}
+	if current != "" {
+		parts = append(parts, current)
+	}
+
+	// First word is first_name, rest joined is last_name
+	if len(parts) == 0 {
+		return []string{"", ""}
+	}
+	if len(parts) == 1 {
+		return []string{parts[0], ""}
+	}
+	lastName := ""
+	for i := 1; i < len(parts); i++ {
+		if i > 1 {
+			lastName += " "
+		}
+		lastName += parts[i]
+	}
+	return []string{parts[0], lastName}
 }
 
 // DONE: SeedTestDog creates a test dog and returns the ID

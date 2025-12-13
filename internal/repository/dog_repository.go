@@ -403,7 +403,7 @@ func (r *DogRepository) GetFutureBookings(dogID int) ([]*models.Booking, error) 
 		SELECT
 			b.id, b.user_id, b.dog_id, b.date, b.scheduled_time, b.status,
 			b.completed_at, b.user_notes, b.admin_cancellation_reason, b.created_at, b.updated_at,
-			u.name as user_name, u.email as user_email
+			u.first_name as user_first_name, u.last_name as user_last_name, u.email as user_email
 		FROM bookings b
 		LEFT JOIN users u ON b.user_id = u.id
 		WHERE b.dog_id = ? AND b.date >= ? AND b.status = 'scheduled'
@@ -421,7 +421,7 @@ func (r *DogRepository) GetFutureBookings(dogID int) ([]*models.Booking, error) 
 		booking := &models.Booking{
 			User: &models.User{},
 		}
-		var userName, userEmail sql.NullString
+		var userFirstName, userLastName, userEmail sql.NullString
 
 		err := rows.Scan(
 			&booking.ID,
@@ -435,7 +435,8 @@ func (r *DogRepository) GetFutureBookings(dogID int) ([]*models.Booking, error) 
 			&booking.AdminCancellationReason,
 			&booking.CreatedAt,
 			&booking.UpdatedAt,
-			&userName,
+			&userFirstName,
+			&userLastName,
 			&userEmail,
 		)
 		if err != nil {
@@ -443,10 +444,15 @@ func (r *DogRepository) GetFutureBookings(dogID int) ([]*models.Booking, error) 
 		}
 
 		// Populate user details
-		if userName.Valid {
-			booking.User.Name = userName.String
+		if userFirstName.Valid {
+			booking.User.FirstName = userFirstName.String
 		} else {
-			booking.User.Name = "Deleted User"
+			booking.User.FirstName = "Deleted"
+		}
+		if userLastName.Valid {
+			booking.User.LastName = userLastName.String
+		} else {
+			booking.User.LastName = "User"
 		}
 		if userEmail.Valid {
 			email := userEmail.String

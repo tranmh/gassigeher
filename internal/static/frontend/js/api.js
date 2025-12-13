@@ -327,6 +327,10 @@ class API {
         return this.request('PUT', `/users/${id}/activate`, { message });
     }
 
+    async adminUpdateUser(id, data) {
+        return this.request('PUT', `/users/${id}`, data);
+    }
+
     async promoteToAdmin(userId) {
         return this.request('POST', `/admin/users/${userId}/promote`);
     }

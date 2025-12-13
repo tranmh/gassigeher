@@ -226,6 +226,7 @@ func main() {
 	// User management (admin only)
 	admin.HandleFunc("/users", userHandler.ListUsers).Methods("GET")
 	admin.HandleFunc("/users/{id}", userHandler.GetUser).Methods("GET")
+	admin.HandleFunc("/users/{id}", userHandler.AdminUpdateUser).Methods("PUT")
 	admin.HandleFunc("/users/{id}/activate", userHandler.ActivateUser).Methods("PUT")
 	admin.HandleFunc("/users/{id}/deactivate", userHandler.DeactivateUser).Methods("PUT")
 

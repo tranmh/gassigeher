@@ -10,7 +10,8 @@ import (
 // User represents a user in the system
 type User struct {
 	ID                       int        `json:"id"`
-	Name                     string     `json:"name"`
+	FirstName                string     `json:"first_name"`
+	LastName                 string     `json:"last_name"`
 	Email                    *string    `json:"email,omitempty"`
 	Phone                    *string    `json:"phone,omitempty"`
 	PasswordHash             *string    `json:"-"`
@@ -37,9 +38,18 @@ type User struct {
 	UpdatedAt                time.Time  `json:"updated_at"`
 }
 
+// FullName returns the user's full name (FirstName LastName)
+func (u *User) FullName() string {
+	if u.LastName == "" {
+		return u.FirstName
+	}
+	return u.FirstName + " " + u.LastName
+}
+
 // RegisterRequest represents the registration payload
 type RegisterRequest struct {
-	Name                 string `json:"name"`
+	FirstName            string `json:"first_name"`
+	LastName             string `json:"last_name"`
 	Email                string `json:"email"`
 	Phone                string `json:"phone"`
 	Password             string `json:"password"`
@@ -86,10 +96,18 @@ type ChangePasswordRequest struct {
 }
 
 // UpdateProfileRequest represents profile update payload
+// Note: FirstName and LastName can only be edited by admins
 type UpdateProfileRequest struct {
-	Name  *string `json:"name,omitempty"`
 	Email *string `json:"email,omitempty"`
 	Phone *string `json:"phone,omitempty"`
+}
+
+// AdminUpdateUserRequest represents admin profile update payload (can edit names)
+type AdminUpdateUserRequest struct {
+	FirstName *string `json:"first_name,omitempty"`
+	LastName  *string `json:"last_name,omitempty"`
+	Email     *string `json:"email,omitempty"`
+	Phone     *string `json:"phone,omitempty"`
 }
 
 // Phone regex: allows digits, country code, separators, and balanced parentheses
@@ -139,8 +157,11 @@ var registrationPasswordRegex = regexp.MustCompile(`^[a-zA-Z0-9]{8}$`)
 
 // Validate validates the RegisterRequest
 func (r *RegisterRequest) Validate() error {
-	if strings.TrimSpace(r.Name) == "" {
-		return errors.New("Name ist erforderlich")
+	if strings.TrimSpace(r.FirstName) == "" {
+		return errors.New("Vorname ist erforderlich")
+	}
+	if strings.TrimSpace(r.LastName) == "" {
+		return errors.New("Nachname ist erforderlich")
 	}
 	if strings.TrimSpace(r.Email) == "" {
 		return errors.New("E-Mail ist erforderlich")
@@ -172,14 +193,30 @@ func (r *RegisterRequest) Validate() error {
 
 // Validate validates the UpdateProfileRequest
 func (u *UpdateProfileRequest) Validate() error {
-	if u.Name != nil && strings.TrimSpace(*u.Name) == "" {
-		return errors.New("Name darf nicht leer sein")
-	}
 	if u.Email != nil && strings.TrimSpace(*u.Email) == "" {
 		return errors.New("E-Mail darf nicht leer sein")
 	}
 	if u.Phone != nil {
 		if err := ValidatePhone(*u.Phone); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Validate validates the AdminUpdateUserRequest
+func (a *AdminUpdateUserRequest) Validate() error {
+	if a.FirstName != nil && strings.TrimSpace(*a.FirstName) == "" {
+		return errors.New("Vorname darf nicht leer sein")
+	}
+	if a.LastName != nil && strings.TrimSpace(*a.LastName) == "" {
+		return errors.New("Nachname darf nicht leer sein")
+	}
+	if a.Email != nil && strings.TrimSpace(*a.Email) == "" {
+		return errors.New("E-Mail darf nicht leer sein")
+	}
+	if a.Phone != nil {
+		if err := ValidatePhone(*a.Phone); err != nil {
 			return err
 		}
 	}

@@ -33,7 +33,8 @@ func TestUserHandler_GetMe(t *testing.T) {
 
 	email := "getme@example.com"
 	user := &models.User{
-		Name:            "Get Me User",
+		FirstName:       "Get Me",
+		LastName:        "User",
 		Email:           &email,
 		PasswordHash:    &hash,
 		ExperienceLevel: "blue",
@@ -63,8 +64,8 @@ func TestUserHandler_GetMe(t *testing.T) {
 			t.Errorf("Expected user ID %d, got %d", user.ID, response.ID)
 		}
 
-		if response.Name != "Get Me User" {
-			t.Errorf("Expected name 'Get Me User', got %s", response.Name)
+		if response.FullName() != "Get Me User" {
+			t.Errorf("Expected name 'Get Me User', got %s", response.FullName())
 		}
 
 		if response.ExperienceLevel != "blue" {
@@ -115,7 +116,8 @@ func TestUserHandler_UpdateMe(t *testing.T) {
 	email := "update@example.com"
 	phone := "+49 123 456789"
 	user := &models.User{
-		Name:            "Original Name",
+		FirstName:       "Original",
+		LastName:        "Name",
 		Email:           &email,
 		Phone:           &phone,
 		PasswordHash:    &hash,
@@ -127,31 +129,8 @@ func TestUserHandler_UpdateMe(t *testing.T) {
 	}
 	userRepo.Create(user)
 
-	t.Run("update name only", func(t *testing.T) {
-		newName := "Updated Name"
-		reqBody := map[string]interface{}{
-			"name": newName,
-		}
-
-		body, _ := json.Marshal(reqBody)
-		req := httptest.NewRequest("PUT", "/api/users/me", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		ctx := contextWithUser(req.Context(), user.ID, *user.Email, false)
-		req = req.WithContext(ctx)
-
-		rec := httptest.NewRecorder()
-		handler.UpdateMe(rec, req)
-
-		if rec.Code != http.StatusOK {
-			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
-		}
-
-		// Verify update
-		updatedUser, _ := userRepo.FindByID(user.ID)
-		if updatedUser.Name != newName {
-			t.Errorf("Expected name '%s', got '%s'", newName, updatedUser.Name)
-		}
-	})
+	// Note: Name updates are no longer allowed for regular users
+	// Only admin can change names via admin interface
 
 	t.Run("update phone only", func(t *testing.T) {
 		newPhone := "+49 987 654321"
@@ -253,7 +232,8 @@ func TestUserHandler_DeleteAccount(t *testing.T) {
 
 	email := "delete@example.com"
 	user := &models.User{
-		Name:            "Delete Me",
+		FirstName:       "Delete",
+		LastName:        "Me",
 		Email:           &email,
 		PasswordHash:    &hash,
 		ExperienceLevel: "green",
@@ -288,8 +268,8 @@ func TestUserHandler_DeleteAccount(t *testing.T) {
 			t.Fatalf("User should still exist but be anonymized: %v", err)
 		}
 
-		if deletedUser.Name != "Deleted User" {
-			t.Errorf("Expected name 'Deleted User', got %s", deletedUser.Name)
+		if deletedUser.FullName() != "Deleted User" {
+			t.Errorf("Expected name 'Deleted User', got %s", deletedUser.FullName())
 		}
 
 		if deletedUser.Email != nil {
@@ -665,6 +645,177 @@ func TestUserHandler_ActivateUser(t *testing.T) {
 
 		rec := httptest.NewRecorder()
 		handler.ActivateUser(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", rec.Code)
+		}
+	})
+}
+
+// TestUserHandler_AdminUpdateUser tests admin updating user profiles
+func TestUserHandler_AdminUpdateUser(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewUserHandler(db, cfg)
+
+	// Create admin user
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin User", "green")
+
+	// Create test user to be updated
+	testUserID := testutil.SeedTestUser(t, db, "testuser@example.com", "Test User", "green")
+
+	t.Run("successful name update", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"first_name": "Updated",
+			"last_name":  "Name",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/admin/users/%d", testUserID), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", testUserID)})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminUpdateUser(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		user := response["user"].(map[string]interface{})
+		if user["first_name"] != "Updated" {
+			t.Errorf("Expected first_name 'Updated', got %v", user["first_name"])
+		}
+		if user["last_name"] != "Name" {
+			t.Errorf("Expected last_name 'Name', got %v", user["last_name"])
+		}
+	})
+
+	t.Run("successful email and phone update", func(t *testing.T) {
+		newEmail := "newemail@example.com"
+		newPhone := "+49 123 9876543"
+		reqBody := map[string]interface{}{
+			"email": newEmail,
+			"phone": newPhone,
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/admin/users/%d", testUserID), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", testUserID)})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminUpdateUser(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		user := response["user"].(map[string]interface{})
+		if user["email"] != newEmail {
+			t.Errorf("Expected email '%s', got %v", newEmail, user["email"])
+		}
+	})
+
+	t.Run("empty first name fails validation", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"first_name": "",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/admin/users/%d", testUserID), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", testUserID)})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminUpdateUser(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("duplicate email fails", func(t *testing.T) {
+		// Create another user
+		testutil.SeedTestUser(t, db, "existing@example.com", "Existing User", "green")
+
+		reqBody := map[string]interface{}{
+			"email": "existing@example.com",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/admin/users/%d", testUserID), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", testUserID)})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminUpdateUser(rec, req)
+
+		if rec.Code != http.StatusConflict {
+			t.Errorf("Expected status 409, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("user not found", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"first_name": "Test",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/admin/users/99999", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": "99999"})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminUpdateUser(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("Expected status 404, got %d", rec.Code)
+		}
+	})
+
+	t.Run("invalid user ID", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"first_name": "Test",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/admin/users/invalid", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": "invalid"})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminUpdateUser(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", rec.Code)
+		}
+	})
+
+	t.Run("invalid request body", func(t *testing.T) {
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/admin/users/%d", testUserID), bytes.NewReader([]byte("invalid json")))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", testUserID)})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminUpdateUser(rec, req)
 
 		if rec.Code != http.StatusBadRequest {
 			t.Errorf("Expected status 400, got %d", rec.Code)

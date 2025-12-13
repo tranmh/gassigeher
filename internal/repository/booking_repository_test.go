@@ -24,6 +24,8 @@ func setupTestDB(t *testing.T) *sql.DB {
 	CREATE TABLE users (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT NOT NULL,
+		first_name TEXT,
+		last_name TEXT,
 		email TEXT UNIQUE,
 		phone TEXT,
 		password_hash TEXT,
@@ -1005,8 +1007,8 @@ func TestBookingRepository_FindByIDWithDetails(t *testing.T) {
 			t.Fatal("Expected user details, got nil")
 		}
 
-		if booking.User.Name != "Booking User" {
-			t.Errorf("Expected user name 'Booking User', got %s", booking.User.Name)
+		if booking.User.FullName() != "Booking User" {
+			t.Errorf("Expected user name 'Booking User', got %s", booking.User.FullName())
 		}
 
 		if booking.User.Email == nil || *booking.User.Email != "bookinguser@example.com" {
@@ -1060,8 +1062,8 @@ func TestBookingRepository_FindByIDWithDetails(t *testing.T) {
 		}
 
 		// User name should be "Deleted User"
-		if booking.User.Name != "Deleted User" {
-			t.Errorf("Expected user name 'Deleted User', got %s", booking.User.Name)
+		if booking.User.FullName() != "Deleted User" {
+			t.Errorf("Expected user name 'Deleted User', got %s", booking.User.FullName())
 		}
 
 		// Email should be nil after deletion

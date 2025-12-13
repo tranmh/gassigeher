@@ -220,7 +220,7 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 
 	// Send confirmation email
 	if user.Email != nil && h.emailService != nil {
-		go h.emailService.SendBookingConfirmation(*user.Email, user.Name, dog.Name, booking.Date, booking.ScheduledTime)
+		go h.emailService.SendBookingConfirmation(*user.Email, user.FirstName, dog.Name, booking.Date, booking.ScheduledTime)
 	}
 
 	respondJSON(w, http.StatusCreated, booking)
@@ -418,10 +418,10 @@ func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) {
 	if booking.User.Email != nil && h.emailService != nil {
 		if isAdmin && req.Reason != nil {
 			// Admin cancelled
-			go h.emailService.SendAdminCancellation(*booking.User.Email, booking.User.Name, booking.Dog.Name, booking.Date, booking.ScheduledTime, *req.Reason)
+			go h.emailService.SendAdminCancellation(*booking.User.Email, booking.User.FirstName, booking.Dog.Name, booking.Date, booking.ScheduledTime, *req.Reason)
 		} else {
 			// User cancelled
-			go h.emailService.SendBookingCancellation(*booking.User.Email, booking.User.Name, booking.Dog.Name, booking.Date, booking.ScheduledTime)
+			go h.emailService.SendBookingCancellation(*booking.User.Email, booking.User.FirstName, booking.Dog.Name, booking.Date, booking.ScheduledTime)
 		}
 	}
 
@@ -570,7 +570,7 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 	if booking.User.Email != nil && h.emailService != nil {
 		go h.emailService.SendBookingMoved(
 			*booking.User.Email,
-			booking.User.Name,
+			booking.User.FirstName,
 			booking.Dog.Name,
 			oldDate,
 			oldTime,
@@ -729,7 +729,7 @@ func (h *BookingHandler) ApprovePendingBooking(w http.ResponseWriter, r *http.Re
 		if err == nil && booking != nil && booking.User != nil && booking.User.Email != nil && *booking.User.Email != "" {
 			go h.emailService.SendBookingApproved(
 				*booking.User.Email,
-				booking.User.Name,
+				booking.User.FirstName,
 				booking.Dog.Name,
 				booking.Date,
 				booking.ScheduledTime,
@@ -794,7 +794,7 @@ func (h *BookingHandler) RejectPendingBooking(w http.ResponseWriter, r *http.Req
 	if h.emailService != nil && booking != nil && booking.User != nil && booking.User.Email != nil && *booking.User.Email != "" {
 		go h.emailService.SendBookingRejected(
 			*booking.User.Email,
-			booking.User.Name,
+			booking.User.FirstName,
 			booking.Dog.Name,
 			booking.Date,
 			booking.ScheduledTime,

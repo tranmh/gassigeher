@@ -33,7 +33,8 @@ func TestAuthHandler_Register(t *testing.T) {
 
 	t.Run("successful registration", func(t *testing.T) {
 		reqBody := map[string]interface{}{
-			"name":                  "Test User",
+			"first_name":            "Test",
+			"last_name":             "User",
 			"email":                 "newuser@example.com",
 			"phone":                 "+49 123 456789",
 			"password":              "Test1234",
@@ -68,21 +69,35 @@ func TestAuthHandler_Register(t *testing.T) {
 			expected string
 		}{
 			{
-				name: "missing name",
+				name: "missing first name",
 				reqBody: map[string]interface{}{
+					"last_name":        "User",
 					"email":            "test@example.com",
-					"phone":            "+49 123",
+					"phone":            "+49 123 456789",
 					"password":         "Test1234",
 					"confirm_password": "Test1234",
 					"accept_terms":     true,
 				},
-				expected: "Name ist erforderlich",
+				expected: "Vorname ist erforderlich",
+			},
+			{
+				name: "missing last name",
+				reqBody: map[string]interface{}{
+					"first_name":       "Test",
+					"email":            "test@example.com",
+					"phone":            "+49 123 456789",
+					"password":         "Test1234",
+					"confirm_password": "Test1234",
+					"accept_terms":     true,
+				},
+				expected: "Nachname ist erforderlich",
 			},
 			{
 				name: "missing email",
 				reqBody: map[string]interface{}{
-					"name":             "Test",
-					"phone":            "+49 123",
+					"first_name":       "Test",
+					"last_name":        "User",
+					"phone":            "+49 123 456789",
 					"password":         "Test1234",
 					"confirm_password": "Test1234",
 					"accept_terms":     true,
@@ -92,7 +107,8 @@ func TestAuthHandler_Register(t *testing.T) {
 			{
 				name: "missing phone",
 				reqBody: map[string]interface{}{
-					"name":             "Test",
+					"first_name":       "Test",
+					"last_name":        "User",
 					"email":            "test@example.com",
 					"password":         "Test1234",
 					"confirm_password": "Test1234",
@@ -124,7 +140,8 @@ func TestAuthHandler_Register(t *testing.T) {
 
 	t.Run("password mismatch", func(t *testing.T) {
 		reqBody := map[string]interface{}{
-			"name":             "Test",
+			"first_name":       "Test",
+			"last_name":        "User",
 			"email":            "test@example.com",
 			"phone":            "+49 123 4567890",
 			"password":         "Test1234",
@@ -150,9 +167,10 @@ func TestAuthHandler_Register(t *testing.T) {
 
 	t.Run("terms not accepted", func(t *testing.T) {
 		reqBody := map[string]interface{}{
-			"name":             "Test",
+			"first_name":       "Test",
+			"last_name":        "User",
 			"email":            "test@example.com",
-			"phone":            "+49 123",
+			"phone":            "+49 123 456789",
 			"password":         "Test1234",
 			"confirm_password": "Test1234",
 			"accept_terms":     false,
@@ -172,9 +190,10 @@ func TestAuthHandler_Register(t *testing.T) {
 
 	t.Run("weak password", func(t *testing.T) {
 		reqBody := map[string]interface{}{
-			"name":             "Test",
+			"first_name":       "Test",
+			"last_name":        "User",
 			"email":            "test@example.com",
-			"phone":            "+49 123",
+			"phone":            "+49 123 456789",
 			"password":         "weak",
 			"confirm_password": "weak",
 			"accept_terms":     true,
@@ -197,7 +216,8 @@ func TestAuthHandler_Register(t *testing.T) {
 		testutil.SeedTestUser(t, db, "existing@example.com", "Existing User", "green")
 
 		reqBody := map[string]interface{}{
-			"name":                  "New User",
+			"first_name":            "New",
+			"last_name":             "User",
 			"email":                 "existing@example.com",
 			"phone":                 "+49 123 4567890",
 			"password":              "Test1234",
@@ -235,7 +255,8 @@ func TestAuthHandler_Login(t *testing.T) {
 
 	email := "test@example.com"
 	user := &models.User{
-		Name:            "Test User",
+		FirstName:       "Test",
+		LastName:        "User",
 		Email:           &email,
 		PasswordHash:    &hash,
 		ExperienceLevel: "green",
@@ -315,7 +336,8 @@ func TestAuthHandler_Login(t *testing.T) {
 		// Create unverified user
 		unverifiedEmail := "unverified@example.com"
 		unverifiedUser := &models.User{
-			Name:            "Unverified",
+			FirstName:       "Unverified",
+			LastName:        "User",
 			Email:           &unverifiedEmail,
 			PasswordHash:    &hash,
 			ExperienceLevel: "green",
@@ -354,7 +376,8 @@ func TestAuthHandler_Login(t *testing.T) {
 		// Create inactive user
 		inactiveEmail := "inactive@example.com"
 		inactiveUser := &models.User{
-			Name:            "Inactive",
+			FirstName:       "Inactive",
+			LastName:        "User",
 			Email:           &inactiveEmail,
 			PasswordHash:    &hash,
 			ExperienceLevel: "green",
@@ -409,7 +432,8 @@ func TestAuthHandler_Login(t *testing.T) {
 		// Create users in different states
 		unverifiedEmail := "security_unverified@example.com"
 		unverifiedUser := &models.User{
-			Name:            "Unverified Security Test",
+			FirstName:       "Unverified",
+			LastName:        "Security Test",
 			Email:           &unverifiedEmail,
 			PasswordHash:    &hash,
 			ExperienceLevel: "green",
@@ -422,7 +446,8 @@ func TestAuthHandler_Login(t *testing.T) {
 
 		deactivatedEmail := "security_deactivated@example.com"
 		deactivatedUser := &models.User{
-			Name:            "Deactivated Security Test",
+			FirstName:       "Deactivated",
+			LastName:        "Security Test",
 			Email:           &deactivatedEmail,
 			PasswordHash:    &hash,
 			ExperienceLevel: "green",
@@ -522,7 +547,8 @@ func TestAuthHandler_ChangePassword(t *testing.T) {
 
 	email := "changepass@example.com"
 	user := &models.User{
-		Name:            "Test User",
+		FirstName:       "Test",
+		LastName:        "User",
 		Email:           &email,
 		PasswordHash:    &hash,
 		ExperienceLevel: "green",
@@ -647,7 +673,8 @@ func TestAuthHandler_VerifyEmail(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	email := "verify@example.com"
 	user := &models.User{
-		Name:                     "Verify Me",
+		FirstName:                "Verify",
+		LastName:                 "Me",
 		Email:                    &email,
 		PasswordHash:             &hash,
 		ExperienceLevel:          "green",
@@ -712,7 +739,8 @@ func TestAuthHandler_VerifyEmail(t *testing.T) {
 
 		email2 := "expired@example.com"
 		expiredUser := &models.User{
-			Name:                     "Expired Token",
+			FirstName:                "Expired",
+			LastName:                 "Token",
 			Email:                    &email2,
 			PasswordHash:             &hash,
 			ExperienceLevel:          "green",

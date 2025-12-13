@@ -165,7 +165,7 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
 				if err := h.emailService.SendAdminCancellation(userEmail, userName, dogName, date, scheduledTime, reason); err != nil {
 					fmt.Printf("Warning: Failed to send cancellation email to %s: %v\n", userEmail, err)
 				}
-			}(*user.Email, user.Name, dog.Name, booking.Date, booking.ScheduledTime, cancellationReason)
+			}(*user.Email, user.FirstName, dog.Name, booking.Date, booking.ScheduledTime, cancellationReason)
 		}
 	}
 

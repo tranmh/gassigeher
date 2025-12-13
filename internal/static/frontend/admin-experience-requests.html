@@ -107,7 +107,7 @@
             }
 
             container.innerHTML = requests.map(request => {
-                const safeUserName = request.user ? sanitizeHTML(request.user.name) : `User #${request.user_id}`;
+                const safeUserName = request.user ? sanitizeHTML(`${request.user.first_name || ''} ${request.user.last_name || ''}`.trim()) : `User #${request.user_id}`;
                 const safeEmail = request.user && request.user.email ? sanitizeHTML(request.user.email) : 'N/A';
                 const safeAdminMessage = request.admin_message ? sanitizeHTML(request.admin_message) : '';
                 const levelLabel = getLevelLabel(request.requested_level);

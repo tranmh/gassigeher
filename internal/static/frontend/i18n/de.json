@@ -16,6 +16,8 @@
     "email": "E-Mail-Adresse",
     "password": "Passwort",
     "confirm_password": "Passwort bestätigen",
+    "first_name": "Vorname",
+    "last_name": "Nachname",
     "name": "Name",
     "phone": "Telefonnummer",
     "accept_terms": "Ich akzeptiere die",

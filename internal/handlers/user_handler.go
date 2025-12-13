@@ -116,11 +116,7 @@ func (h *UserHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	// Track if email changed
 	emailChanged := false
 
-	// Update fields
-	if req.Name != nil && strings.TrimSpace(*req.Name) != "" {
-		user.Name = *req.Name
-	}
-
+	// Update fields (Note: FirstName and LastName can only be edited by admins)
 	if req.Phone != nil && strings.TrimSpace(*req.Phone) != "" {
 		user.Phone = req.Phone
 	}
@@ -167,7 +163,7 @@ func (h *UserHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 
 	// Send verification email if email changed
 	if emailChanged && user.Email != nil && h.emailService != nil {
-		go h.emailService.SendVerificationEmail(*user.Email, user.Name, *user.VerificationToken)
+		go h.emailService.SendVerificationEmail(*user.Email, user.FirstName, *user.VerificationToken)
 	}
 
 	// Don't return sensitive data
@@ -320,7 +316,7 @@ func (h *UserHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 
 	// Send confirmation email to original email
 	if emailForConfirmation != "" && h.emailService != nil {
-		go h.emailService.SendAccountDeletionConfirmation(emailForConfirmation, user.Name)
+		go h.emailService.SendAccountDeletionConfirmation(emailForConfirmation, user.FirstName)
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"message": "Account deleted successfully"})
@@ -422,7 +418,7 @@ func (h *UserHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 
 	// Send email notification
 	if user.Email != nil && h.emailService != nil {
-		go h.emailService.SendAccountDeactivated(*user.Email, user.Name, req.Reason)
+		go h.emailService.SendAccountDeactivated(*user.Email, user.FirstName, req.Reason)
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"message": "User deactivated successfully"})
@@ -463,7 +459,7 @@ func (h *UserHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
 
 	// Send email notification
 	if user.Email != nil && h.emailService != nil {
-		go h.emailService.SendAccountReactivated(*user.Email, user.Name, req.Message)
+		go h.emailService.SendAccountReactivated(*user.Email, user.FirstName, req.Message)
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"message": "User activated successfully"})
@@ -587,6 +583,87 @@ func (h *UserHandler) DemoteAdmin(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"message": "Admin privileges revoked successfully",
+		"user":    updatedUser,
+	})
+}
+
+// AdminUpdateUser allows admins to update user profiles (including names)
+func (h *UserHandler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
+	// Get user ID from URL
+	vars := mux.Vars(r)
+	userIDStr := vars["id"]
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
+
+	// Parse request body
+	var req models.AdminUpdateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Validate request
+	if err := req.Validate(); err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Get target user
+	targetUser, err := h.userRepo.FindByID(userID)
+	if err != nil {
+		respondError(w, http.StatusNotFound, "User not found")
+		return
+	}
+	if targetUser == nil {
+		respondError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	// Cannot edit deleted users
+	if targetUser.IsDeleted {
+		respondError(w, http.StatusBadRequest, "Cannot edit deleted user")
+		return
+	}
+
+	// Apply updates
+	if req.FirstName != nil {
+		targetUser.FirstName = *req.FirstName
+	}
+	if req.LastName != nil {
+		targetUser.LastName = *req.LastName
+	}
+	if req.Email != nil {
+		// Check if email is already taken by another user
+		existingUser, _ := h.userRepo.FindByEmail(*req.Email)
+		if existingUser != nil && existingUser.ID != userID {
+			respondError(w, http.StatusConflict, "E-Mail wird bereits verwendet")
+			return
+		}
+		targetUser.Email = req.Email
+	}
+	if req.Phone != nil {
+		targetUser.Phone = req.Phone
+	}
+
+	// Save updates
+	err = h.userRepo.Update(targetUser)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to update user")
+		return
+	}
+
+	// Get updated user
+	updatedUser, err := h.userRepo.FindByID(userID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to retrieve updated user")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "User updated successfully",
 		"user":    updatedUser,
 	})
 }

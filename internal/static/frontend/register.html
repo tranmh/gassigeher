@@ -28,11 +28,22 @@
                 <div id="alert-container"></div>
 
                 <form id="register-form">
+                    <div class="alert alert-info" style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(130, 185, 101, 0.1); border: 1px solid #82b965; border-radius: 8px;">
+                        <strong>Hinweis:</strong> Bitte verwenden Sie Ihren echten Namen. Fantasienamen, Spitznamen oder Pseudonyme sind nicht erlaubt.
+                    </div>
+
                     <div class="form-group">
-                        <label data-i18n="auth.name">Name</label>
-                        <input type="text" id="name" name="name" required
-                               data-i18n-placeholder="auth.name">
-                        <div class="form-error" id="name-error"></div>
+                        <label data-i18n="auth.first_name">Vorname</label>
+                        <input type="text" id="first-name" name="first_name" required
+                               placeholder="Vorname">
+                        <div class="form-error" id="first-name-error"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label data-i18n="auth.last_name">Nachname</label>
+                        <input type="text" id="last-name" name="last_name" required
+                               placeholder="Nachname">
+                        <div class="form-error" id="last-name-error"></div>
                     </div>
 
                     <div class="form-group">
@@ -133,7 +144,8 @@
 
                 // Get form data
                 const data = {
-                    name: document.getElementById('name').value.trim(),
+                    first_name: document.getElementById('first-name').value.trim(),
+                    last_name: document.getElementById('last-name').value.trim(),
                     email: document.getElementById('email').value.trim(),
                     phone: document.getElementById('phone').value.trim(),
                     password: document.getElementById('password').value,
@@ -145,8 +157,13 @@
                 // Client-side validation
                 let hasError = false;
 
-                if (!data.name) {
-                    showError('name', window.i18n.t('errors.required_field'));
+                if (!data.first_name) {
+                    showError('first-name', 'Vorname ist erforderlich');
+                    hasError = true;
+                }
+
+                if (!data.last_name) {
+                    showError('last-name', 'Nachname ist erforderlich');
                     hasError = true;
                 }
 

@@ -20,24 +20,27 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 
 // Create creates a new user
 func (r *UserRepository) Create(user *models.User) error {
+	// Include name column for backward compatibility (NOT NULL constraint)
 	query := `
 		INSERT INTO users (
-			name, email, phone, password_hash, experience_level,
+			name, first_name, last_name, email, phone, password_hash, experience_level,
 			is_admin, is_super_admin, is_verified, is_active,
 			verification_token, verification_token_expires,
 			terms_accepted_at, last_activity_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	result, err := r.db.Exec(
 		query,
-		user.Name,
+		user.FullName(),      // Legacy name column for backward compatibility
+		user.FirstName,
+		user.LastName,
 		user.Email,
 		user.Phone,
 		user.PasswordHash,
 		user.ExperienceLevel,
-		user.IsAdmin,          // DONE: Added
-		user.IsSuperAdmin,     // DONE: Added
+		user.IsAdmin,
+		user.IsSuperAdmin,
 		user.IsVerified,
 		user.IsActive,
 		user.VerificationToken,
@@ -61,7 +64,7 @@ func (r *UserRepository) Create(user *models.User) error {
 // FindByEmail finds a user by email
 func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
 	query := `
-		SELECT id, name, email, phone, password_hash, experience_level,
+		SELECT id, first_name, last_name, email, phone, password_hash, experience_level,
 		       is_admin, is_super_admin, is_verified, is_active, is_deleted,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
@@ -73,9 +76,11 @@ func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
 	`
 
 	user := &models.User{}
+	var firstName, lastName sql.NullString
 	err := r.db.QueryRow(query, email).Scan(
 		&user.ID,
-		&user.Name,
+		&firstName,
+		&lastName,
 		&user.Email,
 		&user.Phone,
 		&user.PasswordHash,
@@ -107,6 +112,12 @@ func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user: %w", err)
 	}
+	if firstName.Valid {
+		user.FirstName = firstName.String
+	}
+	if lastName.Valid {
+		user.LastName = lastName.String
+	}
 
 	return user, nil
 }
@@ -114,7 +125,7 @@ func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
 // FindByID finds a user by ID
 func (r *UserRepository) FindByID(id int) (*models.User, error) {
 	query := `
-		SELECT id, name, email, phone, password_hash, experience_level,
+		SELECT id, first_name, last_name, email, phone, password_hash, experience_level,
 		       is_admin, is_super_admin, is_verified, is_active, is_deleted,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
@@ -126,9 +137,11 @@ func (r *UserRepository) FindByID(id int) (*models.User, error) {
 	`
 
 	user := &models.User{}
+	var firstName, lastName sql.NullString
 	err := r.db.QueryRow(query, id).Scan(
 		&user.ID,
-		&user.Name,
+		&firstName,
+		&lastName,
 		&user.Email,
 		&user.Phone,
 		&user.PasswordHash,
@@ -160,6 +173,12 @@ func (r *UserRepository) FindByID(id int) (*models.User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user: %w", err)
 	}
+	if firstName.Valid {
+		user.FirstName = firstName.String
+	}
+	if lastName.Valid {
+		user.LastName = lastName.String
+	}
 
 	return user, nil
 }
@@ -167,7 +186,7 @@ func (r *UserRepository) FindByID(id int) (*models.User, error) {
 // FindByVerificationToken finds a user by verification token
 func (r *UserRepository) FindByVerificationToken(token string) (*models.User, error) {
 	query := `
-		SELECT id, name, email, phone, password_hash, experience_level,
+		SELECT id, first_name, last_name, email, phone, password_hash, experience_level,
 		       is_admin, is_super_admin, is_verified, is_active, is_deleted,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
@@ -179,9 +198,11 @@ func (r *UserRepository) FindByVerificationToken(token string) (*models.User, er
 	`
 
 	user := &models.User{}
+	var firstName, lastName sql.NullString
 	err := r.db.QueryRow(query, token).Scan(
 		&user.ID,
-		&user.Name,
+		&firstName,
+		&lastName,
 		&user.Email,
 		&user.Phone,
 		&user.PasswordHash,
@@ -213,6 +234,12 @@ func (r *UserRepository) FindByVerificationToken(token string) (*models.User, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user: %w", err)
 	}
+	if firstName.Valid {
+		user.FirstName = firstName.String
+	}
+	if lastName.Valid {
+		user.LastName = lastName.String
+	}
 
 	return user, nil
 }
@@ -220,7 +247,7 @@ func (r *UserRepository) FindByVerificationToken(token string) (*models.User, er
 // FindByPasswordResetToken finds a user by password reset token
 func (r *UserRepository) FindByPasswordResetToken(token string) (*models.User, error) {
 	query := `
-		SELECT id, name, email, phone, password_hash, experience_level,
+		SELECT id, first_name, last_name, email, phone, password_hash, experience_level,
 		       is_admin, is_super_admin, is_verified, is_active, is_deleted,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
@@ -232,9 +259,11 @@ func (r *UserRepository) FindByPasswordResetToken(token string) (*models.User, e
 	`
 
 	user := &models.User{}
+	var firstName, lastName sql.NullString
 	err := r.db.QueryRow(query, token).Scan(
 		&user.ID,
-		&user.Name,
+		&firstName,
+		&lastName,
 		&user.Email,
 		&user.Phone,
 		&user.PasswordHash,
@@ -266,6 +295,12 @@ func (r *UserRepository) FindByPasswordResetToken(token string) (*models.User, e
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user: %w", err)
 	}
+	if firstName.Valid {
+		user.FirstName = firstName.String
+	}
+	if lastName.Valid {
+		user.LastName = lastName.String
+	}
 
 	return user, nil
 }
@@ -274,7 +309,8 @@ func (r *UserRepository) FindByPasswordResetToken(token string) (*models.User, e
 func (r *UserRepository) Update(user *models.User) error {
 	query := `
 		UPDATE users SET
-			name = ?,
+			first_name = ?,
+			last_name = ?,
 			email = ?,
 			phone = ?,
 			password_hash = ?,
@@ -301,7 +337,8 @@ func (r *UserRepository) Update(user *models.User) error {
 
 	_, err := r.db.Exec(
 		query,
-		user.Name,
+		user.FirstName,
+		user.LastName,
 		user.Email,
 		user.Phone,
 		user.PasswordHash,
@@ -359,7 +396,8 @@ func (r *UserRepository) DeleteAccount(userID int) error {
 
 	query := `
 		UPDATE users SET
-			name = 'Deleted User',
+			first_name = 'Deleted',
+			last_name = 'User',
 			email = NULL,
 			phone = NULL,
 			password_hash = NULL,
@@ -424,7 +462,7 @@ func (r *UserRepository) Activate(userID int) error {
 // FindInactiveUsers finds users who haven't been active for the specified number of days
 func (r *UserRepository) FindInactiveUsers(days int) ([]*models.User, error) {
 	query := `
-		SELECT id, name, email, phone, password_hash, experience_level,
+		SELECT id, first_name, last_name, email, phone, password_hash, experience_level,
 		       is_admin, is_super_admin, is_verified, is_active, is_deleted,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
@@ -449,9 +487,11 @@ func (r *UserRepository) FindInactiveUsers(days int) ([]*models.User, error) {
 	users := []*models.User{}
 	for rows.Next() {
 		user := &models.User{}
+		var firstName, lastName sql.NullString
 		err := rows.Scan(
 			&user.ID,
-			&user.Name,
+			&firstName,
+			&lastName,
 			&user.Email,
 			&user.Phone,
 			&user.PasswordHash,
@@ -479,6 +519,12 @@ func (r *UserRepository) FindInactiveUsers(days int) ([]*models.User, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan user: %w", err)
 		}
+		if firstName.Valid {
+			user.FirstName = firstName.String
+		}
+		if lastName.Valid {
+			user.LastName = lastName.String
+		}
 		users = append(users, user)
 	}
 
@@ -488,7 +534,7 @@ func (r *UserRepository) FindInactiveUsers(days int) ([]*models.User, error) {
 // FindAll finds all users with optional filters
 func (r *UserRepository) FindAll(activeOnly *bool) ([]*models.User, error) {
 	query := `
-		SELECT id, name, email, phone, password_hash, experience_level,
+		SELECT id, first_name, last_name, email, phone, password_hash, experience_level,
 		       is_admin, is_super_admin, is_verified, is_active, is_deleted,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
@@ -520,9 +566,11 @@ func (r *UserRepository) FindAll(activeOnly *bool) ([]*models.User, error) {
 	users := []*models.User{}
 	for rows.Next() {
 		user := &models.User{}
+		var firstName, lastName sql.NullString
 		err := rows.Scan(
 			&user.ID,
-			&user.Name,
+			&firstName,
+			&lastName,
 			&user.Email,
 			&user.Phone,
 			&user.PasswordHash,
@@ -549,6 +597,12 @@ func (r *UserRepository) FindAll(activeOnly *bool) ([]*models.User, error) {
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan user: %w", err)
+		}
+		if firstName.Valid {
+			user.FirstName = firstName.String
+		}
+		if lastName.Valid {
+			user.LastName = lastName.String
 		}
 		users = append(users, user)
 	}

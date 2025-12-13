@@ -101,7 +101,8 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	// Create user
 	user := &models.User{
-		Name:                     req.Name,
+		FirstName:                req.FirstName,
+		LastName:                 req.LastName,
 		Email:                    &req.Email,
 		Phone:                    &req.Phone,
 		PasswordHash:             &passwordHash,
@@ -122,7 +123,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	// Send verification email
 	if h.emailService != nil {
-		if err := h.emailService.SendVerificationEmail(req.Email, req.Name, verificationToken); err != nil {
+		if err := h.emailService.SendVerificationEmail(req.Email, req.FirstName, verificationToken); err != nil {
 			fmt.Printf("Failed to send verification email: %v\n", err)
 			// Don't fail the registration if email fails
 		}
@@ -182,7 +183,7 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 
 	// Send welcome email
 	if h.emailService != nil && user.Email != nil {
-		if err := h.emailService.SendWelcomeEmail(*user.Email, user.Name); err != nil {
+		if err := h.emailService.SendWelcomeEmail(*user.Email, user.FirstName); err != nil {
 			fmt.Printf("Failed to send welcome email: %v\n", err)
 		}
 	}
@@ -229,7 +230,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if !user.IsVerified {
 		// Send verification reminder email in background (don't block response)
 		if user.Email != nil && user.VerificationToken != nil && h.emailService != nil {
-			go h.emailService.SendVerificationEmail(*user.Email, user.Name, *user.VerificationToken)
+			go h.emailService.SendVerificationEmail(*user.Email, user.FirstName, *user.VerificationToken)
 		}
 		respondError(w, http.StatusUnauthorized, "Ungültige Anmeldedaten")
 		return
@@ -312,7 +313,7 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 
 	// Send reset email
 	if h.emailService != nil && user.Email != nil {
-		if err := h.emailService.SendPasswordResetEmail(*user.Email, user.Name, resetToken); err != nil {
+		if err := h.emailService.SendPasswordResetEmail(*user.Email, user.FirstName, resetToken); err != nil {
 			fmt.Printf("Failed to send password reset email: %v\n", err)
 		}
 	}

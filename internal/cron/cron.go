@@ -144,7 +144,7 @@ func (s *CronService) sendBookingReminders() {
 		// Send reminder email
 		err := s.emailService.SendBookingReminder(
 			*booking.User.Email,
-			booking.User.Name,
+			booking.User.FirstName,
 			dogName,
 			formattedDate,
 			booking.ScheduledTime,
@@ -162,7 +162,7 @@ func (s *CronService) sendBookingReminders() {
 		}
 
 		log.Printf("Sent reminder for booking %d (user: %s, dog: %s, time: %s %s)",
-			booking.ID, booking.User.Name, dogName, formattedDate, booking.ScheduledTime)
+			booking.ID, booking.User.FullName(), dogName, formattedDate, booking.ScheduledTime)
 	}
 }
 
@@ -237,7 +237,7 @@ func (s *CronService) autoDeactivateInactiveUsers() {
 		// Send email notification about deactivation
 		if s.emailService != nil && user.Email != nil {
 			reason := fmt.Sprintf("Keine Aktivität seit %d Tagen", days)
-			go s.emailService.SendAccountDeactivated(*user.Email, user.Name, reason)
+			go s.emailService.SendAccountDeactivated(*user.Email, user.FirstName, reason)
 		}
 	}
 }
