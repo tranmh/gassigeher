@@ -153,14 +153,14 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if date is blocked
-	isBlocked, err := h.blockedDateRepo.IsBlocked(req.Date)
+	// Check if date is blocked for this specific dog
+	isBlocked, err := h.blockedDateRepo.IsBlockedForDog(req.Date, req.DogID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check blocked dates")
 		return
 	}
 	if isBlocked {
-		respondError(w, http.StatusBadRequest, "This date is blocked")
+		respondError(w, http.StatusBadRequest, "This date is blocked for this dog")
 		return
 	}
 
@@ -532,14 +532,14 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 	oldDate := booking.Date
 	oldTime := booking.ScheduledTime
 
-	// Check if new date is blocked
-	isBlocked, err := h.blockedDateRepo.IsBlocked(req.Date)
+	// Check if new date is blocked for this dog
+	isBlocked, err := h.blockedDateRepo.IsBlockedForDog(req.Date, booking.DogID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check blocked dates")
 		return
 	}
 	if isBlocked {
-		respondError(w, http.StatusBadRequest, "The new date is blocked")
+		respondError(w, http.StatusBadRequest, "The new date is blocked for this dog")
 		return
 	}
 
@@ -631,10 +631,13 @@ func (h *BookingHandler) GetCalendarData(w http.ResponseWriter, r *http.Request)
 		bookingsByDate[booking.Date] = append(bookingsByDate[booking.Date], booking)
 	}
 
-	// Create a map of blocked dates
-	blockedByDate := make(map[string]*models.BlockedDate)
+	// Create a map of global blocked dates (dog_id IS NULL)
+	globalBlockedByDate := make(map[string]*models.BlockedDate)
 	for _, blocked := range blockedDates {
-		blockedByDate[blocked.Date] = blocked
+		// Only add to global map if it's a global block (dog_id = nil)
+		if blocked.DogID == nil {
+			globalBlockedByDate[blocked.Date] = blocked
+		}
 	}
 
 	// Build days array
@@ -646,7 +649,8 @@ func (h *BookingHandler) GetCalendarData(w http.ResponseWriter, r *http.Request)
 			Bookings: bookingsByDate[dateStr],
 		}
 
-		if blocked, ok := blockedByDate[dateStr]; ok {
+		// Only mark as blocked if it's a global block (applies to all dogs)
+		if blocked, ok := globalBlockedByDate[dateStr]; ok {
 			day.IsBlocked = true
 			day.BlockedReason = &blocked.Reason
 		}
@@ -659,9 +663,10 @@ func (h *BookingHandler) GetCalendarData(w http.ResponseWriter, r *http.Request)
 	}
 
 	response := &models.CalendarResponse{
-		Year:  year,
-		Month: month,
-		Days:  days,
+		Year:         year,
+		Month:        month,
+		Days:         days,
+		BlockedDates: blockedDates, // Include all blocked dates for frontend to handle dog-specific blocks
 	}
 
 	respondJSON(w, http.StatusOK, response)

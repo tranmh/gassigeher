@@ -59,6 +59,13 @@
                         <input type="date" id="block-date" required>
                     </div>
                     <div class="form-group">
+                        <label>Hund</label>
+                        <select id="block-dog-id">
+                            <option value="">Alle Hunde (globale Sperrung)</option>
+                            <!-- Dog options populated dynamically -->
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label data-i18n="admin.block_reason">Grund der Sperrung</label>
                         <textarea id="block-reason" rows="3" required></textarea>
                     </div>
@@ -80,6 +87,7 @@
     <script src="/js/api.js"></script>
     <script>
         let blockedDates = [];
+        let allDogs = [];
 
         document.addEventListener('DOMContentLoaded', async () => {
             if (!api.isAuthenticated()) {
@@ -107,10 +115,24 @@
             console.log('i18n loaded, updating translations...');
             window.i18n.updateElement(document.body);
 
+            await loadDogs();  // Load dogs for selector
             loadBlockedDates();
 
             document.getElementById('block-form').addEventListener('submit', handleBlockSubmit);
         });
+
+        async function loadDogs() {
+            try {
+                allDogs = await api.getDogs();
+                const dogSelect = document.getElementById('block-dog-id');
+                dogSelect.innerHTML = '<option value="">Alle Hunde (globale Sperrung)</option>';
+                allDogs.forEach(dog => {
+                    dogSelect.innerHTML += `<option value="${dog.id}">${dog.name}</option>`;
+                });
+            } catch (error) {
+                console.error('Failed to load dogs:', error);
+            }
+        }
 
         async function loadBlockedDates() {
             try {
@@ -129,17 +151,24 @@
                 return;
             }
 
-            container.innerHTML = blockedDates.map(blocked => `
-                <div class="card" style="margin-bottom: 15px;">
-                    <div style="display: flex; justify-content: space-between; align-items: start;">
-                        <div>
-                            <h4 style="margin: 0 0 10px 0;">📅 ${blocked.date}</h4>
-                            <p style="margin: 0; color: #666;">${blocked.reason}</p>
+            container.innerHTML = blockedDates.map(blocked => {
+                const dogDisplay = blocked.dog_id
+                    ? `<span style="color: var(--primary-green);">🐕 ${blocked.dog_name || 'Unbekannter Hund'}</span>`
+                    : '<span style="color: #888;">🌐 Alle Hunde</span>';
+
+                return `
+                    <div class="card" style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div>
+                                <h4 style="margin: 0 0 10px 0;">📅 ${blocked.date}</h4>
+                                <p style="margin: 0 0 5px 0; font-weight: bold;">${dogDisplay}</p>
+                                <p style="margin: 0; color: #666;">${blocked.reason}</p>
+                            </div>
+                            <button class="btn btn-danger" onclick="unblockDate(${blocked.id})" data-i18n="admin.unblock_date">Aufheben</button>
                         </div>
-                        <button class="btn btn-danger" onclick="unblockDate(${blocked.id})" data-i18n="admin.unblock_date">Aufheben</button>
                     </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         function showBlockForm() {
@@ -155,13 +184,16 @@
             e.preventDefault();
 
             const date = document.getElementById('block-date').value;
+            const dogIdValue = document.getElementById('block-dog-id').value;
             const reason = document.getElementById('block-reason').value;
 
+            const dogId = dogIdValue ? parseInt(dogIdValue) : null;
+
             try {
-                const response = await api.createBlockedDate(date, reason);
+                const response = await api.createBlockedDate(date, reason, dogId);
 
                 // Show success message with cancellation count
-                let message = 'Tag wurde gesperrt';
+                let message = dogId ? 'Hund wurde gesperrt' : 'Tag wurde gesperrt';
                 if (response.cancelled_bookings > 0) {
                     message += ` (${response.cancelled_bookings} ${response.cancelled_bookings === 1 ? 'Buchung wurde storniert' : 'Buchungen wurden storniert'})`;
                 }
@@ -170,12 +202,12 @@
                 hideBlockForm();
                 loadBlockedDates();
             } catch (error) {
-                showAlert('error', error.message || 'Fehler beim Sperren des Tages');
+                showAlert('error', error.message || 'Fehler beim Sperren');
             }
         }
 
         async function unblockDate(id) {
-            if (!confirm('Möchten Sie die Sperrung dieses Tages aufheben?')) {
+            if (!confirm('Möchten Sie die Sperrung aufheben?')) {
                 return;
             }
 

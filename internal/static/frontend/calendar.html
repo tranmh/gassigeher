@@ -544,16 +544,29 @@
 
             console.log('[CALENDAR DEBUG] Found', dogBookings.length, 'bookings for dog', dogId, 'on', date);
 
-            const isBlocked = blockedDates.some(bd => {
+            // Check for blocked dates - now supports dog-specific blocks
+            // A date is blocked for this dog if:
+            // 1. There's a global block (dog_id is null) for this date, OR
+            // 2. There's a specific block for this dog on this date
+            const isGloballyBlocked = blockedDates.some(bd => {
                 const blockedDate = bd.date.split('T')[0];
-                return blockedDate === date;
+                return blockedDate === date && bd.dog_id === null;
             });
+
+            const isDogSpecificBlocked = blockedDates.some(bd => {
+                const blockedDate = bd.date.split('T')[0];
+                return blockedDate === date && bd.dog_id === dogId;
+            });
+
+            const isBlocked = isGloballyBlocked || isDogSpecificBlocked;
 
             const dog = allDogs.find(d => d.id === dogId);
 
             return {
                 dogBookings,
                 isBlocked,
+                isGloballyBlocked,
+                isDogSpecificBlocked,
                 isDogAvailable: dog?.is_available
             };
         }
@@ -567,9 +580,11 @@
             }
 
             if (data.isBlocked) {
+                // Show different message for global vs dog-specific blocks
+                const blockMessage = data.isGloballyBlocked ? 'Datum gesperrt' : 'Hund gesperrt';
                 return `<div class="calendar-cell unavailable">
                     <span style="font-size: 1.5rem;">🚫</span>
-                    <div style="font-size: 0.7rem; margin-top: 4px;">Datum gesperrt</div>
+                    <div style="font-size: 0.7rem; margin-top: 4px;">${blockMessage}</div>
                 </div>`;
             }
 
@@ -705,9 +720,11 @@
                             <div style="color: #999;">❌ Nicht verfügbar</div>
                         </div>`;
                     } else if (cellData.isBlocked) {
+                        // Show different message for global vs dog-specific blocks
+                        const blockMessage = cellData.isGloballyBlocked ? '🚫 Datum gesperrt' : '🚫 Hund gesperrt';
                         html += `<div class="day-slot unavailable">
                             <div><strong>${dayName} ${dateDisplay}</strong></div>
-                            <div style="color: #999;">🚫 Gesperrt</div>
+                            <div style="color: #999;">${blockMessage}</div>
                         </div>`;
                     } else {
                         const bookedTimes = cellData.dogBookings.map(b => b.scheduled_time);

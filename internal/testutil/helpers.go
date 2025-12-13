@@ -209,6 +209,22 @@ func SeedTestBlockedDate(t *testing.T, db *sql.DB, date, reason string, createdB
 	return int(id)
 }
 
+// SeedTestBlockedDateForDog creates a test blocked date for a specific dog and returns the ID
+func SeedTestBlockedDateForDog(t *testing.T, db *sql.DB, date, reason string, createdBy int, dogID int) int {
+	now := time.Now()
+	result, err := db.Exec(`
+		INSERT INTO blocked_dates (date, reason, created_by, dog_id, created_at)
+		VALUES (?, ?, ?, ?, ?)
+	`, date, reason, createdBy, dogID, now)
+
+	if err != nil {
+		t.Fatalf("Failed to seed test blocked date for dog: %v", err)
+	}
+
+	id, _ := result.LastInsertId()
+	return int(id)
+}
+
 // DONE: SeedTestExperienceRequest creates a test experience request and returns the ID
 func SeedTestExperienceRequest(t *testing.T, db *sql.DB, userID int, requestedLevel, status string) int {
 	now := time.Now()

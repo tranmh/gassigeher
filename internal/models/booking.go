@@ -99,9 +99,10 @@ type CalendarDay struct {
 
 // CalendarResponse represents a month view of the calendar
 type CalendarResponse struct {
-	Year  int            `json:"year"`
-	Month int            `json:"month"`
-	Days  []*CalendarDay `json:"days"`
+	Year         int            `json:"year"`
+	Month        int            `json:"month"`
+	Days         []*CalendarDay `json:"days"`
+	BlockedDates []*BlockedDate `json:"blocked_dates,omitempty"` // All blocked dates including dog-specific
 }
 
 // Validate validates the create booking request

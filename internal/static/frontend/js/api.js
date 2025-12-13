@@ -242,8 +242,12 @@ class API {
         return this.request('GET', '/blocked-dates');
     }
 
-    async createBlockedDate(date, reason) {
-        return this.request('POST', '/blocked-dates', { date, reason });
+    async createBlockedDate(date, reason, dogId = null) {
+        const body = { date, reason };
+        if (dogId !== null) {
+            body.dog_id = dogId;
+        }
+        return this.request('POST', '/blocked-dates', body);
     }
 
     async deleteBlockedDate(id) {

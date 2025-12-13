@@ -193,6 +193,8 @@
     "saturday": "Samstag",
     "sunday": "Sonntag",
     "blocked_date": "Gesperrter Tag",
+    "dog_blocked": "Hund gesperrt",
+    "date_blocked": "Datum gesperrt",
     "no_bookings_this_day": "Keine Buchungen an diesem Tag"
   },
   "dashboard": {
@@ -231,6 +233,13 @@
     "confirm_unblock": "Möchten Sie die Sperrung dieses Tages aufheben?",
     "date_blocked": "Tag wurde gesperrt",
     "date_unblocked": "Sperrung aufgehoben",
+    "dog_blocked": "Hund wurde gesperrt",
+    "all_dogs": "Alle Hunde",
+    "global_block": "Globale Sperrung",
+    "dog_specific_block": "Hundespezifische Sperrung",
+    "select_dog": "Hund auswählen",
+    "dog_blocked_for_date": "Hund für dieses Datum gesperrt",
+    "date_globally_blocked": "Datum global gesperrt",
     "booking_moved": "Buchung verschoben",
     "approve_request": "Genehmigen",
     "deny_request": "Ablehnen",

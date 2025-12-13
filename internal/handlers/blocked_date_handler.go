@@ -57,6 +57,7 @@ func (h *BlockedDateHandler) ListBlockedDates(w http.ResponseWriter, r *http.Req
 }
 
 // CreateBlockedDate creates a new blocked date (admin only)
+// Now supports optional dog_id for dog-specific blocking
 func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Request) {
 	// Get admin user ID from context
 	userID, _ := r.Context().Value(middleware.UserIDKey).(int)
@@ -74,29 +75,53 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// If dog_id is provided, verify the dog exists
+	var dogName string
+	if req.DogID != nil {
+		dog, err := h.dogRepo.FindByID(*req.DogID)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "Failed to verify dog")
+			return
+		}
+		if dog == nil {
+			respondError(w, http.StatusNotFound, "Dog not found")
+			return
+		}
+		dogName = dog.Name
+	}
+
 	// Create blocked date
 	blockedDate := &models.BlockedDate{
 		Date:      req.Date,
+		DogID:     req.DogID,
 		Reason:    req.Reason,
 		CreatedBy: userID,
 	}
 
 	if err := h.blockedDateRepo.Create(blockedDate); err != nil {
-		if err.Error() == "date is already blocked" {
-			respondError(w, http.StatusConflict, err.Error())
+		errStr := err.Error()
+		if errStr == "this dog is already blocked for this date" || errStr == "this date is already globally blocked" {
+			respondError(w, http.StatusConflict, errStr)
 			return
 		}
 		respondError(w, http.StatusInternalServerError, "Failed to create blocked date")
 		return
 	}
 
-	// Find all scheduled bookings on this date
+	// Find bookings to cancel based on block type
 	status := "scheduled"
 	filter := &models.BookingFilterRequest{
 		DateFrom: &req.Date,
 		DateTo:   &req.Date,
 		Status:   &status,
 	}
+
+	if req.DogID != nil {
+		// Dog-specific block: only cancel bookings for this dog
+		filter.DogID = req.DogID
+	}
+	// For global block (req.DogID == nil): cancel ALL bookings on this date
+
 	bookings, err := h.bookingRepo.FindAll(filter)
 	if err != nil {
 		fmt.Printf("Warning: Failed to find bookings for date %s: %v\n", req.Date, err)
@@ -105,7 +130,12 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
 
 	// Cancel each booking and notify users
 	cancelledCount := 0
-	cancellationReason := fmt.Sprintf("Datum wurde durch Administration gesperrt: %s", req.Reason)
+	var cancellationReason string
+	if req.DogID != nil {
+		cancellationReason = fmt.Sprintf("Hund '%s' wurde für dieses Datum gesperrt: %s", dogName, req.Reason)
+	} else {
+		cancellationReason = fmt.Sprintf("Datum wurde durch Administration gesperrt: %s", req.Reason)
+	}
 
 	for _, booking := range bookings {
 		// Cancel the booking
@@ -117,14 +147,14 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
 
 		// Get user details for email
 		user, err := h.userRepo.FindByID(booking.UserID)
-		if err != nil {
+		if err != nil || user == nil {
 			fmt.Printf("Warning: Failed to get user %d for cancellation email: %v\n", booking.UserID, err)
 			continue
 		}
 
 		// Get dog details for email
 		dog, err := h.dogRepo.FindByID(booking.DogID)
-		if err != nil {
+		if err != nil || dog == nil {
 			fmt.Printf("Warning: Failed to get dog %d for cancellation email: %v\n", booking.DogID, err)
 			continue
 		}
@@ -139,9 +169,14 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
 		}
 	}
 
+	// Set dog name in response if dog-specific
+	if req.DogID != nil {
+		blockedDate.DogName = &dogName
+	}
+
 	// Return response with cancellation count
 	response := map[string]interface{}{
-		"blocked_date":      blockedDate,
+		"blocked_date":       blockedDate,
 		"cancelled_bookings": cancelledCount,
 	}
 
