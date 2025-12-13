@@ -30,7 +30,7 @@ echo [OK] Dependencies downloaded
 echo.
 
 echo [3/6] Preparing version info...
-set VERSION=1.1
+set VERSION=1.2
 for /f %%i in ('git rev-parse --short HEAD 2^>nul') do set GIT_COMMIT=%%i
 if "%GIT_COMMIT%"=="" set GIT_COMMIT=unknown
 for /f %%i in ('powershell -command "Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ' -AsUTC"') do set BUILD_TIME=%%i
