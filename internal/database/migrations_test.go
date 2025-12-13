@@ -14,8 +14,8 @@ import (
 func TestMigrationRegistry(t *testing.T) {
 	migrations := GetAllMigrations()
 
-	t.Run("All_16_migrations_registered", func(t *testing.T) {
-		assert.Len(t, migrations, 16, "Should have 16 migrations")
+	t.Run("All_17_migrations_registered", func(t *testing.T) {
+		assert.Len(t, migrations, 17, "Should have 17 migrations")
 	})
 
 	t.Run("Migrations_have_unique_IDs", func(t *testing.T) {
@@ -74,7 +74,7 @@ func TestRunMigrations_SQLite(t *testing.T) {
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 16, count, "Should have 16 applied migrations")
+	assert.Equal(t, 17, count, "Should have 17 applied migrations")
 
 	// Verify all tables created
 	tables := []string{
@@ -87,10 +87,10 @@ func TestRunMigrations_SQLite(t *testing.T) {
 		assert.NoError(t, err, "Table %s should exist", table)
 	}
 
-	// Verify default settings inserted (3 from migration 008 + 5 from migration 012 + 1 from migration 017)
+	// Verify default settings inserted (3 from migration 008 + 5 from migration 012 + 1 from migration 017 + 1 from migration 018)
 	err = db.QueryRow("SELECT COUNT(*) FROM system_settings").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 9, count, "Should have 9 default settings")
+	assert.Equal(t, 10, count, "Should have 10 default settings")
 
 	// Verify photo_thumbnail column exists in dogs table
 	err = db.QueryRow(`
@@ -119,16 +119,16 @@ func TestRunMigrations_Idempotent(t *testing.T) {
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 16, count)
+	assert.Equal(t, 17, count)
 
 	// Run migrations second time (should be idempotent)
 	err = RunMigrationsWithDialect(db, dialect)
 	assert.NoError(t, err, "Second migration run should succeed (idempotent)")
 
-	// Count should still be 16 (no duplicates)
+	// Count should still be 17 (no duplicates)
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 16, count, "Should still have 16 migrations (no duplicates)")
+	assert.Equal(t, 17, count, "Should still have 17 migrations (no duplicates)")
 }
 
 // TestGetMigrationStatus tests migration status reporting
@@ -146,7 +146,7 @@ func TestGetMigrationStatus(t *testing.T) {
 	applied, pending, err := GetMigrationStatus(db, dialect)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, applied)
-	assert.Equal(t, 16, pending)
+	assert.Equal(t, 17, pending)
 
 	// After migrations
 	err = RunMigrationsWithDialect(db, dialect)
@@ -154,7 +154,7 @@ func TestGetMigrationStatus(t *testing.T) {
 
 	applied, pending, err = GetMigrationStatus(db, dialect)
 	assert.NoError(t, err)
-	assert.Equal(t, 16, applied)
+	assert.Equal(t, 17, applied)
 	assert.Equal(t, 0, pending)
 }
 
@@ -366,6 +366,7 @@ func TestMigrationOrder(t *testing.T) {
 		"015_add_external_link",
 		"016_add_reminder_sent",
 		"017_insert_site_logo_setting",
+		"018_insert_registration_password",
 	}
 
 	assert.Len(t, migrations, len(expectedOrder))

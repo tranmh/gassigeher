@@ -18,6 +18,7 @@ import (
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
 	userRepo     *repository.UserRepository
+	settingsRepo *repository.SettingsRepository
 	authService  *services.AuthService
 	emailService *services.EmailService
 	config       *config.Config
@@ -33,6 +34,7 @@ func NewAuthHandler(db *sql.DB, cfg *config.Config) *AuthHandler {
 
 	return &AuthHandler{
 		userRepo:     repository.NewUserRepository(db),
+		settingsRepo: repository.NewSettingsRepository(db),
 		authService:  services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours),
 		emailService: emailService,
 		config:       cfg,
@@ -50,6 +52,17 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	// Validate input (includes phone number validation)
 	if err := req.Validate(); err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Validate registration password against stored value
+	storedPassword, err := h.settingsRepo.Get("registration_password")
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Database error")
+		return
+	}
+	if storedPassword == nil || !strings.EqualFold(storedPassword.Value, req.RegistrationPassword) {
+		respondError(w, http.StatusBadRequest, "Ungültiges Registrierungspasswort")
 		return
 	}
 

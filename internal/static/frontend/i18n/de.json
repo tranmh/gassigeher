@@ -31,7 +31,9 @@
     "new_password": "Neues Passwort",
     "confirm_new_password": "Neues Passwort bestätigen",
     "change_password": "Passwort ändern",
-    "old_password": "Altes Passwort"
+    "old_password": "Altes Passwort",
+    "registration_password": "Registrierungspasswort",
+    "registration_password_hint": "Der 8-stellige Code wird vom Tierheim bereitgestellt"
   },
   "home": {
     "welcome": "Willkommen bei Gassigeher",
@@ -341,6 +343,7 @@
     "invalid_date": "Ungültiges Datum",
     "booking_failed": "Buchung fehlgeschlagen",
     "dog_not_available": "Dieser Hund ist derzeit nicht verfügbar",
-    "already_booked": "Dieser Hund ist für diese Zeit bereits gebucht"
+    "already_booked": "Dieser Hund ist für diese Zeit bereits gebucht",
+    "invalid_registration_password": "Ungültiges Registrierungspasswort"
   }
 }

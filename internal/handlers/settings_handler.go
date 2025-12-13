@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -74,6 +75,14 @@ func (h *SettingsHandler) UpdateSetting(w http.ResponseWriter, r *http.Request) 
 	if numericSettings[key] {
 		if val, err := strconv.Atoi(req.Value); err != nil || val <= 0 {
 			respondError(w, http.StatusBadRequest, "Value must be a positive integer")
+			return
+		}
+	}
+
+	// Validate registration password format (8 alphanumeric characters)
+	if key == "registration_password" {
+		if !regexp.MustCompile(`^[a-zA-Z0-9]{8}$`).MatchString(req.Value) {
+			respondError(w, http.StatusBadRequest, "Registration password must be exactly 8 alphanumeric characters")
 			return
 		}
 	}

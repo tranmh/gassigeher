@@ -85,6 +85,34 @@
                 </div>
             </div>
 
+            <!-- Registration Password Section -->
+            <div class="card" style="margin-top: 30px;">
+                <h2>Registrierungspasswort</h2>
+                <p style="font-size: 0.85rem; color: #666; margin-bottom: 20px;">
+                    Dieses Passwort müssen Benutzer bei der Registrierung eingeben.
+                    Teilen Sie es nur mit vertrauenswürdigen Personen.
+                </p>
+
+                <div class="form-group">
+                    <label>Aktuelles Passwort</label>
+                    <input type="text" id="registration-password"
+                           style="font-family: monospace; font-size: 1.2rem; letter-spacing: 3px; text-transform: uppercase;"
+                           maxlength="8" minlength="8"
+                           pattern="[a-zA-Z0-9]{8}">
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        8 alphanumerische Zeichen (Groß-/Kleinbuchstaben und Zahlen)
+                    </p>
+                    <div style="margin-top: 10px;">
+                        <button class="btn" onclick="updateRegistrationPassword()">
+                            Speichern
+                        </button>
+                        <button class="btn btn-secondary" onclick="generateNewPassword()" style="margin-left: 10px;">
+                            Neues Passwort generieren
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Site Logo Section -->
             <div class="card" style="margin-top: 30px;">
                 <h2>Website-Logo</h2>
@@ -178,6 +206,7 @@
                 document.getElementById('booking-advance-days').value = settings['booking_advance_days'] || '14';
                 document.getElementById('cancellation-notice-hours').value = settings['cancellation_notice_hours'] || '12';
                 document.getElementById('auto-deactivation-days').value = settings['auto_deactivation_days'] || '365';
+                document.getElementById('registration-password').value = settings['registration_password'] || '';
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Laden der Einstellungen');
             }
@@ -198,6 +227,35 @@
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Aktualisieren');
             }
+        }
+
+        async function updateRegistrationPassword() {
+            const value = document.getElementById('registration-password').value.trim().toUpperCase();
+
+            // Validate format
+            if (!/^[a-zA-Z0-9]{8}$/.test(value)) {
+                showAlert('error', 'Passwort muss genau 8 alphanumerische Zeichen enthalten');
+                return;
+            }
+
+            try {
+                await api.updateSetting('registration_password', value);
+                showAlert('success', 'Registrierungspasswort aktualisiert');
+                settings['registration_password'] = value;
+                document.getElementById('registration-password').value = value;
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Aktualisieren');
+            }
+        }
+
+        function generateNewPassword() {
+            const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let password = '';
+            for (let i = 0; i < 8; i++) {
+                password += charset.charAt(Math.floor(Math.random() * charset.length));
+            }
+            document.getElementById('registration-password').value = password;
+            showAlert('success', 'Neues Passwort generiert. Klicken Sie "Speichern" um es zu übernehmen.');
         }
 
         function showAlert(type, message) {

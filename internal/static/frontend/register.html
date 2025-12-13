@@ -70,6 +70,19 @@
                     </div>
 
                     <div class="form-group">
+                        <label data-i18n="auth.registration_password">Registrierungspasswort</label>
+                        <input type="text" id="registration-password" name="registration_password" required
+                               maxlength="8" minlength="8"
+                               pattern="[a-zA-Z0-9]{8}"
+                               style="text-transform: uppercase; letter-spacing: 2px; font-family: monospace; font-size: 1.1rem;"
+                               placeholder="8-stelliger Code">
+                        <div class="form-error" id="registration-password-error"></div>
+                        <small style="color: #666;">
+                            Der 8-stellige Code wird vom Tierheim bereitgestellt
+                        </small>
+                    </div>
+
+                    <div class="form-group">
                         <div class="checkbox-group">
                             <input type="checkbox" id="accept-terms" name="accept_terms" required>
                             <label for="accept-terms" style="font-weight: 400; margin: 0;">
@@ -126,6 +139,7 @@
                     password: document.getElementById('password').value,
                     confirm_password: document.getElementById('confirm-password').value,
                     accept_terms: document.getElementById('accept-terms').checked,
+                    registration_password: document.getElementById('registration-password').value.trim().toUpperCase(),
                 };
 
                 // Client-side validation
@@ -160,6 +174,15 @@
 
                 if (data.password !== data.confirm_password) {
                     showError('confirm-password', window.i18n.t('errors.password_mismatch'));
+                    hasError = true;
+                }
+
+                // Validate registration password
+                if (!data.registration_password) {
+                    showError('registration-password', 'Registrierungspasswort ist erforderlich');
+                    hasError = true;
+                } else if (!/^[a-zA-Z0-9]{8}$/.test(data.registration_password)) {
+                    showError('registration-password', 'Muss genau 8 alphanumerische Zeichen sein');
                     hasError = true;
                 }
 

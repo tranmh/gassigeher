@@ -27,14 +27,19 @@ func TestAuthHandler_Register(t *testing.T) {
 	}
 	handler := NewAuthHandler(db, cfg)
 
+	// Set up a known registration password for testing
+	const testRegPassword = "TEST1234"
+	db.Exec(`UPDATE system_settings SET value = ? WHERE key = 'registration_password'`, testRegPassword)
+
 	t.Run("successful registration", func(t *testing.T) {
 		reqBody := map[string]interface{}{
-			"name":             "Test User",
-			"email":            "newuser@example.com",
-			"phone":            "+49 123 456789",
-			"password":         "Test1234",
-			"confirm_password": "Test1234",
-			"accept_terms":     true,
+			"name":                  "Test User",
+			"email":                 "newuser@example.com",
+			"phone":                 "+49 123 456789",
+			"password":              "Test1234",
+			"confirm_password":      "Test1234",
+			"accept_terms":          true,
+			"registration_password": testRegPassword,
 		}
 
 		body, _ := json.Marshal(reqBody)
@@ -192,12 +197,13 @@ func TestAuthHandler_Register(t *testing.T) {
 		testutil.SeedTestUser(t, db, "existing@example.com", "Existing User", "green")
 
 		reqBody := map[string]interface{}{
-			"name":             "New User",
-			"email":            "existing@example.com",
-			"phone":            "+49 123 4567890",
-			"password":         "Test1234",
-			"confirm_password": "Test1234",
-			"accept_terms":     true,
+			"name":                  "New User",
+			"email":                 "existing@example.com",
+			"phone":                 "+49 123 4567890",
+			"password":              "Test1234",
+			"confirm_password":      "Test1234",
+			"accept_terms":          true,
+			"registration_password": testRegPassword,
 		}
 
 		body, _ := json.Marshal(reqBody)

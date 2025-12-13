@@ -39,12 +39,13 @@ type User struct {
 
 // RegisterRequest represents the registration payload
 type RegisterRequest struct {
-	Name            string `json:"name"`
-	Email           string `json:"email"`
-	Phone           string `json:"phone"`
-	Password        string `json:"password"`
-	ConfirmPassword string `json:"confirm_password"`
-	AcceptTerms     bool   `json:"accept_terms"`
+	Name                 string `json:"name"`
+	Email                string `json:"email"`
+	Phone                string `json:"phone"`
+	Password             string `json:"password"`
+	ConfirmPassword      string `json:"confirm_password"`
+	AcceptTerms          bool   `json:"accept_terms"`
+	RegistrationPassword string `json:"registration_password"`
 }
 
 // LoginRequest represents the login payload
@@ -133,6 +134,9 @@ func ValidatePhone(phone string) error {
 	return nil
 }
 
+// registrationPasswordRegex validates 8 alphanumeric characters
+var registrationPasswordRegex = regexp.MustCompile(`^[a-zA-Z0-9]{8}$`)
+
 // Validate validates the RegisterRequest
 func (r *RegisterRequest) Validate() error {
 	if strings.TrimSpace(r.Name) == "" {
@@ -155,6 +159,13 @@ func (r *RegisterRequest) Validate() error {
 	}
 	if !r.AcceptTerms {
 		return errors.New("Sie müssen die AGB akzeptieren")
+	}
+	// Validate registration password format
+	if strings.TrimSpace(r.RegistrationPassword) == "" {
+		return errors.New("Registrierungspasswort ist erforderlich")
+	}
+	if !registrationPasswordRegex.MatchString(r.RegistrationPassword) {
+		return errors.New("Registrierungspasswort muss genau 8 alphanumerische Zeichen enthalten")
 	}
 	return nil
 }
