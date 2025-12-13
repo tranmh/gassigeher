@@ -130,6 +130,16 @@
                 </form>
             </div>
 
+            <!-- WhatsApp Group -->
+            <div class="card" id="whatsapp-card" style="display: none; border-left: 4px solid #25d366;">
+                <h3 style="color: #25d366;">💬 WhatsApp-Gruppe</h3>
+                <p style="margin-bottom: 15px;">Treten Sie unserer WhatsApp-Gruppe bei, um auf dem Laufenden zu bleiben und sich mit anderen Gassigehern auszutauschen!</p>
+                <a href="#" id="profile-whatsapp-btn" target="_blank" rel="noopener noreferrer"
+                   style="display: inline-block; padding: 12px 25px; background-color: #25d366; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">
+                    WhatsApp-Gruppe beitreten
+                </a>
+            </div>
+
             <!-- Account Deletion (GDPR) -->
             <div class="card" style="border-left: 4px solid #dc3545;">
                 <h3 style="color: #dc3545;" data-i18n="profile.delete_account">Konto löschen</h3>
@@ -169,6 +179,7 @@
                 loadMyRequests();
                 renderProfile();
                 renderPromotionButtons();
+                loadWhatsAppSettings();
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Laden');
             }
@@ -422,6 +433,20 @@
             const container = document.getElementById('alert-container');
             container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
             setTimeout(() => container.innerHTML = '', 5000);
+        }
+
+        async function loadWhatsAppSettings() {
+            try {
+                const whatsappData = await api.getWhatsAppSettings();
+                if (whatsappData.enabled && whatsappData.link) {
+                    const card = document.getElementById('whatsapp-card');
+                    const btn = document.getElementById('profile-whatsapp-btn');
+                    btn.href = whatsappData.link;
+                    card.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error loading WhatsApp settings:', error);
+            }
         }
     </script>
 </body>

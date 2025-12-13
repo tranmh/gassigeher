@@ -356,5 +356,21 @@
     "dog_not_available": "Dieser Hund ist derzeit nicht verfügbar",
     "already_booked": "Dieser Hund ist für diese Zeit bereits gebucht",
     "invalid_registration_password": "Ungültiges Registrierungspasswort"
+  },
+  "whatsapp": {
+    "group_title": "WhatsApp-Gruppe",
+    "group_description": "Aktivieren Sie die WhatsApp-Gruppe, damit neue Benutzer nach der Registrierung beitreten können.",
+    "enable_group": "WhatsApp-Gruppe aktivieren",
+    "enable_hint": "Wenn aktiviert, wird Benutzern ein Button zum Beitritt der WhatsApp-Gruppe angezeigt.",
+    "group_link": "WhatsApp-Gruppen-Link",
+    "link_hint": "So erhalten Sie den Link: WhatsApp öffnen → Gruppe → Gruppeninfo → Einladen über Link → Link kopieren",
+    "save_settings": "WhatsApp-Einstellungen speichern",
+    "settings_saved": "WhatsApp-Einstellungen gespeichert",
+    "invalid_link": "WhatsApp-Link muss mit https://chat.whatsapp.com/ beginnen",
+    "join_group": "WhatsApp-Gruppe beitreten",
+    "join_title": "Unserer WhatsApp-Gruppe beitreten",
+    "join_description": "Bleiben Sie auf dem Laufenden und tauschen Sie sich mit anderen Gassigehern aus!",
+    "profile_title": "WhatsApp-Gruppe",
+    "profile_description": "Treten Sie unserer WhatsApp-Gruppe bei, um auf dem Laufenden zu bleiben und sich mit anderen Gassigehern auszutauschen!"
   }
 }

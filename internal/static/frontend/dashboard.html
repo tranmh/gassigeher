@@ -35,8 +35,12 @@
             <div id="alert-container"></div>
 
             <!-- Quick Actions -->
-            <div style="margin-bottom: 30px;">
+            <div style="margin-bottom: 30px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
                 <a href="/dogs.html" class="btn" data-i18n="dashboard.view_all_dogs">Alle Hunde anzeigen</a>
+                <a href="#" id="whatsapp-btn" target="_blank" rel="noopener noreferrer"
+                   style="display: none; padding: 10px 20px; background-color: #25d366; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">
+                    💬 WhatsApp-Gruppe
+                </a>
             </div>
 
             <!-- Upcoming Bookings -->
@@ -109,6 +113,7 @@
 
                 loadUpcomingBookings();
                 loadPastBookings();
+                loadWhatsAppButton();
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Laden');
             }
@@ -274,6 +279,19 @@
             const container = document.getElementById('alert-container');
             container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
             setTimeout(() => container.innerHTML = '', 5000);
+        }
+
+        async function loadWhatsAppButton() {
+            try {
+                const whatsappData = await api.getWhatsAppSettings();
+                if (whatsappData.enabled && whatsappData.link) {
+                    const btn = document.getElementById('whatsapp-btn');
+                    btn.href = whatsappData.link;
+                    btn.style.display = 'inline-block';
+                }
+            } catch (error) {
+                console.error('Error loading WhatsApp settings:', error);
+            }
         }
     </script>
 </body>

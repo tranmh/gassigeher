@@ -161,6 +161,9 @@ func main() {
 	// Site logo (public - for displaying logo on all pages)
 	router.HandleFunc("/api/settings/logo", settingsHandler.GetLogo).Methods("GET")
 
+	// WhatsApp group settings (public - for displaying join button)
+	router.HandleFunc("/api/settings/whatsapp", settingsHandler.GetWhatsAppSettings).Methods("GET")
+
 	// Protected routes (authenticated users)
 	protected := router.PathPrefix("/api").Subrouter()
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))

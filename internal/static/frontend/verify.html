@@ -49,23 +49,48 @@
             // Verify email
             try {
                 const response = await window.api.verifyEmail(token);
-                showResult(true, response.message || window.i18n.t('verification.success_message'));
+
+                // Check if WhatsApp group is enabled
+                const whatsappData = await window.api.getWhatsAppSettings();
+                showResult(true, response.message || window.i18n.t('verification.success_message'), whatsappData);
             } catch (error) {
-                showResult(false, error.message || window.i18n.t('verification.error_message'));
+                showResult(false, error.message || window.i18n.t('verification.error_message'), null);
             }
         });
 
-        function showResult(success, message) {
+        function showResult(success, message, whatsappData) {
             const container = document.getElementById('verification-status');
             const icon = success ? '✅' : '❌';
             const title = success
                 ? window.i18n.t('verification.success')
                 : window.i18n.t('verification.error');
 
+            let whatsappSection = '';
+            if (success && whatsappData && whatsappData.enabled && whatsappData.link) {
+                whatsappSection = `
+                    <div style="background: #dcf8c6; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #25d366; text-align: left;">
+                        <p style="margin: 0 0 15px 0; font-weight: 600; text-align: center;">
+                            <span style="font-size: 1.5rem; margin-right: 8px;">💬</span>
+                            Unserer WhatsApp-Gruppe beitreten
+                        </p>
+                        <p style="margin: 0 0 15px 0; font-size: 0.9rem; color: #666; text-align: center;">
+                            Bleiben Sie auf dem Laufenden und tauschen Sie sich mit anderen Gassigehern aus!
+                        </p>
+                        <div style="text-align: center;">
+                            <a href="${whatsappData.link}" target="_blank" rel="noopener noreferrer"
+                               style="display: inline-block; padding: 12px 30px; background-color: #25d366; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">
+                                WhatsApp-Gruppe beitreten
+                            </a>
+                        </div>
+                    </div>
+                `;
+            }
+
             container.innerHTML = `
                 <h1 style="font-size: 4rem;">${icon}</h1>
                 <h2>${title}</h2>
                 <p>${message}</p>
+                ${whatsappSection}
                 ${success ? `
                     <a href="/login.html" class="btn" style="margin-top: 20px;">
                         ${window.i18n.t('verification.go_to_login')}

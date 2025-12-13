@@ -58,10 +58,17 @@ func (h *SettingsHandler) UpdateSetting(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Validate request
-	if err := req.Validate(); err != nil {
-		respondError(w, http.StatusBadRequest, err.Error())
-		return
+	// Settings that allow empty values
+	allowEmptySettings := map[string]bool{
+		"whatsapp_group_link": true,
+	}
+
+	// Validate request (skip for settings that allow empty values)
+	if !allowEmptySettings[key] {
+		if err := req.Validate(); err != nil {
+			respondError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 	}
 
 	// BUGFIX #3: Validate numeric settings to prevent silent failures
@@ -83,6 +90,22 @@ func (h *SettingsHandler) UpdateSetting(w http.ResponseWriter, r *http.Request) 
 	if key == "registration_password" {
 		if !regexp.MustCompile(`^[a-zA-Z0-9]{8}$`).MatchString(req.Value) {
 			respondError(w, http.StatusBadRequest, "Registration password must be exactly 8 alphanumeric characters")
+			return
+		}
+	}
+
+	// Validate WhatsApp group enabled (boolean as string)
+	if key == "whatsapp_group_enabled" {
+		if req.Value != "true" && req.Value != "false" {
+			respondError(w, http.StatusBadRequest, "WhatsApp group enabled must be 'true' or 'false'")
+			return
+		}
+	}
+
+	// Validate WhatsApp group link (must be valid WhatsApp URL or empty)
+	if key == "whatsapp_group_link" {
+		if req.Value != "" && !strings.HasPrefix(req.Value, "https://chat.whatsapp.com/") {
+			respondError(w, http.StatusBadRequest, "WhatsApp group link must start with https://chat.whatsapp.com/")
 			return
 		}
 	}
@@ -160,6 +183,36 @@ func (h *SettingsHandler) UploadLogo(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{
 		"message":  "Logo uploaded successfully",
 		"logo_url": localURL,
+	})
+}
+
+// GetWhatsAppSettings returns the WhatsApp group settings (public endpoint, no auth required)
+func (h *SettingsHandler) GetWhatsAppSettings(w http.ResponseWriter, r *http.Request) {
+	enabledSetting, err := h.settingsRepo.Get("whatsapp_group_enabled")
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to get WhatsApp enabled setting")
+		return
+	}
+
+	linkSetting, err := h.settingsRepo.Get("whatsapp_group_link")
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to get WhatsApp link setting")
+		return
+	}
+
+	enabled := false
+	if enabledSetting != nil && enabledSetting.Value == "true" {
+		enabled = true
+	}
+
+	link := ""
+	if linkSetting != nil {
+		link = linkSetting.Value
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"enabled": enabled,
+		"link":    link,
 	})
 }
 

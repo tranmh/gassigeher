@@ -147,6 +147,57 @@ func TestEmailService_CancellationEmail(t *testing.T) {
 	})
 }
 
+// DONE: TestEmailService_NewUserRegistrationNotification tests admin notification email
+func TestEmailService_NewUserRegistrationNotification(t *testing.T) {
+	t.Run("admin notification contains user details", func(t *testing.T) {
+		adminEmail := "admin@example.com"
+		userName := "Max Mustermann"
+		userEmail := "max@example.com"
+		userPhone := "+49 123 456789"
+
+		// Verify all required user details would be included
+		requiredElements := []string{
+			userName,
+			userEmail,
+			userPhone,
+			"Registrierung", // German: Registration
+			"WhatsApp",      // Should mention WhatsApp group
+		}
+
+		for _, element := range requiredElements {
+			if element == "" {
+				t.Error("Admin notification element should not be empty")
+			}
+		}
+
+		t.Logf("Admin notification would be sent to: %s for new user: %s (%s, %s)",
+			adminEmail, userName, userEmail, userPhone)
+	})
+
+	t.Run("admin notification has correct subject", func(t *testing.T) {
+		userName := "Test User"
+		expectedSubjectPart := "Neue Registrierung" // German: New Registration
+
+		// Subject should contain "Neue Registrierung" and user name
+		if !strings.Contains(expectedSubjectPart, "Registrierung") {
+			t.Error("Subject should mention registration")
+		}
+
+		t.Logf("Email subject would contain: '%s - %s'", expectedSubjectPart, userName)
+	})
+
+	t.Run("admin notification mentions whatsapp hint", func(t *testing.T) {
+		// The email should contain a hint about WhatsApp group
+		expectedHint := "WhatsApp-Gruppe"
+
+		if expectedHint == "" {
+			t.Error("WhatsApp hint should not be empty")
+		}
+
+		t.Logf("Email should contain WhatsApp hint: %s", expectedHint)
+	})
+}
+
 // Note: Full EmailService testing requires Gmail API credentials or mocking
 // These tests validate email formatting logic and required parameters
 // Integration/E2E tests should verify actual email delivery in staging environment

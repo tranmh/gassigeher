@@ -127,6 +127,21 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 			fmt.Printf("Failed to send verification email: %v\n", err)
 			// Don't fail the registration if email fails
 		}
+
+		// Send admin notification email (to Super Admin)
+		if h.config.SuperAdminEmail != "" {
+			fullName := req.FirstName + " " + req.LastName
+			go func() {
+				if err := h.emailService.SendNewUserRegistrationNotification(
+					h.config.SuperAdminEmail,
+					fullName,
+					req.Email,
+					req.Phone,
+				); err != nil {
+					fmt.Printf("Failed to send admin notification email: %v\n", err)
+				}
+			}()
+		}
 	}
 
 	respondJSON(w, http.StatusCreated, map[string]interface{}{

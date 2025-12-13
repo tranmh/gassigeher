@@ -113,6 +113,40 @@
                 </div>
             </div>
 
+            <!-- WhatsApp Group Section -->
+            <div class="card" style="margin-top: 30px;">
+                <h2>WhatsApp-Gruppe</h2>
+                <p style="font-size: 0.85rem; color: #666; margin-bottom: 20px;">
+                    Aktivieren Sie die WhatsApp-Gruppe, damit neue Benutzer nach der Registrierung beitreten können.
+                </p>
+
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" id="whatsapp-enabled" style="width: 20px; height: 20px; cursor: pointer;">
+                        <span>WhatsApp-Gruppe aktivieren</span>
+                    </label>
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        Wenn aktiviert, wird Benutzern ein Button zum Beitritt der WhatsApp-Gruppe angezeigt.
+                    </p>
+                </div>
+
+                <div class="form-group" id="whatsapp-link-group" style="margin-top: 20px;">
+                    <label>WhatsApp-Gruppen-Link</label>
+                    <input type="url" id="whatsapp-link"
+                           placeholder="https://chat.whatsapp.com/..."
+                           style="font-family: monospace;">
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        So erhalten Sie den Link: WhatsApp öffnen → Gruppe → Gruppeninfo → Einladen über Link → Link kopieren
+                    </p>
+                </div>
+
+                <div style="margin-top: 15px;">
+                    <button class="btn" onclick="saveWhatsAppSettings()">
+                        WhatsApp-Einstellungen speichern
+                    </button>
+                </div>
+            </div>
+
             <!-- Site Logo Section -->
             <div class="card" style="margin-top: 30px;">
                 <h2>Website-Logo</h2>
@@ -191,6 +225,7 @@
             loadSettings();
             loadCurrentLogo();
             setupLogoUpload();
+            loadWhatsAppSettings();
         });
 
         async function loadSettings() {
@@ -347,6 +382,50 @@
                 document.getElementById('current-logo-preview').src = result.logo_url;
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Zurücksetzen des Logos');
+            }
+        }
+
+        // WhatsApp Settings Functions
+        async function loadWhatsAppSettings() {
+            try {
+                const data = await api.getWhatsAppSettings();
+                document.getElementById('whatsapp-enabled').checked = data.enabled;
+                document.getElementById('whatsapp-link').value = data.link || '';
+                updateWhatsAppLinkVisibility();
+            } catch (error) {
+                console.error('Error loading WhatsApp settings:', error);
+            }
+
+            // Add event listener for toggle
+            document.getElementById('whatsapp-enabled').addEventListener('change', updateWhatsAppLinkVisibility);
+        }
+
+        function updateWhatsAppLinkVisibility() {
+            const enabled = document.getElementById('whatsapp-enabled').checked;
+            const linkGroup = document.getElementById('whatsapp-link-group');
+            linkGroup.style.opacity = enabled ? '1' : '0.5';
+        }
+
+        async function saveWhatsAppSettings() {
+            const enabled = document.getElementById('whatsapp-enabled').checked;
+            const link = document.getElementById('whatsapp-link').value.trim();
+
+            // Validate link if enabled
+            if (enabled && link && !link.startsWith('https://chat.whatsapp.com/')) {
+                showAlert('error', 'WhatsApp-Link muss mit https://chat.whatsapp.com/ beginnen');
+                return;
+            }
+
+            try {
+                // Save enabled status
+                await api.updateSetting('whatsapp_group_enabled', enabled ? 'true' : 'false');
+
+                // Save link
+                await api.updateSetting('whatsapp_group_link', link);
+
+                showAlert('success', 'WhatsApp-Einstellungen gespeichert');
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Speichern der WhatsApp-Einstellungen');
             }
         }
     </script>

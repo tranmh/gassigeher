@@ -280,6 +280,12 @@ class API {
         return this.request('DELETE', '/settings/logo');
     }
 
+    // WHATSAPP SETTINGS ENDPOINTS
+
+    async getWhatsAppSettings() {
+        return this.request('GET', '/settings/whatsapp');
+    }
+
     // EXPERIENCE REQUEST ENDPOINTS
 
     async createExperienceRequest(requestedLevel) {

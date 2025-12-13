@@ -859,6 +859,79 @@ func (s *EmailService) SendExperienceLevelApproved(to, name, level string, messa
 	return s.SendEmail(to, subject, body.String())
 }
 
+// SendNewUserRegistrationNotification sends an email to admin when a new user registers
+func (s *EmailService) SendNewUserRegistrationNotification(adminEmail, userName, userEmail, userPhone string) error {
+	subject := "Neue Registrierung - " + userName
+
+	tmpl := `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #26272b; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #17a2b8; color: white; padding: 20px; text-align: center; border-radius: 6px 6px 0 0; }
+        .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 6px 6px; }
+        .user-details { background-color: white; padding: 20px; margin: 20px 0; border-radius: 6px; border-left: 4px solid #17a2b8; }
+        .detail-row { margin: 10px 0; }
+        .label { font-weight: 600; color: #666; }
+        .whatsapp-hint { background-color: #dcf8c6; padding: 15px; margin: 20px 0; border-radius: 6px; border-left: 4px solid #25d366; }
+        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👤 Neue Registrierung</h1>
+        </div>
+        <div class="content">
+            <p>Ein neuer Benutzer hat sich bei Gassigeher registriert:</p>
+
+            <div class="user-details">
+                <h3 style="margin-top: 0;">Benutzerdetails</h3>
+                <div class="detail-row">
+                    <span class="label">Name:</span> {{.UserName}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">E-Mail:</span> {{.UserEmail}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Telefon:</span> {{.UserPhone}}
+                </div>
+            </div>
+
+            <div class="whatsapp-hint">
+                <strong>💬 WhatsApp-Gruppe</strong><br>
+                Falls der Benutzer der WhatsApp-Gruppe nicht selbst beigetreten ist, können Sie ihn mit der obigen Telefonnummer manuell hinzufügen.
+            </div>
+
+            <p style="font-size: 0.9rem; color: #666;">
+                Der Benutzer muss seine E-Mail-Adresse noch bestätigen, bevor er sich anmelden kann.
+            </p>
+        </div>
+        <div class="footer">
+            <p>© 2025 Gassigeher. Alle Rechte vorbehalten.</p>
+        </div>
+    </div>
+</body>
+</html>
+`
+
+	t := template.Must(template.New("new_user").Parse(tmpl))
+	var body bytes.Buffer
+	data := map[string]string{
+		"UserName":  userName,
+		"UserEmail": userEmail,
+		"UserPhone": userPhone,
+	}
+	if err := t.Execute(&body, data); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return s.SendEmail(adminEmail, subject, body.String())
+}
+
 // SendExperienceLevelDenied sends an email when experience level request is denied
 func (s *EmailService) SendExperienceLevelDenied(to, name, level string, message *string) error {
 	levelLabel := "Blau"
