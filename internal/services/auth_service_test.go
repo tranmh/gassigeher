@@ -424,3 +424,169 @@ func TestAuthService_GenerateTempPassword(t *testing.T) {
 		}
 	})
 }
+
+// TestAuthService_GenerateImpersonationJWT tests impersonation JWT generation
+func TestAuthService_GenerateImpersonationJWT(t *testing.T) {
+	service := NewAuthService("test-secret", 24)
+
+	t.Run("generates valid impersonation token", func(t *testing.T) {
+		tokenString, err := service.GenerateImpersonationJWT(2, "user@example.com", false, false, 1)
+		if err != nil {
+			t.Fatalf("GenerateImpersonationJWT() error = %v", err)
+		}
+
+		if tokenString == "" {
+			t.Error("Expected JWT token to be generated")
+		}
+
+		// Parse and verify token
+		claims, err := service.ValidateJWT(tokenString)
+		if err != nil {
+			t.Fatalf("ValidateJWT() failed: %v", err)
+		}
+
+		// Check user_id is target user
+		if (*claims)["user_id"].(float64) != 2 {
+			t.Errorf("Expected user_id to be 2, got %v", (*claims)["user_id"])
+		}
+
+		// Check email is target user
+		if (*claims)["email"].(string) != "user@example.com" {
+			t.Errorf("Expected email to be user@example.com, got %v", (*claims)["email"])
+		}
+	})
+}
+
+// TestAuthService_GenerateImpersonationJWT_ContainsOriginalUserID tests original user ID claim
+func TestAuthService_GenerateImpersonationJWT_ContainsOriginalUserID(t *testing.T) {
+	service := NewAuthService("test-secret", 24)
+
+	tokenString, err := service.GenerateImpersonationJWT(2, "user@example.com", false, false, 1)
+	if err != nil {
+		t.Fatalf("GenerateImpersonationJWT() error = %v", err)
+	}
+
+	claims, err := service.ValidateJWT(tokenString)
+	if err != nil {
+		t.Fatalf("ValidateJWT() failed: %v", err)
+	}
+
+	originalUserID, ok := (*claims)["original_user_id"].(float64)
+	if !ok {
+		t.Fatal("Expected original_user_id claim to exist")
+	}
+
+	if originalUserID != 1 {
+		t.Errorf("Expected original_user_id to be 1, got %v", originalUserID)
+	}
+}
+
+// TestAuthService_GenerateImpersonationJWT_ContainsImpersonatingFlag tests impersonating flag
+func TestAuthService_GenerateImpersonationJWT_ContainsImpersonatingFlag(t *testing.T) {
+	service := NewAuthService("test-secret", 24)
+
+	tokenString, err := service.GenerateImpersonationJWT(2, "user@example.com", false, false, 1)
+	if err != nil {
+		t.Fatalf("GenerateImpersonationJWT() error = %v", err)
+	}
+
+	claims, err := service.ValidateJWT(tokenString)
+	if err != nil {
+		t.Fatalf("ValidateJWT() failed: %v", err)
+	}
+
+	impersonating, ok := (*claims)["impersonating"].(bool)
+	if !ok {
+		t.Fatal("Expected impersonating claim to exist")
+	}
+
+	if !impersonating {
+		t.Error("Expected impersonating to be true")
+	}
+}
+
+// TestAuthService_ValidateJWT_ExtractsImpersonationClaims tests extraction of impersonation claims
+func TestAuthService_ValidateJWT_ExtractsImpersonationClaims(t *testing.T) {
+	service := NewAuthService("test-secret", 24)
+
+	// Generate impersonation token with admin impersonating regular user
+	tokenString, err := service.GenerateImpersonationJWT(5, "regular@example.com", false, false, 1)
+	if err != nil {
+		t.Fatalf("GenerateImpersonationJWT() error = %v", err)
+	}
+
+	claims, err := service.ValidateJWT(tokenString)
+	if err != nil {
+		t.Fatalf("ValidateJWT() failed: %v", err)
+	}
+
+	// Check all expected claims
+	tests := []struct {
+		name     string
+		key      string
+		expected interface{}
+	}{
+		{"user_id", "user_id", float64(5)},
+		{"email", "email", "regular@example.com"},
+		{"is_admin", "is_admin", false},
+		{"is_super_admin", "is_super_admin", false},
+		{"original_user_id", "original_user_id", float64(1)},
+		{"impersonating", "impersonating", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			value, ok := (*claims)[tt.key]
+			if !ok {
+				t.Errorf("Expected claim %s to exist", tt.key)
+				return
+			}
+			if value != tt.expected {
+				t.Errorf("Expected %s to be %v, got %v", tt.key, tt.expected, value)
+			}
+		})
+	}
+}
+
+// TestAuthService_GenerateImpersonationJWT_PreservesAdminFlags tests admin flags are correct for target
+func TestAuthService_GenerateImpersonationJWT_PreservesAdminFlags(t *testing.T) {
+	service := NewAuthService("test-secret", 24)
+
+	t.Run("impersonating regular admin", func(t *testing.T) {
+		tokenString, err := service.GenerateImpersonationJWT(3, "admin@example.com", true, false, 1)
+		if err != nil {
+			t.Fatalf("GenerateImpersonationJWT() error = %v", err)
+		}
+
+		claims, err := service.ValidateJWT(tokenString)
+		if err != nil {
+			t.Fatalf("ValidateJWT() failed: %v", err)
+		}
+
+		if (*claims)["is_admin"].(bool) != true {
+			t.Error("Expected is_admin to be true for admin target")
+		}
+		if (*claims)["is_super_admin"].(bool) != false {
+			t.Error("Expected is_super_admin to be false for regular admin")
+		}
+	})
+
+	t.Run("impersonating regular user", func(t *testing.T) {
+		tokenString, err := service.GenerateImpersonationJWT(5, "user@example.com", false, false, 1)
+		if err != nil {
+			t.Fatalf("GenerateImpersonationJWT() error = %v", err)
+		}
+
+		claims, err := service.ValidateJWT(tokenString)
+		if err != nil {
+			t.Fatalf("ValidateJWT() failed: %v", err)
+		}
+
+		if (*claims)["is_admin"].(bool) != false {
+			t.Error("Expected is_admin to be false for regular user")
+		}
+		if (*claims)["is_super_admin"].(bool) != false {
+			t.Error("Expected is_super_admin to be false for regular user")
+		}
+	})
+}

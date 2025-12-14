@@ -189,6 +189,7 @@
     <script src="/js/api.js"></script>
     <script src="/js/dog-photo-helpers.js"></script>
     <script src="/js/sanitize.js"></script>
+    <script src="/js/impersonation-banner.js"></script>
     <script>
         let currentDogs = [];
         let userLevel = 'green';
@@ -205,6 +206,9 @@
             // Explicitly update all translations after load
             console.log('i18n loaded, updating translations...');
             window.i18n.updateElement(document.body);
+
+            // Initialize impersonation banner (shows if impersonating)
+            await ImpersonationBanner.init();
 
             try {
                 // Get user info

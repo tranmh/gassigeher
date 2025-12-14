@@ -198,6 +198,7 @@
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/sanitize.js"></script>
+    <script src="/js/impersonation-banner.js"></script>
     <script>
         let users = [];
         let currentUser = null;
@@ -227,6 +228,9 @@
             // Explicitly update all translations after load
             console.log('i18n loaded, updating translations...');
             window.i18n.updateElement(document.body);
+
+            // Initialize impersonation banner (shows if impersonating)
+            await ImpersonationBanner.init();
 
             loadUsers();
         });
@@ -326,6 +330,9 @@
                                     ` : `
                                         <button class="btn btn-secondary btn-sm" onclick="promoteToAdmin(${user.id}, '${safeName.replace(/'/g, "\\'")}')">Zu Admin ernennen</button>
                                     `}
+                                    ${!user.is_deleted && user.is_active ? `
+                                        <button class="btn btn-info btn-sm" onclick="impersonateUser(${user.id}, '${safeName.replace(/'/g, "\\'")}')">Impersonieren</button>
+                                    ` : ''}
                                     ${!user.is_deleted ? `
                                         <button class="btn btn-danger btn-sm" onclick="showDeleteModal(${user.id}, '${safeName.replace(/'/g, "\\'")}')">Löschen</button>
                                     ` : ''}
@@ -402,6 +409,25 @@
             } catch (error) {
                 console.error('Error demoting admin:', error);
                 showAlert('error', error.message || 'Fehler beim Entziehen der Admin-Rechte');
+            }
+        }
+
+        async function impersonateUser(userId, userName) {
+            if (!confirm(`Möchten Sie sich als "${userName}" anmelden?\n\nSie werden als dieser Benutzer agieren und können alle seine Funktionen nutzen.\nKlicken Sie auf "Zurück zum Admin" um die Impersonation zu beenden.`)) {
+                return;
+            }
+
+            try {
+                const response = await api.impersonateUser(userId);
+                if (response && response.token) {
+                    // Set the new impersonation token
+                    api.setToken(response.token);
+                    // Redirect to user dashboard
+                    window.location.href = '/dashboard.html';
+                }
+            } catch (error) {
+                console.error('Error impersonating user:', error);
+                showAlert('error', error.message || 'Fehler beim Impersonieren des Benutzers');
             }
         }
 
@@ -649,6 +675,15 @@
             gap: 10px;
             justify-content: flex-end;
             margin-top: 20px;
+        }
+
+        .btn-info {
+            background-color: #17a2b8;
+            color: white;
+        }
+
+        .btn-info:hover {
+            background-color: #138496;
         }
     </style>
 </body>

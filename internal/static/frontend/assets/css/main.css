@@ -1213,4 +1213,65 @@ textarea.error {
   }
 }
 
+/* Impersonation Banner */
+#impersonation-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #dc3545;
+  color: white;
+  padding: 12px 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  z-index: 9999;
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+#impersonation-banner strong {
+  font-weight: 700;
+}
+
+#impersonation-banner button {
+  background: white;
+  color: #dc3545;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+#impersonation-banner button:hover {
+  background: #f8f9fa;
+  transform: scale(1.02);
+}
+
+#impersonation-banner button:active {
+  transform: scale(0.98);
+}
+
+body.impersonating {
+  padding-top: 52px;
+}
+
+/* Mobile responsive for impersonation banner */
+@media (max-width: 600px) {
+  #impersonation-banner {
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 15px;
+    text-align: center;
+  }
+
+  body.impersonating {
+    padding-top: 85px;
+  }
+}
+
 /*# sourceMappingURL=main.css.map */

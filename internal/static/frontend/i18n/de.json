@@ -316,7 +316,18 @@
     "create_admin_hint": "Admins erhalten automatisch Blau-Level und haben Zugang zu allen Verwaltungsfunktionen.",
     "temp_password_hint": "Der Benutzer erhält ein temporäres Passwort per E-Mail und muss dieses bei der ersten Anmeldung ändern.",
     "must_change_password": "Bitte ändern Sie Ihr temporäres Passwort.",
-    "experience_level": "Erfahrungslevel"
+    "experience_level": "Erfahrungslevel",
+    "impersonate": "Impersonieren",
+    "impersonate_confirm": "Möchten Sie sich als diesen Benutzer anmelden?",
+    "impersonate_success": "Sie sind jetzt als dieser Benutzer angemeldet.",
+    "impersonate_error": "Fehler beim Impersonieren des Benutzers.",
+    "end_impersonation": "Zurück zum Admin",
+    "impersonation_active": "Impersonation aktiv"
+  },
+  "impersonation": {
+    "banner_text": "Sie sind als {name} angemeldet",
+    "return_to_admin": "Zurück zum Admin",
+    "active": "Impersonation aktiv"
   },
   "reactivation": {
     "title": "Reaktivierung beantragen",

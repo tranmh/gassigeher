@@ -353,6 +353,16 @@ class API {
         return this.request('DELETE', `/users/${userId}`);
     }
 
+    // IMPERSONATION ENDPOINTS (Super Admin only)
+
+    async impersonateUser(userId) {
+        return this.request('POST', `/admin/users/${userId}/impersonate`);
+    }
+
+    async endImpersonation() {
+        return this.request('POST', `/end-impersonation`);
+    }
+
     // REACTIVATION REQUEST ENDPOINTS
 
     async createReactivationRequest(email) {

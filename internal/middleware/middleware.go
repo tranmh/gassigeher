@@ -16,8 +16,10 @@ type contextKey string
 const UserIDKey contextKey = "userID"
 const EmailKey contextKey = "email"
 const IsAdminKey contextKey = "isAdmin"
-const IsSuperAdminKey contextKey = "isSuperAdmin" // DONE: Phase 3
+const IsSuperAdminKey contextKey = "isSuperAdmin"       // DONE: Phase 3
 const RequestIDKey contextKey = "requestID"
+const OriginalUserIDKey contextKey = "originalUserID"   // Impersonation: Super-admin's real ID
+const IsImpersonatingKey contextKey = "isImpersonating" // Impersonation: Boolean flag
 
 // LoggingMiddleware logs HTTP requests with comprehensive information
 // Includes: timestamp, request ID, client IP, method, path, status code,
@@ -173,11 +175,23 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 				isSuperAdmin = false
 			}
 
+			// Extract impersonation claims (if present)
+			originalUserID := 0
+			isImpersonating := false
+			if impersonating, ok := (*claims)["impersonating"].(bool); ok && impersonating {
+				isImpersonating = true
+				if origID, ok := (*claims)["original_user_id"].(float64); ok {
+					originalUserID = int(origID)
+				}
+			}
+
 			// Add to context
 			ctx := context.WithValue(r.Context(), UserIDKey, int(userID))
 			ctx = context.WithValue(ctx, EmailKey, email)
 			ctx = context.WithValue(ctx, IsAdminKey, isAdmin)
 			ctx = context.WithValue(ctx, IsSuperAdminKey, isSuperAdmin) // DONE: Phase 3
+			ctx = context.WithValue(ctx, IsImpersonatingKey, isImpersonating)
+			ctx = context.WithValue(ctx, OriginalUserIDKey, originalUserID)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

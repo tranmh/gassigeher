@@ -21,6 +21,9 @@
     await window.i18n.load();
     window.i18n.updateElement(document.body);
 
+    // Initialize impersonation banner (shows if impersonating)
+    await ImpersonationBanner.init();
+
     // Load settings
     async function loadSettings() {
         try {

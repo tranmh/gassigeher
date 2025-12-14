@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/logging"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -53,6 +55,10 @@ func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	// Get admin status from context
 	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
 
+	// Get impersonation status from context
+	isImpersonating, _ := r.Context().Value(middleware.IsImpersonatingKey).(bool)
+	originalUserID, _ := r.Context().Value(middleware.OriginalUserIDKey).(int)
+
 	user, err := h.userRepo.FindByID(userID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Database error")
@@ -68,16 +74,20 @@ func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	user.VerificationToken = nil
 	user.PasswordResetToken = nil
 
-	// Create response with user data + is_admin flag
+	// Create response with user data + is_admin flag + impersonation info
 	// Keep user fields at top level for backward compatibility
 	type UserResponse struct {
 		*models.User
-		IsAdmin bool `json:"is_admin"`
+		IsAdmin         bool `json:"is_admin"`
+		IsImpersonating bool `json:"is_impersonating"`
+		OriginalUserID  int  `json:"original_user_id,omitempty"`
 	}
 
 	response := &UserResponse{
-		User:    user,
-		IsAdmin: isAdmin,
+		User:            user,
+		IsAdmin:         isAdmin,
+		IsImpersonating: isImpersonating,
+		OriginalUserID:  originalUserID,
 	}
 
 	respondJSON(w, http.StatusOK, response)
@@ -584,6 +594,161 @@ func (h *UserHandler) DemoteAdmin(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"message": "Admin privileges revoked successfully",
 		"user":    updatedUser,
+	})
+}
+
+// ImpersonateUser allows super-admin to act as another user (not super-admin)
+func (h *UserHandler) ImpersonateUser(w http.ResponseWriter, r *http.Request) {
+	// Extract super admin from context (middleware already verified)
+	isSuperAdmin, _ := r.Context().Value(middleware.IsSuperAdminKey).(bool)
+	if !isSuperAdmin {
+		respondError(w, http.StatusForbidden, "Only Super Admin can impersonate users")
+		return
+	}
+
+	// Get current super-admin user ID
+	currentUserID, _ := r.Context().Value(middleware.UserIDKey).(int)
+
+	// Get target user ID from URL
+	vars := mux.Vars(r)
+	targetUserIDStr := vars["id"]
+	targetUserID, err := strconv.Atoi(targetUserIDStr)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
+
+	// Cannot impersonate yourself
+	if targetUserID == currentUserID {
+		respondError(w, http.StatusBadRequest, "Cannot impersonate yourself")
+		return
+	}
+
+	// Get target user
+	targetUser, err := h.userRepo.FindByID(targetUserID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Database error")
+		return
+	}
+	if targetUser == nil {
+		respondError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	// Cannot impersonate deleted users
+	if targetUser.IsDeleted {
+		respondError(w, http.StatusBadRequest, "Cannot impersonate deleted user")
+		return
+	}
+
+	// Cannot impersonate inactive users
+	if !targetUser.IsActive {
+		respondError(w, http.StatusBadRequest, "Cannot impersonate inactive user")
+		return
+	}
+
+	// Cannot impersonate super-admin
+	if targetUser.IsSuperAdmin {
+		respondError(w, http.StatusForbidden, "Cannot impersonate Super Admin")
+		return
+	}
+
+	// Get target user's email
+	targetEmail := ""
+	if targetUser.Email != nil {
+		targetEmail = *targetUser.Email
+	}
+
+	// Generate impersonation JWT
+	token, err := h.authService.GenerateImpersonationJWT(
+		targetUserID,
+		targetEmail,
+		targetUser.IsAdmin,
+		targetUser.IsSuperAdmin,
+		currentUserID,
+	)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to generate token")
+		return
+	}
+
+	// Audit log
+	clientIP := logging.GetClientIP(r)
+	log.Printf("AUDIT: Super-admin %d started impersonating user %d (%s %s) from IP %s",
+		currentUserID, targetUserID, targetUser.FirstName, targetUser.LastName, clientIP)
+
+	// Don't return sensitive data
+	targetUser.PasswordHash = nil
+	targetUser.VerificationToken = nil
+	targetUser.PasswordResetToken = nil
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"token": token,
+		"user":  targetUser,
+	})
+}
+
+// EndImpersonation ends the impersonation session and returns to super-admin
+func (h *UserHandler) EndImpersonation(w http.ResponseWriter, r *http.Request) {
+	// Check if currently impersonating
+	isImpersonating, _ := r.Context().Value(middleware.IsImpersonatingKey).(bool)
+	if !isImpersonating {
+		respondError(w, http.StatusBadRequest, "Not currently impersonating")
+		return
+	}
+
+	// Get original super-admin user ID
+	originalUserID, ok := r.Context().Value(middleware.OriginalUserIDKey).(int)
+	if !ok || originalUserID == 0 {
+		respondError(w, http.StatusBadRequest, "Invalid impersonation session")
+		return
+	}
+
+	// Get impersonated user ID for audit log
+	impersonatedUserID, _ := r.Context().Value(middleware.UserIDKey).(int)
+
+	// Get original super-admin user
+	originalUser, err := h.userRepo.FindByID(originalUserID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Database error")
+		return
+	}
+	if originalUser == nil {
+		respondError(w, http.StatusNotFound, "Original user not found")
+		return
+	}
+
+	// Get original user's email
+	originalEmail := ""
+	if originalUser.Email != nil {
+		originalEmail = *originalUser.Email
+	}
+
+	// Generate normal JWT for super-admin (no impersonation claims)
+	token, err := h.authService.GenerateJWT(
+		originalUserID,
+		originalEmail,
+		originalUser.IsAdmin,
+		originalUser.IsSuperAdmin,
+	)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to generate token")
+		return
+	}
+
+	// Audit log
+	clientIP := logging.GetClientIP(r)
+	log.Printf("AUDIT: Super-admin %d ended impersonation of user %d from IP %s",
+		originalUserID, impersonatedUserID, clientIP)
+
+	// Don't return sensitive data
+	originalUser.PasswordHash = nil
+	originalUser.VerificationToken = nil
+	originalUser.PasswordResetToken = nil
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"token": token,
+		"user":  originalUser,
 	})
 }
 

@@ -217,6 +217,7 @@
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/sanitize.js"></script>
+    <script src="/js/impersonation-banner.js"></script>
     <script>
         let allBookings = [];
         let currentFilter = 'pending';
@@ -244,6 +245,9 @@
 
             await window.i18n.load();
             window.i18n.updateElement(document.body);
+
+            // Initialize impersonation banner (shows if impersonating)
+            await ImpersonationBanner.init();
 
             await loadApprovals();
 

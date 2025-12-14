@@ -85,6 +85,7 @@
     <script src="/js/nav-menu.js"></script>
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
+    <script src="/js/impersonation-banner.js"></script>
     <script>
         let blockedDates = [];
         let allDogs = [];
@@ -114,6 +115,9 @@
             // Explicitly update all translations after load
             console.log('i18n loaded, updating translations...');
             window.i18n.updateElement(document.body);
+
+            // Initialize impersonation banner (shows if impersonating)
+            await ImpersonationBanner.init();
 
             await loadDogs();  // Load dogs for selector
             loadBlockedDates();

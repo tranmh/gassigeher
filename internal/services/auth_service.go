@@ -96,6 +96,28 @@ func (s *AuthService) GenerateJWT(userID int, email string, isAdmin bool, isSupe
 
 // DONE: Phase 3 - JWT now includes is_admin and is_super_admin claims
 
+// GenerateImpersonationJWT generates a JWT token for impersonation
+// Includes original_user_id and impersonating flag for audit trail
+func (s *AuthService) GenerateImpersonationJWT(targetUserID int, targetEmail string, targetIsAdmin bool, targetIsSuperAdmin bool, originalUserID int) (string, error) {
+	claims := jwt.MapClaims{
+		"user_id":          targetUserID,
+		"email":            targetEmail,
+		"is_admin":         targetIsAdmin,
+		"is_super_admin":   targetIsSuperAdmin,
+		"original_user_id": originalUserID,
+		"impersonating":    true,
+		"exp":              time.Now().Add(time.Hour * time.Duration(s.jwtExpirationHours)).Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString([]byte(s.jwtSecret))
+	if err != nil {
+		return "", fmt.Errorf("failed to sign impersonation token: %w", err)
+	}
+
+	return tokenString, nil
+}
+
 // ValidateJWT validates and parses a JWT token
 func (s *AuthService) ValidateJWT(tokenString string) (*jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {

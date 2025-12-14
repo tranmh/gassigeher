@@ -276,6 +276,10 @@ func main() {
 	superAdmin.Use(middleware.RequireSuperAdmin)
 	superAdmin.HandleFunc("/admin/users/{id}/promote", userHandler.PromoteToAdmin).Methods("POST")
 	superAdmin.HandleFunc("/admin/users/{id}/demote", userHandler.DemoteAdmin).Methods("POST")
+	superAdmin.HandleFunc("/admin/users/{id}/impersonate", userHandler.ImpersonateUser).Methods("POST")
+	// NOTE: EndImpersonation is on 'protected' router (not superAdmin) because when
+	// impersonating a regular user, the token has is_super_admin=false
+	protected.HandleFunc("/end-impersonation", userHandler.EndImpersonation).Methods("POST")
 
 	// Uploads directory (user photos, dog photos) - must remain on filesystem
 	router.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
