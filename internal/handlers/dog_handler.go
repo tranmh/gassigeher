@@ -403,12 +403,20 @@ func (h *DogHandler) UploadDogPhoto(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Validate file type (checking extension first for quick validation)
+	// Validate file extension (quick validation)
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" {
 		respondError(w, http.StatusBadRequest, "Only JPEG and PNG files are allowed")
 		return
 	}
+
+	// Validate MIME type (magic bytes) to prevent file type spoofing
+	if errMsg, valid := ValidateImageMIMEType(file); !valid {
+		respondError(w, http.StatusBadRequest, errMsg)
+		return
+	}
+	// Reset file reader position after MIME check
+	file.Seek(0, 0)
 
 	// Delete old photos if they exist (before processing new ones)
 	if dog.Photo != nil && *dog.Photo != "" {

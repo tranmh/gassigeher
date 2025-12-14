@@ -10,6 +10,7 @@ import (
 	"mime/multipart"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/disintegration/imaging"
 )
@@ -305,17 +306,66 @@ func (s *ImageService) ProcessWalkReportPhoto(file multipart.File, reportID int,
 	return fullRelPath, thumbRelPath, nil
 }
 
+// safeJoinPath safely joins a base directory with a relative path,
+// preventing path traversal attacks. Returns error if the resulting path
+// would escape the base directory.
+func (s *ImageService) safeJoinPath(relativePath string) (string, error) {
+	// Reject absolute paths
+	if filepath.IsAbs(relativePath) {
+		return "", fmt.Errorf("absolute paths not allowed")
+	}
+
+	// Reject paths with ".." components
+	if strings.Contains(relativePath, "..") {
+		return "", fmt.Errorf("path traversal not allowed")
+	}
+
+	// Clean and join the path
+	cleanPath := filepath.Clean(relativePath)
+	fullPath := filepath.Join(s.uploadDir, cleanPath)
+
+	// Verify the result is still within uploadDir
+	absUploadDir, err := filepath.Abs(s.uploadDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve upload directory: %w", err)
+	}
+
+	absFullPath, err := filepath.Abs(fullPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve path: %w", err)
+	}
+
+	// Ensure the resolved path starts with the upload directory
+	if !strings.HasPrefix(absFullPath, absUploadDir+string(filepath.Separator)) &&
+		absFullPath != absUploadDir {
+		return "", fmt.Errorf("path escapes upload directory")
+	}
+
+	return fullPath, nil
+}
+
 // DeleteWalkReportPhoto deletes a walk report photo (both full and thumbnail)
 // Does not return error if files don't exist (idempotent)
+// Includes path traversal protection to prevent deletion of files outside upload directory
 func (s *ImageService) DeleteWalkReportPhoto(fullPath, thumbPath string) error {
+	// Validate and resolve full-size image path (with path traversal protection)
+	fullAbsPath, err := s.safeJoinPath(fullPath)
+	if err != nil {
+		return fmt.Errorf("invalid full image path: %w", err)
+	}
+
 	// Delete full-size image
-	fullAbsPath := filepath.Join(s.uploadDir, fullPath)
 	if err := os.Remove(fullAbsPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to delete full-size image: %w", err)
 	}
 
+	// Validate and resolve thumbnail path (with path traversal protection)
+	thumbAbsPath, err := s.safeJoinPath(thumbPath)
+	if err != nil {
+		return fmt.Errorf("invalid thumbnail path: %w", err)
+	}
+
 	// Delete thumbnail
-	thumbAbsPath := filepath.Join(s.uploadDir, thumbPath)
 	if err := os.Remove(thumbAbsPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to delete thumbnail: %w", err)
 	}

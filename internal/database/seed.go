@@ -1,10 +1,11 @@
 package database
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"fmt"
 	"log"
-	"math/rand"
+	"math/big"
 	"os"
 	"time"
 
@@ -110,8 +111,8 @@ func SeedDatabase(db *sql.DB, superAdminEmail string) error {
 	return nil
 }
 
-// generateSecurePassword generates a secure random password
-// DONE
+// generateSecurePassword generates a cryptographically secure random password
+// Uses crypto/rand for unpredictable random bytes
 func generateSecurePassword(length int) string {
 	// Character sets for password generation
 	lowercase := "abcdefghijklmnopqrstuvwxyz"
@@ -120,24 +121,34 @@ func generateSecurePassword(length int) string {
 	special := "!@#$%^&*"
 	allChars := lowercase + uppercase + numbers + special
 
-	rand.Seed(time.Now().UnixNano())
-
 	password := make([]byte, length)
+
+	// Helper function for cryptographically secure random index
+	secureRandomIndex := func(max int) int {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(max)))
+		if err != nil {
+			// Fallback should never happen with crypto/rand
+			panic("crypto/rand failed: " + err.Error())
+		}
+		return int(n.Int64())
+	}
+
 	// Ensure at least one of each type
-	password[0] = lowercase[rand.Intn(len(lowercase))]
-	password[1] = uppercase[rand.Intn(len(uppercase))]
-	password[2] = numbers[rand.Intn(len(numbers))]
-	password[3] = special[rand.Intn(len(special))]
+	password[0] = lowercase[secureRandomIndex(len(lowercase))]
+	password[1] = uppercase[secureRandomIndex(len(uppercase))]
+	password[2] = numbers[secureRandomIndex(len(numbers))]
+	password[3] = special[secureRandomIndex(len(special))]
 
 	// Fill rest randomly
 	for i := 4; i < length; i++ {
-		password[i] = allChars[rand.Intn(len(allChars))]
+		password[i] = allChars[secureRandomIndex(len(allChars))]
 	}
 
-	// Shuffle
-	rand.Shuffle(len(password), func(i, j int) {
+	// Shuffle using Fisher-Yates with crypto/rand
+	for i := len(password) - 1; i > 0; i-- {
+		j := secureRandomIndex(i + 1)
 		password[i], password[j] = password[j], password[i]
-	})
+	}
 
 	return string(password)
 }

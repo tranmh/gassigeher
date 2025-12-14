@@ -412,6 +412,14 @@ func (h *WalkReportHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Validate MIME type (magic bytes) to prevent file type spoofing
+	if errMsg, valid := ValidateImageMIMEType(file); !valid {
+		respondError(w, http.StatusBadRequest, errMsg)
+		return
+	}
+	// Reset file reader position after MIME check
+	file.Seek(0, 0)
+
 	// Process and save the photo
 	fullPath, thumbPath, err := h.imageService.ProcessWalkReportPhoto(file, reportID, photoCount+1)
 	if err != nil {

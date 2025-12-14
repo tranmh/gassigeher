@@ -920,3 +920,77 @@ func TestImageService_ProcessLogo_Overwrites(t *testing.T) {
 		}
 	})
 }
+
+// TestImageService_PathTraversalPrevention tests that path traversal attacks are blocked
+func TestImageService_PathTraversalPrevention(t *testing.T) {
+	tempDir := t.TempDir()
+	service := NewImageService(tempDir)
+
+	// Create a sensitive file outside the upload directory that we'll try to delete
+	sensitiveFile := filepath.Join(tempDir, "..", "sensitive.txt")
+	os.WriteFile(sensitiveFile, []byte("sensitive data"), 0644)
+	defer os.Remove(sensitiveFile)
+
+	t.Run("path traversal in DeleteWalkReportPhoto is blocked", func(t *testing.T) {
+		// Try to delete a file outside the upload directory using path traversal
+		err := service.DeleteWalkReportPhoto("../sensitive.txt", "../sensitive.txt")
+
+		// The function should return an error for path traversal attempts
+		if err == nil {
+			t.Error("Expected error for path traversal attempt")
+		}
+
+		// Verify the sensitive file was NOT deleted
+		if _, statErr := os.Stat(sensitiveFile); os.IsNotExist(statErr) {
+			t.Error("Path traversal vulnerability: sensitive file was deleted!")
+		}
+	})
+
+	t.Run("path traversal with absolute path is blocked", func(t *testing.T) {
+		// Try to delete using absolute path
+		err := service.DeleteWalkReportPhoto("/etc/passwd", "/etc/passwd")
+
+		// Should return error
+		if err == nil {
+			t.Error("Expected error for absolute path attempt")
+		}
+	})
+
+	t.Run("path traversal with encoded characters is blocked", func(t *testing.T) {
+		// Try various path traversal patterns
+		patterns := []string{
+			"..%2F..%2F..%2Fetc%2Fpasswd",
+			"....//....//etc/passwd",
+			"walk_reports/../../../etc/passwd",
+		}
+
+		for _, pattern := range patterns {
+			err := service.DeleteWalkReportPhoto(pattern, pattern)
+			if err == nil {
+				t.Errorf("Expected error for path traversal pattern: %s", pattern)
+			}
+		}
+	})
+
+	t.Run("valid path within upload directory works", func(t *testing.T) {
+		// Create a valid file in the walk_reports directory
+		walkReportsDir := filepath.Join(tempDir, "walk_reports")
+		os.MkdirAll(walkReportsDir, 0755)
+
+		validFile := filepath.Join(walkReportsDir, "test_photo.jpg")
+		os.WriteFile(validFile, []byte("test"), 0644)
+
+		// Delete using valid relative path
+		err := service.DeleteWalkReportPhoto("walk_reports/test_photo.jpg", "walk_reports/test_photo.jpg")
+
+		// Should NOT return error for valid paths
+		if err != nil {
+			t.Errorf("Unexpected error for valid path: %v", err)
+		}
+
+		// File should be deleted
+		if _, statErr := os.Stat(validFile); !os.IsNotExist(statErr) {
+			t.Error("Valid file should have been deleted")
+		}
+	})
+}

@@ -213,12 +213,20 @@ func (h *UserHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Validate file type
+	// Validate file extension
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" {
 		respondError(w, http.StatusBadRequest, "Only JPEG and PNG files are allowed")
 		return
 	}
+
+	// Validate MIME type (magic bytes) to prevent file type spoofing
+	if errMsg, valid := ValidateImageMIMEType(file); !valid {
+		respondError(w, http.StatusBadRequest, errMsg)
+		return
+	}
+	// Reset file reader position after MIME check
+	file.Seek(0, 0)
 
 	// Create upload directory if it doesn't exist
 	userDir := filepath.Join(h.config.UploadDir, "users")

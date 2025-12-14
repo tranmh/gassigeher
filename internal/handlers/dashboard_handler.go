@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"html"
 	"net/http"
 	"time"
 
@@ -120,7 +121,8 @@ func (h *DashboardHandler) GetRecentActivity(w http.ResponseWriter, r *http.Requ
 			dog, err := h.dogRepo.FindByID(booking.DogID)
 			dogName := "Unknown"
 			if err == nil && dog != nil {
-				dogName = dog.Name
+				// HTML-escape dog name to prevent XSS attacks
+				dogName = html.EscapeString(dog.Name)
 			}
 
 			var activityType, message string

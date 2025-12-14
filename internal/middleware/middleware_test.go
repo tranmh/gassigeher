@@ -296,3 +296,89 @@ func TestLoggingMiddleware(t *testing.T) {
 		}
 	})
 }
+
+// TestRateLimitLogin_IPSpoofingPrevention tests that rate limiting cannot be bypassed
+// by spoofing the X-Forwarded-For header when proxy trust is disabled
+func TestRateLimitLogin_IPSpoofingPrevention(t *testing.T) {
+	// Reset rate limiter state for clean test
+	ResetRateLimiter()
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := RateLimitLogin(testHandler)
+
+	t.Run("spoofed X-Forwarded-For does not bypass rate limit", func(t *testing.T) {
+		// Make 5 requests (the limit) with the same RemoteAddr but different X-Forwarded-For
+		for i := 0; i < 5; i++ {
+			req := httptest.NewRequest("POST", "/api/auth/login", nil)
+			req.RemoteAddr = "192.168.1.100:12345"
+			// Attacker tries to spoof different IPs to bypass rate limiting
+			req.Header.Set("X-Forwarded-For", "10.0.0."+string(rune('1'+i)))
+
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Errorf("Request %d should succeed, got status %d", i+1, rec.Code)
+			}
+		}
+
+		// 6th request should be rate limited (based on RemoteAddr, not spoofed header)
+		req := httptest.NewRequest("POST", "/api/auth/login", nil)
+		req.RemoteAddr = "192.168.1.100:12345"
+		req.Header.Set("X-Forwarded-For", "completely-different-ip")
+
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusTooManyRequests {
+			t.Errorf("6th request should be rate limited, got status %d (expected 429)", rec.Code)
+		}
+	})
+}
+
+// TestRateLimitLogin_TrustedProxy tests rate limiting with trusted proxy configuration
+func TestRateLimitLogin_TrustedProxy(t *testing.T) {
+	// Reset rate limiter state
+	ResetRateLimiter()
+
+	// Configure trusted proxy
+	SetTrustedProxies([]string{"127.0.0.1"})
+	defer SetTrustedProxies(nil) // Reset after test
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := RateLimitLogin(testHandler)
+
+	t.Run("uses X-Forwarded-For when from trusted proxy", func(t *testing.T) {
+		// Make 5 requests from trusted proxy with same client IP
+		for i := 0; i < 5; i++ {
+			req := httptest.NewRequest("POST", "/api/auth/login", nil)
+			req.RemoteAddr = "127.0.0.1:12345" // Trusted proxy
+			req.Header.Set("X-Forwarded-For", "203.0.113.50") // Real client IP
+
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Errorf("Request %d should succeed, got status %d", i+1, rec.Code)
+			}
+		}
+
+		// 6th request should be rate limited based on client IP from header
+		req := httptest.NewRequest("POST", "/api/auth/login", nil)
+		req.RemoteAddr = "127.0.0.1:12345"
+		req.Header.Set("X-Forwarded-For", "203.0.113.50")
+
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusTooManyRequests {
+			t.Errorf("6th request should be rate limited, got status %d", rec.Code)
+		}
+	})
+}

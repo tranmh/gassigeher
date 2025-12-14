@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/testutil"
 )
 
@@ -104,6 +106,70 @@ func TestDashboardHandler_GetRecentActivity(t *testing.T) {
 		// Verify we got valid JSON response
 		if rec.Body.String() == "" {
 			t.Error("Expected non-empty response body")
+		}
+	})
+}
+
+// TestDashboardHandler_XSSPrevention tests that dog names are HTML-escaped in activity messages
+func TestDashboardHandler_XSSPrevention(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewDashboardHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
+	userID := testutil.SeedTestUser(t, db, "user@example.com", "User", "green")
+
+	// Create dog with XSS payload in name
+	xssDogName := "<script>alert('XSS')</script>"
+	dogID := testutil.SeedTestDog(t, db, xssDogName, "Labrador", "green")
+
+	// Create recent booking for this dog
+	today := time.Now().Format("2006-01-02")
+	testutil.SeedTestBooking(t, db, userID, dogID, today, "09:00", "scheduled")
+
+	t.Run("activity messages escape HTML in dog names", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/admin/activity", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.GetRecentActivity(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", rec.Code)
+		}
+
+		var response models.RecentActivityResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+
+		// Check that the raw script tag is NOT present in any activity message
+		responseBody := rec.Body.String()
+		if strings.Contains(responseBody, "<script>") {
+			t.Error("XSS vulnerability: unescaped <script> tag found in response")
+		}
+
+		// Verify activities contain escaped HTML entities
+		for _, activity := range response.Activities {
+			if strings.Contains(activity.Message, "<script>") {
+				t.Errorf("XSS in message: %s", activity.Message)
+			}
+			if strings.Contains(activity.DogName, "<script>") {
+				t.Errorf("XSS in dog name: %s", activity.DogName)
+			}
+		}
+
+		// The escaped version should be present instead
+		if len(response.Activities) > 0 {
+			// Check for HTML entity escaping
+			if !strings.Contains(responseBody, "&lt;script&gt;") &&
+				!strings.Contains(responseBody, "\\u003c") { // JSON unicode escape
+				t.Log("Note: Expected escaped HTML entities in response")
+			}
 		}
 	})
 }
