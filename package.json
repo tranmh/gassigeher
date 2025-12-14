@@ -7,9 +7,13 @@
     "sass": "sass internal/static/frontend/assets/scss:internal/static/frontend/assets/css --no-source-map",
     "sass:watch": "sass internal/static/frontend/assets/scss:internal/static/frontend/assets/css --watch --no-source-map",
     "sass:prod": "sass internal/static/frontend/assets/scss:internal/static/frontend/assets/css --style=compressed --no-source-map",
-    "build": "npm run sass:prod"
+    "build": "npm run sass:prod",
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
     "sass": "^1.69.5"
   }
 }

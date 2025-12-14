@@ -52,11 +52,28 @@ else
 fi
 echo ""
 
-echo "[4/4] Running tests..."
+echo "[4/5] Running Go tests..."
 if go test -v -cover ./...; then
-    echo -e "${GREEN}[OK] All tests passed${NC}"
+    echo -e "${GREEN}[OK] All Go tests passed${NC}"
 else
-    echo -e "${YELLOW}[WARNING] Some tests failed${NC}"
+    echo -e "${YELLOW}[WARNING] Some Go tests failed${NC}"
+fi
+echo ""
+
+echo "[5/5] Running frontend tests..."
+if command -v npm &> /dev/null; then
+    # Check if node_modules exists, install if not
+    if [ ! -d "node_modules" ]; then
+        echo "Installing npm dependencies..."
+        npm install
+    fi
+    if npm test; then
+        echo -e "${GREEN}[OK] All frontend tests passed${NC}"
+    else
+        echo -e "${YELLOW}[WARNING] Some frontend tests failed${NC}"
+    fi
+else
+    echo -e "${YELLOW}[SKIP] npm not found - frontend tests skipped${NC}"
 fi
 echo ""
 

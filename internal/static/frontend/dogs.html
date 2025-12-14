@@ -503,7 +503,7 @@
                     </div>
                 `;
             } catch (error) {
-                content.innerHTML = `<p class="alert alert-error">Fehler beim Laden: ${error.message}</p>`;
+                content.innerHTML = `<p class="alert alert-error">Fehler beim Laden: ${sanitizeHTML(error.message)}</p>`;
             }
         }
 

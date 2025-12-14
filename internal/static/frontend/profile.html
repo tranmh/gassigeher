@@ -156,6 +156,7 @@
     <script src="/js/nav-menu.js"></script>
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
+    <script src="/js/sanitize.js"></script>
     <script src="/js/impersonation-banner.js"></script>
     <script>
         let currentUser = null;
@@ -304,7 +305,7 @@
                                     Beantragt am: ${new Date(request.created_at).toLocaleDateString('de-DE')}
                                 </p>
                                 ${request.reviewed_at ? `<p style="margin: 5px 0; font-size: 0.9rem;">Geprüft am: ${new Date(request.reviewed_at).toLocaleDateString('de-DE')}</p>` : ''}
-                                ${request.admin_message ? `<p style="margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 4px;"><strong>Nachricht:</strong> ${request.admin_message}</p>` : ''}
+                                ${request.admin_message ? `<p style="margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 4px;"><strong>Nachricht:</strong> ${sanitizeHTML(request.admin_message)}</p>` : ''}
                             </div>
                             <span class="alert ${statusClass}" style="padding: 6px 12px; font-size: 0.85rem; margin: 0;">${statusLabel}</span>
                         </div>

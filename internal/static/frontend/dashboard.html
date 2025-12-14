@@ -288,7 +288,7 @@
                 `;
                 }).join('');
             } catch (error) {
-                document.getElementById('upcoming-bookings').innerHTML = `<p class="alert alert-error">${error.message}</p>`;
+                document.getElementById('upcoming-bookings').innerHTML = `<p class="alert alert-error">${sanitizeHTML(error.message)}</p>`;
             }
         }
 
@@ -377,7 +377,7 @@
                 `;
                 }).join('');
             } catch (error) {
-                document.getElementById('past-bookings').innerHTML = `<p class="alert alert-error">${error.message}</p>`;
+                document.getElementById('past-bookings').innerHTML = `<p class="alert alert-error">${sanitizeHTML(error.message)}</p>`;
             }
         }
 

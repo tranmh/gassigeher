@@ -326,15 +326,15 @@
 
                                 ${currentUser && currentUser.is_super_admin && !user.is_super_admin ? `
                                     ${user.is_admin ? `
-                                        <button class="btn btn-warning btn-sm" onclick="demoteAdmin(${user.id}, '${safeName.replace(/'/g, "\\'")}')">Admin entfernen</button>
+                                        <button class="btn btn-warning btn-sm" onclick="demoteAdmin(${user.id})">Admin entfernen</button>
                                     ` : `
-                                        <button class="btn btn-secondary btn-sm" onclick="promoteToAdmin(${user.id}, '${safeName.replace(/'/g, "\\'")}')">Zu Admin ernennen</button>
+                                        <button class="btn btn-secondary btn-sm" onclick="promoteToAdmin(${user.id})">Zu Admin ernennen</button>
                                     `}
                                     ${!user.is_deleted && user.is_active ? `
-                                        <button class="btn btn-info btn-sm" onclick="impersonateUser(${user.id}, '${safeName.replace(/'/g, "\\'")}')">Impersonieren</button>
+                                        <button class="btn btn-info btn-sm" onclick="impersonateUser(${user.id})">Impersonieren</button>
                                     ` : ''}
                                     ${!user.is_deleted ? `
-                                        <button class="btn btn-danger btn-sm" onclick="showDeleteModal(${user.id}, '${safeName.replace(/'/g, "\\'")}')">Löschen</button>
+                                        <button class="btn btn-danger btn-sm" onclick="showDeleteModal(${user.id})">Löschen</button>
                                     ` : ''}
                                 ` : ''}
                             </div>
@@ -382,7 +382,10 @@
             }
         }
 
-        async function promoteToAdmin(userId, userName) {
+        async function promoteToAdmin(userId) {
+            const user = users.find(u => u.id === userId);
+            const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Benutzer';
+
             if (!confirm(`Möchten Sie ${userName} wirklich zum Admin ernennen?\n\nAdmins haben Zugriff auf alle Verwaltungsfunktionen.`)) {
                 return;
             }
@@ -397,7 +400,10 @@
             }
         }
 
-        async function demoteAdmin(userId, userName) {
+        async function demoteAdmin(userId) {
+            const user = users.find(u => u.id === userId);
+            const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Benutzer';
+
             if (!confirm(`Möchten Sie ${userName} wirklich die Admin-Rechte entziehen?\n\nDer Benutzer wird zu einem normalen Benutzer herabgestuft.`)) {
                 return;
             }
@@ -412,7 +418,10 @@
             }
         }
 
-        async function impersonateUser(userId, userName) {
+        async function impersonateUser(userId) {
+            const user = users.find(u => u.id === userId);
+            const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Benutzer';
+
             if (!confirm(`Möchten Sie sich als "${userName}" anmelden?\n\nSie werden als dieser Benutzer agieren und können alle seine Funktionen nutzen.\nKlicken Sie auf "Zurück zum Admin" um die Impersonation zu beenden.`)) {
                 return;
             }
@@ -526,7 +535,10 @@
         }
 
         // Delete User Modal Functions (Super-Admin only)
-        function showDeleteModal(userId, userName) {
+        function showDeleteModal(userId) {
+            const user = users.find(u => u.id === userId);
+            const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Benutzer';
+
             document.getElementById('delete-user-id').value = userId;
             document.getElementById('delete-user-name').textContent = userName;
             document.getElementById('delete-modal').style.display = 'flex';

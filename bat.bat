@@ -61,14 +61,34 @@ set GOOS=
 set GOARCH=
 echo.
 
-echo [6/6] Running tests...
+echo [6/7] Running Go tests...
 go test -v -cover ./...
 if %ERRORLEVEL% NEQ 0 (
-    echo [WARNING] Some tests failed
+    echo [WARNING] Some Go tests failed
     echo.
 ) else (
-    echo [OK] All tests passed
+    echo [OK] All Go tests passed
     echo.
+)
+
+echo [7/7] Running frontend tests...
+where npm >nul 2>nul
+if %ERRORLEVEL% NEQ 0 (
+    echo [SKIP] npm not found - frontend tests skipped
+    echo.
+) else (
+    if not exist "node_modules" (
+        echo Installing npm dependencies...
+        npm install
+    )
+    npm test
+    if %ERRORLEVEL% NEQ 0 (
+        echo [WARNING] Some frontend tests failed
+        echo.
+    ) else (
+        echo [OK] All frontend tests passed
+        echo.
+    )
 )
 
 echo ========================================

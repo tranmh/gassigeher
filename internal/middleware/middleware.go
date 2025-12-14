@@ -240,9 +240,22 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 		// Enforce HTTPS in production
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 
-		// Content Security Policy
+		// Content Security Policy (Enhanced for XSS protection)
 		// Note: img-src includes tierheim-goeppingen.de for the default site logo
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.tierheim-goeppingen.de")
+		// 'unsafe-inline' required for current architecture (inline scripts/styles)
+		csp := strings.Join([]string{
+			"default-src 'self'",
+			"script-src 'self' 'unsafe-inline'",
+			"style-src 'self' 'unsafe-inline'",
+			"img-src 'self' data: https://www.tierheim-goeppingen.de",
+			"font-src 'self' data:",
+			"connect-src 'self'",
+			"frame-ancestors 'none'",
+			"form-action 'self'",
+			"base-uri 'self'",
+			"object-src 'none'",
+		}, "; ")
+		w.Header().Set("Content-Security-Policy", csp)
 
 		next.ServeHTTP(w, r)
 	})
