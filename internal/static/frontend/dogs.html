@@ -37,11 +37,11 @@
             <!-- Experience Level Info -->
             <div id="level-info" class="card" style="margin-bottom: 20px;">
                 <p style="margin: 0;">
-                    <strong data-i18n="dogs.your_level">Ihr Level:</strong>
+                    <strong data-i18n="dogs.your_level">Dein Level:</strong>
                     <span id="user-level" class="dog-category-badge"></span>
                 </p>
                 <p style="font-size: 0.875rem; color: #666; margin-top: 10px; margin-bottom: 0;">
-                    <span data-i18n="dogs.level_info">Sie können Hunde entsprechend Ihres Levels buchen. Höhere Level werden mit einem Schloss-Symbol angezeigt.</span>
+                    <span data-i18n="dogs.level_info">Du kannst Hunde entsprechend deines Levels buchen. Höhere Level werden mit einem Schloss-Symbol angezeigt.</span>
                 </p>
             </div>
 
@@ -746,7 +746,7 @@
                 console.log('[BOOKING DEBUG] Booking created successfully:', booking);
 
                 closeBookingModal();
-                showAlert('success', 'Buchung erfolgreich erstellt! Sie erhalten eine Bestätigung per E-Mail.');
+                showAlert('success', 'Buchung erfolgreich erstellt! Du erhältst eine Bestätigung per E-Mail.');
 
                 // Redirect to dashboard
                 setTimeout(() => {
@@ -757,7 +757,7 @@
                 console.error('[BOOKING ERROR] Error message:', error.message);
                 console.error('[BOOKING ERROR] Error stack:', error.stack);
                 showAlert('error', error.message || 'Fehler beim Erstellen der Buchung');
-                alert('BOOKING FEHLER: ' + error.message + '\n\nBitte prüfen Sie die Konsole für Details.');
+                alert('BOOKING FEHLER: ' + error.message + '\n\nBitte prüfe die Konsole für Details.');
             }
         }
 

@@ -67,7 +67,7 @@
                         <label data-i18n="auth.email">E-Mail-Adresse</label>
                         <input type="email" id="edit-email" required>
                         <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
-                            Hinweis: Bei Änderung der E-Mail müssen Sie diese erneut bestätigen.
+                            Hinweis: Bei Änderung der E-Mail musst du diese erneut bestätigen.
                         </p>
                     </div>
                     <div class="form-group">
@@ -75,7 +75,7 @@
                         <input type="tel" id="edit-phone" required
                                pattern="\+?[0-9\s\-\.\(\)]{7,20}"
                                placeholder="z.B. 0123 456789 oder +49 123 456789"
-                               title="Bitte geben Sie eine gültige Telefonnummer ein (z.B. 0123 456789 oder +49 123 456789)">
+                               title="Bitte gib eine gültige Telefonnummer ein (z.B. 0123 456789 oder +49 123 456789)">
                         <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
                             Format: z.B. 0123 456789, +49 123 456789 oder 0123-456789
                         </p>
@@ -92,7 +92,7 @@
                 </div>
 
                 <div id="promotion-section">
-                    <p data-i18n="profile.promotion_description">Beantragen Sie ein höheres Erfahrungslevel, um Zugang zu anspruchsvolleren Hunden zu erhalten.</p>
+                    <p data-i18n="profile.promotion_description">Beantrage ein höheres Erfahrungslevel, um Zugang zu anspruchsvolleren Hunden zu erhalten.</p>
 
                     <div style="margin: 20px 0; padding: 15px; background: #f9f9f9; border-radius: 6px;">
                         <p style="margin: 5px 0;"><strong style="color: #28a745;">●</strong> <span data-i18n="profile.level_green_desc">Grün: Für Anfänger</span></p>
@@ -133,7 +133,7 @@
             <!-- WhatsApp Group -->
             <div class="card" id="whatsapp-card" style="display: none; border-left: 4px solid #25d366;">
                 <h3 style="color: #25d366;">💬 WhatsApp-Gruppe</h3>
-                <p style="margin-bottom: 15px;">Treten Sie unserer WhatsApp-Gruppe bei, um auf dem Laufenden zu bleiben und sich mit anderen Gassigehern auszutauschen!</p>
+                <p style="margin-bottom: 15px;">Tritt unserer WhatsApp-Gruppe bei, um auf dem Laufenden zu bleiben und dich mit anderen Gassigehern auszutauschen!</p>
                 <a href="#" id="profile-whatsapp-btn" target="_blank" rel="noopener noreferrer"
                    style="display: inline-block; padding: 12px 25px; background-color: #25d366; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">
                     WhatsApp-Gruppe beitreten
@@ -202,7 +202,7 @@
                         passwordCard.style.boxShadow = '0 0 10px rgba(255, 193, 7, 0.3)';
                         passwordCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-                        showAlert('warning', 'Bitte ändern Sie Ihr temporäres Passwort, um fortzufahren.');
+                        showAlert('warning', 'Bitte ändere dein temporäres Passwort, um fortzufahren.');
                     }
                 }, 500);
             }
@@ -239,7 +239,7 @@
             const currentLevel = currentUser.experience_level;
 
             if (currentLevel === 'blue') {
-                container.innerHTML = '<p style="color: #28a745; font-weight: 600;">Sie haben das höchste Level erreicht!</p>';
+                container.innerHTML = '<p style="color: #28a745; font-weight: 600;">Du hast das höchste Level erreicht!</p>';
                 return;
             }
 
@@ -324,7 +324,7 @@
         }
 
         async function requestPromotion(level) {
-            if (!confirm(`Möchten Sie ${getLevelLabel(level)} Level beantragen?`)) {
+            if (!confirm(`Möchtest du ${getLevelLabel(level)} Level beantragen?`)) {
                 return;
             }
 
@@ -353,7 +353,7 @@
             // Additional phone validation
             const phonePattern = /^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}$/;
             if (!phonePattern.test(phone)) {
-                showAlert('error', 'Bitte geben Sie eine gültige Telefonnummer ein (z.B. 0123 456789 oder +49 123 456789)');
+                showAlert('error', 'Bitte gib eine gültige Telefonnummer ein (z.B. 0123 456789 oder +49 123 456789)');
                 return;
             }
 
@@ -430,16 +430,16 @@
         }
 
         async function confirmDeleteAccount() {
-            if (!confirm('WARNUNG: Diese Aktion kann nicht rückgängig gemacht werden!\n\nIhre persönlichen Daten werden gelöscht, aber Ihre Spaziergangshistorie wird anonymisiert aufbewahrt.\n\nMöchten Sie fortfahren?')) {
+            if (!confirm('WARNUNG: Diese Aktion kann nicht rückgängig gemacht werden!\n\nDeine persönlichen Daten werden gelöscht, aber deine Spaziergangshistorie wird anonymisiert aufbewahrt.\n\nMöchtest du fortfahren?')) {
                 return;
             }
 
-            const password = prompt('Geben Sie Ihr Passwort ein, um die Löschung zu bestätigen:');
+            const password = prompt('Gib dein Passwort ein, um die Löschung zu bestätigen:');
             if (!password) return;
 
             try {
                 await api.deleteAccount(password);
-                alert('Ihr Konto wurde gelöscht. Sie erhalten eine Bestätigungs-E-Mail.');
+                alert('Dein Konto wurde gelöscht. Du erhältst eine Bestätigungs-E-Mail.');
 
                 // Logout and redirect
                 api.setToken(null);

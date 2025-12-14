@@ -371,7 +371,7 @@
         }
 
         async function deleteDog(id) {
-            if (!confirm('Sind Sie sicher, dass Sie diesen Hund löschen möchten?')) return;
+            if (!confirm('Bist du sicher, dass du diesen Hund löschen möchtest?')) return;
 
             try {
                 await api.deleteDog(id);
@@ -434,7 +434,7 @@
                     ${bookingList}
                 </ul>
                 <p style="margin: 20px 0; font-weight: bold;">
-                    Möchten Sie alle diese Buchungen stornieren und die betroffenen Benutzer per E-Mail benachrichtigen?
+                    Möchtest du alle diese Buchungen stornieren und die betroffenen Benutzer per E-Mail benachrichtigen?
                 </p>
                 <div style="display: flex; gap: 10px; margin-top: 20px;">
                     <button id="confirm-force-delete" class="btn btn-danger" style="flex: 1;">

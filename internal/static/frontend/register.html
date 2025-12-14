@@ -29,7 +29,7 @@
 
                 <form id="register-form">
                     <div class="alert alert-info" style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(130, 185, 101, 0.1); border: 1px solid #82b965; border-radius: 8px;">
-                        <strong>Hinweis:</strong> Bitte verwenden Sie Ihren echten Namen. Fantasienamen, Spitznamen oder Pseudonyme sind nicht erlaubt.
+                        <strong>Hinweis:</strong> Bitte verwende deinen echten Namen. Fantasienamen, Spitznamen oder Pseudonyme sind nicht erlaubt.
                     </div>
 
                     <div class="form-group">
@@ -58,7 +58,7 @@
                         <input type="tel" id="phone" name="phone" required
                                pattern="\+?[0-9\s\-\.\(\)]{7,20}"
                                placeholder="z.B. 0123 456789 oder +49 123 456789"
-                               title="Bitte geben Sie eine gültige Telefonnummer ein"
+                               title="Bitte gib eine gültige Telefonnummer ein"
                                data-i18n-placeholder="auth.phone">
                         <div class="form-error" id="phone-error"></div>
                     </div>
@@ -179,7 +179,7 @@
                     // Validate phone number format
                     const phonePattern = /^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}$/;
                     if (!phonePattern.test(data.phone)) {
-                        showError('phone', 'Bitte geben Sie eine gültige Telefonnummer ein (z.B. 0123 456789 oder +49 123 456789)');
+                        showError('phone', 'Bitte gib eine gültige Telefonnummer ein (z.B. 0123 456789 oder +49 123 456789)');
                         hasError = true;
                     }
                 }
@@ -204,7 +204,7 @@
                 }
 
                 if (!data.accept_terms) {
-                    showError('terms', 'Sie müssen die AGB akzeptieren');
+                    showError('terms', 'Du musst die AGB akzeptieren');
                     hasError = true;
                 }
 
@@ -220,9 +220,9 @@
                     // Check if WhatsApp group is enabled and show success with WhatsApp button
                     const whatsappData = await window.api.getWhatsAppSettings();
                     if (whatsappData.enabled && whatsappData.link) {
-                        showRegistrationSuccess(response.message || 'Registrierung erfolgreich! Bitte prüfen Sie Ihre E-Mails.', whatsappData.link);
+                        showRegistrationSuccess(response.message || 'Registrierung erfolgreich! Bitte prüfe deine E-Mails.', whatsappData.link);
                     } else {
-                        showAlert('success', response.message || 'Registrierung erfolgreich! Bitte prüfen Sie Ihre E-Mails.');
+                        showAlert('success', response.message || 'Registrierung erfolgreich! Bitte prüfe deine E-Mails.');
                         setTimeout(() => {
                             window.location.href = '/login.html';
                         }, 3000);
@@ -270,7 +270,7 @@
                             Unserer WhatsApp-Gruppe beitreten
                         </p>
                         <p style="margin: 0 0 15px 0; font-size: 0.9rem; color: #666;">
-                            Bleiben Sie auf dem Laufenden und tauschen Sie sich mit anderen Gassigehern aus!
+                            Bleibe auf dem Laufenden und tausche dich mit anderen Gassigehern aus!
                         </p>
                         <a href="${whatsappLink}" target="_blank" rel="noopener noreferrer"
                            style="display: inline-block; padding: 12px 30px; background-color: #25d366; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">

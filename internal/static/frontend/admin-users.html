@@ -353,7 +353,7 @@
             const reason = prompt('Grund für die Deaktivierung:');
             if (!reason) return;
 
-            if (!confirm('Sind Sie sicher, dass Sie diesen Benutzer deaktivieren möchten?')) {
+            if (!confirm('Bist du sicher, dass du diesen Benutzer deaktivieren möchtest?')) {
                 return;
             }
 
@@ -369,7 +369,7 @@
         async function activateUser(id) {
             const message = prompt('Optional: Nachricht an den Benutzer:');
 
-            if (!confirm('Möchten Sie diesen Benutzer aktivieren?')) {
+            if (!confirm('Möchtest du diesen Benutzer aktivieren?')) {
                 return;
             }
 
@@ -386,7 +386,7 @@
             const user = users.find(u => u.id === userId);
             const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Benutzer';
 
-            if (!confirm(`Möchten Sie ${userName} wirklich zum Admin ernennen?\n\nAdmins haben Zugriff auf alle Verwaltungsfunktionen.`)) {
+            if (!confirm(`Möchtest du ${userName} wirklich zum Admin ernennen?\n\nAdmins haben Zugriff auf alle Verwaltungsfunktionen.`)) {
                 return;
             }
 
@@ -404,7 +404,7 @@
             const user = users.find(u => u.id === userId);
             const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Benutzer';
 
-            if (!confirm(`Möchten Sie ${userName} wirklich die Admin-Rechte entziehen?\n\nDer Benutzer wird zu einem normalen Benutzer herabgestuft.`)) {
+            if (!confirm(`Möchtest du ${userName} wirklich die Admin-Rechte entziehen?\n\nDer Benutzer wird zu einem normalen Benutzer herabgestuft.`)) {
                 return;
             }
 
@@ -422,7 +422,7 @@
             const user = users.find(u => u.id === userId);
             const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Benutzer';
 
-            if (!confirm(`Möchten Sie sich als "${userName}" anmelden?\n\nSie werden als dieser Benutzer agieren und können alle seine Funktionen nutzen.\nKlicken Sie auf "Zurück zum Admin" um die Impersonation zu beenden.`)) {
+            if (!confirm(`Möchtest du dich als "${userName}" anmelden?\n\nDu wirst als dieser Benutzer agieren und kannst alle seine Funktionen nutzen.\nKlicke auf "Zurück zum Admin" um die Impersonation zu beenden.`)) {
                 return;
             }
 

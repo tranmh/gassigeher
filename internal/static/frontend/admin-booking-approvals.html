@@ -165,7 +165,7 @@
         <div class="container">
             <h1 data-i18n="admin.booking_approvals">Buchungs-Genehmigungen</h1>
             <p style="color: #666; margin-bottom: 30px;">
-                Verwalten Sie Buchungsanfragen, die eine Admin-Genehmigung erfordern (z.B. Vormittagsspaziergänge).
+                Verwalte Buchungsanfragen, die eine Admin-Genehmigung erfordern (z.B. Vormittagsspaziergänge).
             </p>
 
             <div id="alert-container"></div>
@@ -200,7 +200,7 @@
     <div id="reject-modal" class="modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
         <div class="card" style="max-width: 500px; margin: 20px; padding: 30px;">
             <h3>Buchung ablehnen</h3>
-            <p style="color: #666; margin-bottom: 20px;">Bitte geben Sie einen Grund fuer die Ablehnung an:</p>
+            <p style="color: #666; margin-bottom: 20px;">Bitte gib einen Grund für die Ablehnung an:</p>
             <div class="form-group">
                 <label for="reject-reason">Grund *</label>
                 <textarea id="reject-reason" rows="3" required placeholder="z.B. Hund ist an diesem Tag nicht verfuegbar..."></textarea>
@@ -440,7 +440,7 @@
         async function confirmReject() {
             const reason = document.getElementById('reject-reason').value.trim();
             if (!reason) {
-                showAlert('error', 'Bitte geben Sie einen Ablehnungsgrund an');
+                showAlert('error', 'Bitte gib einen Ablehnungsgrund an');
                 return;
             }
 

@@ -140,7 +140,7 @@
                         <input type="file" id="report-photo-input" accept="image/jpeg,image/png" style="display: none;" onchange="uploadReportPhoto()">
                         <!-- Message shown before report is saved -->
                         <p id="photo-save-first-msg" style="color: #888; font-style: italic; margin: 10px 0;">
-                            💡 Speichern Sie zuerst den Bericht, um Fotos hinzuzufügen.
+                            💡 Speichere zuerst den Bericht, um Fotos hinzuzufügen.
                         </p>
                         <!-- Button shown after report is saved -->
                         <button type="button" id="add-photo-btn" class="btn btn-secondary" style="display: none;" onclick="document.getElementById('report-photo-input').click()">📷 Foto hinzufügen</button>
@@ -459,12 +459,12 @@
             const notes = document.getElementById('report-notes').value || null;
 
             if (!behaviorRating || behaviorRating < 1 || behaviorRating > 5) {
-                showAlert('error', 'Bitte wählen Sie eine Bewertung (1-5 Sterne)');
+                showAlert('error', 'Bitte wähle eine Bewertung (1-5 Sterne)');
                 return;
             }
 
             if (!energyLevel) {
-                showAlert('error', 'Bitte wählen Sie ein Energielevel');
+                showAlert('error', 'Bitte wähle ein Energielevel');
                 return;
             }
 
@@ -486,7 +486,7 @@
                         energy_level: energyLevel,
                         notes: notes
                     });
-                    showAlert('success', 'Bericht gespeichert! Sie können jetzt Fotos hinzufügen.');
+                    showAlert('success', 'Bericht gespeichert! Du kannst jetzt Fotos hinzufügen.');
 
                     // Show photo upload button now that report is created
                     currentReportId = report.id;
@@ -614,7 +614,7 @@
         }
 
         async function cancelBooking(id) {
-            if (!confirm('Sind Sie sicher, dass Sie diese Buchung stornieren möchten?')) {
+            if (!confirm('Bist du sicher, dass du diese Buchung stornieren möchtest?')) {
                 return;
             }
 
