@@ -114,8 +114,8 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check experience level access
-	if !repository.CanUserAccessDog(user.ExperienceLevel, dog.Category) {
+	// Check experience level access (admins and super admins bypass this check)
+	if !user.IsAdmin && !user.IsSuperAdmin && !repository.CanUserAccessDog(user.ExperienceLevel, dog.Category) {
 		respondError(w, http.StatusForbidden, "You don't have the required experience level for this dog")
 		return
 	}

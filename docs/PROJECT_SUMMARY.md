@@ -345,7 +345,7 @@ All with inline CSS and brand colors (#82b965).
    - Audit trail preservation
 
 2. **Intelligent Experience System**
-   - Progressive access (Green → Blue → Orange)
+   - Progressive access (Green → Orange → Blue)
    - Admin-approved promotions
    - Based on walk history
 

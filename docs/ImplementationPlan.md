@@ -92,7 +92,7 @@ Based on Tierheim Göppingen aesthetic:
 - See when dogs are temporarily unavailable (e.g., "Currently unavailable: Health check")
 - Filter dogs by breed, size, age, special needs, category
 - View dog details (name, breed, size, age, photo, special needs, pick-up location, walk route, duration, instructions)
-- Book dogs within their experience level (Green → Blue → Orange)
+- Book dogs within their experience level (Green → Orange → Blue)
 - View higher-level dogs (disabled, labeled "Requires X level")
 - Adjust suggested walk times when booking
 - Book multiple dogs for same walk time (unlimited)
@@ -1558,7 +1558,7 @@ Ready to start implementing a complete dog walking management system! 🐕
 - ✅ **Authentication**: Login, logout, password reset, password change
 - ✅ **Dog Browsing**: Filters, search, categories, availability status
 - ✅ **Booking System**: Create, view, cancel, notes, validation
-- ✅ **Experience Levels**: Green → Blue → Orange promotion workflow
+- ✅ **Experience Levels**: Green → Orange → Blue promotion workflow
 - ✅ **Profile Management**: Edit, photos, email re-verification
 - ✅ **Account Deletion**: GDPR-compliant anonymization
 - ✅ **Auto-Deactivation**: 365-day inactivity policy

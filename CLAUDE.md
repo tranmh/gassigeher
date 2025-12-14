@@ -137,8 +137,9 @@ Response (JSON)
 
 **Experience Level Enforcement:**
 - Helper: `repository.CanUserAccessDog(userLevel, dogCategory)`
-- Levels: green (1) → blue (2) → orange (3)
+- Levels: green (1) → orange (2) → blue (3) (blue is highest)
 - Users can only book dogs at or below their level
+- Admins/Super-Admins bypass level check and can book any dog
 - Frontend shows locked dogs with 🔒 icon
 
 ## Critical Implementation Details
@@ -760,7 +761,8 @@ After completion, users can add notes via `PUT /bookings/:id/notes`.
 ### Experience Level Progression
 
 **Rules enforced in code:**
-- Green users can only request Blue (not Orange directly)
+- Green users can only request Orange (not Blue directly)
+- Orange users can request Blue (the highest level)
 - Cannot request already-owned level
 - Cannot have duplicate pending requests
 - Approval automatically updates user's `experience_level` field

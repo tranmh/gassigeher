@@ -611,10 +611,11 @@ func (r *UserRepository) FindAll(activeOnly *bool) ([]*models.User, error) {
 }
 
 // PromoteToAdmin promotes a user to admin role
+// Also sets experience_level to 'blue' (highest level) so admins can book any dog
 // DONE
 func (r *UserRepository) PromoteToAdmin(userID int) error {
-	query := `UPDATE users SET is_admin = ?, updated_at = ? WHERE id = ?`
-	_, err := r.db.Exec(query, true, time.Now(), userID)
+	query := `UPDATE users SET is_admin = ?, experience_level = ?, updated_at = ? WHERE id = ?`
+	_, err := r.db.Exec(query, true, "blue", time.Now(), userID)
 	if err != nil {
 		return fmt.Errorf("failed to promote user to admin: %w", err)
 	}
