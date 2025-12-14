@@ -291,6 +291,22 @@ func SeedTestExperienceRequest(t *testing.T, db *sql.DB, userID int, requestedLe
 	return int(id)
 }
 
+// SeedTestWalkReport creates a test walk report and returns the ID
+func SeedTestWalkReport(t *testing.T, db *sql.DB, bookingID int, behaviorRating int, energyLevel, notes string) int {
+	now := time.Now()
+	result, err := db.Exec(`
+		INSERT INTO walk_reports (booking_id, behavior_rating, energy_level, notes, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, bookingID, behaviorRating, energyLevel, notes, now, now)
+
+	if err != nil {
+		t.Fatalf("Failed to seed test walk report: %v", err)
+	}
+
+	id, _ := result.LastInsertId()
+	return int(id)
+}
+
 // DONE: CountRows returns the count of rows in a table
 func CountRows(t *testing.T, db *sql.DB, table string) int {
 	var count int

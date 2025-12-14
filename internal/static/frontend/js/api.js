@@ -430,6 +430,42 @@ class API {
     async rejectBooking(id, reason) {
         return this.request('PUT', `/admin/bookings/${id}/reject`, { reason });
     }
+
+    // WALK REPORT ENDPOINTS
+
+    async createWalkReport(data) {
+        return this.request('POST', '/walk-reports', data);
+    }
+
+    async getWalkReport(id) {
+        return this.request('GET', `/walk-reports/${id}`);
+    }
+
+    async getWalkReportByBooking(bookingId) {
+        return this.request('GET', `/walk-reports/by-booking/${bookingId}`);
+    }
+
+    async updateWalkReport(id, data) {
+        return this.request('PUT', `/walk-reports/${id}`, data);
+    }
+
+    async deleteWalkReport(id) {
+        return this.request('DELETE', `/walk-reports/${id}`);
+    }
+
+    async getDogWalkReports(dogId, limit = 10) {
+        return this.request('GET', `/dogs/${dogId}/walk-reports?limit=${limit}`);
+    }
+
+    async uploadWalkReportPhoto(reportId, file) {
+        const formData = new FormData();
+        formData.append('photo', file);
+        return this.uploadFile(`/walk-reports/${reportId}/photos`, formData);
+    }
+
+    async deleteWalkReportPhoto(reportId, photoId) {
+        return this.request('DELETE', `/walk-reports/${reportId}/photos/${photoId}`);
+    }
 }
 
 // Global instance

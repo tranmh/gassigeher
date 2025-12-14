@@ -257,3 +257,68 @@ func (s *ImageService) DeleteLogo() error {
 	}
 	return nil
 }
+
+// ProcessWalkReportPhoto processes an uploaded walk report photo
+// Returns the relative paths (e.g., "walk_reports/report_5_1_full.jpg", "walk_reports/report_5_1_thumb.jpg")
+func (s *ImageService) ProcessWalkReportPhoto(file multipart.File, reportID int, photoIndex int) (fullPath, thumbPath string, err error) {
+	// Reset file pointer to beginning
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return "", "", fmt.Errorf("failed to seek file: %w", err)
+	}
+
+	// Decode the uploaded image
+	img, err := imaging.Decode(file)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to decode image: %w", err)
+	}
+
+	// Create walk_reports directory if it doesn't exist
+	reportsDir := filepath.Join(s.uploadDir, "walk_reports")
+	if err := os.MkdirAll(reportsDir, 0755); err != nil {
+		return "", "", fmt.Errorf("failed to create walk_reports directory: %w", err)
+	}
+
+	// Process full-size image
+	fullImg := s.resizeImage(img, MaxImageWidth, MaxImageHeight)
+	fullFilename := fmt.Sprintf("report_%d_%d_full.jpg", reportID, photoIndex)
+	fullFilePath := filepath.Join(reportsDir, fullFilename)
+
+	if err := s.saveJPEG(fullImg, fullFilePath, JPEGQuality); err != nil {
+		return "", "", fmt.Errorf("failed to save full-size image: %w", err)
+	}
+
+	// Process thumbnail
+	thumbImg := s.resizeImage(img, ThumbnailSize, ThumbnailSize)
+	thumbFilename := fmt.Sprintf("report_%d_%d_thumb.jpg", reportID, photoIndex)
+	thumbFilePath := filepath.Join(reportsDir, thumbFilename)
+
+	if err := s.saveJPEG(thumbImg, thumbFilePath, JPEGQuality); err != nil {
+		// Clean up full image if thumbnail fails
+		os.Remove(fullFilePath)
+		return "", "", fmt.Errorf("failed to save thumbnail: %w", err)
+	}
+
+	// Return relative paths (as stored in database)
+	fullRelPath := filepath.Join("walk_reports", fullFilename)
+	thumbRelPath := filepath.Join("walk_reports", thumbFilename)
+
+	return fullRelPath, thumbRelPath, nil
+}
+
+// DeleteWalkReportPhoto deletes a walk report photo (both full and thumbnail)
+// Does not return error if files don't exist (idempotent)
+func (s *ImageService) DeleteWalkReportPhoto(fullPath, thumbPath string) error {
+	// Delete full-size image
+	fullAbsPath := filepath.Join(s.uploadDir, fullPath)
+	if err := os.Remove(fullAbsPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to delete full-size image: %w", err)
+	}
+
+	// Delete thumbnail
+	thumbAbsPath := filepath.Join(s.uploadDir, thumbPath)
+	if err := os.Remove(thumbAbsPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to delete thumbnail: %w", err)
+	}
+
+	return nil
+}

@@ -89,6 +89,16 @@
         </div>
     </main>
 
+    <!-- Dog Detail Modal (with Walk History) -->
+    <div id="dog-detail-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 700px;">
+            <span class="modal-close" onclick="closeDogDetailModal()">&times;</span>
+            <div id="dog-detail-content">
+                <p>Laden...</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Booking Modal -->
     <div id="booking-modal" class="modal" style="display: none;">
         <div class="modal-content">
@@ -165,6 +175,11 @@
         }
         .form-actions button {
             flex: 1;
+        }
+        .dog-detail-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
     </style>
 
@@ -389,8 +404,107 @@
             return labels[size] || size;
         }
 
-        function viewDog(dogId) {
-            showBookingModal(dogId);
+        async function viewDog(dogId) {
+            const modal = document.getElementById('dog-detail-modal');
+            const content = document.getElementById('dog-detail-content');
+            content.innerHTML = '<p style="text-align: center; padding: 20px;">Laden...</p>';
+            modal.style.display = 'flex';
+
+            try {
+                // Load dog details and walk reports in parallel
+                const [dog, walkData] = await Promise.all([
+                    api.getDog(dogId),
+                    api.getDogWalkReports(dogId, 5).catch(() => ({ reports: [], stats: null }))
+                ]);
+
+                const safeDogName = sanitizeHTML(dog.name);
+                const safeDogBreed = sanitizeHTML(dog.breed);
+                const safeSpecialNeeds = dog.special_needs ? sanitizeHTML(dog.special_needs) : '';
+                const safeDescription = dog.description ? sanitizeHTML(dog.description) : '';
+
+                // Build walk history section
+                let walkHistoryHtml = '';
+                if (walkData && (walkData.reports?.length > 0 || walkData.stats)) {
+                    const stats = walkData.stats || {};
+                    const reports = walkData.reports || [];
+
+                    walkHistoryHtml = `
+                        <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid var(--border-light);">
+                            <h4 style="margin: 0 0 15px 0; display: flex; align-items: center; gap: 8px;">
+                                📊 Spaziergang-Historie
+                            </h4>
+                            ${stats.total_walks > 0 ? `
+                                <div style="display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap;">
+                                    <div style="background: linear-gradient(135deg, #f0f9f0 0%, #e8f5e8 100%); padding: 12px 20px; border-radius: 8px; flex: 1; min-width: 120px;">
+                                        <div style="font-size: 1.5rem; font-weight: bold; color: var(--primary-green);">${stats.total_walks}</div>
+                                        <div style="font-size: 0.85rem; color: #666;">Spaziergänge</div>
+                                    </div>
+                                    <div style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); padding: 12px 20px; border-radius: 8px; flex: 1; min-width: 120px;">
+                                        <div style="font-size: 1.5rem; font-weight: bold; color: #ffc107;">
+                                            ${'★'.repeat(Math.round(stats.average_rating || 0))}${'☆'.repeat(5 - Math.round(stats.average_rating || 0))}
+                                        </div>
+                                        <div style="font-size: 0.85rem; color: #666;">Ø Verhalten (${stats.average_rating?.toFixed(1) || '0.0'})</div>
+                                    </div>
+                                </div>
+                            ` : ''}
+                            ${reports.length > 0 ? `
+                                <div style="display: flex; flex-direction: column; gap: 12px;">
+                                    ${reports.map(report => {
+                                        const stars = '★'.repeat(report.behavior_rating) + '☆'.repeat(5 - report.behavior_rating);
+                                        const energyEmoji = report.energy_level === 'low' ? '😴' : report.energy_level === 'medium' ? '🐕' : '🔥';
+                                        const energyLabel = report.energy_level === 'low' ? 'Niedrig' : report.energy_level === 'medium' ? 'Mittel' : 'Hoch';
+                                        const dateStr = new Date(report.created_at).toLocaleDateString('de-DE');
+                                        const notesPreview = report.notes ? sanitizeHTML(report.notes.substring(0, 80)) + (report.notes.length > 80 ? '...' : '') : '';
+                                        const photoCount = report.photos ? report.photos.length : 0;
+                                        const walkerName = report.user ? sanitizeHTML(report.user.first_name + ' ' + (report.user.last_name || '').charAt(0) + '.') : 'Unbekannt';
+
+                                        return `
+                                            <div style="padding: 12px; background: #f9f9f9; border-radius: 8px; border-left: 3px solid var(--primary-green);">
+                                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                                                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                                        <span style="color: #ffc107; font-size: 14px;">${stars}</span>
+                                                        <span style="font-size: 0.85rem;">${energyEmoji} ${energyLabel}</span>
+                                                        ${photoCount > 0 ? `<span style="font-size: 0.85rem;">📷 ${photoCount}</span>` : ''}
+                                                    </div>
+                                                    <span style="font-size: 0.8rem; color: #666;">${dateStr} • ${walkerName}</span>
+                                                </div>
+                                                ${notesPreview ? `<p style="margin: 8px 0 0 0; font-size: 0.85rem; color: #555;">${notesPreview}</p>` : ''}
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            ` : '<p style="color: #666; font-size: 0.9rem;">Noch keine Berichte vorhanden</p>'}
+                        </div>
+                    `;
+                }
+
+                content.innerHTML = `
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                        <div style="flex: 0 0 auto; width: 200px; height: 200px; border-radius: 12px; overflow: hidden; background: #f0f0f0;">
+                            ${getDogPhotoHtml(dog, false, 'dog-detail-image', false, true)}
+                        </div>
+                        <div style="flex: 1; min-width: 200px;">
+                            <div class="dog-category-badge ${dog.category}" style="margin-bottom: 10px;">${getCategoryLabel(dog.category)}</div>
+                            <h2 style="margin: 0 0 10px 0;">${safeDogName}</h2>
+                            <p style="margin: 0 0 8px 0; color: #666;">${safeDogBreed} • ${getSizeLabel(dog.size)} • ${dog.age} Jahre</p>
+                            ${safeSpecialNeeds ? `<p style="margin: 0 0 8px 0; color: var(--warning-orange); font-size: 0.9rem;">⚠️ ${safeSpecialNeeds}</p>` : ''}
+                            ${safeDescription ? `<p style="margin: 10px 0 0 0; font-size: 0.9rem;">${safeDescription}</p>` : ''}
+                            ${dog.external_link ? `<a href="${dog.external_link}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 10px; color: var(--primary-green);">mehr über mich &rarr;</a>` : ''}
+                        </div>
+                    </div>
+                    ${walkHistoryHtml}
+                    <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid var(--border-light); display: flex; gap: 10px;">
+                        <button class="btn" onclick="closeDogDetailModal(); showBookingModal(${dog.id});">🗓️ Spaziergang buchen</button>
+                        <button class="btn btn-secondary" onclick="closeDogDetailModal()">Schließen</button>
+                    </div>
+                `;
+            } catch (error) {
+                content.innerHTML = `<p class="alert alert-error">Fehler beim Laden: ${error.message}</p>`;
+            }
+        }
+
+        function closeDogDetailModal() {
+            document.getElementById('dog-detail-modal').style.display = 'none';
         }
 
         function showBookingModal(dogId) {
@@ -643,11 +757,15 @@
             }
         }
 
-        // Close modal when clicking outside
+        // Close modals when clicking outside
         window.onclick = function(event) {
-            const modal = document.getElementById('booking-modal');
-            if (event.target === modal) {
+            const bookingModal = document.getElementById('booking-modal');
+            const dogDetailModal = document.getElementById('dog-detail-modal');
+            if (event.target === bookingModal) {
                 closeBookingModal();
+            }
+            if (event.target === dogDetailModal) {
+                closeDogDetailModal();
             }
         }
 

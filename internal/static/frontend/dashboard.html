@@ -82,6 +82,91 @@
         </div>
     </div>
 
+    <!-- Walk Report Modal -->
+    <div id="walk-report-modal" class="modal hidden" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto;">
+        <div class="card" style="max-width: 600px; margin: 20px auto; position: relative;">
+            <button type="button" onclick="closeWalkReportModal()" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
+            <h3 data-i18n="walkReport.title">Spaziergang-Bericht</h3>
+
+            <form id="walk-report-form" onsubmit="submitWalkReport(event)">
+                <input type="hidden" id="report-booking-id">
+                <input type="hidden" id="report-id">
+
+                <!-- Behavior Rating (Star Rating) -->
+                <div class="form-group">
+                    <label data-i18n="walkReport.behaviorRating">Verhalten des Hundes</label>
+                    <p style="font-size: 0.85rem; color: #666; margin: 5px 0;" data-i18n="walkReport.behaviorRatingHint">Wie hat sich der Hund während des Spaziergangs verhalten?</p>
+                    <div id="star-rating" class="star-rating" style="display: flex; gap: 5px; font-size: 28px; cursor: pointer;">
+                        <span data-value="1" onclick="setRating(1)" title="Sehr schwierig">☆</span>
+                        <span data-value="2" onclick="setRating(2)" title="Schwierig">☆</span>
+                        <span data-value="3" onclick="setRating(3)" title="Normal">☆</span>
+                        <span data-value="4" onclick="setRating(4)" title="Gut">☆</span>
+                        <span data-value="5" onclick="setRating(5)" title="Sehr gut">☆</span>
+                    </div>
+                    <input type="hidden" id="report-behavior-rating" required>
+                </div>
+
+                <!-- Energy Level -->
+                <div class="form-group">
+                    <label data-i18n="walkReport.energyLevel">Energielevel</label>
+                    <p style="font-size: 0.85rem; color: #666; margin: 5px 0;" data-i18n="walkReport.energyLevelHint">Wie energiegeladen war der Hund?</p>
+                    <div class="energy-selector" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-secondary energy-btn" data-value="low" onclick="setEnergyLevel('low')">
+                            😴 <span data-i18n="walkReport.energyLow">Niedrig</span>
+                        </button>
+                        <button type="button" class="btn btn-secondary energy-btn" data-value="medium" onclick="setEnergyLevel('medium')">
+                            🐕 <span data-i18n="walkReport.energyMedium">Mittel</span>
+                        </button>
+                        <button type="button" class="btn btn-secondary energy-btn" data-value="high" onclick="setEnergyLevel('high')">
+                            🔥 <span data-i18n="walkReport.energyHigh">Hoch</span>
+                        </button>
+                    </div>
+                    <input type="hidden" id="report-energy-level" required>
+                </div>
+
+                <!-- Notes -->
+                <div class="form-group">
+                    <label data-i18n="walkReport.notes">Beobachtungen</label>
+                    <textarea id="report-notes" rows="4" maxlength="2000" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; resize: vertical;" data-i18n-placeholder="walkReport.notesPlaceholder" placeholder="Wie war der Spaziergang? Besondere Vorkommnisse? Gesundheitliche Beobachtungen?"></textarea>
+                    <small style="color: #666;"><span id="notes-char-count">0</span>/2000</small>
+                </div>
+
+                <!-- Photo Upload Section -->
+                <div id="photo-upload-section">
+                    <div class="form-group">
+                        <label data-i18n="walkReport.photos">Fotos vom Spaziergang</label>
+                        <p style="font-size: 0.85rem; color: #666; margin: 5px 0;">Optional, max 3 Fotos (JPEG/PNG)</p>
+                        <div id="report-photos-preview" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;"></div>
+                        <input type="file" id="report-photo-input" accept="image/jpeg,image/png" style="display: none;" onchange="uploadReportPhoto()">
+                        <!-- Message shown before report is saved -->
+                        <p id="photo-save-first-msg" style="color: #888; font-style: italic; margin: 10px 0;">
+                            💡 Speichern Sie zuerst den Bericht, um Fotos hinzuzufügen.
+                        </p>
+                        <!-- Button shown after report is saved -->
+                        <button type="button" id="add-photo-btn" class="btn btn-secondary" style="display: none;" onclick="document.getElementById('report-photo-input').click()">📷 Foto hinzufügen</button>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn" id="report-submit-btn" data-i18n="walkReport.submit">Bericht speichern</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeWalkReportModal()" data-i18n="common.cancel">Abbrechen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- View Report Modal (read-only) -->
+    <div id="view-report-modal" class="modal hidden" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto;">
+        <div class="card" style="max-width: 600px; margin: 20px auto; position: relative;">
+            <button type="button" onclick="closeViewReportModal()" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
+            <h3 data-i18n="walkReport.title">Spaziergang-Bericht</h3>
+            <div id="view-report-content"></div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeViewReportModal()" data-i18n="common.close">Schließen</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/js/logo-banner.js"></script>
     <script src="/js/nav-menu.js"></script>
     <script src="/js/i18n.js"></script>
@@ -216,21 +301,65 @@
                     return;
                 }
 
-                // Get dog details for each booking
-                const bookingsWithDogs = await Promise.all(
+                // Get dog details and walk reports for each booking
+                const bookingsWithDetails = await Promise.all(
                     bookings.slice(0, 10).map(async (booking) => {
                         try {
-                            const dog = await api.getDog(booking.dog_id);
-                            return { ...booking, dog };
+                            const [dog, report] = await Promise.all([
+                                api.getDog(booking.dog_id).catch(() => null),
+                                api.getWalkReportByBooking(booking.id).catch(() => null)
+                            ]);
+                            return { ...booking, dog, walkReport: report };
                         } catch (error) {
                             return booking;
                         }
                     })
                 );
 
-                container.innerHTML = bookingsWithDogs.map(booking => {
+                container.innerHTML = bookingsWithDetails.map(booking => {
                     const pastDogName = booking.dog ? sanitizeHTML(booking.dog.name) : `Hund #${booking.dog_id}`;
-                    const pastUserNotes = booking.user_notes ? sanitizeHTML(booking.user_notes) : '';
+                    const hasReport = booking.walkReport != null;
+                    const hasLegacyNotes = !hasReport && booking.user_notes;
+
+                    // Check if user can add/edit reports: own booking OR admin
+                    const isOwnBooking = booking.user_id === currentUser.id;
+                    const canEditReport = isOwnBooking || currentUser.is_admin || currentUser.is_super_admin;
+
+                    let reportHtml = '';
+                    if (hasReport) {
+                        const report = booking.walkReport;
+                        const stars = '★'.repeat(report.behavior_rating) + '☆'.repeat(5 - report.behavior_rating);
+                        const energyEmoji = report.energy_level === 'low' ? '😴' : report.energy_level === 'medium' ? '🐕' : '🔥';
+                        const energyLabel = report.energy_level === 'low' ? 'Niedrig' : report.energy_level === 'medium' ? 'Mittel' : 'Hoch';
+                        const notesPreview = report.notes ? sanitizeHTML(report.notes.substring(0, 100)) + (report.notes.length > 100 ? '...' : '') : '';
+                        const photoCount = report.photos ? report.photos.length : 0;
+
+                        reportHtml = `
+                            <div style="margin-top: 10px; padding: 12px; background: linear-gradient(135deg, #f0f9f0 0%, #e8f5e8 100%); border-radius: 8px; border-left: 4px solid #82b965;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                                    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                                        <span style="color: #ffc107; font-size: 16px;" title="Verhalten: ${report.behavior_rating}/5">${stars}</span>
+                                        <span title="Energielevel: ${energyLabel}">${energyEmoji} ${energyLabel}</span>
+                                        ${photoCount > 0 ? `<span title="${photoCount} Foto(s)">📷 ${photoCount}</span>` : ''}
+                                    </div>
+                                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="viewWalkReport(${report.id})">Bericht ansehen</button>
+                                </div>
+                                ${notesPreview ? `<p style="margin: 8px 0 0 0; font-size: 0.9rem; color: #555;">${notesPreview}</p>` : ''}
+                            </div>
+                        `;
+                    } else if (hasLegacyNotes) {
+                        const pastUserNotes = sanitizeHTML(booking.user_notes);
+                        reportHtml = `
+                            <div style="margin-top: 10px; padding: 10px; background: #f9f9f9; border-radius: 4px;">
+                                <p style="margin: 0; font-size: 0.9rem; color: #666;"><em>Frühere Notizen:</em> ${pastUserNotes}</p>
+                            </div>
+                        `;
+                    }
+
+                    // Show "Add report" button only if user can edit AND no report exists
+                    const addReportButton = (!hasReport && !hasLegacyNotes && canEditReport)
+                        ? `<button class="btn" style="margin-top: 10px; padding: 8px 16px;" onclick="openWalkReportModal(${booking.id})">📝 Bericht hinzufügen</button>`
+                        : '';
 
                     return `
                     <div class="card" style="margin-bottom: 15px; padding: 15px;">
@@ -238,14 +367,246 @@
                         <p style="margin: 5px 0; font-size: 0.9rem; color: #666;">
                             📅 ${booking.date} - ${booking.scheduled_time} Uhr
                         </p>
-                        ${booking.user_notes ? `<p style="margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 4px;"><strong>Notizen:</strong> ${pastUserNotes}</p>` : ''}
-                        ${!booking.user_notes ? `<button class="btn" style="margin-top: 10px; padding: 8px 16px;" onclick="addNotes(${booking.id})">Notizen hinzufügen</button>` : ''}
+                        ${reportHtml}
+                        ${addReportButton}
                     </div>
                 `;
                 }).join('');
             } catch (error) {
                 document.getElementById('past-bookings').innerHTML = `<p class="alert alert-error">${error.message}</p>`;
             }
+        }
+
+        // Walk Report Modal Functions
+        let currentReportId = null;
+
+        function openWalkReportModal(bookingId, existingReport = null) {
+            document.getElementById('report-booking-id').value = bookingId;
+            document.getElementById('report-id').value = existingReport ? existingReport.id : '';
+            currentReportId = existingReport ? existingReport.id : null;
+
+            // Reset form
+            setRating(existingReport ? existingReport.behavior_rating : 0);
+            setEnergyLevel(existingReport ? existingReport.energy_level : '');
+            document.getElementById('report-notes').value = existingReport ? (existingReport.notes || '') : '';
+            updateCharCount();
+
+            // Photo section: show message for new reports, show button for existing
+            document.getElementById('report-photos-preview').innerHTML = '';
+            if (existingReport) {
+                document.getElementById('photo-save-first-msg').style.display = 'none';
+                document.getElementById('add-photo-btn').style.display = 'inline-block';
+                loadReportPhotos(existingReport);
+            } else {
+                document.getElementById('photo-save-first-msg').style.display = 'block';
+                document.getElementById('add-photo-btn').style.display = 'none';
+            }
+
+            // Update submit button text
+            document.getElementById('report-submit-btn').textContent = existingReport ? 'Bericht aktualisieren' : 'Bericht speichern';
+
+            const modal = document.getElementById('walk-report-modal');
+            modal.classList.remove('hidden');
+            modal.style.display = 'flex';
+        }
+
+        function closeWalkReportModal() {
+            const modal = document.getElementById('walk-report-modal');
+            modal.classList.add('hidden');
+            modal.style.display = 'none';
+            currentReportId = null;
+        }
+
+        function setRating(rating) {
+            document.getElementById('report-behavior-rating').value = rating;
+            const stars = document.querySelectorAll('#star-rating span');
+            stars.forEach((star, index) => {
+                star.textContent = index < rating ? '★' : '☆';
+                star.style.color = index < rating ? '#ffc107' : '#ddd';
+            });
+        }
+
+        function setEnergyLevel(level) {
+            document.getElementById('report-energy-level').value = level;
+            document.querySelectorAll('.energy-btn').forEach(btn => {
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-secondary');
+                if (btn.dataset.value === level) {
+                    btn.classList.remove('btn-secondary');
+                    btn.classList.add('btn-primary');
+                }
+            });
+        }
+
+        function updateCharCount() {
+            const notes = document.getElementById('report-notes').value;
+            document.getElementById('notes-char-count').textContent = notes.length;
+        }
+
+        document.getElementById('report-notes')?.addEventListener('input', updateCharCount);
+
+        async function submitWalkReport(event) {
+            event.preventDefault();
+
+            const bookingId = parseInt(document.getElementById('report-booking-id').value);
+            const reportId = document.getElementById('report-id').value;
+            const behaviorRating = parseInt(document.getElementById('report-behavior-rating').value);
+            const energyLevel = document.getElementById('report-energy-level').value;
+            const notes = document.getElementById('report-notes').value || null;
+
+            if (!behaviorRating || behaviorRating < 1 || behaviorRating > 5) {
+                showAlert('error', 'Bitte wählen Sie eine Bewertung (1-5 Sterne)');
+                return;
+            }
+
+            if (!energyLevel) {
+                showAlert('error', 'Bitte wählen Sie ein Energielevel');
+                return;
+            }
+
+            try {
+                let report;
+                if (reportId) {
+                    // Update existing report
+                    report = await api.updateWalkReport(reportId, {
+                        behavior_rating: behaviorRating,
+                        energy_level: energyLevel,
+                        notes: notes
+                    });
+                    showAlert('success', 'Bericht aktualisiert');
+                } else {
+                    // Create new report
+                    report = await api.createWalkReport({
+                        booking_id: bookingId,
+                        behavior_rating: behaviorRating,
+                        energy_level: energyLevel,
+                        notes: notes
+                    });
+                    showAlert('success', 'Bericht gespeichert! Sie können jetzt Fotos hinzufügen.');
+
+                    // Show photo upload button now that report is created
+                    currentReportId = report.id;
+                    document.getElementById('report-id').value = report.id;
+                    document.getElementById('photo-save-first-msg').style.display = 'none';
+                    document.getElementById('add-photo-btn').style.display = 'inline-block';
+                    document.getElementById('report-submit-btn').textContent = 'Bericht aktualisieren';
+                }
+
+                loadPastBookings();
+            } catch (error) {
+                // Close modal first so error message is visible
+                closeWalkReportModal();
+                showAlert('error', error.message || 'Fehler beim Speichern des Berichts');
+            }
+        }
+
+        function loadReportPhotos(report) {
+            const container = document.getElementById('report-photos-preview');
+            const photos = report.photos || [];
+
+            container.innerHTML = photos.map(photo => `
+                <div style="position: relative; width: 100px; height: 100px;">
+                    <img src="/uploads/${photo.photo_thumbnail}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 6px;">
+                    <button type="button" onclick="deleteReportPhoto(${report.id}, ${photo.id})" style="position: absolute; top: -8px; right: -8px; background: #dc3545; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px;">&times;</button>
+                </div>
+            `).join('');
+
+            // Hide add photo button if max reached
+            document.getElementById('add-photo-btn').style.display = photos.length >= 3 ? 'none' : 'inline-block';
+        }
+
+        async function uploadReportPhoto() {
+            const fileInput = document.getElementById('report-photo-input');
+            const file = fileInput.files[0];
+            if (!file || !currentReportId) return;
+
+            try {
+                await api.uploadWalkReportPhoto(currentReportId, file);
+                showAlert('success', 'Foto hochgeladen');
+
+                // Reload the report to get updated photos
+                const report = await api.getWalkReport(currentReportId);
+                loadReportPhotos(report);
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Hochladen des Fotos');
+            }
+
+            fileInput.value = '';
+        }
+
+        async function deleteReportPhoto(reportId, photoId) {
+            if (!confirm('Foto wirklich löschen?')) return;
+
+            try {
+                await api.deleteWalkReportPhoto(reportId, photoId);
+                showAlert('success', 'Foto gelöscht');
+
+                const report = await api.getWalkReport(reportId);
+                loadReportPhotos(report);
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Löschen des Fotos');
+            }
+        }
+
+        async function viewWalkReport(reportId) {
+            try {
+                const report = await api.getWalkReport(reportId);
+                const stars = '★'.repeat(report.behavior_rating) + '☆'.repeat(5 - report.behavior_rating);
+                const energyEmoji = report.energy_level === 'low' ? '😴' : report.energy_level === 'medium' ? '🐕' : '🔥';
+                const energyLabel = report.energy_level === 'low' ? 'Niedrig' : report.energy_level === 'medium' ? 'Mittel' : 'Hoch';
+                const photos = report.photos || [];
+
+                let photosHtml = '';
+                if (photos.length > 0) {
+                    photosHtml = `
+                        <div style="margin-top: 15px;">
+                            <strong>Fotos:</strong>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+                                ${photos.map(photo => `
+                                    <a href="/uploads/${photo.photo_path}" target="_blank">
+                                        <img src="/uploads/${photo.photo_thumbnail}" style="width: 120px; height: 120px; object-fit: cover; border-radius: 6px; cursor: pointer;">
+                                    </a>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                document.getElementById('view-report-content').innerHTML = `
+                    <div style="padding: 15px 0;">
+                        <div style="margin-bottom: 15px;">
+                            <strong>Verhalten:</strong>
+                            <span style="color: #ffc107; margin-left: 10px; font-size: 18px;">${stars}</span>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <strong>Energielevel:</strong>
+                            <span style="margin-left: 10px;">${energyEmoji} ${energyLabel}</span>
+                        </div>
+                        ${report.notes ? `
+                            <div style="margin-bottom: 15px;">
+                                <strong>Beobachtungen:</strong>
+                                <p style="margin: 10px 0; padding: 12px; background: #f9f9f9; border-radius: 6px; white-space: pre-wrap;">${sanitizeHTML(report.notes)}</p>
+                            </div>
+                        ` : ''}
+                        ${photosHtml}
+                        <p style="margin-top: 15px; font-size: 0.85rem; color: #666;">
+                            Erstellt am: ${new Date(report.created_at).toLocaleDateString('de-DE')}
+                        </p>
+                    </div>
+                `;
+
+                const modal = document.getElementById('view-report-modal');
+                modal.classList.remove('hidden');
+                modal.style.display = 'flex';
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Laden des Berichts');
+            }
+        }
+
+        function closeViewReportModal() {
+            const modal = document.getElementById('view-report-modal');
+            modal.classList.add('hidden');
+            modal.style.display = 'none';
         }
 
         async function cancelBooking(id) {
@@ -259,19 +620,6 @@
                 loadUpcomingBookings();
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Stornieren');
-            }
-        }
-
-        async function addNotes(bookingId) {
-            const notes = prompt('Notizen zu diesem Spaziergang:');
-            if (!notes) return;
-
-            try {
-                await api.addBookingNotes(bookingId, notes);
-                showAlert('success', 'Notizen hinzugefügt');
-                loadPastBookings();
-            } catch (error) {
-                showAlert('error', error.message || 'Fehler beim Hinzufügen der Notizen');
             }
         }
 

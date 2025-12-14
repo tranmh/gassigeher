@@ -112,6 +112,7 @@ func main() {
 	reactivationHandler := handlers.NewReactivationRequestHandler(db, cfg)
 	dashboardHandler := handlers.NewDashboardHandler(db, cfg)
 	healthHandler := handlers.NewHealthHandler()
+	walkReportHandler := handlers.NewWalkReportHandler(db, cfg)
 	router.HandleFunc("/api/health", healthHandler.Health).Methods("GET")
 
 	// Initialize booking time repositories and services
@@ -196,6 +197,16 @@ func main() {
 	// Experience requests (authenticated users)
 	protected.HandleFunc("/experience-requests", experienceHandler.CreateRequest).Methods("POST")
 	protected.HandleFunc("/experience-requests", experienceHandler.ListRequests).Methods("GET")
+
+	// Walk reports (authenticated users)
+	protected.HandleFunc("/walk-reports", walkReportHandler.CreateReport).Methods("POST")
+	protected.HandleFunc("/walk-reports/by-booking/{bookingId}", walkReportHandler.GetReportByBooking).Methods("GET")
+	protected.HandleFunc("/walk-reports/{id}", walkReportHandler.GetReport).Methods("GET")
+	protected.HandleFunc("/walk-reports/{id}", walkReportHandler.UpdateReport).Methods("PUT")
+	protected.HandleFunc("/walk-reports/{id}", walkReportHandler.DeleteReport).Methods("DELETE")
+	protected.HandleFunc("/walk-reports/{id}/photos", walkReportHandler.UploadPhoto).Methods("POST")
+	protected.HandleFunc("/walk-reports/{id}/photos/{photoId}", walkReportHandler.DeletePhoto).Methods("DELETE")
+	protected.HandleFunc("/dogs/{id}/walk-reports", walkReportHandler.GetDogWalkReports).Methods("GET")
 
 	// Admin-only routes
 	admin := protected.PathPrefix("").Subrouter()

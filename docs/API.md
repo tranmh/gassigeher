@@ -2,7 +2,7 @@
 
 **Complete REST API documentation for the Gassigeher dog walking booking system.**
 
-**Status**: ✅ All 50+ endpoints implemented and documented
+**Status**: ✅ All 60+ endpoints implemented and documented
 
 > **Quick Links**: [README](../README.md) | [Deployment](DEPLOYMENT.md) | [User Guide](USER_GUIDE.md) | [Admin Guide](ADMIN_GUIDE.md)
 
@@ -618,6 +618,208 @@ Add notes to a completed booking.
 ```json
 {
   "message": "Notes added successfully"
+}
+```
+
+---
+
+## Walk Report Endpoints
+
+Walk reports allow users to submit detailed feedback after completing a walk, including behavior ratings, energy levels, notes, and photos.
+
+### Create Walk Report
+`POST /walk-reports` 🔒 Protected
+
+Create a report for a completed booking.
+
+**Request:**
+```json
+{
+  "booking_id": 42,
+  "behavior_rating": 4,
+  "energy_level": "medium",
+  "notes": "Max was very friendly today and responded well to commands."
+}
+```
+
+**Response:** `201 Created`
+```json
+{
+  "id": 15,
+  "booking_id": 42,
+  "behavior_rating": 4,
+  "energy_level": "medium",
+  "notes": "Max was very friendly today...",
+  "photos": [],
+  "created_at": "2025-12-13T10:30:00Z",
+  "updated_at": "2025-12-13T10:30:00Z"
+}
+```
+
+**Rules:**
+- Only the booking owner can create a report
+- Booking must be completed
+- Only one report per booking allowed
+- behavior_rating: 1-5 (integer)
+- energy_level: "low", "medium", or "high"
+- notes: optional, max 2000 characters
+
+---
+
+### Get Walk Report
+`GET /walk-reports/:id` 🔒 Protected
+
+Get a single walk report by ID.
+
+**Response:** `200 OK`
+```json
+{
+  "id": 15,
+  "booking_id": 42,
+  "behavior_rating": 4,
+  "energy_level": "medium",
+  "notes": "Max was very friendly...",
+  "photos": [
+    {
+      "id": 1,
+      "photo_path": "walk_reports/report_15_1_full.jpg",
+      "photo_thumbnail": "walk_reports/report_15_1_thumb.jpg",
+      "display_order": 0
+    }
+  ],
+  "created_at": "2025-12-13T10:30:00Z",
+  "updated_at": "2025-12-13T10:30:00Z"
+}
+```
+
+---
+
+### Get Walk Report by Booking
+`GET /walk-reports/by-booking/:bookingId` 🔒 Protected
+
+Get the walk report for a specific booking.
+
+**Response:** `200 OK` - Same as Get Walk Report
+
+**Response:** `404 Not Found` if no report exists for the booking.
+
+---
+
+### Get Dog Walk Reports
+`GET /dogs/:id/walk-reports` 🔒 Protected
+
+Get walk history for a specific dog including statistics.
+
+**Query Parameters:**
+- `limit` (optional): Max reports to return (default: 10, max: 100)
+
+**Response:** `200 OK`
+```json
+{
+  "dog": {
+    "id": 5,
+    "name": "Max",
+    "breed": "Labrador"
+  },
+  "stats": {
+    "total_walks": 23,
+    "average_rating": 4.2,
+    "reports_with_photos": 8
+  },
+  "reports": [
+    {
+      "id": 15,
+      "behavior_rating": 4,
+      "energy_level": "medium",
+      "notes": "Max was very friendly...",
+      "photos": [...],
+      "created_at": "2025-12-13T10:30:00Z",
+      "user": {
+        "first_name": "Anna",
+        "last_name": "M."
+      }
+    }
+  ]
+}
+```
+
+---
+
+### Update Walk Report
+`PUT /walk-reports/:id` 🔒 Protected
+
+Update an existing walk report.
+
+**Request:**
+```json
+{
+  "behavior_rating": 5,
+  "energy_level": "high",
+  "notes": "Updated notes..."
+}
+```
+
+**Response:** `200 OK` - Returns updated report.
+
+**Rules:**
+- Only the booking owner can update their report
+
+---
+
+### Delete Walk Report
+`DELETE /walk-reports/:id` 🔒 Protected / Admin
+
+Delete a walk report and all associated photos.
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Report deleted"
+}
+```
+
+**Rules:**
+- Users can delete their own reports
+- Admins can delete any report
+
+---
+
+### Upload Walk Report Photo
+`POST /walk-reports/:id/photos` 🔒 Protected
+
+Upload a photo to a walk report.
+
+**Request:** `multipart/form-data`
+- `photo`: Image file (JPEG or PNG, max 5MB)
+
+**Response:** `201 Created`
+```json
+{
+  "id": 1,
+  "walk_report_id": 15,
+  "photo_path": "walk_reports/report_15_1_full.jpg",
+  "photo_thumbnail": "walk_reports/report_15_1_thumb.jpg",
+  "display_order": 0,
+  "created_at": "2025-12-13T10:35:00Z"
+}
+```
+
+**Rules:**
+- Max 3 photos per report
+- Only JPEG and PNG files allowed
+- Max file size: 5MB
+
+---
+
+### Delete Walk Report Photo
+`DELETE /walk-reports/:id/photos/:photoId` 🔒 Protected
+
+Delete a photo from a walk report.
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Photo deleted"
 }
 ```
 
