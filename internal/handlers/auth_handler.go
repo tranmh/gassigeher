@@ -276,9 +276,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, models.LoginResponse{
-		Token:   token,
-		User:    user,
-		IsAdmin: isAdmin,
+		Token:              token,
+		User:               user,
+		IsAdmin:            isAdmin,
+		MustChangePassword: user.MustChangePassword,
 	})
 }
 
@@ -454,6 +455,13 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	if err := h.userRepo.Update(user); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to update password")
 		return
+	}
+
+	// Clear must_change_password flag if set
+	if user.MustChangePassword {
+		if err := h.userRepo.ClearMustChangePassword(user.ID); err != nil {
+			fmt.Printf("Warning: Failed to clear must_change_password flag: %v\n", err)
+		}
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{

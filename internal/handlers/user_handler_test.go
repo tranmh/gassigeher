@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
 	"github.com/tranmh/gassigeher/internal/services"
@@ -807,6 +809,52 @@ func TestUserHandler_AdminUpdateUser(t *testing.T) {
 		}
 	})
 
+	t.Run("successful experience level update", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"experience_level": "blue",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/admin/users/%d", testUserID), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", testUserID)})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminUpdateUser(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		user := response["user"].(map[string]interface{})
+		if user["experience_level"] != "blue" {
+			t.Errorf("Expected experience_level 'blue', got %v", user["experience_level"])
+		}
+	})
+
+	t.Run("invalid experience level fails validation", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"experience_level": "invalid",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/admin/users/%d", testUserID), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", testUserID)})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminUpdateUser(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+
 	t.Run("invalid request body", func(t *testing.T) {
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/admin/users/%d", testUserID), bytes.NewReader([]byte("invalid json")))
 		req.Header.Set("Content-Type", "application/json")
@@ -819,6 +867,472 @@ func TestUserHandler_AdminUpdateUser(t *testing.T) {
 
 		if rec.Code != http.StatusBadRequest {
 			t.Errorf("Expected status 400, got %d", rec.Code)
+		}
+	})
+}
+
+// Helper function to add super admin context to request
+func contextWithSuperAdmin(ctx context.Context, userID int, email string) context.Context {
+	ctx = context.WithValue(ctx, middleware.UserIDKey, userID)
+	ctx = context.WithValue(ctx, middleware.EmailKey, email)
+	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.IsSuperAdminKey, true)
+
+	ctx = context.WithValue(ctx, "user_id", userID)
+	ctx = context.WithValue(ctx, "email", email)
+	ctx = context.WithValue(ctx, "is_admin", true)
+	ctx = context.WithValue(ctx, "is_super_admin", true)
+
+	return ctx
+}
+
+// TestUserHandler_AdminCreateUser tests admin creating new users
+func TestUserHandler_AdminCreateUser(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewUserHandler(db, cfg)
+	userRepo := repository.NewUserRepository(db)
+
+	// Create admin user
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin User", "blue")
+
+	// Create super admin user
+	superAdminID := testutil.SeedTestUser(t, db, "superadmin@example.com", "Super Admin", "blue")
+
+	t.Run("admin can create regular user", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"first_name":       "New",
+			"last_name":        "User",
+			"email":            "newuser@example.com",
+			"experience_level": "green",
+			"is_admin":         false,
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/users", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminCreateUser(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Errorf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		user := response["user"].(map[string]interface{})
+		if user["email"] != "newuser@example.com" {
+			t.Errorf("Expected email 'newuser@example.com', got %v", user["email"])
+		}
+		if user["first_name"] != "New" {
+			t.Errorf("Expected first_name 'New', got %v", user["first_name"])
+		}
+		if user["experience_level"] != "green" {
+			t.Errorf("Expected experience_level 'green', got %v", user["experience_level"])
+		}
+
+		// Verify user was created with must_change_password = true
+		createdUser, _ := userRepo.FindByEmail("newuser@example.com")
+		if !createdUser.MustChangePassword {
+			t.Error("Created user should have must_change_password = true")
+		}
+		if !createdUser.IsVerified {
+			t.Error("Admin-created user should be verified")
+		}
+		if !createdUser.IsActive {
+			t.Error("Admin-created user should be active")
+		}
+	})
+
+	t.Run("admin cannot create admin user", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"first_name":       "Admin",
+			"last_name":        "Attempt",
+			"email":            "adminattempt@example.com",
+			"experience_level": "blue",
+			"is_admin":         true,
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/users", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminCreateUser(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("Expected status 403, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("super admin can create admin user", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"first_name":       "New",
+			"last_name":        "Admin",
+			"email":            "newadmin@example.com",
+			"experience_level": "orange", // Should be overridden to blue for admin
+			"is_admin":         true,
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/users", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithSuperAdmin(req.Context(), superAdminID, "superadmin@example.com")
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminCreateUser(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Errorf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		user := response["user"].(map[string]interface{})
+		if user["is_admin"] != true {
+			t.Error("Created user should be admin")
+		}
+		// Admin users should automatically get blue experience level
+		if user["experience_level"] != "blue" {
+			t.Errorf("Admin user should have experience_level 'blue', got %v", user["experience_level"])
+		}
+	})
+
+	t.Run("duplicate email fails", func(t *testing.T) {
+		// Create a user first
+		testutil.SeedTestUser(t, db, "existing@example.com", "Existing User", "green")
+
+		reqBody := map[string]interface{}{
+			"first_name":       "Duplicate",
+			"last_name":        "Email",
+			"email":            "existing@example.com",
+			"experience_level": "green",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/users", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminCreateUser(rec, req)
+
+		if rec.Code != http.StatusConflict {
+			t.Errorf("Expected status 409, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("empty first name fails validation", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"first_name":       "",
+			"last_name":        "User",
+			"email":            "nofirst@example.com",
+			"experience_level": "green",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/users", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminCreateUser(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("invalid experience level fails validation", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"first_name":       "Test",
+			"last_name":        "User",
+			"email":            "invalidlevel@example.com",
+			"experience_level": "invalid",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/users", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminCreateUser(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("create user with phone", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"first_name":       "Phone",
+			"last_name":        "User",
+			"email":            "phoneuser@example.com",
+			"phone":            "+49 123 456789",
+			"experience_level": "orange",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/users", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminCreateUser(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Errorf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		user := response["user"].(map[string]interface{})
+		if user["phone"] != "+49 123 456789" {
+			t.Errorf("Expected phone '+49 123 456789', got %v", user["phone"])
+		}
+	})
+
+	t.Run("invalid phone fails validation", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"first_name":       "Bad",
+			"last_name":        "Phone",
+			"email":            "badphone@example.com",
+			"phone":            "123",
+			"experience_level": "green",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/users", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminCreateUser(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("non-admin cannot create user", func(t *testing.T) {
+		regularUserID := testutil.SeedTestUser(t, db, "regular@example.com", "Regular User", "green")
+
+		reqBody := map[string]interface{}{
+			"first_name":       "Should",
+			"last_name":        "Fail",
+			"email":            "shouldfail@example.com",
+			"experience_level": "green",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/users", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), regularUserID, "regular@example.com", false)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminCreateUser(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("Expected status 403, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("invalid JSON body fails", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/api/users", bytes.NewReader([]byte("invalid json")))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminCreateUser(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+}
+
+// TestUserHandler_AdminDeleteUser tests super-admin deleting users
+func TestUserHandler_AdminDeleteUser(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewUserHandler(db, cfg)
+	userRepo := repository.NewUserRepository(db)
+
+	// Create super admin user (ID will be used as current user for delete operations)
+	superAdminID := testutil.SeedTestUser(t, db, "superadmin@example.com", "Super Admin", "blue")
+	// Mark as super admin in database
+	db.Exec("UPDATE users SET is_super_admin = 1, is_admin = 1 WHERE id = ?", superAdminID)
+
+	// Create regular admin user
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin User", "blue")
+	db.Exec("UPDATE users SET is_admin = 1 WHERE id = ?", adminID)
+
+	t.Run("super admin can delete regular user", func(t *testing.T) {
+		// Create user to delete
+		targetUserID := testutil.SeedTestUser(t, db, "todelete@example.com", "To Delete", "green")
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/admin/users/%d", targetUserID), nil)
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", targetUserID)})
+		ctx := contextWithSuperAdmin(req.Context(), superAdminID, "superadmin@example.com")
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminDeleteUser(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		// Verify user is deleted (anonymized)
+		deletedUser, _ := userRepo.FindByID(targetUserID)
+		if deletedUser == nil || !deletedUser.IsDeleted {
+			t.Error("User should be marked as deleted")
+		}
+		if deletedUser.FirstName != "Deleted" || deletedUser.LastName != "User" {
+			t.Error("User should be anonymized")
+		}
+	})
+
+	t.Run("super admin can delete admin user", func(t *testing.T) {
+		// Create admin user to delete
+		targetAdminID := testutil.SeedTestUser(t, db, "admintodelete@example.com", "Admin To Delete", "blue")
+		db.Exec("UPDATE users SET is_admin = 1 WHERE id = ?", targetAdminID)
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/admin/users/%d", targetAdminID), nil)
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", targetAdminID)})
+		ctx := contextWithSuperAdmin(req.Context(), superAdminID, "superadmin@example.com")
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminDeleteUser(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		// Verify admin user is deleted
+		deletedUser, _ := userRepo.FindByID(targetAdminID)
+		if deletedUser == nil || !deletedUser.IsDeleted {
+			t.Error("Admin user should be marked as deleted")
+		}
+	})
+
+	t.Run("super admin cannot delete themselves", func(t *testing.T) {
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/admin/users/%d", superAdminID), nil)
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", superAdminID)})
+		ctx := contextWithSuperAdmin(req.Context(), superAdminID, "superadmin@example.com")
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminDeleteUser(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	// Note: "super admin cannot delete another super admin" test is not needed
+	// because there can only be one super admin (UNIQUE constraint on is_super_admin=1)
+	// The protection is still in place via the handler check for IsSuperAdmin
+
+	t.Run("regular admin cannot delete users", func(t *testing.T) {
+		// Create user to try to delete
+		targetUserID := testutil.SeedTestUser(t, db, "shouldnotdelete@example.com", "Should Not Delete", "green")
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/admin/users/%d", targetUserID), nil)
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", targetUserID)})
+		// Use admin context (not super admin)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminDeleteUser(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("Expected status 403, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		// Verify user was NOT deleted
+		user, _ := userRepo.FindByID(targetUserID)
+		if user == nil || user.IsDeleted {
+			t.Error("User should NOT be deleted by regular admin")
+		}
+	})
+
+	t.Run("normal user cannot delete users", func(t *testing.T) {
+		regularUserID := testutil.SeedTestUser(t, db, "regularuser@example.com", "Regular User", "green")
+		targetUserID := testutil.SeedTestUser(t, db, "target@example.com", "Target User", "green")
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/admin/users/%d", targetUserID), nil)
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", targetUserID)})
+		ctx := contextWithUser(req.Context(), regularUserID, "regularuser@example.com", false)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminDeleteUser(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("Expected status 403, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("user not found", func(t *testing.T) {
+		req := httptest.NewRequest("DELETE", "/api/admin/users/99999", nil)
+		req = mux.SetURLVars(req, map[string]string{"id": "99999"})
+		ctx := contextWithSuperAdmin(req.Context(), superAdminID, "superadmin@example.com")
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminDeleteUser(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("Expected status 404, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("user already deleted", func(t *testing.T) {
+		// Create and delete a user
+		deletedUserID := testutil.SeedTestUser(t, db, "alreadydeleted@example.com", "Already Deleted", "green")
+		db.Exec("UPDATE users SET is_deleted = 1, first_name = 'Deleted', last_name = 'User' WHERE id = ?", deletedUserID)
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/admin/users/%d", deletedUserID), nil)
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", deletedUserID)})
+		ctx := contextWithSuperAdmin(req.Context(), superAdminID, "superadmin@example.com")
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminDeleteUser(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("invalid user ID", func(t *testing.T) {
+		req := httptest.NewRequest("DELETE", "/api/admin/users/invalid", nil)
+		req = mux.SetURLVars(req, map[string]string{"id": "invalid"})
+		ctx := contextWithSuperAdmin(req.Context(), superAdminID, "superadmin@example.com")
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminDeleteUser(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d. Body: %s", rec.Code, rec.Body.String())
 		}
 	})
 }

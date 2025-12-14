@@ -337,12 +337,20 @@ class API {
         return this.request('PUT', `/users/${id}`, data);
     }
 
+    async createUser(data) {
+        return this.request('POST', '/users', data);
+    }
+
     async promoteToAdmin(userId) {
         return this.request('POST', `/admin/users/${userId}/promote`);
     }
 
     async demoteAdmin(userId) {
         return this.request('POST', `/admin/users/${userId}/demote`);
+    }
+
+    async deleteUser(userId) {
+        return this.request('DELETE', `/users/${userId}`);
     }
 
     // REACTIVATION REQUEST ENDPOINTS

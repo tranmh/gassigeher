@@ -309,7 +309,14 @@
     "promote_success": "Benutzer wurde erfolgreich zum Admin ernannt.",
     "demote_success": "Admin-Rechte wurden erfolgreich entzogen.",
     "promote_error": "Fehler beim Ernennen des Benutzers zum Admin.",
-    "demote_error": "Fehler beim Entziehen der Admin-Rechte."
+    "demote_error": "Fehler beim Entziehen der Admin-Rechte.",
+    "create_user": "Benutzer erstellen",
+    "create_user_success": "Benutzer erfolgreich erstellt. Temporäres Passwort wurde per E-Mail gesendet.",
+    "create_as_admin": "Als Administrator erstellen",
+    "create_admin_hint": "Admins erhalten automatisch Blau-Level und haben Zugang zu allen Verwaltungsfunktionen.",
+    "temp_password_hint": "Der Benutzer erhält ein temporäres Passwort per E-Mail und muss dieses bei der ersten Anmeldung ändern.",
+    "must_change_password": "Bitte ändern Sie Ihr temporäres Passwort.",
+    "experience_level": "Erfahrungslevel"
   },
   "reactivation": {
     "title": "Reaktivierung beantragen",

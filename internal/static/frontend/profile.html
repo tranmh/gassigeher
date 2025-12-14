@@ -186,6 +186,21 @@
 
             document.getElementById('profile-form').addEventListener('submit', handleProfileUpdate);
             document.getElementById('password-form').addEventListener('submit', handlePasswordChange);
+
+            // Check if redirected for mandatory password change
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('change_password') === 'true') {
+                setTimeout(() => {
+                    const passwordCard = document.getElementById('password-form').closest('.card');
+                    if (passwordCard) {
+                        passwordCard.style.border = '2px solid #ffc107';
+                        passwordCard.style.boxShadow = '0 0 10px rgba(255, 193, 7, 0.3)';
+                        passwordCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                        showAlert('warning', 'Bitte ändern Sie Ihr temporäres Passwort, um fortzufahren.');
+                    }
+                }, 500);
+            }
         });
 
         function updateHeaderPhoto() {

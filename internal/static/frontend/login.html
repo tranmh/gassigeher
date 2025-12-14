@@ -86,15 +86,21 @@
 
                 try {
                     const response = await window.api.login(email, password);
+
+                    // Check if user must change password
+                    if (response.must_change_password) {
+                        showAlert('info', 'Bitte ändern Sie Ihr temporäres Passwort.');
+                        setTimeout(() => {
+                            window.location.href = '/profile.html?change_password=true';
+                        }, 1500);
+                        return;
+                    }
+
                     showAlert('success', 'Login erfolgreich!');
 
-                    // Redirect based on role
+                    // Redirect to dashboard
                     setTimeout(() => {
-                        if (response.is_admin) {
-                            window.location.href = '/dashboard.html';
-                        } else {
-                            window.location.href = '/dashboard.html';
-                        }
+                        window.location.href = '/dashboard.html';
                     }, 1000);
                 } catch (error) {
                     showAlert('error', error.message || window.i18n.t('errors.unexpected_error'));

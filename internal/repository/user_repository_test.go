@@ -794,3 +794,179 @@ func TestUserRepository_Update(t *testing.T) {
 func stringPtr(s string) *string {
 	return &s
 }
+
+// TestUserRepository_ClearMustChangePassword tests clearing the must_change_password flag
+func TestUserRepository_ClearMustChangePassword(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewUserRepository(db)
+
+	t.Run("clears must_change_password flag successfully", func(t *testing.T) {
+		// Create user with must_change_password = true
+		email := "mustchange@example.com"
+		_, err := db.Exec(`
+			INSERT INTO users (email, name, first_name, last_name, password_hash, experience_level, is_active, is_verified, must_change_password, terms_accepted_at, last_activity_at, created_at)
+			VALUES (?, 'Must Change', 'Must', 'Change', 'hash', 'green', 1, 1, 1, datetime('now'), datetime('now'), datetime('now'))
+		`, email)
+		if err != nil {
+			t.Fatalf("Failed to seed user: %v", err)
+		}
+
+		// Find user to get ID
+		user, err := repo.FindByEmail(email)
+		if err != nil {
+			t.Fatalf("Failed to find user: %v", err)
+		}
+
+		// Verify must_change_password is initially true
+		if !user.MustChangePassword {
+			t.Error("Expected must_change_password to be true initially")
+		}
+
+		// Clear the flag
+		err = repo.ClearMustChangePassword(user.ID)
+		if err != nil {
+			t.Fatalf("ClearMustChangePassword() failed: %v", err)
+		}
+
+		// Verify flag is cleared
+		updatedUser, err := repo.FindByID(user.ID)
+		if err != nil {
+			t.Fatalf("Failed to find updated user: %v", err)
+		}
+
+		if updatedUser.MustChangePassword {
+			t.Error("Expected must_change_password to be false after clearing")
+		}
+	})
+
+	t.Run("clearing flag for non-existent user does not error", func(t *testing.T) {
+		err := repo.ClearMustChangePassword(99999)
+		// Should not error even if user doesn't exist
+		if err != nil {
+			t.Logf("ClearMustChangePassword for non-existent user returned: %v", err)
+		}
+	})
+
+	t.Run("clearing flag on user where it is already false", func(t *testing.T) {
+		// Create user with must_change_password = false
+		email := "nochange@example.com"
+		_, err := db.Exec(`
+			INSERT INTO users (email, name, first_name, last_name, password_hash, experience_level, is_active, is_verified, must_change_password, terms_accepted_at, last_activity_at, created_at)
+			VALUES (?, 'No Change', 'No', 'Change', 'hash', 'blue', 1, 1, 0, datetime('now'), datetime('now'), datetime('now'))
+		`, email)
+		if err != nil {
+			t.Fatalf("Failed to seed user: %v", err)
+		}
+
+		user, _ := repo.FindByEmail(email)
+
+		// Clear should succeed even if already false
+		err = repo.ClearMustChangePassword(user.ID)
+		if err != nil {
+			t.Fatalf("ClearMustChangePassword() failed: %v", err)
+		}
+
+		// Verify still false
+		updatedUser, _ := repo.FindByID(user.ID)
+		if updatedUser.MustChangePassword {
+			t.Error("Expected must_change_password to remain false")
+		}
+	})
+}
+
+// TestUserRepository_MustChangePasswordField tests the must_change_password field persistence
+func TestUserRepository_MustChangePasswordField(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewUserRepository(db)
+
+	t.Run("create user with must_change_password true", func(t *testing.T) {
+		email := "newadmincreated@example.com"
+		user := &models.User{
+			FirstName:          "Admin",
+			LastName:           "Created",
+			Email:              &email,
+			PasswordHash:       stringPtr("hashed_password"),
+			ExperienceLevel:    "green",
+			IsVerified:         true,
+			IsActive:           true,
+			MustChangePassword: true,
+			TermsAcceptedAt:    time.Now(),
+			LastActivityAt:     time.Now(),
+		}
+
+		err := repo.Create(user)
+		if err != nil {
+			t.Fatalf("Create() failed: %v", err)
+		}
+
+		// Verify the flag was saved
+		savedUser, err := repo.FindByID(user.ID)
+		if err != nil {
+			t.Fatalf("FindByID() failed: %v", err)
+		}
+
+		if !savedUser.MustChangePassword {
+			t.Error("Expected must_change_password to be true after creation")
+		}
+	})
+
+	t.Run("create user with must_change_password false (default)", func(t *testing.T) {
+		email := "regularuser@example.com"
+		user := &models.User{
+			FirstName:          "Regular",
+			LastName:           "User",
+			Email:              &email,
+			PasswordHash:       stringPtr("hashed_password"),
+			ExperienceLevel:    "green",
+			IsVerified:         false,
+			IsActive:           true,
+			MustChangePassword: false,
+			TermsAcceptedAt:    time.Now(),
+			LastActivityAt:     time.Now(),
+		}
+
+		err := repo.Create(user)
+		if err != nil {
+			t.Fatalf("Create() failed: %v", err)
+		}
+
+		savedUser, _ := repo.FindByID(user.ID)
+		if savedUser.MustChangePassword {
+			t.Error("Expected must_change_password to be false for regular user creation")
+		}
+	})
+
+	t.Run("update user preserves must_change_password flag", func(t *testing.T) {
+		email := "updatepreserve@example.com"
+		user := &models.User{
+			FirstName:          "Update",
+			LastName:           "Preserve",
+			Email:              &email,
+			PasswordHash:       stringPtr("hashed_password"),
+			ExperienceLevel:    "green",
+			IsVerified:         true,
+			IsActive:           true,
+			MustChangePassword: true,
+			TermsAcceptedAt:    time.Now(),
+			LastActivityAt:     time.Now(),
+		}
+
+		repo.Create(user)
+
+		// Update other fields
+		user.ExperienceLevel = "orange"
+		err := repo.Update(user)
+		if err != nil {
+			t.Fatalf("Update() failed: %v", err)
+		}
+
+		// Verify must_change_password is still true
+		updatedUser, _ := repo.FindByID(user.ID)
+		if !updatedUser.MustChangePassword {
+			t.Error("Expected must_change_password to remain true after update")
+		}
+		if updatedUser.ExperienceLevel != "orange" {
+			t.Error("Expected experience level to be updated to orange")
+		}
+	})
+}

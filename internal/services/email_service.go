@@ -202,6 +202,72 @@ func (s *EmailService) SendWelcomeEmail(to, name string) error {
 	return s.SendEmail(to, subject, body.String())
 }
 
+// SendTempPasswordEmail sends an email with temporary password for admin-created users
+func (s *EmailService) SendTempPasswordEmail(to, name, tempPassword string) error {
+	subject := "Ihr Konto wurde erstellt - Gassigeher"
+
+	tmpl := `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Titillium, Arial, sans-serif; line-height: 1.6; color: #26272b; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #82b965; color: white; padding: 20px; text-align: center; border-radius: 6px 6px 0 0; }
+        .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 6px 6px; }
+        .password-box { background-color: #fff3cd; padding: 20px; margin: 20px 0; border-radius: 6px; border-left: 4px solid #ffc107; text-align: center; }
+        .password { font-size: 1.5rem; font-family: monospace; font-weight: bold; letter-spacing: 2px; color: #26272b; }
+        .warning { background-color: #f8d7da; padding: 15px; margin: 20px 0; border-radius: 6px; border-left: 4px solid #dc3545; }
+        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🐕 Willkommen bei Gassigeher!</h1>
+        </div>
+        <div class="content">
+            <p>Hallo {{.Name}},</p>
+            <p>Ein Administrator hat ein Konto für Sie erstellt. Sie können sich jetzt mit den folgenden Zugangsdaten anmelden:</p>
+
+            <p><strong>E-Mail:</strong> {{.Email}}</p>
+
+            <div class="password-box">
+                <p style="margin: 0 0 10px 0;">Ihr temporäres Passwort:</p>
+                <span class="password">{{.TempPassword}}</span>
+            </div>
+
+            <div class="warning">
+                <strong>⚠️ Wichtig:</strong> Sie werden bei der ersten Anmeldung aufgefordert, ein neues Passwort zu wählen. Das temporäre Passwort ist nur für die erste Anmeldung gültig.
+            </div>
+
+            <p style="text-align: center; margin-top: 30px;">
+                <a href="{{.BaseURL}}/login.html" style="display: inline-block; padding: 12px 30px; background-color: #82b965; color: white; text-decoration: none; border-radius: 6px;">Jetzt anmelden</a>
+            </p>
+        </div>
+        <div class="footer">
+            <p>© 2025 Gassigeher. Alle Rechte vorbehalten.</p>
+        </div>
+    </div>
+</body>
+</html>
+`
+
+	t := template.Must(template.New("temp_password").Parse(tmpl))
+	var body bytes.Buffer
+	if err := t.Execute(&body, map[string]string{
+		"Name":         name,
+		"Email":        to,
+		"TempPassword": tempPassword,
+		"BaseURL":      s.baseURL,
+	}); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return s.SendEmail(to, subject, body.String())
+}
+
 // SendPasswordResetEmail sends a password reset link
 func (s *EmailService) SendPasswordResetEmail(to, name, token string) error {
 	subject := "Passwort zurücksetzen - Gassigeher"

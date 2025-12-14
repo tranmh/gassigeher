@@ -62,51 +62,51 @@ func TestValidatePhone(t *testing.T) {
 			reason:  "International format with 7 digits should be valid",
 		},
 
-		// CURRENT BUGS - These should fail but currently pass
+		// Edge cases - validation correctly rejects these
 		{
-			name:    "CURRENT BUG: Single digit",
+			name:    "Single digit rejected",
 			phone:   "1",
 			wantErr: true,
 			reason:  "Single digit should be invalid (too short)",
 		},
 		{
-			name:    "CURRENT BUG: Two digits",
+			name:    "Two digits rejected",
 			phone:   "12",
 			wantErr: true,
 			reason:  "Two digits should be invalid (too short)",
 		},
 		{
-			name:    "CURRENT BUG: Multiple plus signs",
+			name:    "Multiple plus signs rejected",
 			phone:   "++123456789",
 			wantErr: true,
 			reason:  "Multiple plus signs should be invalid",
 		},
 		{
-			name:    "CURRENT BUG: Ends with hyphen",
+			name:    "Ends with hyphen rejected",
 			phone:   "0123456789-",
 			wantErr: true,
 			reason:  "Should not end with separator",
 		},
 		{
-			name:    "CURRENT BUG: Unmatched opening parenthesis",
+			name:    "Unmatched opening parenthesis rejected",
 			phone:   "(0123 456789",
 			wantErr: true,
 			reason:  "Unmatched parenthesis should be invalid",
 		},
 		{
-			name:    "CURRENT BUG: Unmatched closing parenthesis",
+			name:    "Unmatched closing parenthesis rejected",
 			phone:   "0123) 456789",
 			wantErr: true,
 			reason:  "Unmatched parenthesis should be invalid",
 		},
 		{
-			name:    "CURRENT BUG: Only 5 digits",
+			name:    "Only 5 digits rejected",
 			phone:   "01234",
 			wantErr: true,
 			reason:  "5 digits is too short (minimum 7)",
 		},
 		{
-			name:    "CURRENT BUG: Only 6 digits",
+			name:    "Only 6 digits rejected",
 			phone:   "012345",
 			wantErr: true,
 			reason:  "6 digits is too short (minimum 7)",
@@ -352,5 +352,204 @@ func TestUpdateProfileRequest_Validate(t *testing.T) {
 				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+// TestAdminCreateUserRequest_Validate tests AdminCreateUserRequest validation
+func TestAdminCreateUserRequest_Validate(t *testing.T) {
+	phone := "+49 123 456789"
+	invalidPhone := "123"
+
+	tests := []struct {
+		name    string
+		req     AdminCreateUserRequest
+		wantErr bool
+	}{
+		{
+			name: "Valid request with all fields",
+			req: AdminCreateUserRequest{
+				FirstName:       "John",
+				LastName:        "Doe",
+				Email:           "john@example.com",
+				Phone:           &phone,
+				ExperienceLevel: "green",
+				IsAdmin:         false,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Valid request without phone",
+			req: AdminCreateUserRequest{
+				FirstName:       "Jane",
+				LastName:        "Doe",
+				Email:           "jane@example.com",
+				Phone:           nil,
+				ExperienceLevel: "orange",
+				IsAdmin:         false,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Valid admin user",
+			req: AdminCreateUserRequest{
+				FirstName:       "Admin",
+				LastName:        "User",
+				Email:           "admin@example.com",
+				ExperienceLevel: "blue",
+				IsAdmin:         true,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Empty first name",
+			req: AdminCreateUserRequest{
+				FirstName:       "",
+				LastName:        "Doe",
+				Email:           "test@example.com",
+				ExperienceLevel: "green",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Empty last name",
+			req: AdminCreateUserRequest{
+				FirstName:       "John",
+				LastName:        "",
+				Email:           "test@example.com",
+				ExperienceLevel: "green",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Empty email",
+			req: AdminCreateUserRequest{
+				FirstName:       "John",
+				LastName:        "Doe",
+				Email:           "",
+				ExperienceLevel: "green",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid experience level",
+			req: AdminCreateUserRequest{
+				FirstName:       "John",
+				LastName:        "Doe",
+				Email:           "test@example.com",
+				ExperienceLevel: "invalid",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid phone format",
+			req: AdminCreateUserRequest{
+				FirstName:       "John",
+				LastName:        "Doe",
+				Email:           "test@example.com",
+				Phone:           &invalidPhone,
+				ExperienceLevel: "green",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Experience level green",
+			req: AdminCreateUserRequest{
+				FirstName:       "John",
+				LastName:        "Doe",
+				Email:           "green@example.com",
+				ExperienceLevel: "green",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Experience level orange",
+			req: AdminCreateUserRequest{
+				FirstName:       "John",
+				LastName:        "Doe",
+				Email:           "orange@example.com",
+				ExperienceLevel: "orange",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Experience level blue",
+			req: AdminCreateUserRequest{
+				FirstName:       "John",
+				LastName:        "Doe",
+				Email:           "blue@example.com",
+				ExperienceLevel: "blue",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Whitespace-only first name",
+			req: AdminCreateUserRequest{
+				FirstName:       "   ",
+				LastName:        "Doe",
+				Email:           "test@example.com",
+				ExperienceLevel: "green",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Whitespace-only last name",
+			req: AdminCreateUserRequest{
+				FirstName:       "John",
+				LastName:        "   ",
+				Email:           "test@example.com",
+				ExperienceLevel: "green",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Whitespace-only email",
+			req: AdminCreateUserRequest{
+				FirstName:       "John",
+				LastName:        "Doe",
+				Email:           "   ",
+				ExperienceLevel: "green",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.req.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestAdminCreateUserRequest_TrimFields verifies that whitespace is trimmed from fields
+func TestAdminCreateUserRequest_TrimFields(t *testing.T) {
+	phone := "  +49 123 456789  "
+	req := AdminCreateUserRequest{
+		FirstName:       "  John  ",
+		LastName:        "  Doe  ",
+		Email:           "  test@example.com  ",
+		Phone:           &phone,
+		ExperienceLevel: "green",
+	}
+
+	err := req.Validate()
+	if err != nil {
+		t.Fatalf("Validation failed: %v", err)
+	}
+
+	// Verify all fields are trimmed after validation
+	if req.FirstName != "John" {
+		t.Errorf("FirstName should be trimmed, got '%s'", req.FirstName)
+	}
+	if req.LastName != "Doe" {
+		t.Errorf("LastName should be trimmed, got '%s'", req.LastName)
+	}
+	if req.Email != "test@example.com" {
+		t.Errorf("Email should be trimmed, got '%s'", req.Email)
+	}
+	if req.Phone == nil || *req.Phone != "+49 123 456789" {
+		t.Errorf("Phone should be trimmed, got '%v'", req.Phone)
 	}
 }

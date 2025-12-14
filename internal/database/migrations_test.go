@@ -14,8 +14,8 @@ import (
 func TestMigrationRegistry(t *testing.T) {
 	migrations := GetAllMigrations()
 
-	t.Run("All_21_migrations_registered", func(t *testing.T) {
-		assert.Len(t, migrations, 21, "Should have 21 migrations")
+	t.Run("All_22_migrations_registered", func(t *testing.T) {
+		assert.Len(t, migrations, 22, "Should have 22 migrations")
 	})
 
 	t.Run("Migrations_have_unique_IDs", func(t *testing.T) {
@@ -74,7 +74,7 @@ func TestRunMigrations_SQLite(t *testing.T) {
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 21, count, "Should have 21 applied migrations")
+	assert.Equal(t, 22, count, "Should have 22 applied migrations")
 
 	// Verify all tables created
 	tables := []string{
@@ -120,16 +120,16 @@ func TestRunMigrations_Idempotent(t *testing.T) {
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 21, count)
+	assert.Equal(t, 22, count)
 
 	// Run migrations second time (should be idempotent)
 	err = RunMigrationsWithDialect(db, dialect)
 	assert.NoError(t, err, "Second migration run should succeed (idempotent)")
 
-	// Count should still be 21 (no duplicates)
+	// Count should still be 22 (no duplicates)
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 21, count, "Should still have 21 migrations (no duplicates)")
+	assert.Equal(t, 22, count, "Should still have 22 migrations (no duplicates)")
 }
 
 // TestGetMigrationStatus tests migration status reporting
@@ -147,7 +147,7 @@ func TestGetMigrationStatus(t *testing.T) {
 	applied, pending, err := GetMigrationStatus(db, dialect)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, applied)
-	assert.Equal(t, 21, pending)
+	assert.Equal(t, 22, pending)
 
 	// After migrations
 	err = RunMigrationsWithDialect(db, dialect)
@@ -155,7 +155,7 @@ func TestGetMigrationStatus(t *testing.T) {
 
 	applied, pending, err = GetMigrationStatus(db, dialect)
 	assert.NoError(t, err)
-	assert.Equal(t, 21, applied)
+	assert.Equal(t, 22, applied)
 	assert.Equal(t, 0, pending)
 }
 
@@ -372,6 +372,7 @@ func TestMigrationOrder(t *testing.T) {
 		"020_split_name_to_first_last",
 		"021_insert_whatsapp_settings",
 		"022_create_walk_reports_table",
+		"023_add_must_change_password",
 	}
 
 	assert.Len(t, migrations, len(expectedOrder))

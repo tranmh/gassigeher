@@ -324,3 +324,103 @@ func TestAuthService_ValidatePassword_EdgeCases(t *testing.T) {
 		})
 	}
 }
+
+// TestAuthService_GenerateTempPassword tests temporary password generation
+func TestAuthService_GenerateTempPassword(t *testing.T) {
+	service := NewAuthService("test-secret", 24)
+
+	t.Run("generates 12 character password", func(t *testing.T) {
+		password, err := service.GenerateTempPassword()
+		if err != nil {
+			t.Errorf("GenerateTempPassword() error = %v", err)
+		}
+		if len(password) != 12 {
+			t.Errorf("Expected password length 12, got %d", len(password))
+		}
+	})
+
+	t.Run("password meets validation requirements", func(t *testing.T) {
+		password, err := service.GenerateTempPassword()
+		if err != nil {
+			t.Fatalf("GenerateTempPassword() error = %v", err)
+		}
+
+		// Generated password should pass validation
+		err = service.ValidatePassword(password)
+		if err != nil {
+			t.Errorf("Generated password failed validation: %v (password: %s)", err, password)
+		}
+	})
+
+	t.Run("generates unique passwords", func(t *testing.T) {
+		passwords := make(map[string]bool)
+		for i := 0; i < 100; i++ {
+			password, err := service.GenerateTempPassword()
+			if err != nil {
+				t.Fatalf("GenerateTempPassword() error = %v", err)
+			}
+			if passwords[password] {
+				t.Errorf("Duplicate password generated: %s", password)
+			}
+			passwords[password] = true
+		}
+	})
+
+	t.Run("contains uppercase letter", func(t *testing.T) {
+		password, _ := service.GenerateTempPassword()
+		hasUpper := false
+		for _, c := range password {
+			if c >= 'A' && c <= 'Z' {
+				hasUpper = true
+				break
+			}
+		}
+		if !hasUpper {
+			t.Errorf("Password should contain uppercase letter: %s", password)
+		}
+	})
+
+	t.Run("contains lowercase letter", func(t *testing.T) {
+		password, _ := service.GenerateTempPassword()
+		hasLower := false
+		for _, c := range password {
+			if c >= 'a' && c <= 'z' {
+				hasLower = true
+				break
+			}
+		}
+		if !hasLower {
+			t.Errorf("Password should contain lowercase letter: %s", password)
+		}
+	})
+
+	t.Run("contains number", func(t *testing.T) {
+		password, _ := service.GenerateTempPassword()
+		hasNumber := false
+		for _, c := range password {
+			if c >= '0' && c <= '9' {
+				hasNumber = true
+				break
+			}
+		}
+		if !hasNumber {
+			t.Errorf("Password should contain number: %s", password)
+		}
+	})
+
+	t.Run("password can be hashed and verified", func(t *testing.T) {
+		password, err := service.GenerateTempPassword()
+		if err != nil {
+			t.Fatalf("GenerateTempPassword() error = %v", err)
+		}
+
+		hash, err := service.HashPassword(password)
+		if err != nil {
+			t.Fatalf("HashPassword() error = %v", err)
+		}
+
+		if !service.CheckPassword(password, hash) {
+			t.Error("Password should match generated hash")
+		}
+	})
+}

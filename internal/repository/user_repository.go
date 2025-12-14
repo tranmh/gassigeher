@@ -24,10 +24,10 @@ func (r *UserRepository) Create(user *models.User) error {
 	query := `
 		INSERT INTO users (
 			name, first_name, last_name, email, phone, password_hash, experience_level,
-			is_admin, is_super_admin, is_verified, is_active,
+			is_admin, is_super_admin, is_verified, is_active, must_change_password,
 			verification_token, verification_token_expires,
 			terms_accepted_at, last_activity_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	result, err := r.db.Exec(
@@ -43,6 +43,7 @@ func (r *UserRepository) Create(user *models.User) error {
 		user.IsSuperAdmin,
 		user.IsVerified,
 		user.IsActive,
+		user.MustChangePassword,
 		user.VerificationToken,
 		user.VerificationTokenExpires,
 		user.TermsAcceptedAt,
@@ -65,7 +66,7 @@ func (r *UserRepository) Create(user *models.User) error {
 func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
 	query := `
 		SELECT id, first_name, last_name, email, phone, password_hash, experience_level,
-		       is_admin, is_super_admin, is_verified, is_active, is_deleted,
+		       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
 		       terms_accepted_at, last_activity_at, deactivated_at,
@@ -85,11 +86,12 @@ func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
 		&user.Phone,
 		&user.PasswordHash,
 		&user.ExperienceLevel,
-		&user.IsAdmin,         // DONE: Added
-		&user.IsSuperAdmin,    // DONE: Added
+		&user.IsAdmin,
+		&user.IsSuperAdmin,
 		&user.IsVerified,
 		&user.IsActive,
 		&user.IsDeleted,
+		&user.MustChangePassword,
 		&user.VerificationToken,
 		&user.VerificationTokenExpires,
 		&user.PasswordResetToken,
@@ -126,7 +128,7 @@ func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
 func (r *UserRepository) FindByID(id int) (*models.User, error) {
 	query := `
 		SELECT id, first_name, last_name, email, phone, password_hash, experience_level,
-		       is_admin, is_super_admin, is_verified, is_active, is_deleted,
+		       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
 		       terms_accepted_at, last_activity_at, deactivated_at,
@@ -146,11 +148,12 @@ func (r *UserRepository) FindByID(id int) (*models.User, error) {
 		&user.Phone,
 		&user.PasswordHash,
 		&user.ExperienceLevel,
-		&user.IsAdmin,         // DONE: Added
-		&user.IsSuperAdmin,    // DONE: Added
+		&user.IsAdmin,
+		&user.IsSuperAdmin,
 		&user.IsVerified,
 		&user.IsActive,
 		&user.IsDeleted,
+		&user.MustChangePassword,
 		&user.VerificationToken,
 		&user.VerificationTokenExpires,
 		&user.PasswordResetToken,
@@ -187,7 +190,7 @@ func (r *UserRepository) FindByID(id int) (*models.User, error) {
 func (r *UserRepository) FindByVerificationToken(token string) (*models.User, error) {
 	query := `
 		SELECT id, first_name, last_name, email, phone, password_hash, experience_level,
-		       is_admin, is_super_admin, is_verified, is_active, is_deleted,
+		       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
 		       terms_accepted_at, last_activity_at, deactivated_at,
@@ -207,11 +210,12 @@ func (r *UserRepository) FindByVerificationToken(token string) (*models.User, er
 		&user.Phone,
 		&user.PasswordHash,
 		&user.ExperienceLevel,
-		&user.IsAdmin,         // DONE: Added
-		&user.IsSuperAdmin,    // DONE: Added
+		&user.IsAdmin,
+		&user.IsSuperAdmin,
 		&user.IsVerified,
 		&user.IsActive,
 		&user.IsDeleted,
+		&user.MustChangePassword,
 		&user.VerificationToken,
 		&user.VerificationTokenExpires,
 		&user.PasswordResetToken,
@@ -248,7 +252,7 @@ func (r *UserRepository) FindByVerificationToken(token string) (*models.User, er
 func (r *UserRepository) FindByPasswordResetToken(token string) (*models.User, error) {
 	query := `
 		SELECT id, first_name, last_name, email, phone, password_hash, experience_level,
-		       is_admin, is_super_admin, is_verified, is_active, is_deleted,
+		       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
 		       terms_accepted_at, last_activity_at, deactivated_at,
@@ -268,11 +272,12 @@ func (r *UserRepository) FindByPasswordResetToken(token string) (*models.User, e
 		&user.Phone,
 		&user.PasswordHash,
 		&user.ExperienceLevel,
-		&user.IsAdmin,         // DONE: Added
-		&user.IsSuperAdmin,    // DONE: Added
+		&user.IsAdmin,
+		&user.IsSuperAdmin,
 		&user.IsVerified,
 		&user.IsActive,
 		&user.IsDeleted,
+		&user.MustChangePassword,
 		&user.VerificationToken,
 		&user.VerificationTokenExpires,
 		&user.PasswordResetToken,
@@ -320,6 +325,7 @@ func (r *UserRepository) Update(user *models.User) error {
 			is_verified = ?,
 			is_active = ?,
 			is_deleted = ?,
+			must_change_password = ?,
 			verification_token = ?,
 			verification_token_expires = ?,
 			password_reset_token = ?,
@@ -343,11 +349,12 @@ func (r *UserRepository) Update(user *models.User) error {
 		user.Phone,
 		user.PasswordHash,
 		user.ExperienceLevel,
-		user.IsAdmin,          // DONE: Added
-		user.IsSuperAdmin,     // DONE: Added
+		user.IsAdmin,
+		user.IsSuperAdmin,
 		user.IsVerified,
 		user.IsActive,
 		user.IsDeleted,
+		user.MustChangePassword,
 		user.VerificationToken,
 		user.VerificationTokenExpires,
 		user.PasswordResetToken,
@@ -391,8 +398,8 @@ func (r *UserRepository) DeleteAccount(userID int) error {
 		return fmt.Errorf("cannot delete Super Admin account")
 	}
 
-	// Generate anonymous ID
-	anonymousID := fmt.Sprintf("anonymous_user_%d", time.Now().Unix())
+	// Generate anonymous ID (using UnixNano for uniqueness in rapid deletions)
+	anonymousID := fmt.Sprintf("anonymous_user_%d", time.Now().UnixNano())
 
 	query := `
 		UPDATE users SET
@@ -463,7 +470,7 @@ func (r *UserRepository) Activate(userID int) error {
 func (r *UserRepository) FindInactiveUsers(days int) ([]*models.User, error) {
 	query := `
 		SELECT id, first_name, last_name, email, phone, password_hash, experience_level,
-		       is_admin, is_super_admin, is_verified, is_active, is_deleted,
+		       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
 		       terms_accepted_at, last_activity_at, deactivated_at,
@@ -496,11 +503,12 @@ func (r *UserRepository) FindInactiveUsers(days int) ([]*models.User, error) {
 			&user.Phone,
 			&user.PasswordHash,
 			&user.ExperienceLevel,
-			&user.IsAdmin,         // DONE: Added
-			&user.IsSuperAdmin,    // DONE: Added
+			&user.IsAdmin,
+			&user.IsSuperAdmin,
 			&user.IsVerified,
 			&user.IsActive,
 			&user.IsDeleted,
+			&user.MustChangePassword,
 			&user.VerificationToken,
 			&user.VerificationTokenExpires,
 			&user.PasswordResetToken,
@@ -535,7 +543,7 @@ func (r *UserRepository) FindInactiveUsers(days int) ([]*models.User, error) {
 func (r *UserRepository) FindAll(activeOnly *bool) ([]*models.User, error) {
 	query := `
 		SELECT id, first_name, last_name, email, phone, password_hash, experience_level,
-		       is_admin, is_super_admin, is_verified, is_active, is_deleted,
+		       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
 		       terms_accepted_at, last_activity_at, deactivated_at,
@@ -575,11 +583,12 @@ func (r *UserRepository) FindAll(activeOnly *bool) ([]*models.User, error) {
 			&user.Phone,
 			&user.PasswordHash,
 			&user.ExperienceLevel,
-			&user.IsAdmin,         // DONE: Added
-			&user.IsSuperAdmin,    // DONE: Added
+			&user.IsAdmin,
+			&user.IsSuperAdmin,
 			&user.IsVerified,
 			&user.IsActive,
 			&user.IsDeleted,
+			&user.MustChangePassword,
 			&user.VerificationToken,
 			&user.VerificationTokenExpires,
 			&user.PasswordResetToken,
@@ -634,7 +643,6 @@ func (r *UserRepository) DemoteAdmin(userID int) error {
 }
 
 // IsSuperAdmin checks if a user is a super admin
-// DONE
 func (r *UserRepository) IsSuperAdmin(userID int) (bool, error) {
 	var isSuperAdmin bool
 	query := `SELECT is_super_admin FROM users WHERE id = ?`
@@ -648,4 +656,12 @@ func (r *UserRepository) IsSuperAdmin(userID int) (bool, error) {
 	return isSuperAdmin, nil
 }
 
-// DONE
+// ClearMustChangePassword clears the must_change_password flag after password change
+func (r *UserRepository) ClearMustChangePassword(userID int) error {
+	query := `UPDATE users SET must_change_password = 0, updated_at = ? WHERE id = ?`
+	_, err := r.db.Exec(query, time.Now(), userID)
+	if err != nil {
+		return fmt.Errorf("failed to clear must_change_password flag: %w", err)
+	}
+	return nil
+}

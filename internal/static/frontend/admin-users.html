@@ -60,8 +60,9 @@
                         </select>
                     </div>
                 </div>
-                <div style="margin-top: 15px;">
+                <div style="margin-top: 15px; display: flex; gap: 10px;">
                     <button class="btn" onclick="applyFilters()" data-i18n="common.apply">Anwenden</button>
+                    <button class="btn btn-secondary" onclick="showCreateModal()">+ Benutzer erstellen</button>
                 </div>
             </div>
 
@@ -95,11 +96,100 @@
                     <label for="edit-phone">Telefon</label>
                     <input type="tel" id="edit-phone">
                 </div>
+                <div class="form-group">
+                    <label for="edit-level">Erfahrungslevel *</label>
+                    <select id="edit-level" required>
+                        <option value="green">Grün (Anfänger)</option>
+                        <option value="orange">Orange (Erfahren)</option>
+                        <option value="blue">Blau (Nur feste Gassigeher)</option>
+                    </select>
+                </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Abbrechen</button>
                     <button type="submit" class="btn">Speichern</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Create User Modal -->
+    <div id="create-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Benutzer erstellen</h3>
+                <button class="modal-close" onclick="closeCreateModal()">&times;</button>
+            </div>
+            <form id="create-form" onsubmit="createUser(event)">
+                <div class="form-group">
+                    <label for="create-first-name">Vorname *</label>
+                    <input type="text" id="create-first-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="create-last-name">Nachname *</label>
+                    <input type="text" id="create-last-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="create-email">E-Mail *</label>
+                    <input type="email" id="create-email" required>
+                </div>
+                <div class="form-group">
+                    <label for="create-phone">Telefon</label>
+                    <input type="tel" id="create-phone">
+                </div>
+                <div class="form-group">
+                    <label for="create-level">Erfahrungslevel *</label>
+                    <select id="create-level" required>
+                        <option value="green">Grün (Anfänger)</option>
+                        <option value="orange">Orange (Erfahren)</option>
+                        <option value="blue">Blau (Nur feste Gassigeher)</option>
+                    </select>
+                </div>
+                <div class="form-group" id="create-admin-group" style="display: none;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" id="create-is-admin" style="width: auto;">
+                        <span>Als Administrator erstellen</span>
+                    </label>
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        Admins erhalten automatisch Blau-Level und haben Zugang zu allen Verwaltungsfunktionen.
+                    </p>
+                </div>
+                <div class="form-info" style="background: #e3f2fd; padding: 15px; border-radius: 6px; margin: 15px 0;">
+                    <p style="margin: 0; font-size: 0.9rem;">
+                        <strong>Hinweis:</strong> Der Benutzer erhält ein temporäres Passwort per E-Mail und muss dieses bei der ersten Anmeldung ändern.
+                    </p>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeCreateModal()">Abbrechen</button>
+                    <button type="submit" class="btn">Benutzer erstellen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete User Confirmation Modal -->
+    <div id="delete-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3>Benutzer löschen</h3>
+                <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+            </div>
+            <div style="padding: 20px;">
+                <input type="hidden" id="delete-user-id">
+                <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 6px; padding: 15px; margin-bottom: 20px;">
+                    <p style="margin: 0 0 10px 0; color: #721c24; font-weight: bold;">
+                        Warnung: Diese Aktion kann nicht rückgängig gemacht werden!
+                    </p>
+                    <p style="margin: 0; color: #721c24; font-size: 0.9rem;">
+                        Der Benutzer <strong id="delete-user-name"></strong> wird unwiderruflich gelöscht.
+                        Alle persönlichen Daten werden anonymisiert (DSGVO-konform).
+                        Die Buchungshistorie bleibt erhalten, zeigt aber nur "Deleted User" an.
+                    </p>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Abbrechen</button>
+                    <button type="button" class="btn btn-danger" onclick="confirmDeleteUser()">Endgültig löschen</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -187,17 +277,17 @@
                 } else if (user.is_admin) {
                     roleBadge = '<span class="badge-admin">Admin</span>';
                 } else {
-                    roleBadge = '<span style="color: #666;">Benutzer</span>';
+                    roleBadge = '<span class="badge-user">Benutzer</span>';
                 }
 
                 return `
                     <div class="card" style="margin-bottom: 15px;">
-                        <div style="display: flex; justify-content: space-between; align-items: start;">
-                            <div style="flex: 1;">
-                                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
-                                    <h4 style="margin: 0;">${safeName}</h4>
-                                    <span class="alert ${statusClass}" style="padding: 4px 12px; font-size: 0.8rem; margin: 0;">${statusLabel}</span>
-                                    <span class="dog-category-badge ${user.experience_level}" style="font-size: 0.8rem;">${levelLabel}</span>
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 15px;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
+                                    <h4 style="margin: 0; white-space: nowrap;">${safeName}</h4>
+                                    <span class="badge-status ${statusClass}">${statusLabel}</span>
+                                    <span class="badge-level ${user.experience_level}">${levelLabel}</span>
                                     ${roleBadge}
                                 </div>
                                 <p style="margin: 5px 0; color: #666;">
@@ -236,6 +326,9 @@
                                     ` : `
                                         <button class="btn btn-secondary btn-sm" onclick="promoteToAdmin(${user.id}, '${safeName.replace(/'/g, "\\'")}')">Zu Admin ernennen</button>
                                     `}
+                                    ${!user.is_deleted ? `
+                                        <button class="btn btn-danger btn-sm" onclick="showDeleteModal(${user.id}, '${safeName.replace(/'/g, "\\'")}')">Löschen</button>
+                                    ` : ''}
                                 ` : ''}
                             </div>
                         </div>
@@ -324,6 +417,7 @@
             document.getElementById('edit-last-name').value = user.last_name || '';
             document.getElementById('edit-email').value = user.email || '';
             document.getElementById('edit-phone').value = user.phone || '';
+            document.getElementById('edit-level').value = user.experience_level || 'green';
 
             document.getElementById('edit-modal').style.display = 'flex';
         }
@@ -341,7 +435,8 @@
                 first_name: document.getElementById('edit-first-name').value.trim(),
                 last_name: document.getElementById('edit-last-name').value.trim(),
                 email: document.getElementById('edit-email').value.trim(),
-                phone: document.getElementById('edit-phone').value.trim() || null
+                phone: document.getElementById('edit-phone').value.trim() || null,
+                experience_level: document.getElementById('edit-level').value
             };
 
             try {
@@ -359,8 +454,81 @@
         document.addEventListener('click', (e) => {
             if (e.target.classList.contains('modal')) {
                 closeEditModal();
+                closeCreateModal();
+                closeDeleteModal();
             }
         });
+
+        // Create User Modal Functions
+        function showCreateModal() {
+            // Show admin checkbox only for Super Admins
+            if (currentUser && currentUser.is_super_admin) {
+                document.getElementById('create-admin-group').style.display = 'block';
+            } else {
+                document.getElementById('create-admin-group').style.display = 'none';
+            }
+            document.getElementById('create-modal').style.display = 'flex';
+        }
+
+        function closeCreateModal() {
+            document.getElementById('create-modal').style.display = 'none';
+            document.getElementById('create-form').reset();
+            document.getElementById('create-admin-group').style.display = 'none';
+        }
+
+        async function createUser(event) {
+            event.preventDefault();
+
+            const data = {
+                first_name: document.getElementById('create-first-name').value.trim(),
+                last_name: document.getElementById('create-last-name').value.trim(),
+                email: document.getElementById('create-email').value.trim(),
+                phone: document.getElementById('create-phone').value.trim() || null,
+                experience_level: document.getElementById('create-level').value,
+                is_admin: document.getElementById('create-is-admin').checked
+            };
+
+            try {
+                await api.createUser(data);
+                showAlert('success', 'Benutzer erfolgreich erstellt. Temporäres Passwort wurde per E-Mail gesendet.');
+                closeCreateModal();
+                loadUsers();
+            } catch (error) {
+                console.error('Error creating user:', error);
+                showAlert('error', error.message || 'Fehler beim Erstellen des Benutzers');
+            }
+        }
+
+        // Delete User Modal Functions (Super-Admin only)
+        function showDeleteModal(userId, userName) {
+            document.getElementById('delete-user-id').value = userId;
+            document.getElementById('delete-user-name').textContent = userName;
+            document.getElementById('delete-modal').style.display = 'flex';
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('delete-modal').style.display = 'none';
+            document.getElementById('delete-user-id').value = '';
+            document.getElementById('delete-user-name').textContent = '';
+        }
+
+        async function confirmDeleteUser() {
+            const userId = parseInt(document.getElementById('delete-user-id').value);
+            if (!userId) {
+                showAlert('error', 'Kein Benutzer ausgewählt');
+                return;
+            }
+
+            try {
+                await api.deleteUser(userId);
+                showAlert('success', 'Benutzer erfolgreich gelöscht');
+                closeDeleteModal();
+                loadUsers();
+            } catch (error) {
+                console.error('Error deleting user:', error);
+                showAlert('error', error.message || 'Fehler beim Löschen des Benutzers');
+            }
+        }
 
         function showAlert(type, message) {
             const container = document.getElementById('alert-container');
@@ -370,22 +538,61 @@
     </script>
 
     <style>
+        /* Badge styles for consistent alignment */
+        .badge-status,
+        .badge-level,
+        .badge-super-admin,
+        .badge-admin,
+        .badge-user {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            line-height: 1;
+            border-radius: var(--border-radius);
+            white-space: nowrap;
+        }
+
+        .badge-status.alert-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .badge-status.alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .badge-level.green {
+            background-color: #82b965;
+            color: white;
+        }
+
+        .badge-level.orange {
+            background-color: #ff9800;
+            color: white;
+        }
+
+        .badge-level.blue {
+            background-color: #2196f3;
+            color: white;
+        }
+
         .badge-super-admin {
             background-color: #d32f2f;
             color: white;
-            padding: 4px 12px;
-            border-radius: var(--border-radius);
-            font-size: 0.8rem;
             font-weight: bold;
         }
 
         .badge-admin {
             background-color: #1976d2;
             color: white;
-            padding: 4px 12px;
-            border-radius: var(--border-radius);
-            font-size: 0.8rem;
             font-weight: bold;
+        }
+
+        .badge-user {
+            color: #666;
+            background-color: #f5f5f5;
         }
 
         /* Modal Styles */

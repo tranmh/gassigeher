@@ -22,6 +22,7 @@ type User struct {
 	IsVerified               bool       `json:"is_verified"`
 	IsActive                 bool       `json:"is_active"`
 	IsDeleted                bool       `json:"is_deleted"`
+	MustChangePassword       bool       `json:"must_change_password"`
 	VerificationToken        *string    `json:"-"`
 	VerificationTokenExpires *time.Time `json:"-"`
 	PasswordResetToken       *string    `json:"-"`
@@ -66,9 +67,10 @@ type LoginRequest struct {
 
 // LoginResponse represents the login response
 type LoginResponse struct {
-	Token   string `json:"token"`
-	User    *User  `json:"user"`
-	IsAdmin bool   `json:"is_admin"`
+	Token              string `json:"token"`
+	User               *User  `json:"user"`
+	IsAdmin            bool   `json:"is_admin"`
+	MustChangePassword bool   `json:"must_change_password"`
 }
 
 // VerifyEmailRequest represents email verification payload
@@ -102,12 +104,13 @@ type UpdateProfileRequest struct {
 	Phone *string `json:"phone,omitempty"`
 }
 
-// AdminUpdateUserRequest represents admin profile update payload (can edit names)
+// AdminUpdateUserRequest represents admin profile update payload (can edit names and experience level)
 type AdminUpdateUserRequest struct {
-	FirstName *string `json:"first_name,omitempty"`
-	LastName  *string `json:"last_name,omitempty"`
-	Email     *string `json:"email,omitempty"`
-	Phone     *string `json:"phone,omitempty"`
+	FirstName       *string `json:"first_name,omitempty"`
+	LastName        *string `json:"last_name,omitempty"`
+	Email           *string `json:"email,omitempty"`
+	Phone           *string `json:"phone,omitempty"`
+	ExperienceLevel *string `json:"experience_level,omitempty"`
 }
 
 // Phone regex: allows digits, country code, separators, and balanced parentheses
@@ -217,6 +220,53 @@ func (a *AdminUpdateUserRequest) Validate() error {
 	}
 	if a.Phone != nil {
 		if err := ValidatePhone(*a.Phone); err != nil {
+			return err
+		}
+	}
+	if a.ExperienceLevel != nil {
+		validLevels := map[string]bool{"green": true, "orange": true, "blue": true}
+		if !validLevels[*a.ExperienceLevel] {
+			return errors.New("Ungültiges Erfahrungslevel (green, orange, blue)")
+		}
+	}
+	return nil
+}
+
+// AdminCreateUserRequest represents admin user creation payload
+type AdminCreateUserRequest struct {
+	FirstName       string  `json:"first_name"`
+	LastName        string  `json:"last_name"`
+	Email           string  `json:"email"`
+	Phone           *string `json:"phone,omitempty"`
+	ExperienceLevel string  `json:"experience_level"`
+	IsAdmin         bool    `json:"is_admin"`
+}
+
+// Validate validates the AdminCreateUserRequest and trims whitespace from fields
+func (r *AdminCreateUserRequest) Validate() error {
+	// Trim whitespace from all string fields
+	r.FirstName = strings.TrimSpace(r.FirstName)
+	r.LastName = strings.TrimSpace(r.LastName)
+	r.Email = strings.TrimSpace(r.Email)
+
+	if r.FirstName == "" {
+		return errors.New("Vorname ist erforderlich")
+	}
+	if r.LastName == "" {
+		return errors.New("Nachname ist erforderlich")
+	}
+	if r.Email == "" {
+		return errors.New("E-Mail ist erforderlich")
+	}
+	// Validate experience level
+	validLevels := map[string]bool{"green": true, "orange": true, "blue": true}
+	if !validLevels[r.ExperienceLevel] {
+		return errors.New("Ungültiges Erfahrungslevel (green, orange, blue)")
+	}
+	if r.Phone != nil && *r.Phone != "" {
+		trimmedPhone := strings.TrimSpace(*r.Phone)
+		r.Phone = &trimmedPhone
+		if err := ValidatePhone(*r.Phone); err != nil {
 			return err
 		}
 	}

@@ -48,6 +48,32 @@ func (s *AuthService) GenerateToken() (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
+// GenerateTempPassword generates a secure temporary password
+// Returns a 12-character password with uppercase, lowercase, and numbers
+func (s *AuthService) GenerateTempPassword() (string, error) {
+	// Character set excluding ambiguous characters (0, O, l, 1, I)
+	const charset = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+	const length = 12
+
+	bytes := make([]byte, length)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("failed to generate temp password: %w", err)
+	}
+
+	result := make([]byte, length)
+	for i := range bytes {
+		result[i] = charset[int(bytes[i])%len(charset)]
+	}
+
+	// Ensure password meets requirements by placing required characters
+	// Position 0: uppercase, Position 1: lowercase, Position 2: number
+	result[0] = "ABCDEFGHJKLMNPQRSTUVWXYZ"[int(bytes[0])%24]
+	result[1] = "abcdefghjkmnpqrstuvwxyz"[int(bytes[1])%23]
+	result[2] = "23456789"[int(bytes[2])%8]
+
+	return string(result), nil
+}
+
 // GenerateJWT generates a JWT token for a user
 // DONE: Phase 3 - Updated to include is_super_admin claim
 func (s *AuthService) GenerateJWT(userID int, email string, isAdmin bool, isSuperAdmin bool) (string, error) {

@@ -647,6 +647,9 @@ func (h *UserHandler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	if req.Phone != nil {
 		targetUser.Phone = req.Phone
 	}
+	if req.ExperienceLevel != nil {
+		targetUser.ExperienceLevel = *req.ExperienceLevel
+	}
 
 	// Save updates
 	err = h.userRepo.Update(targetUser)
@@ -668,4 +671,172 @@ func (h *UserHandler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// DONE: Phase 4 - Handler methods complete
+// AdminCreateUser creates a new user (admin only, Super Admin can create admins)
+func (h *UserHandler) AdminCreateUser(w http.ResponseWriter, r *http.Request) {
+	// Check if current user is admin
+	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
+	isSuperAdmin, _ := r.Context().Value(middleware.IsSuperAdminKey).(bool)
+
+	if !isAdmin {
+		respondError(w, http.StatusForbidden, "Admin access required")
+		return
+	}
+
+	// Parse request body
+	var req models.AdminCreateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Validate request
+	if err := req.Validate(); err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Only Super Admin can create admin users
+	if req.IsAdmin && !isSuperAdmin {
+		respondError(w, http.StatusForbidden, "Nur Super Admin kann Admin-Benutzer erstellen")
+		return
+	}
+
+	// Check email uniqueness
+	existing, err := h.userRepo.FindByEmail(req.Email)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Database error")
+		return
+	}
+	if existing != nil {
+		respondError(w, http.StatusConflict, "E-Mail wird bereits verwendet")
+		return
+	}
+
+	// Generate temporary password
+	tempPassword, err := h.authService.GenerateTempPassword()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to generate password")
+		return
+	}
+
+	// Hash password
+	passwordHash, err := h.authService.HashPassword(tempPassword)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to hash password")
+		return
+	}
+
+	// Determine experience level - admins always get blue level
+	experienceLevel := req.ExperienceLevel
+	if req.IsAdmin {
+		experienceLevel = "blue"
+	}
+
+	// Create user
+	user := &models.User{
+		FirstName:          req.FirstName,
+		LastName:           req.LastName,
+		Email:              &req.Email,
+		Phone:              req.Phone,
+		PasswordHash:       &passwordHash,
+		ExperienceLevel:    experienceLevel,
+		IsAdmin:            req.IsAdmin,
+		IsSuperAdmin:       false, // Cannot create super admin via API
+		IsVerified:         true,  // Skip email verification for admin-created users
+		IsActive:           true,
+		IsDeleted:          false,
+		MustChangePassword: true, // Force password change on first login
+		TermsAcceptedAt:    time.Now(),
+		LastActivityAt:     time.Now(),
+	}
+
+	if err := h.userRepo.Create(user); err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to create user")
+		return
+	}
+
+	// Send temp password email
+	if h.emailService != nil {
+		go h.emailService.SendTempPasswordEmail(req.Email, req.FirstName, tempPassword)
+	}
+
+	// Don't return sensitive data
+	user.PasswordHash = nil
+
+	respondJSON(w, http.StatusCreated, map[string]interface{}{
+		"message": "Benutzer erfolgreich erstellt. Temporäres Passwort wurde per E-Mail gesendet.",
+		"user":    user,
+	})
+}
+
+// AdminDeleteUser deletes a user account (super-admin only, GDPR anonymization)
+func (h *UserHandler) AdminDeleteUser(w http.ResponseWriter, r *http.Request) {
+	// Check if current user is super admin
+	isSuperAdmin, _ := r.Context().Value(middleware.IsSuperAdminKey).(bool)
+	if !isSuperAdmin {
+		respondError(w, http.StatusForbidden, "Nur Super-Admins können Benutzer löschen")
+		return
+	}
+
+	// Get current user ID
+	currentUserID, _ := r.Context().Value(middleware.UserIDKey).(int)
+
+	// Get target user ID from URL
+	vars := mux.Vars(r)
+	userIDStr := vars["id"]
+	targetUserID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
+
+	// Cannot delete yourself
+	if targetUserID == currentUserID {
+		respondError(w, http.StatusBadRequest, "Sie können Ihr eigenes Konto nicht löschen")
+		return
+	}
+
+	// Get target user
+	targetUser, err := h.userRepo.FindByID(targetUserID)
+	if err != nil {
+		respondError(w, http.StatusNotFound, "Benutzer nicht gefunden")
+		return
+	}
+	if targetUser == nil {
+		respondError(w, http.StatusNotFound, "Benutzer nicht gefunden")
+		return
+	}
+
+	// Check if already deleted
+	if targetUser.IsDeleted {
+		respondError(w, http.StatusBadRequest, "Benutzer wurde bereits gelöscht")
+		return
+	}
+
+	// Cannot delete super admin users
+	if targetUser.IsSuperAdmin {
+		respondError(w, http.StatusForbidden, "Super-Admin kann nicht gelöscht werden")
+		return
+	}
+
+	// Store email for confirmation before deletion
+	var emailForConfirmation string
+	var userName string
+	if targetUser.Email != nil {
+		emailForConfirmation = *targetUser.Email
+	}
+	userName = targetUser.FirstName
+
+	// Delete account (GDPR anonymization)
+	if err := h.userRepo.DeleteAccount(targetUserID); err != nil {
+		respondError(w, http.StatusInternalServerError, "Fehler beim Löschen des Benutzers: "+err.Error())
+		return
+	}
+
+	// Send confirmation email to the deleted user
+	if emailForConfirmation != "" && h.emailService != nil {
+		go h.emailService.SendAccountDeletionConfirmation(emailForConfirmation, userName)
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"message": "Benutzer erfolgreich gelöscht"})
+}
