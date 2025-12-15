@@ -307,6 +307,51 @@ func SeedTestWalkReport(t *testing.T, db *sql.DB, bookingID int, behaviorRating 
 	return int(id)
 }
 
+// SeedTestColorCategory creates a test color category and returns the ID
+func SeedTestColorCategory(t *testing.T, db *sql.DB, name, hexCode string, sortOrder int) int {
+	now := time.Now()
+	result, err := db.Exec(`
+		INSERT INTO color_categories (name, hex_code, pattern_icon, sort_order, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, name, hexCode, "circle", sortOrder, now, now)
+
+	if err != nil {
+		t.Fatalf("Failed to seed test color category: %v", err)
+	}
+
+	id, _ := result.LastInsertId()
+	return int(id)
+}
+
+// SeedTestUserColor adds a color to a user
+func SeedTestUserColor(t *testing.T, db *sql.DB, userID, colorID int) {
+	now := time.Now()
+	_, err := db.Exec(`
+		INSERT INTO user_colors (user_id, color_id, granted_at)
+		VALUES (?, ?, ?)
+	`, userID, colorID, now)
+
+	if err != nil {
+		t.Fatalf("Failed to seed test user color: %v", err)
+	}
+}
+
+// SeedTestColorRequest creates a test color request and returns the ID
+func SeedTestColorRequest(t *testing.T, db *sql.DB, userID, colorID int, status string) int {
+	now := time.Now()
+	result, err := db.Exec(`
+		INSERT INTO color_requests (user_id, color_id, status, created_at)
+		VALUES (?, ?, ?, ?)
+	`, userID, colorID, status, now)
+
+	if err != nil {
+		t.Fatalf("Failed to seed test color request: %v", err)
+	}
+
+	id, _ := result.LastInsertId()
+	return int(id)
+}
+
 // DONE: CountRows returns the count of rows in a table
 func CountRows(t *testing.T, db *sql.DB, table string) int {
 	var count int

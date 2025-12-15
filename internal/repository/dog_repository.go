@@ -24,10 +24,10 @@ func NewDogRepository(db *sql.DB) *DogRepository {
 func (r *DogRepository) Create(dog *models.Dog) error {
 	query := `
 		INSERT INTO dogs (
-			name, breed, size, age, category, photo, photo_thumbnail, special_needs,
+			name, breed, size, age, category, color_id, photo, photo_thumbnail, special_needs,
 			pickup_location, walk_route, walk_duration, special_instructions,
 			default_morning_time, default_evening_time, is_available, external_link
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	result, err := r.db.Exec(
@@ -37,6 +37,7 @@ func (r *DogRepository) Create(dog *models.Dog) error {
 		dog.Size,
 		dog.Age,
 		dog.Category,
+		dog.ColorID,
 		dog.Photo,
 		dog.PhotoThumbnail,
 		dog.SpecialNeeds,
@@ -67,7 +68,7 @@ func (r *DogRepository) Create(dog *models.Dog) error {
 // FindByID finds a dog by ID
 func (r *DogRepository) FindByID(id int) (*models.Dog, error) {
 	query := `
-		SELECT id, name, breed, size, age, category, photo, photo_thumbnail, special_needs,
+		SELECT id, name, breed, size, age, category, color_id, photo, photo_thumbnail, special_needs,
 		       pickup_location, walk_route, walk_duration, special_instructions,
 		       default_morning_time, default_evening_time, is_available, is_featured,
 		       external_link, unavailable_reason, unavailable_since, created_at, updated_at
@@ -83,6 +84,7 @@ func (r *DogRepository) FindByID(id int) (*models.Dog, error) {
 		&dog.Size,
 		&dog.Age,
 		&dog.Category,
+		&dog.ColorID,
 		&dog.Photo,
 		&dog.PhotoThumbnail,
 		&dog.SpecialNeeds,
@@ -114,7 +116,7 @@ func (r *DogRepository) FindByID(id int) (*models.Dog, error) {
 // FindAll finds all dogs with optional filtering
 func (r *DogRepository) FindAll(filter *models.DogFilterRequest) ([]*models.Dog, error) {
 	query := `
-		SELECT id, name, breed, size, age, category, photo, photo_thumbnail, special_needs,
+		SELECT id, name, breed, size, age, category, color_id, photo, photo_thumbnail, special_needs,
 		       pickup_location, walk_route, walk_duration, special_instructions,
 		       default_morning_time, default_evening_time, is_available, is_featured,
 		       external_link, unavailable_reason, unavailable_since, created_at, updated_at
@@ -181,6 +183,7 @@ func (r *DogRepository) FindAll(filter *models.DogFilterRequest) ([]*models.Dog,
 			&dog.Size,
 			&dog.Age,
 			&dog.Category,
+			&dog.ColorID,
 			&dog.Photo,
 			&dog.PhotoThumbnail,
 			&dog.SpecialNeeds,
@@ -211,7 +214,7 @@ func (r *DogRepository) FindAll(filter *models.DogFilterRequest) ([]*models.Dog,
 // If more than 3 dogs are featured, a random selection of 3 is returned
 func (r *DogRepository) GetFeatured() ([]*models.Dog, error) {
 	query := `
-		SELECT id, name, breed, size, age, category, photo, photo_thumbnail, special_needs,
+		SELECT id, name, breed, size, age, category, color_id, photo, photo_thumbnail, special_needs,
 		       pickup_location, walk_route, walk_duration, special_instructions,
 		       default_morning_time, default_evening_time, is_available, is_featured,
 		       external_link, unavailable_reason, unavailable_since, created_at, updated_at
@@ -236,6 +239,7 @@ func (r *DogRepository) GetFeatured() ([]*models.Dog, error) {
 			&dog.Size,
 			&dog.Age,
 			&dog.Category,
+			&dog.ColorID,
 			&dog.Photo,
 			&dog.PhotoThumbnail,
 			&dog.SpecialNeeds,
@@ -306,6 +310,7 @@ func (r *DogRepository) Update(dog *models.Dog) error {
 			size = ?,
 			age = ?,
 			category = ?,
+			color_id = ?,
 			photo = ?,
 			photo_thumbnail = ?,
 			special_needs = ?,
@@ -330,6 +335,7 @@ func (r *DogRepository) Update(dog *models.Dog) error {
 		dog.Size,
 		dog.Age,
 		dog.Category,
+		dog.ColorID,
 		dog.Photo,
 		dog.PhotoThumbnail,
 		dog.SpecialNeeds,
@@ -526,6 +532,7 @@ func (r *DogRepository) GetBreeds() ([]string, error) {
 }
 
 // CanUserAccessDog checks if a user can access a dog based on their experience level
+// DEPRECATED: Use CanUserAccessDogByColor for the new color-based system
 func CanUserAccessDog(userLevel, dogCategory string) bool {
 	// Define level hierarchy: green < orange < blue
 	levelOrder := map[string]int{
@@ -543,4 +550,28 @@ func CanUserAccessDog(userLevel, dogCategory string) bool {
 
 	// User can access dog if their level is >= dog's required level
 	return userLevelNum >= dogLevelNum
+}
+
+// CanUserAccessDogByColor checks if a user can access a dog based on their assigned colors
+// This is the new non-hierarchical color-based access control system
+// Returns true if the user has the dog's required color
+func CanUserAccessDogByColor(userColorIDs []int, dogColorID int) bool {
+	// Dog must have a valid color ID
+	if dogColorID <= 0 {
+		return false
+	}
+
+	// User must have at least one color
+	if userColorIDs == nil || len(userColorIDs) == 0 {
+		return false
+	}
+
+	// Check if user has the dog's color
+	for _, colorID := range userColorIDs {
+		if colorID == dogColorID {
+			return true
+		}
+	}
+
+	return false
 }

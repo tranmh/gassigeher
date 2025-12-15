@@ -179,6 +179,7 @@ func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) {
 		Size:                req.Size,
 		Age:                 req.Age,
 		Category:            req.Category,
+		ColorID:             req.ColorID,
 		SpecialNeeds:        req.SpecialNeeds,
 		PickupLocation:      req.PickupLocation,
 		WalkRoute:           req.WalkRoute,
@@ -228,6 +229,11 @@ func (h *DogHandler) UpdateDog(w http.ResponseWriter, r *http.Request) {
 
 	// Update fields if provided
 	if req.Name != nil {
+		// Validate name is not empty
+		if strings.TrimSpace(*req.Name) == "" {
+			respondError(w, http.StatusBadRequest, "Name is required")
+			return
+		}
 		dog.Name = *req.Name
 	}
 	if req.Breed != nil {
@@ -241,6 +247,9 @@ func (h *DogHandler) UpdateDog(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Category != nil {
 		dog.Category = *req.Category
+	}
+	if req.ColorID != nil {
+		dog.ColorID = req.ColorID
 	}
 	if req.SpecialNeeds != nil {
 		dog.SpecialNeeds = req.SpecialNeeds

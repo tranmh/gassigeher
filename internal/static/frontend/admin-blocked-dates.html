@@ -28,11 +28,12 @@
                         <a href="#">Benutzer</a>
                         <div class="nav-dropdown-menu">
                             <a href="/admin-users.html">👥 Alle Benutzer</a>
-                            <a href="/admin-experience-requests.html">⭐ Level-Anfragen</a>
+                            <a href="/admin-color-requests.html">🎨 Farb-Anfragen</a>
                             <a href="/admin-reactivation-requests.html">🔄 Reaktivierungen</a>
                         </div>
                     </li>
                     <li><a href="/admin-settings.html" data-i18n="admin_dashboard.system_settings">Einstellungen</a></li>
+                    <li id="super-admin-colors-link" style="display:none;"><a href="/admin-colors.html">🎨 Farben</a></li>
                     <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
                     <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
@@ -104,6 +105,11 @@
                     alert('Zugriff verweigert: Diese Seite ist nur für Administratoren zugänglich.');
                     window.location.href = '/dashboard.html';
                     return;
+                }
+                // Show colors link for super-admins
+                if (userData.is_super_admin) {
+                    const colorsLink = document.getElementById('super-admin-colors-link');
+                    if (colorsLink) colorsLink.style.display = '';
                 }
             } catch (error) {
                 console.error('Failed to verify admin status:', error);

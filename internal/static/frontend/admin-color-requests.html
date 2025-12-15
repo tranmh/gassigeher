@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reaktivierungsanfragen - Gassigeher Admin</title>
+    <title>Farb-Anfragen verwalten - Gassigeher Admin</title>
     <link rel="stylesheet" href="/assets/css/main.css">
 </head>
 <body>
@@ -44,7 +44,7 @@
 
     <main style="padding: 40px 0;">
         <div class="container">
-            <h1 data-i18n="reactivation.manage_requests">Reaktivierungsanfragen</h1>
+            <h1 data-i18n="color_requests.manage_requests">Farb-Anfragen verwalten</h1>
 
             <div id="alert-container"></div>
 
@@ -61,6 +61,7 @@
     <script src="/js/impersonation-banner.js"></script>
     <script>
         let requests = [];
+        let allColors = [];
 
         document.addEventListener('DOMContentLoaded', async () => {
             if (!api.isAuthenticated()) {
@@ -96,53 +97,120 @@
             // Initialize impersonation banner (shows if impersonating)
             await ImpersonationBanner.init();
 
+            // Load colors first, then requests
+            await loadColors();
             loadRequests();
         });
 
+        async function loadColors() {
+            try {
+                const response = await api.getColors();
+                allColors = response.colors || [];
+            } catch (error) {
+                console.error('Failed to load colors:', error);
+            }
+        }
+
         async function loadRequests() {
             try {
-                requests = await api.getReactivationRequests();
+                requests = await api.getColorRequests();
                 renderRequests();
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Laden der Anfragen');
             }
         }
 
+        function getColorById(colorId) {
+            return allColors.find(c => c.id === colorId);
+        }
+
+        function getPatternIcon(pattern) {
+            const icons = {
+                'circle': '●',
+                'triangle': '▲',
+                'square': '■',
+                'diamond': '◆',
+                'pentagon': '⬠',
+                'hexagon': '⬡',
+                'star': '★',
+                'heart': '♥',
+                'cross': '✚',
+                'spade': '♠',
+                'club': '♣',
+                'moon': '☽',
+                'sun': '☀',
+                'ring': '○',
+                'target': '◎'
+            };
+            return icons[pattern] || '●';
+        }
+
+        function getColorBadgeHtml(color) {
+            if (!color) {
+                return '<span class="dog-category-badge">Unbekannte Farbe</span>';
+            }
+            return `
+                <span class="dog-category-badge" style="
+                    background: ${color.hex_code}20;
+                    border: 2px solid ${color.hex_code};
+                    color: ${color.hex_code};
+                ">
+                    ${getPatternIcon(color.pattern_icon)} ${sanitizeHTML(color.name)}
+                </span>
+            `;
+        }
+
         function renderRequests() {
             const container = document.getElementById('requests-list');
 
             if (requests.length === 0) {
-                container.innerHTML = '<div class="card"><p data-i18n="reactivation.no_requests">Keine ausstehenden Anfragen</p></div>';
+                container.innerHTML = '<div class="card"><p data-i18n="color_requests.no_pending_requests">Keine ausstehenden Anfragen</p></div>';
                 return;
             }
 
             container.innerHTML = requests.map(request => {
                 const safeUserName = request.user ? sanitizeHTML(`${request.user.first_name || ''} ${request.user.last_name || ''}`.trim()) : `User #${request.user_id}`;
                 const safeEmail = request.user && request.user.email ? sanitizeHTML(request.user.email) : 'N/A';
-                const safeDeactivationReason = request.user && request.user.deactivation_reason ? sanitizeHTML(request.user.deactivation_reason) : '';
+                const safeAdminMessage = request.admin_message ? sanitizeHTML(request.admin_message) : '';
+                const requestedColor = request.color || getColorById(request.color_id);
+                const colorBadgeHtml = getColorBadgeHtml(requestedColor);
+                const statusClass = request.status === 'pending' ? 'alert-warning' :
+                                  (request.status === 'approved' ? 'alert-success' : 'alert-error');
+
+                // Build user's current colors display
+                let userColorsHtml = 'Keine Farben';
+                if (request.user && request.user.colors && request.user.colors.length > 0) {
+                    userColorsHtml = request.user.colors.map(c => getColorBadgeHtml(c)).join(' ');
+                }
 
                 return `
                     <div class="card" style="margin-bottom: 15px;">
                         <div style="display: flex; justify-content: space-between; align-items: start;">
                             <div style="flex: 1;">
-                                <h4 style="margin: 0 0 10px 0;">${safeUserName}</h4>
+                                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;">
+                                    <h4 style="margin: 0;">${safeUserName}</h4>
+                                    <span style="color: #666;">möchte</span>
+                                    ${colorBadgeHtml}
+                                </div>
                                 <p style="margin: 5px 0; color: #666;">
                                     <strong>E-Mail:</strong> ${safeEmail}
                                 </p>
                                 <p style="margin: 5px 0; color: #666;">
-                                    <strong>Level:</strong> ${request.user ? getLevelLabel(request.user.experience_level) : 'N/A'}
+                                    <strong>Aktuelle Farben:</strong> ${userColorsHtml}
                                 </p>
                                 <p style="margin: 5px 0; color: #666;">
-                                    <strong>Deaktiviert seit:</strong> ${request.user && request.user.deactivated_at ? new Date(request.user.deactivated_at).toLocaleDateString('de-DE') : 'N/A'}
+                                    <strong>Beantragt am:</strong> ${new Date(request.created_at).toLocaleDateString('de-DE')}
                                 </p>
-                                ${request.user && request.user.deactivation_reason ? `
-                                    <p style="margin: 10px 0; padding: 10px; background: #fff3cd; border-radius: 4px;">
-                                        <strong>Deaktivierungsgrund:</strong> ${safeDeactivationReason}
+                                ${request.reviewed_at ? `
+                                    <p style="margin: 5px 0; color: #666;">
+                                        <strong>Status:</strong> <span class="alert ${statusClass}" style="padding: 4px 8px; font-size: 0.8rem; margin-left: 5px;">${getStatusLabel(request.status)}</span>
                                     </p>
                                 ` : ''}
-                                <p style="margin: 5px 0; color: #666;">
-                                    <strong>Anfrage vom:</strong> ${new Date(request.created_at).toLocaleDateString('de-DE')}
-                                </p>
+                                ${request.admin_message ? `
+                                    <p style="margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 4px;">
+                                        <strong>Nachricht:</strong> ${safeAdminMessage}
+                                    </p>
+                                ` : ''}
                             </div>
                             ${request.status === 'pending' ? `
                                 <div style="display: flex; gap: 5px; flex-direction: column; min-width: 120px;">
@@ -156,17 +224,21 @@
             }).join('');
         }
 
-        function getLevelLabel(level) {
-            const labels = { green: 'Grün', blue: 'Blau', orange: 'Orange' };
-            return labels[level] || level;
+        function getStatusLabel(status) {
+            const labels = {
+                pending: 'Ausstehend',
+                approved: 'Genehmigt',
+                denied: 'Abgelehnt'
+            };
+            return labels[status] || status;
         }
 
         async function approveRequest(id) {
             const message = prompt('Optional: Nachricht an den Benutzer:');
 
             try {
-                await api.approveReactivationRequest(id, message || null);
-                showAlert('success', 'Anfrage genehmigt und Benutzer reaktiviert');
+                await api.approveColorRequest(id, message || null);
+                showAlert('success', 'Farb-Anfrage genehmigt');
                 loadRequests();
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Genehmigen');
@@ -176,13 +248,13 @@
         async function denyRequest(id) {
             const message = prompt('Optional: Nachricht an den Benutzer (Grund der Ablehnung):');
 
-            if (!confirm('Möchtest du diese Reaktivierungsanfrage wirklich ablehnen?')) {
+            if (!confirm('Möchtest du diese Anfrage wirklich ablehnen?')) {
                 return;
             }
 
             try {
-                await api.denyReactivationRequest(id, message || null);
-                showAlert('success', 'Anfrage abgelehnt');
+                await api.denyColorRequest(id, message || null);
+                showAlert('success', 'Farb-Anfrage abgelehnt');
                 loadRequests();
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Ablehnen');
@@ -191,7 +263,7 @@
 
         function showAlert(type, message) {
             const container = document.getElementById('alert-container');
-            container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            container.innerHTML = `<div class="alert alert-${type}">${sanitizeHTML(message)}</div>`;
             setTimeout(() => container.innerHTML = '', 5000);
         }
     </script>

@@ -30,7 +30,7 @@
 
         /* Calendar Headers */
         .calendar-header {
-            background: linear-gradient(135deg, var(--primary-green) 0%, var(--secondary-green) 100%);
+            background: linear-gradient(135deg, #82b965 0%, #6fa050 100%);
             color: white;
             padding: 16px 12px;
             text-align: center;
@@ -47,7 +47,7 @@
             position: sticky;
             left: 0;
             z-index: 11;
-            background: linear-gradient(135deg, var(--header-bg) 0%, var(--primary-green) 100%);
+            background: linear-gradient(135deg, #26272b 0%, #82b965 100%);
         }
 
         /* Calendar Cells */
@@ -67,6 +67,7 @@
         .calendar-cell.dog-name {
             text-align: left;
             justify-content: flex-start;
+            align-items: flex-start; /* Override center from .calendar-cell to left-align content */
             position: sticky;
             left: 0;
             z-index: 5;
@@ -74,6 +75,12 @@
             background: var(--warm-cream);
             color: var(--text-dark);
             font-size: 0.95rem;
+        }
+
+        /* Override the centered justify-content from main.css */
+        .calendar-cell.dog-name .calendar-dog-name-cell {
+            justify-content: flex-start;
+            width: 100%;
         }
 
         /* Available Cells - Light green with good contrast */
@@ -316,12 +323,10 @@
             <!-- Filters -->
             <div class="filter-section">
                 <div class="form-group">
-                    <label for="category-filter">🏷️ Nach Kategorie filtern:</label>
-                    <select id="category-filter" onchange="loadCalendar()">
-                        <option value="">Alle Kategorien</option>
-                        <option value="green">🟢 Grün (Anfänger)</option>
-                        <option value="blue">🔵 Blau (Fortgeschritten)</option>
-                        <option value="orange">🟠 Orange (Experte)</option>
+                    <label for="color-filter">🎨 Nach Farbe filtern:</label>
+                    <select id="color-filter" onchange="loadCalendar()">
+                        <option value="">Alle Farben</option>
+                        <!-- Dynamic color options loaded from API -->
                     </select>
                 </div>
                 <div class="form-group">
@@ -391,6 +396,7 @@
         let allDogs = [];
         let bookings = [];
         let blockedDates = [];
+        let allColors = [];
 
         document.addEventListener('DOMContentLoaded', async () => {
             if (!api.isAuthenticated()) {
@@ -399,9 +405,6 @@
             }
 
             await window.i18n.load();
-
-            // Explicitly update all translations after load
-            console.log('i18n loaded, updating translations...');
             window.i18n.updateElement(document.body);
 
             // Initialize impersonation banner (shows if impersonating)
@@ -415,17 +418,74 @@
                 console.error('Failed to load user:', error);
             }
 
+            // Load colors first, then calendar
+            await loadColors();
             await loadCalendar();
         });
 
+        async function loadColors() {
+            try {
+                const response = await api.getColors();
+                allColors = response.colors || [];
+                const colorSelect = document.getElementById('color-filter');
+                // Keep the first "Alle Farben" option
+                colorSelect.innerHTML = '<option value="">Alle Farben</option>';
+                allColors.forEach(color => {
+                    const option = document.createElement('option');
+                    option.value = color.id;
+                    option.textContent = `${getPatternIcon(color.pattern_icon)} ${color.name}`;
+                    option.style.color = color.hex_code;
+                    colorSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Failed to load colors:', error);
+            }
+        }
+
+        function getPatternIcon(pattern) {
+            const icons = {
+                'circle': '●',
+                'triangle': '▲',
+                'square': '■',
+                'diamond': '◆',
+                'pentagon': '⬠',
+                'hexagon': '⬡',
+                'star': '★',
+                'heart': '♥',
+                'cross': '✚',
+                'spade': '♠',
+                'club': '♣',
+                'moon': '☽',
+                'sun': '☀',
+                'ring': '○',
+                'target': '◎'
+            };
+            return icons[pattern] || '●';
+        }
+
+        function getColorBadgeHtml(color) {
+            if (!color) return '';
+            return `<span style="
+                display: inline-flex;
+                align-items: center;
+                gap: 3px;
+                padding: 2px 6px;
+                border-radius: 8px;
+                font-size: 0.7rem;
+                font-weight: 500;
+                background: ${color.hex_code}20;
+                border: 1px solid ${color.hex_code};
+                color: ${color.hex_code};
+            ">${getPatternIcon(color.pattern_icon)} ${color.name}</span>`;
+        }
+
         async function loadCalendar() {
             try {
-                const categoryFilter = document.getElementById('category-filter').value;
+                const colorFilter = document.getElementById('color-filter').value;
 
                 // Fetch dogs
-                const params = categoryFilter ? { category: categoryFilter } : {};
+                const params = colorFilter ? { color_id: colorFilter } : {};
                 allDogs = await api.getDogs(params);
-                console.log('[CALENDAR DEBUG] Loaded', allDogs.length, 'dogs');
 
                 // Fetch bookings for next 14 days
                 const today = new Date();
@@ -434,33 +494,20 @@
 
                 const startDate = today.toISOString().split('T')[0];
                 const endDate = twoWeeksLater.toISOString().split('T')[0];
-                console.log('[CALENDAR DEBUG] Fetching bookings from', startDate, 'to', endDate);
 
                 bookings = await api.getBookings({
-                    date_from: startDate,  // Backend expects date_from, not start_date
-                    date_to: endDate,      // Backend expects date_to, not end_date
-                    calendar_view: 'true'  // Allow seeing all bookings for availability
-                });
-
-                console.log('[CALENDAR DEBUG] Loaded', bookings.length, 'bookings:');
-                bookings.forEach(b => {
-                    console.log('[CALENDAR DEBUG] Booking:', {
-                        id: b.id,
-                        dog_id: b.dog_id,
-                        date: b.date,
-                        scheduled_time: b.scheduled_time,
-                        status: b.status
-                    });
+                    date_from: startDate,
+                    date_to: endDate,
+                    calendar_view: 'true'
                 });
 
                 // Fetch blocked dates
                 blockedDates = await api.getBlockedDates();
-                console.log('[CALENDAR DEBUG] Loaded', blockedDates.length, 'blocked dates');
 
                 renderCalendar();
-                renderMobileView();  // Always render both views, CSS handles visibility
+                renderMobileView();
             } catch (error) {
-                console.error('[CALENDAR ERROR] Failed to load calendar:', error);
+                console.error('Failed to load calendar:', error);
                 showAlert('error', 'Fehler beim Laden der Daten: ' + (error.message || 'Unbekannter Fehler'));
             }
         }
@@ -486,11 +533,17 @@
                 </div>`;
             });
 
+            // Filter dogs with valid names
+            const validDogs = allDogs.filter(dog => {
+                if (!dog || !dog.id || !dog.name) return false;
+                const visibleName = dog.name.replace(/[\s\u00A0\u2000-\u200B\u2028\u2029\u3000]/g, '');
+                return visibleName.length > 0;
+            });
+
             // Dog rows
-            allDogs.forEach(dog => {
-                html += `<div class="calendar-cell dog-name">
-                    ${getCalendarDogCell(dog)}
-                </div>`;
+            validDogs.forEach(dog => {
+                const dogColor = getColorForDog(dog);
+                html += `<div class="calendar-cell dog-name" data-dog-id="${dog.id}">${getCalendarDogCell(dog, dogColor)}</div>`;
 
                 dates.forEach(date => {
                     const dateStr = date.toISOString().split('T')[0];
@@ -525,28 +578,11 @@
         }
 
         function getCellData(dogId, date) {
-            console.log('[CALENDAR DEBUG] getCellData - dogId:', dogId, 'date:', date);
-
-            // Normalize date for comparison
-            // date parameter is "YYYY-MM-DD"
-            // b.date from API might be "YYYY-MM-DD" or "YYYY-MM-DDT00:00:00Z"
+            // Filter bookings for this dog and date
             const dogBookings = bookings.filter(b => {
-                const bookingDate = b.date.split('T')[0]; // Extract YYYY-MM-DD from ISO format
-                const match = b.dog_id === dogId && bookingDate === date && b.status !== 'cancelled';
-                if (b.dog_id === dogId) {
-                    console.log('[CALENDAR DEBUG] Checking booking:', {
-                        booking_id: b.id,
-                        raw_date: b.date,
-                        normalized_date: bookingDate,
-                        target_date: date,
-                        status: b.status,
-                        matches: match
-                    });
-                }
-                return match;
+                const bookingDate = b.date.split('T')[0];
+                return b.dog_id === dogId && bookingDate === date && b.status !== 'cancelled';
             });
-
-            console.log('[CALENDAR DEBUG] Found', dogBookings.length, 'bookings for dog', dogId, 'on', date);
 
             // Check for blocked dates - now supports dog-specific blocks
             // A date is blocked for this dog if:
@@ -624,40 +660,17 @@
             return `${day}.${month}.${year}`;
         }
 
-        function getCategoryLabel(category) {
-            const labels = {
-                green: 'Grün',
-                blue: 'Blau',
-                orange: 'Orange'
-            };
-            return labels[category] || category;
+        function getColorForDog(dog) {
+            if (dog.color) return dog.color;
+            return allColors.find(c => c.id === dog.color_id);
         }
 
         function quickBook(dogId, date) {
-            console.log('[CALENDAR DEBUG] quickBook called:', {dogId, date});
-
             const dog = allDogs.find(d => d.id === dogId);
-            if (!dog) {
-                console.error('[CALENDAR ERROR] Dog not found in allDogs array:', dogId);
-                return;
-            }
-            console.log('[CALENDAR DEBUG] Found dog:', dog);
+            if (!dog) return;
 
-            // Redirect to dogs page with pre-filled booking (user will select time slot there)
-            const pendingBooking = {
-                dogId: dogId,
-                date: date
-            };
-            console.log('[CALENDAR DEBUG] Saving pending booking to localStorage:', pendingBooking);
-            console.log('[CALENDAR DEBUG] JSON.stringify:', JSON.stringify(pendingBooking));
-
-            localStorage.setItem('pendingBooking', JSON.stringify(pendingBooking));
-
-            // Verify it was saved
-            const savedValue = localStorage.getItem('pendingBooking');
-            console.log('[CALENDAR DEBUG] Verification - saved value:', savedValue);
-
-            console.log('[CALENDAR DEBUG] Redirecting to /dogs.html...');
+            // Redirect to dogs page with pre-filled booking
+            localStorage.setItem('pendingBooking', JSON.stringify({ dogId, date }));
             window.location.href = '/dogs.html';
         }
 
@@ -708,9 +721,19 @@
             const dates = getNext14Days();
             let html = '';
 
-            allDogs.forEach(dog => {
+            // Filter dogs with valid names (same logic as desktop)
+            const validDogs = allDogs.filter(dog => {
+                if (!dog || !dog.id) return false;
+                if (!dog.name) return false;
+                const visibleName = dog.name.replace(/[\s\u00A0\u2000-\u200B\u2028\u2029\u3000]/g, '');
+                return visibleName.length > 0;
+            });
+
+            validDogs.forEach(dog => {
+                const dogColor = getColorForDog(dog);
+                const colorBadge = dogColor ? getColorBadgeHtml(dogColor) : '';
                 html += `<div class="dog-card-mobile">
-                    <h3>🐕 ${dog.name} <span style="font-size: 0.85rem; color: var(--text-gray); font-weight: normal;">(${getCategoryLabel(dog.category)})</span></h3>`;
+                    <h3>🐕 ${sanitizeHTML(dog.name)} ${colorBadge}</h3>`;
 
                 dates.forEach(date => {
                     const dateStr = date.toISOString().split('T')[0];

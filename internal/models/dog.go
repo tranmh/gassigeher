@@ -6,28 +6,30 @@ import (
 
 // Dog represents a dog in the system
 type Dog struct {
-	ID                   int        `json:"id"`
-	Name                 string     `json:"name"`
-	Breed                string     `json:"breed"`
-	Size                 string     `json:"size"` // small, medium, large
-	Age                  int        `json:"age"`
-	Category             string     `json:"category"` // green, blue, orange
-	Photo                *string    `json:"photo,omitempty"`
-	PhotoThumbnail       *string    `json:"photo_thumbnail,omitempty"`
-	SpecialNeeds         *string    `json:"special_needs,omitempty"`
-	PickupLocation       *string    `json:"pickup_location,omitempty"`
-	WalkRoute            *string    `json:"walk_route,omitempty"`
-	WalkDuration         *int       `json:"walk_duration,omitempty"` // minutes
-	SpecialInstructions  *string    `json:"special_instructions,omitempty"`
-	DefaultMorningTime   *string    `json:"default_morning_time,omitempty"` // HH:MM format
-	DefaultEveningTime   *string    `json:"default_evening_time,omitempty"` // HH:MM format
-	IsAvailable          bool       `json:"is_available"`
-	IsFeatured           bool       `json:"is_featured"`
-	ExternalLink         *string    `json:"external_link,omitempty"`
-	UnavailableReason    *string    `json:"unavailable_reason,omitempty"`
-	UnavailableSince     *time.Time `json:"unavailable_since,omitempty"`
-	CreatedAt            time.Time  `json:"created_at"`
-	UpdatedAt            time.Time  `json:"updated_at"`
+	ID                   int            `json:"id"`
+	Name                 string         `json:"name"`
+	Breed                string         `json:"breed"`
+	Size                 string         `json:"size"` // small, medium, large
+	Age                  int            `json:"age"`
+	Category             string         `json:"category"` // green, blue, orange (legacy, use color_id)
+	ColorID              *int           `json:"color_id,omitempty"`
+	Color                *ColorCategory `json:"color,omitempty"`
+	Photo                *string        `json:"photo,omitempty"`
+	PhotoThumbnail       *string        `json:"photo_thumbnail,omitempty"`
+	SpecialNeeds         *string        `json:"special_needs,omitempty"`
+	PickupLocation       *string        `json:"pickup_location,omitempty"`
+	WalkRoute            *string        `json:"walk_route,omitempty"`
+	WalkDuration         *int           `json:"walk_duration,omitempty"` // minutes
+	SpecialInstructions  *string        `json:"special_instructions,omitempty"`
+	DefaultMorningTime   *string        `json:"default_morning_time,omitempty"` // HH:MM format
+	DefaultEveningTime   *string        `json:"default_evening_time,omitempty"` // HH:MM format
+	IsAvailable          bool           `json:"is_available"`
+	IsFeatured           bool           `json:"is_featured"`
+	ExternalLink         *string        `json:"external_link,omitempty"`
+	UnavailableReason    *string        `json:"unavailable_reason,omitempty"`
+	UnavailableSince     *time.Time     `json:"unavailable_since,omitempty"`
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
 }
 
 // CreateDogRequest represents the request to create a dog
@@ -37,6 +39,7 @@ type CreateDogRequest struct {
 	Size                string  `json:"size"`
 	Age                 int     `json:"age"`
 	Category            string  `json:"category"`
+	ColorID             *int    `json:"color_id,omitempty"`
 	SpecialNeeds        *string `json:"special_needs,omitempty"`
 	PickupLocation      *string `json:"pickup_location,omitempty"`
 	WalkRoute           *string `json:"walk_route,omitempty"`
@@ -54,6 +57,7 @@ type UpdateDogRequest struct {
 	Size                *string `json:"size,omitempty"`
 	Age                 *int    `json:"age,omitempty"`
 	Category            *string `json:"category,omitempty"`
+	ColorID             *int    `json:"color_id,omitempty"`
 	SpecialNeeds        *string `json:"special_needs,omitempty"`
 	PickupLocation      *string `json:"pickup_location,omitempty"`
 	WalkRoute           *string `json:"walk_route,omitempty"`

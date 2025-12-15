@@ -66,8 +66,8 @@ func TestSettingsRepository_GetAll(t *testing.T) {
 			t.Fatalf("GetAll() failed: %v", err)
 		}
 
-		if len(settings) != 12 {
-			t.Errorf("Expected 12 settings, got %d", len(settings))
+		if len(settings) != 13 {
+			t.Errorf("Expected 13 settings, got %d", len(settings))
 		}
 
 		// Verify all expected settings are present
@@ -76,12 +76,12 @@ func TestSettingsRepository_GetAll(t *testing.T) {
 			keys[s.Key] = true
 		}
 
-		// Original 3 settings + 5 from migration 012 + 1 from migration 017 + 1 from migration 018 + 2 from migration 021
+		// Original 3 settings + 5 from migration 012 + 1 from migration 017 + 1 from migration 018 + 2 from migration 021 + 1 from migration 028
 		expectedKeys := []string{
 			"booking_advance_days", "cancellation_notice_hours", "auto_deactivation_days",
 			"morning_walk_requires_approval", "use_feiertage_api", "feiertage_state",
 			"booking_time_granularity", "feiertage_cache_days", "site_logo", "registration_password",
-			"whatsapp_group_enabled", "whatsapp_group_link",
+			"whatsapp_group_enabled", "whatsapp_group_link", "default_color_for_new_users",
 		}
 		for _, key := range expectedKeys {
 			if !keys[key] {

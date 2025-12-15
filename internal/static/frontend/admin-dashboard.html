@@ -28,11 +28,12 @@
                         <a href="#">Benutzer</a>
                         <div class="nav-dropdown-menu">
                             <a href="/admin-users.html">👥 Alle Benutzer</a>
-                            <a href="/admin-experience-requests.html">⭐ Level-Anfragen</a>
+                            <a href="/admin-color-requests.html">🎨 Farb-Anfragen</a>
                             <a href="/admin-reactivation-requests.html">🔄 Reaktivierungen</a>
                         </div>
                     </li>
                     <li><a href="/admin-settings.html" data-i18n="admin_dashboard.system_settings">Einstellungen</a></li>
+                    <li id="super-admin-colors-link" style="display:none;"><a href="/admin-colors.html">🎨 Farben</a></li>
                     <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
                     <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
@@ -81,7 +82,7 @@
 
                 <div class="card" style="text-align: center; padding: 25px;">
                     <h2 style="margin: 0 0 10px 0; font-size: 2.5rem; color: #17a2b8;" id="stat-experience-reqs">-</h2>
-                    <p style="margin: 0; font-size: 0.9rem; color: #666;" data-i18n="admin_dashboard.pending_experience_requests">Level-Anfragen</p>
+                    <p style="margin: 0; font-size: 0.9rem; color: #666;" data-i18n="admin_dashboard.pending_color_requests">Farben-Anfragen</p>
                 </div>
 
                 <div class="card" style="text-align: center; padding: 25px;">
@@ -105,11 +106,12 @@
                     <a href="/admin-dogs.html" class="btn">🐕 Hunde verwalten</a>
                     <a href="/admin-bookings.html" class="btn">📅 Buchungen</a>
                     <a href="/admin-users.html" class="btn">👥 Benutzer</a>
-                    <a href="/admin-experience-requests.html" class="btn">⭐ Level-Anfragen</a>
+                    <a href="/admin-color-requests.html" class="btn">🎨 Farb-Anfragen</a>
                     <a href="/admin-reactivation-requests.html" class="btn">🔄 Reaktivierungen</a>
                     <a href="/admin-booking-times.html" class="btn">⏰ Buchungszeiten</a>
                     <a href="/admin-booking-approvals.html" class="btn">✓ Genehmigungen</a>
                     <a href="/admin-settings.html" class="btn">⚙️ Einstellungen</a>
+                    <a href="/admin-colors.html" class="btn" id="colors-link" style="display: none;">🎨 Farben (Super-Admin)</a>
                 </div>
             </div>
         </div>
@@ -135,6 +137,13 @@
                     alert('Zugriff verweigert: Diese Seite ist nur für Administratoren zugänglich.');
                     window.location.href = '/dashboard.html';
                     return;
+                }
+                // Show colors link for super-admins
+                if (userData.is_super_admin) {
+                    const colorsLink = document.getElementById('super-admin-colors-link');
+                    if (colorsLink) colorsLink.style.display = '';
+                    const colorsLinkDashboard = document.getElementById('colors-link');
+                    if (colorsLinkDashboard) colorsLinkDashboard.style.display = 'inline-block';
                 }
             } catch (error) {
                 console.error('Failed to verify admin status:', error);

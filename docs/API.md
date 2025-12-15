@@ -878,6 +878,320 @@ Approve an experience level request. Automatically updates user's level.
 
 ---
 
+## Color Category Endpoints
+
+### List Colors
+`GET /colors` 🔓 Public
+
+Get all available color categories.
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": 1,
+    "name": "gruen",
+    "hex_code": "#28a745",
+    "pattern_icon": "circle",
+    "sort_order": 1,
+    "created_at": "2025-01-16T10:00:00Z",
+    "updated_at": "2025-01-16T10:00:00Z"
+  },
+  {
+    "id": 2,
+    "name": "gelb",
+    "hex_code": "#ffc107",
+    "pattern_icon": "triangle",
+    "sort_order": 2,
+    "created_at": "2025-01-16T10:00:00Z",
+    "updated_at": "2025-01-16T10:00:00Z"
+  }
+]
+```
+
+---
+
+### Create Color
+`POST /colors` 🔒 Super-Admin Only
+
+Create a new color category.
+
+**Request:**
+```json
+{
+  "name": "rot",
+  "hex_code": "#dc3545",
+  "pattern_icon": "star"
+}
+```
+
+**Response:** `201 Created`
+```json
+{
+  "id": 8,
+  "name": "rot",
+  "hex_code": "#dc3545",
+  "pattern_icon": "star",
+  "sort_order": 8,
+  "created_at": "2025-01-16T10:00:00Z",
+  "updated_at": "2025-01-16T10:00:00Z"
+}
+```
+
+**Rules:**
+- Maximum 15 colors allowed
+- Name must be unique
+- Hex code must be valid format (#XXXXXX)
+
+---
+
+### Update Color
+`PUT /colors/:id` 🔒 Super-Admin Only
+
+Update a color category.
+
+**Request:**
+```json
+{
+  "name": "rot",
+  "hex_code": "#ff0000",
+  "pattern_icon": "star",
+  "sort_order": 8
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "id": 8,
+  "name": "rot",
+  "hex_code": "#ff0000",
+  "pattern_icon": "star",
+  "sort_order": 8,
+  "created_at": "2025-01-16T10:00:00Z",
+  "updated_at": "2025-01-16T14:00:00Z"
+}
+```
+
+---
+
+### Delete Color
+`DELETE /colors/:id` 🔒 Super-Admin Only
+
+Delete a color category.
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Color deleted successfully"
+}
+```
+
+**Rules:**
+- Cannot delete if dogs are assigned to this color
+- Minimum 3 colors must remain
+
+---
+
+### Get Color Stats
+`GET /colors/:id/stats` 🔒 Super-Admin Only
+
+Get usage statistics for a color.
+
+**Response:** `200 OK`
+```json
+{
+  "dog_count": 5,
+  "user_count": 12
+}
+```
+
+---
+
+## Color Request Endpoints
+
+### Create Color Request
+`POST /color-requests` 🔒 Protected
+
+Request a new color category.
+
+**Request:**
+```json
+{
+  "color_id": 3
+}
+```
+
+**Response:** `201 Created`
+```json
+{
+  "id": 1,
+  "user_id": 5,
+  "color_id": 3,
+  "status": "pending",
+  "created_at": "2025-01-16T10:00:00Z"
+}
+```
+
+**Rules:**
+- Cannot request color already owned
+- Only one pending request allowed at a time
+
+---
+
+### List Color Requests
+`GET /color-requests` 🔒 Protected
+
+List color requests. Users see own requests, admins see all pending.
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": 1,
+    "user_id": 5,
+    "color_id": 3,
+    "status": "pending",
+    "admin_message": null,
+    "reviewed_by": null,
+    "reviewed_at": null,
+    "created_at": "2025-01-16T10:00:00Z",
+    "color": {
+      "id": 3,
+      "name": "orange",
+      "hex_code": "#fd7e14"
+    }
+  }
+]
+```
+
+---
+
+### Approve Color Request
+`PUT /color-requests/:id/approve` 🔒 Admin Only
+
+Approve a color request. Automatically adds color to user.
+
+**Request:**
+```json
+{
+  "message": "Welcome to orange level!" // Optional
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Request approved successfully"
+}
+```
+
+---
+
+### Deny Color Request
+`PUT /color-requests/:id/deny` 🔒 Admin Only
+
+Deny a color request.
+
+**Request:**
+```json
+{
+  "message": "Please complete more walks first" // Optional
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Request denied successfully"
+}
+```
+
+---
+
+## User Color Endpoints
+
+### Get User Colors
+`GET /users/:id/colors` 🔒 Admin Only
+
+Get all colors assigned to a user.
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": 1,
+    "name": "gruen",
+    "hex_code": "#28a745",
+    "pattern_icon": "circle"
+  },
+  {
+    "id": 3,
+    "name": "orange",
+    "hex_code": "#fd7e14",
+    "pattern_icon": "square"
+  }
+]
+```
+
+---
+
+### Add Color to User
+`POST /users/:id/colors` 🔒 Admin Only
+
+Add a color to a user.
+
+**Request:**
+```json
+{
+  "color_id": 3
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Color added successfully"
+}
+```
+
+---
+
+### Remove Color from User
+`DELETE /users/:id/colors/:colorId` 🔒 Admin Only
+
+Remove a color from a user.
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Color removed successfully"
+}
+```
+
+---
+
+### Set User Colors
+`PUT /users/:id/colors` 🔒 Admin Only
+
+Replace all user colors with new set.
+
+**Request:**
+```json
+{
+  "color_ids": [1, 3, 5]
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Colors updated successfully"
+}
+```
+
+---
+
 ## Admin Dashboard Endpoints
 
 ### Get Statistics

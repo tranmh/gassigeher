@@ -5,6 +5,57 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profil - Gassigeher</title>
     <link rel="stylesheet" href="/assets/css/main.css">
+    <style>
+        .color-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin: 4px;
+            color: white;
+        }
+        .color-badge .pattern-icon {
+            font-size: 0.8rem;
+        }
+        .color-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 15px 0;
+        }
+        .color-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .color-option:hover {
+            border-color: #82b965;
+            background: #f9f9f9;
+        }
+        .color-option.owned {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .color-option.owned::after {
+            content: ' (bereits vorhanden)';
+            font-size: 0.8rem;
+            color: #666;
+        }
+        .color-swatch {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid rgba(0,0,0,0.1);
+        }
+    </style>
 </head>
 <body>
     <header>
@@ -84,29 +135,28 @@
                 </form>
             </div>
 
-            <!-- Experience Level -->
+            <!-- User Colors -->
             <div class="card">
-                <h3 data-i18n="profile.current_level">Aktuelles Level</h3>
-                <div style="margin: 20px 0;">
-                    <span id="current-level-badge" class="dog-category-badge" style="font-size: 1.2rem;"></span>
+                <h3 data-i18n="colors.your_colors">Deine Farben</h3>
+                <div id="user-colors-container">
+                    <p data-i18n="colors.no_colors">Du hast noch keine Farbkategorien</p>
                 </div>
 
-                <div id="promotion-section">
-                    <p data-i18n="profile.promotion_description">Beantrage ein höheres Erfahrungslevel, um Zugang zu anspruchsvolleren Hunden zu erhalten.</p>
-
-                    <div style="margin: 20px 0; padding: 15px; background: #f9f9f9; border-radius: 6px;">
-                        <p style="margin: 5px 0;"><strong style="color: #28a745;">●</strong> <span data-i18n="profile.level_green_desc">Grün: Für Anfänger</span></p>
-                        <p style="margin: 5px 0;"><strong style="color: #ffc107;">●</strong> <span data-i18n="profile.level_orange_desc">Orange: Für Erfahrene</span></p>
-                        <p style="margin: 5px 0;"><strong style="color: #17a2b8;">●</strong> <span data-i18n="profile.level_blue_desc">Blau: Nur für feste Gassigeher</span></p>
+                <div id="request-color-section" style="margin-top: 20px;">
+                    <h4>Neue Farbe beantragen</h4>
+                    <p style="color: #666; font-size: 0.9rem; margin-bottom: 15px;">
+                        Wähle eine Farbe aus, um sie zu beantragen. Du kannst nur eine Anfrage gleichzeitig haben.
+                    </p>
+                    <div id="available-colors" class="color-grid"></div>
+                    <div id="pending-request-notice" style="display: none; padding: 10px; background: #fff3cd; border-radius: 6px; margin-top: 10px;">
+                        <strong>Hinweis:</strong> Du hast bereits eine ausstehende Anfrage.
                     </div>
-
-                    <div id="promotion-buttons"></div>
                 </div>
             </div>
 
-            <!-- My Experience Requests -->
+            <!-- My Color Requests -->
             <div class="card">
-                <h3 data-i18n="profile.your_requests">Ihre Anfragen</h3>
+                <h3 data-i18n="color_requests.title">Deine Farbanfragen</h3>
                 <div id="my-requests"></div>
             </div>
 
@@ -140,13 +190,13 @@
                 </a>
             </div>
 
-            <!-- Account Deletion (GDPR) -->
-            <div class="card" style="border-left: 4px solid #dc3545;">
+            <!-- Account Deletion (GDPR) - hidden for super-admins -->
+            <div id="delete-account-section" class="card" style="border-left: 4px solid #dc3545;">
                 <h3 style="color: #dc3545;" data-i18n="profile.delete_account">Konto löschen</h3>
                 <div style="background: #f8d7da; padding: 15px; border-radius: 6px; margin: 20px 0;">
                     <p style="margin: 0; color: #721c24; font-weight: 600;" data-i18n="profile.delete_account_warning">WARNUNG: Diese Aktion kann nicht rückgängig gemacht werden!</p>
                 </div>
-                <p data-i18n="profile.delete_account_info">Ihre persönlichen Daten werden gelöscht, aber Ihre Spaziergangshistorie wird anonymisiert aufbewahrt.</p>
+                <p data-i18n="profile.delete_account_info">Deine persönlichen Daten werden gelöscht, aber deine Spaziergangshistorie wird anonymisiert aufbewahrt.</p>
                 <button class="btn btn-danger" onclick="confirmDeleteAccount()" data-i18n="profile.delete_account">Konto löschen</button>
             </div>
         </div>
@@ -160,6 +210,8 @@
     <script src="/js/impersonation-banner.js"></script>
     <script>
         let currentUser = null;
+        let userColors = [];
+        let allColors = [];
         let myRequests = [];
 
         document.addEventListener('DOMContentLoaded', async () => {
@@ -169,21 +221,37 @@
             }
 
             await window.i18n.load();
-
-            // Explicitly update all translations after load
-            console.log('i18n loaded, updating translations...');
             window.i18n.updateElement(document.body);
 
             // Initialize impersonation banner (shows if impersonating)
             await ImpersonationBanner.init();
 
             try {
-                currentUser = await api.getMe();
+                // Load all data in parallel
+                const [user, colorsResponse, requests] = await Promise.all([
+                    api.getMe(),
+                    api.getColors(),
+                    api.getColorRequests()
+                ]);
+
+                currentUser = user;
+                allColors = colorsResponse.colors || [];
+                myRequests = requests;
+                userColors = currentUser.colors || [];
+
                 updateHeaderPhoto();
                 showAdminLinkIfAdmin(currentUser);
-                loadMyRequests();
+
+                // Hide delete account section for super-admins (they cannot be deleted)
+                if (currentUser.is_super_admin) {
+                    const deleteSection = document.getElementById('delete-account-section');
+                    if (deleteSection) deleteSection.style.display = 'none';
+                }
+
                 renderProfile();
-                renderPromotionButtons();
+                renderUserColors();
+                renderAvailableColors();
+                renderMyRequests();
                 loadWhatsAppSettings();
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Laden');
@@ -216,70 +284,108 @@
         }
 
         function renderProfile() {
-            // Populate edit form (name fields are read-only)
             document.getElementById('display-first-name').value = currentUser.first_name || '';
             document.getElementById('display-last-name').value = currentUser.last_name || '';
             document.getElementById('edit-email').value = currentUser.email || '';
             document.getElementById('edit-phone').value = currentUser.phone || '';
 
-            // Display profile photo
             if (currentUser.profile_photo) {
                 const photoPreview = document.getElementById('photo-preview');
                 photoPreview.innerHTML = `<img src="/uploads/${currentUser.profile_photo}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">`;
             }
-
-            // Display experience level
-            const levelBadge = document.getElementById('current-level-badge');
-            levelBadge.className = `dog-category-badge ${currentUser.experience_level}`;
-            levelBadge.textContent = getLevelLabel(currentUser.experience_level);
         }
 
-        function renderPromotionButtons() {
-            const container = document.getElementById('promotion-buttons');
-            const currentLevel = currentUser.experience_level;
+        function renderUserColors() {
+            const container = document.getElementById('user-colors-container');
 
-            if (currentLevel === 'blue') {
-                container.innerHTML = '<p style="color: #28a745; font-weight: 600;">Du hast das höchste Level erreicht!</p>';
+            if (!userColors || userColors.length === 0) {
+                container.innerHTML = '<p style="color: #666;">Du hast noch keine Farbkategorien. Beantrage unten eine Farbe!</p>';
                 return;
             }
 
-            // Check for pending requests
-            const hasPendingOrange = myRequests.some(r => r.requested_level === 'orange' && r.status === 'pending');
-            const hasPendingBlue = myRequests.some(r => r.requested_level === 'blue' && r.status === 'pending');
-
-            let buttons = '';
-
-            if (currentLevel === 'green') {
-                if (hasPendingOrange) {
-                    buttons += '<button class="btn" disabled>Orange Level beantragt</button>';
-                } else {
-                    buttons += '<button class="btn" onclick="requestPromotion(\'orange\')">Orange Level beantragen</button>';
-                }
-            }
-
-            if (currentLevel === 'orange') {
-                if (hasPendingBlue) {
-                    buttons += '<button class="btn" disabled>Blau Level beantragt</button>';
-                } else {
-                    buttons += '<button class="btn" onclick="requestPromotion(\'blue\')">Blau Level beantragen</button>';
-                }
-            }
-
-            container.innerHTML = buttons;
+            container.innerHTML = `
+                <div class="color-grid">
+                    ${userColors.map(color => `
+                        <span class="color-badge" style="background-color: ${color.hex_code};">
+                            ${color.pattern_icon ? `<span class="pattern-icon">${getPatternEmoji(color.pattern_icon)}</span>` : ''}
+                            ${getColorLabel(color.name)}
+                        </span>
+                    `).join('')}
+                </div>
+            `;
         }
 
-        function getLevelLabel(level) {
-            const labels = { green: 'Grün', blue: 'Blau', orange: 'Orange' };
-            return labels[level] || level;
+        function renderAvailableColors() {
+            const container = document.getElementById('available-colors');
+            const pendingNotice = document.getElementById('pending-request-notice');
+
+            // Check if user has a pending request
+            const hasPendingRequest = myRequests.some(r => r.status === 'pending');
+            pendingNotice.style.display = hasPendingRequest ? 'block' : 'none';
+
+            // Get IDs of colors user already has
+            const ownedColorIds = userColors.map(c => c.id);
+
+            // Filter to colors user doesn't have
+            const availableColors = allColors.filter(c => !ownedColorIds.includes(c.id));
+
+            if (availableColors.length === 0) {
+                container.innerHTML = '<p style="color: #28a745; font-weight: 600;">Du hast alle verfügbaren Farben!</p>';
+                return;
+            }
+
+            container.innerHTML = availableColors.map(color => `
+                <div class="color-option ${hasPendingRequest ? 'owned' : ''}"
+                     onclick="${hasPendingRequest ? '' : `requestColor(${color.id}, '${color.name}')`}"
+                     style="${hasPendingRequest ? 'opacity: 0.5; cursor: not-allowed;' : ''}">
+                    <span class="color-swatch" style="background-color: ${color.hex_code};"></span>
+                    <span>${getColorLabel(color.name)}</span>
+                    ${color.pattern_icon ? `<span style="font-size: 0.8rem;">${getPatternEmoji(color.pattern_icon)}</span>` : ''}
+                </div>
+            `).join('');
         }
 
-        async function loadMyRequests() {
+        function getColorLabel(name) {
+            const labels = {
+                'gruen': 'Grün',
+                'gelb': 'Gelb',
+                'orange': 'Orange',
+                'hellblau': 'Hellblau',
+                'dunkelblau': 'Dunkelblau',
+                'helllila': 'Helllila',
+                'dunkellila': 'Dunkellila'
+            };
+            return labels[name] || name;
+        }
+
+        function getPatternEmoji(pattern) {
+            const patterns = {
+                'circle': '●',
+                'triangle': '▲',
+                'square': '■',
+                'diamond': '◆',
+                'pentagon': '⬠',
+                'hexagon': '⬡',
+                'star': '★'
+            };
+            return patterns[pattern] || '';
+        }
+
+        async function requestColor(colorId, colorName) {
+            if (!confirm(`Möchtest du "${getColorLabel(colorName)}" beantragen?`)) {
+                return;
+            }
+
             try {
-                myRequests = await api.getExperienceRequests();
+                await api.createColorRequest(colorId);
+                showAlert('success', 'Anfrage erfolgreich eingereicht');
+
+                // Reload requests
+                myRequests = await api.getColorRequests();
+                renderAvailableColors();
                 renderMyRequests();
-                renderPromotionButtons();
             } catch (error) {
-                console.error('Failed to load requests:', error);
+                showAlert('error', error.message || 'Fehler beim Einreichen der Anfrage');
             }
         }
 
@@ -287,7 +393,7 @@
             const container = document.getElementById('my-requests');
 
             if (myRequests.length === 0) {
-                container.innerHTML = '<p data-i18n="profile.no_requests">Keine Anfragen</p>';
+                container.innerHTML = '<p style="color: #666;">Keine Anfragen vorhanden</p>';
                 return;
             }
 
@@ -295,12 +401,20 @@
                 const statusClass = request.status === 'approved' ? 'alert-success' :
                                   (request.status === 'denied' ? 'alert-error' : 'alert-info');
                 const statusLabel = getStatusLabel(request.status);
+                const color = request.color || allColors.find(c => c.id === request.color_id);
 
                 return `
                     <div class="card" style="margin-bottom: 15px; padding: 15px;">
                         <div style="display: flex; justify-content: space-between; align-items: start;">
                             <div>
-                                <h4 style="margin: 0 0 10px 0;">${getLevelLabel(request.requested_level)} Level</h4>
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                                    ${color ? `
+                                        <span class="color-badge" style="background-color: ${color.hex_code}; margin: 0;">
+                                            ${color.pattern_icon ? `<span class="pattern-icon">${getPatternEmoji(color.pattern_icon)}</span>` : ''}
+                                            ${getColorLabel(color.name)}
+                                        </span>
+                                    ` : '<span>Unbekannte Farbe</span>'}
+                                </div>
                                 <p style="margin: 5px 0; font-size: 0.9rem;">
                                     Beantragt am: ${new Date(request.created_at).toLocaleDateString('de-DE')}
                                 </p>
@@ -323,24 +437,9 @@
             return labels[status] || status;
         }
 
-        async function requestPromotion(level) {
-            if (!confirm(`Möchtest du ${getLevelLabel(level)} Level beantragen?`)) {
-                return;
-            }
-
-            try {
-                await api.createExperienceRequest(level);
-                showAlert('success', 'Antrag erfolgreich eingereicht');
-                loadMyRequests();
-            } catch (error) {
-                showAlert('error', error.message || 'Fehler beim Einreichen des Antrags');
-            }
-        }
-
         async function handleProfileUpdate(e) {
             e.preventDefault();
 
-            // Check HTML5 form validity first
             const form = e.target;
             if (!form.checkValidity()) {
                 form.reportValidity();
@@ -350,7 +449,6 @@
             const email = document.getElementById('edit-email').value;
             const phone = document.getElementById('edit-phone').value;
 
-            // Additional phone validation
             const phonePattern = /^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}$/;
             if (!phonePattern.test(phone)) {
                 showAlert('error', 'Bitte gib eine gültige Telefonnummer ein (z.B. 0123 456789 oder +49 123 456789)');
@@ -358,11 +456,9 @@
             }
 
             try {
-                // Note: Name fields (first_name, last_name) can only be changed by admin
                 const response = await api.updateMe({ email, phone });
                 showAlert('success', response.message || 'Profil aktualisiert');
 
-                // Reload user data
                 currentUser = await api.getMe();
                 renderProfile();
             } catch (error) {
@@ -376,19 +472,16 @@
 
             if (!file) return;
 
-            // Validate file type
             if (!file.type.match(/image\/(jpeg|jpg|png)/)) {
                 showAlert('error', 'Nur JPEG und PNG Dateien sind erlaubt');
                 return;
             }
 
-            // Validate file size (5MB)
             if (file.size > 5 * 1024 * 1024) {
                 showAlert('error', 'Datei zu groß (max. 5MB)');
                 return;
             }
 
-            // Preview image
             const reader = new FileReader();
             reader.onload = (e) => {
                 const photoPreview = document.getElementById('photo-preview');
@@ -396,12 +489,9 @@
             };
             reader.readAsDataURL(file);
 
-            // Upload
             try {
                 const response = await api.uploadPhoto(file);
                 showAlert('success', 'Foto erfolgreich hochgeladen');
-
-                // Reload user data
                 currentUser = await api.getMe();
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Hochladen');
@@ -440,8 +530,6 @@
             try {
                 await api.deleteAccount(password);
                 alert('Dein Konto wurde gelöscht. Du erhältst eine Bestätigungs-E-Mail.');
-
-                // Logout and redirect
                 api.setToken(null);
                 window.location.href = '/';
             } catch (error) {

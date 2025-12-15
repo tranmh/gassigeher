@@ -34,14 +34,14 @@
 
             <div id="alert-container"></div>
 
-            <!-- Experience Level Info -->
-            <div id="level-info" class="card" style="margin-bottom: 20px;">
+            <!-- User Colors Info -->
+            <div id="colors-info" class="card" style="margin-bottom: 20px;">
                 <p style="margin: 0;">
-                    <strong data-i18n="dogs.your_level">Dein Level:</strong>
-                    <span id="user-level" class="dog-category-badge"></span>
+                    <strong data-i18n="colors.your_colors">Deine Farben:</strong>
+                    <span id="user-colors" style="display: inline-flex; gap: 6px; flex-wrap: wrap; margin-left: 8px;"></span>
                 </p>
                 <p style="font-size: 0.875rem; color: #666; margin-top: 10px; margin-bottom: 0;">
-                    <span data-i18n="dogs.level_info">Du kannst Hunde entsprechend deines Levels buchen. Höhere Level werden mit einem Schloss-Symbol angezeigt.</span>
+                    <span data-i18n="colors.colors_info">Du kannst nur Hunde mit deinen freigeschalteten Farben buchen. Hunde mit anderen Farben werden mit einem Schloss-Symbol angezeigt.</span>
                 </p>
             </div>
 
@@ -69,12 +69,10 @@
                         </select>
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label data-i18n="dogs.category">Kategorie</label>
-                        <select id="filter-category">
+                        <label data-i18n="colors.color">Farbe</label>
+                        <select id="filter-color">
                             <option value="">Alle</option>
-                            <option value="green" data-i18n="dogs.category_green">Grün</option>
-                            <option value="blue" data-i18n="dogs.category_blue">Blau</option>
-                            <option value="orange" data-i18n="dogs.category_orange">Orange</option>
+                            <!-- Dynamic color options loaded from API -->
                         </select>
                     </div>
                 </div>
@@ -192,7 +190,8 @@
     <script src="/js/impersonation-banner.js"></script>
     <script>
         let currentDogs = [];
-        let userLevel = 'green';
+        let userColors = [];  // Array of color objects the user has
+        let allColors = [];   // All available colors from API
         let allBreeds = [];
 
         document.addEventListener('DOMContentLoaded', async () => {
@@ -211,14 +210,15 @@
             await ImpersonationBanner.init();
 
             try {
-                // Get user info
+                // Get user info and colors
                 const user = await api.getMe();
-                userLevel = user.experience_level || 'green';
-                updateUserLevelDisplay();
+                userColors = user.colors || [];
+                updateUserColorsDisplay();
                 updateHeaderPhoto(user);
                 showAdminLinkIfAdmin(user);
 
-                // Load breeds and dogs
+                // Load all colors and breeds
+                await loadColors();
                 await loadBreeds();
                 await loadDogs();
 
@@ -242,10 +242,67 @@
             }
         }
 
-        function updateUserLevelDisplay() {
-            const levelBadge = document.getElementById('user-level');
-            levelBadge.className = `dog-category-badge ${userLevel}`;
-            levelBadge.textContent = getCategoryLabel(userLevel);
+        function updateUserColorsDisplay() {
+            const colorsContainer = document.getElementById('user-colors');
+            if (userColors.length === 0) {
+                colorsContainer.innerHTML = '<span style="color: #999; font-style: italic;">Keine Farben freigeschaltet</span>';
+                return;
+            }
+            colorsContainer.innerHTML = userColors.map(color => `
+                <span class="color-badge" style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 4px;
+                    padding: 4px 10px;
+                    border-radius: 12px;
+                    font-size: 0.85rem;
+                    font-weight: 500;
+                    background: ${color.hex_code}20;
+                    border: 2px solid ${color.hex_code};
+                    color: ${color.hex_code};
+                ">
+                    <span class="color-pattern-icon">${getPatternIcon(color.pattern_icon)}</span>
+                    ${sanitizeHTML(color.name)}
+                </span>
+            `).join('');
+        }
+
+        function getPatternIcon(pattern) {
+            const icons = {
+                'circle': '●',
+                'triangle': '▲',
+                'square': '■',
+                'diamond': '◆',
+                'pentagon': '⬠',
+                'hexagon': '⬡',
+                'star': '★',
+                'heart': '♥',
+                'cross': '✚',
+                'spade': '♠',
+                'club': '♣',
+                'moon': '☽',
+                'sun': '☀',
+                'ring': '○',
+                'target': '◎'
+            };
+            return icons[pattern] || '●';
+        }
+
+        async function loadColors() {
+            try {
+                const response = await api.getColors();
+                allColors = response.colors || [];
+                const colorSelect = document.getElementById('filter-color');
+                allColors.forEach(color => {
+                    const option = document.createElement('option');
+                    option.value = color.id;
+                    option.textContent = `${getPatternIcon(color.pattern_icon)} ${color.name}`;
+                    option.style.color = color.hex_code;
+                    colorSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Failed to load colors:', error);
+            }
         }
 
         async function loadBreeds() {
@@ -281,12 +338,12 @@
             const search = document.getElementById('filter-search').value.trim();
             const breed = document.getElementById('filter-breed').value;
             const size = document.getElementById('filter-size').value;
-            const category = document.getElementById('filter-category').value;
+            const colorId = document.getElementById('filter-color').value;
 
             if (search) filters.search = search;
             if (breed) filters.breed = breed;
             if (size) filters.size = size;
-            if (category) filters.category = category;
+            if (colorId) filters.color_id = colorId;
             filters.is_available = 'true'; // Only show available dogs by default
 
             return filters;
@@ -341,7 +398,7 @@
             document.getElementById('filter-search').value = '';
             document.getElementById('filter-breed').value = '';
             document.getElementById('filter-size').value = '';
-            document.getElementById('filter-category').value = '';
+            document.getElementById('filter-color').value = '';
             loadDogs();
         }
 
@@ -355,12 +412,14 @@
             }
 
             container.innerHTML = currentDogs.map(dog => {
-                const canAccess = canUserAccessDog(userLevel, dog.category);
+                const canAccess = canUserAccessDog(dog.color_id);
                 const isUnavailable = !dog.is_available;
                 const safeDogName = sanitizeHTML(dog.name);
                 const safeDogBreed = sanitizeHTML(dog.breed);
                 const safeUnavailableReason = dog.unavailable_reason ? sanitizeHTML(dog.unavailable_reason) : 'Nicht verfügbar';
                 const safeSpecialNeeds = dog.special_needs ? sanitizeHTML(dog.special_needs) : '';
+                const dogColor = dog.color || allColors.find(c => c.id === dog.color_id);
+                const colorBadgeHtml = getColorBadgeHtml(dogColor);
                 const externalLinkHtml = dog.external_link
                     ? `<a href="${dog.external_link}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" style="display: inline-block; margin-top: 10px; color: var(--primary-green); text-decoration: none; font-weight: 500; font-size: 0.9rem;">mehr über mich &rarr;</a>`
                     : '';
@@ -370,14 +429,14 @@
                          onclick="${canAccess && !isUnavailable ? `viewDog(${dog.id})` : ''}"
                          style="${!canAccess || isUnavailable ? 'cursor: not-allowed;' : 'cursor: pointer;'}">
                         ${isUnavailable ? `<div class="dog-unavailable-banner">${safeUnavailableReason}</div>` : ''}
-                        ${!canAccess ? '<div class="dog-locked-banner">🔒 Level erforderlich</div>' : ''}
+                        ${!canAccess ? '<div class="dog-locked-banner">🔒 Farbe erforderlich</div>' : ''}
                         ${getDogPhotoHtml(dog, true, 'dog-card-image', true, true)}
                         <div class="dog-card-body">
-                            <div class="dog-category-badge ${dog.category}">${getCategoryLabel(dog.category)}</div>
+                            ${colorBadgeHtml}
                             <h3 class="dog-card-title">${safeDogName}</h3>
                             <p class="dog-card-info">${safeDogBreed} • ${getSizeLabel(dog.size)} • ${dog.age} Jahre</p>
                             ${dog.special_needs ? `<p class="dog-card-info" style="color: var(--warning-orange); font-size: 0.8rem;">⚠️ ${safeSpecialNeeds}</p>` : ''}
-                            ${!canAccess ? `<p class="dog-card-info" style="color: #666; font-size: 0.8rem; margin-top: 10px;">Erfordert ${getCategoryLabel(dog.category)} Level</p>` : ''}
+                            ${!canAccess ? `<p class="dog-card-info" style="color: #666; font-size: 0.8rem; margin-top: 10px;">Erfordert ${dogColor ? sanitizeHTML(dogColor.name) : 'unbekannte'} Farbe</p>` : ''}
                             ${externalLinkHtml}
                         </div>
                     </div>
@@ -385,18 +444,25 @@
             }).join('');
         }
 
-        function canUserAccessDog(userLevel, dogCategory) {
-            const levelOrder = { 'green': 1, 'orange': 2, 'blue': 3 };
-            return (levelOrder[userLevel] || 0) >= (levelOrder[dogCategory] || 0);
+        function getColorBadgeHtml(color) {
+            if (!color) {
+                return '<span class="dog-category-badge">Keine Farbe</span>';
+            }
+            return `
+                <span class="dog-category-badge" style="
+                    background: ${color.hex_code}20;
+                    border: 2px solid ${color.hex_code};
+                    color: ${color.hex_code};
+                ">
+                    ${getPatternIcon(color.pattern_icon)} ${sanitizeHTML(color.name)}
+                </span>
+            `;
         }
 
-        function getCategoryLabel(category) {
-            const labels = {
-                green: 'Grün',
-                blue: 'Blau',
-                orange: 'Orange'
-            };
-            return labels[category] || category;
+        function canUserAccessDog(dogColorId) {
+            // User can access dog if they have the dog's color
+            if (!dogColorId) return true;  // Dogs without color are accessible to all
+            return userColors.some(c => c.id === dogColorId);
         }
 
         function getSizeLabel(size) {
@@ -482,13 +548,16 @@
                     `;
                 }
 
+                const dogColor = dog.color || allColors.find(c => c.id === dog.color_id);
+                const colorBadgeHtml = getColorBadgeHtml(dogColor);
+
                 content.innerHTML = `
                     <div style="display: flex; gap: 20px; flex-wrap: wrap;">
                         <div style="flex: 0 0 auto; width: 200px; height: 200px; border-radius: 12px; overflow: hidden; background: #f0f0f0;">
                             ${getDogPhotoHtml(dog, false, 'dog-detail-image', false, true)}
                         </div>
                         <div style="flex: 1; min-width: 200px;">
-                            <div class="dog-category-badge ${dog.category}" style="margin-bottom: 10px;">${getCategoryLabel(dog.category)}</div>
+                            <div style="margin-bottom: 10px;">${colorBadgeHtml}</div>
                             <h2 style="margin: 0 0 10px 0;">${safeDogName}</h2>
                             <p style="margin: 0 0 8px 0; color: #666;">${safeDogBreed} • ${getSizeLabel(dog.size)} • ${dog.age} Jahre</p>
                             ${safeSpecialNeeds ? `<p style="margin: 0 0 8px 0; color: var(--warning-orange); font-size: 0.9rem;">⚠️ ${safeSpecialNeeds}</p>` : ''}

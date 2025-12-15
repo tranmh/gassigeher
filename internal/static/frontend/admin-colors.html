@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farbkategorien verwalten - Gassigeher Admin</title>
+    <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <a href="/" class="logo">🐕 Gassigeher Admin</a>
+            <nav id="main-nav">
+                <ul>
+                    <li><a href="/admin-dashboard.html" data-i18n="admin_dashboard.title">Dashboard</a></li>
+                    <li><a href="/admin-dogs.html" data-i18n="dogs.manage_dogs">Hunde</a></li>
+                    <li class="nav-dropdown">
+                        <a href="#">Buchungen</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-bookings.html">📅 Alle Buchungen</a>
+                            <a href="/admin-booking-approvals.html">✓ Genehmigungen</a>
+                            <a href="/admin-booking-times.html">⏰ Buchungszeiten</a>
+                            <a href="/admin-blocked-dates.html">🚫 Gesperrte Tage</a>
+                        </div>
+                    </li>
+                    <li class="nav-dropdown">
+                        <a href="#">Benutzer</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-users.html">👥 Alle Benutzer</a>
+                            <a href="/admin-color-requests.html">🎨 Farb-Anfragen</a>
+                            <a href="/admin-reactivation-requests.html">🔄 Reaktivierungen</a>
+                        </div>
+                    </li>
+                    <li><a href="/admin-settings.html" data-i18n="admin_dashboard.system_settings">Einstellungen</a></li>
+                    <li id="super-admin-colors-link" style="display:none;"><a href="/admin-colors.html">🎨 Farben</a></li>
+                    <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
+                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+
+    <main style="padding: 40px 0;">
+        <div class="container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h1 data-i18n="colors.manage_colors">Farbkategorien verwalten</h1>
+                <button class="btn" onclick="showAddColorForm()" data-i18n="colors.add_color">Farbe hinzufügen</button>
+            </div>
+
+            <div id="alert-container"></div>
+
+            <!-- Info Box -->
+            <div class="card" style="margin-bottom: 20px; background: rgba(130, 185, 101, 0.1); border-left: 3px solid var(--primary-green);">
+                <p style="margin: 0; font-size: 0.9rem;">
+                    <strong>Info:</strong> Farbkategorien werden Hunden zugewiesen. Benutzer müssen die entsprechende Farbe haben, um Hunde dieser Kategorie buchen zu können.
+                    Es müssen mindestens 3 und maximal 15 Farben existieren.
+                </p>
+            </div>
+
+            <!-- Add/Edit Color Form (hidden by default) -->
+            <div id="color-form-container" class="card hidden" style="margin-bottom: 30px;">
+                <h3 id="form-title" data-i18n="colors.add_color">Farbe hinzufügen</h3>
+                <form id="color-form">
+                    <input type="hidden" id="color-id">
+                    <div class="form-group">
+                        <label data-i18n="colors.name">Name</label>
+                        <input type="text" id="color-name" required placeholder="z.B. gruen, blau, orange">
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="colors.hex_code">Hex-Farbcode</label>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="color" id="color-picker" value="#28a745" style="width: 50px; height: 40px; border: none; cursor: pointer;">
+                            <input type="text" id="color-hex" required placeholder="#28a745" pattern="^#[0-9A-Fa-f]{6}$" style="flex: 1;">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="colors.pattern_icon">Muster-Symbol (für Barrierefreiheit)</label>
+                        <select id="color-pattern" required>
+                            <option value="circle">● Kreis</option>
+                            <option value="triangle">▲ Dreieck</option>
+                            <option value="square">■ Quadrat</option>
+                            <option value="diamond">◆ Raute</option>
+                            <option value="pentagon">⬠ Fünfeck</option>
+                            <option value="hexagon">⬡ Sechseck</option>
+                            <option value="star">★ Stern</option>
+                            <option value="heart">♥ Herz</option>
+                            <option value="cross">✚ Kreuz</option>
+                            <option value="spade">♠ Pik</option>
+                            <option value="club">♣ Kleeblatt</option>
+                            <option value="moon">☽ Mond</option>
+                            <option value="sun">☀ Sonne</option>
+                            <option value="ring">○ Ring</option>
+                            <option value="target">◎ Zielscheibe</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="colors.sort_order">Sortierreihenfolge</label>
+                        <input type="number" id="color-sort-order" required min="1" value="1">
+                    </div>
+
+                    <!-- Preview -->
+                    <div class="form-group">
+                        <label>Vorschau</label>
+                        <div id="color-preview" style="padding: 15px; background: #f5f5f5; border-radius: 6px;">
+                            <span id="preview-badge" class="color-badge" style="
+                                display: inline-flex;
+                                align-items: center;
+                                gap: 4px;
+                                padding: 6px 12px;
+                                border-radius: 12px;
+                                font-size: 0.9rem;
+                                font-weight: 500;
+                            ">
+                                <span id="preview-icon">●</span>
+                                <span id="preview-name">Farbname</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px;">
+                        <button type="submit" class="btn" data-i18n="common.save">Speichern</button>
+                        <button type="button" class="btn btn-secondary" onclick="hideForm()" data-i18n="common.cancel">Abbrechen</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Colors List -->
+            <div id="colors-list" class="color-grid"></div>
+        </div>
+    </main>
+
+    <style>
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .color-card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-light);
+        }
+        .color-card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        .color-swatch {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+        .color-info {
+            flex: 1;
+        }
+        .color-info h3 {
+            margin: 0 0 4px 0;
+            font-size: 1.1rem;
+        }
+        .color-info p {
+            margin: 0;
+            font-size: 0.85rem;
+            color: #666;
+        }
+        .color-stats {
+            display: flex;
+            gap: 15px;
+            margin: 15px 0;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 6px;
+        }
+        .color-stat {
+            text-align: center;
+        }
+        .color-stat-value {
+            font-size: 1.25rem;
+            font-weight: bold;
+        }
+        .color-stat-label {
+            font-size: 0.75rem;
+            color: #666;
+        }
+        .color-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .color-actions button {
+            flex: 1;
+            padding: 8px;
+        }
+    </style>
+
+    <script src="/js/logo-banner.js"></script>
+    <script src="/js/nav-menu.js"></script>
+    <script src="/js/i18n.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/sanitize.js"></script>
+    <script src="/js/impersonation-banner.js"></script>
+    <script>
+        let currentColors = [];
+        const MIN_COLORS = 3;
+        const MAX_COLORS = 15;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!api.isAuthenticated()) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // Check if user is super admin
+            try {
+                const userData = await api.getMe();
+                if (!userData.is_super_admin) {
+                    alert('Zugriff verweigert: Diese Seite ist nur für Super-Administratoren zugänglich.');
+                    window.location.href = '/admin-dashboard.html';
+                    return;
+                }
+                // Show colors link for super-admins
+                const colorsLink = document.getElementById('super-admin-colors-link');
+                if (colorsLink) colorsLink.style.display = '';
+            } catch (error) {
+                console.error('Failed to verify super admin status:', error);
+                window.location.href = '/admin-dashboard.html';
+                return;
+            }
+
+            await window.i18n.load();
+            window.i18n.updateElement(document.body);
+
+            // Initialize impersonation banner (shows if impersonating)
+            await ImpersonationBanner.init();
+
+            loadColors();
+
+            document.getElementById('color-form').addEventListener('submit', handleFormSubmit);
+
+            // Setup color picker sync
+            setupColorPickerSync();
+
+            // Setup preview updates
+            setupPreviewUpdates();
+        });
+
+        function setupColorPickerSync() {
+            const colorPicker = document.getElementById('color-picker');
+            const colorHex = document.getElementById('color-hex');
+
+            colorPicker.addEventListener('input', () => {
+                colorHex.value = colorPicker.value;
+                updatePreview();
+            });
+
+            colorHex.addEventListener('input', () => {
+                if (/^#[0-9A-Fa-f]{6}$/.test(colorHex.value)) {
+                    colorPicker.value = colorHex.value;
+                }
+                updatePreview();
+            });
+        }
+
+        function setupPreviewUpdates() {
+            document.getElementById('color-name').addEventListener('input', updatePreview);
+            document.getElementById('color-pattern').addEventListener('change', updatePreview);
+        }
+
+        function updatePreview() {
+            const name = document.getElementById('color-name').value || 'Farbname';
+            const hex = document.getElementById('color-hex').value || '#28a745';
+            const pattern = document.getElementById('color-pattern').value;
+
+            const badge = document.getElementById('preview-badge');
+            badge.style.background = hex + '20';
+            badge.style.border = `2px solid ${hex}`;
+            badge.style.color = hex;
+
+            document.getElementById('preview-icon').textContent = getPatternIcon(pattern);
+            document.getElementById('preview-name').textContent = sanitizeHTML(name);
+        }
+
+        function getPatternIcon(pattern) {
+            const icons = {
+                'circle': '●',
+                'triangle': '▲',
+                'square': '■',
+                'diamond': '◆',
+                'pentagon': '⬠',
+                'hexagon': '⬡',
+                'star': '★',
+                'heart': '♥',
+                'cross': '✚',
+                'spade': '♠',
+                'club': '♣',
+                'moon': '☽',
+                'sun': '☀',
+                'ring': '○',
+                'target': '◎'
+            };
+            return icons[pattern] || '●';
+        }
+
+        async function loadColors() {
+            try {
+                const response = await api.getColors();
+                currentColors = response.colors || [];
+                renderColors();
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Laden der Farben');
+            }
+        }
+
+        function renderColors() {
+            const container = document.getElementById('colors-list');
+            if (currentColors.length === 0) {
+                container.innerHTML = '<p>Keine Farbkategorien gefunden</p>';
+                return;
+            }
+
+            container.innerHTML = currentColors.map(color => {
+                const safeName = sanitizeHTML(color.name);
+                const canDelete = currentColors.length > MIN_COLORS;
+
+                return `
+                <div class="color-card">
+                    <div class="color-card-header">
+                        <div class="color-swatch" style="background: ${color.hex_code};">
+                            ${getPatternIcon(color.pattern_icon)}
+                        </div>
+                        <div class="color-info">
+                            <h3>${safeName}</h3>
+                            <p>${color.hex_code} • Reihenfolge: ${color.sort_order}</p>
+                        </div>
+                    </div>
+                    <div class="color-stats">
+                        <div class="color-stat">
+                            <div class="color-stat-value" id="dog-count-${color.id}">-</div>
+                            <div class="color-stat-label">Hunde</div>
+                        </div>
+                        <div class="color-stat">
+                            <div class="color-stat-value" id="user-count-${color.id}">-</div>
+                            <div class="color-stat-label">Benutzer</div>
+                        </div>
+                    </div>
+                    <div class="color-actions">
+                        <button class="btn" onclick="editColor(${color.id})">✏️ Bearbeiten</button>
+                        <button class="btn btn-danger" onclick="deleteColor(${color.id})" ${!canDelete ? 'disabled title="Mindestens 3 Farben erforderlich"' : ''}>🗑️ Löschen</button>
+                    </div>
+                </div>
+                `;
+            }).join('');
+
+            // Load stats for each color
+            currentColors.forEach(color => loadColorStats(color.id));
+        }
+
+        async function loadColorStats(colorId) {
+            try {
+                const stats = await api.getColorStats(colorId);
+                document.getElementById(`dog-count-${colorId}`).textContent = stats.dog_count || 0;
+                document.getElementById(`user-count-${colorId}`).textContent = stats.user_count || 0;
+            } catch (error) {
+                console.error(`Failed to load stats for color ${colorId}:`, error);
+            }
+        }
+
+        function showAddColorForm() {
+            if (currentColors.length >= MAX_COLORS) {
+                showAlert('error', `Maximale Anzahl von ${MAX_COLORS} Farben erreicht.`);
+                return;
+            }
+
+            document.getElementById('form-title').textContent = 'Farbe hinzufügen';
+            document.getElementById('color-form').reset();
+            document.getElementById('color-id').value = '';
+            document.getElementById('color-picker').value = '#28a745';
+            document.getElementById('color-hex').value = '#28a745';
+            document.getElementById('color-sort-order').value = currentColors.length + 1;
+            document.getElementById('color-form-container').classList.remove('hidden');
+            updatePreview();
+
+            document.getElementById('color-form-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function editColor(id) {
+            const color = currentColors.find(c => c.id === id);
+            if (!color) return;
+
+            document.getElementById('form-title').textContent = 'Farbe bearbeiten';
+            document.getElementById('color-id').value = color.id;
+            document.getElementById('color-name').value = color.name;
+            document.getElementById('color-hex').value = color.hex_code;
+            document.getElementById('color-picker').value = color.hex_code;
+            document.getElementById('color-pattern').value = color.pattern_icon;
+            document.getElementById('color-sort-order').value = color.sort_order;
+            document.getElementById('color-form-container').classList.remove('hidden');
+            updatePreview();
+
+            document.getElementById('color-form-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function hideForm() {
+            document.getElementById('color-form-container').classList.add('hidden');
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+
+            const id = document.getElementById('color-id').value;
+            const data = {
+                name: document.getElementById('color-name').value,
+                hex_code: document.getElementById('color-hex').value,
+                pattern_icon: document.getElementById('color-pattern').value,
+                sort_order: parseInt(document.getElementById('color-sort-order').value),
+            };
+
+            try {
+                if (id) {
+                    await api.updateColor(id, data);
+                    showAlert('success', 'Farbe erfolgreich aktualisiert');
+                } else {
+                    await api.createColor(data);
+                    showAlert('success', 'Farbe erfolgreich hinzugefügt');
+                }
+                hideForm();
+                loadColors();
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Speichern');
+            }
+        }
+
+        async function deleteColor(id) {
+            const color = currentColors.find(c => c.id === id);
+            if (!color) return;
+
+            if (currentColors.length <= MIN_COLORS) {
+                showAlert('error', `Es müssen mindestens ${MIN_COLORS} Farben existieren.`);
+                return;
+            }
+
+            if (!confirm(`Bist du sicher, dass du die Farbe "${color.name}" löschen möchtest?\n\nHinweis: Dies ist nur möglich, wenn keine Hunde dieser Farbe zugeordnet sind.`)) {
+                return;
+            }
+
+            try {
+                await api.deleteColor(id);
+                showAlert('success', 'Farbe erfolgreich gelöscht');
+                loadColors();
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Löschen. Möglicherweise sind noch Hunde dieser Farbe zugeordnet.');
+            }
+        }
+
+        function showAlert(type, message) {
+            const container = document.getElementById('alert-container');
+            container.innerHTML = `<div class="alert alert-${type}">${sanitizeHTML(message)}</div>`;
+            setTimeout(() => container.innerHTML = '', 5000);
+        }
+    </script>
+</body>
+</html>

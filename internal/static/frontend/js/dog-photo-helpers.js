@@ -181,13 +181,36 @@ function preloadCriticalDogImages(dogs, count = 3) {
 /**
  * Generate HTML for calendar dog cell with photo
  * @param {Object} dog - Dog object
+ * @param {Object} color - Color object from color_categories (optional)
  * @returns {string} - HTML for calendar dog name cell
  */
-function getCalendarDogCell(dog) {
+function getCalendarDogCell(dog, color) {
     const photoUrl = getDogPhotoUrl(dog, true, true); // Use thumbnail
     const altText = getDogPhotoAlt(dog);
     const safeDogName = typeof sanitizeHTML !== 'undefined' ? sanitizeHTML(dog.name) : dog.name;
 
+    // Use new color system if color object provided
+    if (color && color.hex_code) {
+        const patternIcons = {
+            'circle': '●', 'triangle': '▲', 'square': '■', 'diamond': '◆',
+            'pentagon': '⬠', 'hexagon': '⬡', 'star': '★', 'heart': '♥',
+            'cross': '✚', 'spade': '♠', 'club': '♣', 'moon': '☽',
+            'sun': '☀', 'ring': '○', 'target': '◎'
+        };
+        const icon = patternIcons[color.pattern_icon] || '●';
+
+        return `<div class="calendar-dog-name-cell">
+            <img src="${photoUrl}" alt="${altText}" class="calendar-dog-photo" loading="lazy">
+            <div>
+                <div style="font-weight: 700; font-size: 1rem; color: var(--text-dark);">${safeDogName}</div>
+                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 0.7rem; padding: 2px 8px; background: ${color.hex_code}20; border: 1px solid ${color.hex_code}; color: ${color.hex_code}; border-radius: 4px; margin-top: 4px;">
+                    ${icon} ${color.name}
+                </span>
+            </div>
+        </div>`;
+    }
+
+    // Fallback to old category system
     const categoryEmoji = {
         'green': '🟢',
         'blue': '🔵',

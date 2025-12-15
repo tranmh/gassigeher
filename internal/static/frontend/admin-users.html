@@ -28,11 +28,12 @@
                         <a href="#">Benutzer</a>
                         <div class="nav-dropdown-menu">
                             <a href="/admin-users.html">👥 Alle Benutzer</a>
-                            <a href="/admin-experience-requests.html">⭐ Level-Anfragen</a>
+                            <a href="/admin-color-requests.html">🎨 Farb-Anfragen</a>
                             <a href="/admin-reactivation-requests.html">🔄 Reaktivierungen</a>
                         </div>
                     </li>
                     <li><a href="/admin-settings.html" data-i18n="admin_dashboard.system_settings">Einstellungen</a></li>
+                    <li id="super-admin-colors-link" style="display:none;"><a href="/admin-colors.html">🎨 Farben</a></li>
                     <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
                     <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
@@ -97,12 +98,10 @@
                     <input type="tel" id="edit-phone">
                 </div>
                 <div class="form-group">
-                    <label for="edit-level">Erfahrungslevel *</label>
-                    <select id="edit-level" required>
-                        <option value="green">Grün (Anfänger)</option>
-                        <option value="orange">Orange (Erfahren)</option>
-                        <option value="blue">Blau (Nur feste Gassigeher)</option>
-                    </select>
+                    <label>Farbkategorien</label>
+                    <div id="edit-colors-container" class="colors-checkbox-grid">
+                        <!-- Dynamic color checkboxes loaded from API -->
+                    </div>
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Abbrechen</button>
@@ -137,12 +136,10 @@
                     <input type="tel" id="create-phone">
                 </div>
                 <div class="form-group">
-                    <label for="create-level">Erfahrungslevel *</label>
-                    <select id="create-level" required>
-                        <option value="green">Grün (Anfänger)</option>
-                        <option value="orange">Orange (Erfahren)</option>
-                        <option value="blue">Blau (Nur feste Gassigeher)</option>
-                    </select>
+                    <label>Farbkategorien (optional)</label>
+                    <div id="create-colors-container" class="colors-checkbox-grid">
+                        <!-- Dynamic color checkboxes loaded from API -->
+                    </div>
                 </div>
                 <div class="form-group" id="create-admin-group" style="display: none;">
                     <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
@@ -150,7 +147,7 @@
                         <span>Als Administrator erstellen</span>
                     </label>
                     <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
-                        Admins erhalten automatisch Blau-Level und haben Zugang zu allen Verwaltungsfunktionen.
+                        Admins haben Zugang zu allen Verwaltungsfunktionen und können alle Hunde buchen.
                     </p>
                 </div>
                 <div class="form-info" style="background: #e3f2fd; padding: 15px; border-radius: 6px; margin: 15px 0;">
@@ -202,6 +199,7 @@
     <script>
         let users = [];
         let currentUser = null;
+        let allColors = [];
 
         document.addEventListener('DOMContentLoaded', async () => {
             if (!api.isAuthenticated()) {
@@ -216,6 +214,11 @@
                     alert('Zugriff verweigert: Diese Seite ist nur für Administratoren zugänglich.');
                     window.location.href = '/dashboard.html';
                     return;
+                }
+                // Show colors link for super-admins
+                if (currentUser.is_super_admin) {
+                    const colorsLink = document.getElementById('super-admin-colors-link');
+                    if (colorsLink) colorsLink.style.display = '';
                 }
             } catch (error) {
                 console.error('Failed to verify admin status:', error);
@@ -232,8 +235,93 @@
             // Initialize impersonation banner (shows if impersonating)
             await ImpersonationBanner.init();
 
+            // Load colors first, then users
+            await loadColors();
             loadUsers();
         });
+
+        async function loadColors() {
+            try {
+                const response = await api.getColors();
+                allColors = response.colors || [];
+                // Populate color checkboxes in edit and create modals
+                populateColorCheckboxes('edit-colors-container');
+                populateColorCheckboxes('create-colors-container');
+            } catch (error) {
+                console.error('Failed to load colors:', error);
+            }
+        }
+
+        function populateColorCheckboxes(containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = allColors.map(color => `
+                <label class="color-checkbox-item" style="
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 8px 12px;
+                    border-radius: 6px;
+                    border: 2px solid ${color.hex_code}40;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                " onmouseenter="this.style.background='${color.hex_code}15'" onmouseleave="this.style.background='transparent'">
+                    <input type="checkbox" value="${color.id}" data-color-id="${color.id}" style="width: auto;">
+                    <span class="color-swatch-mini" style="
+                        width: 18px;
+                        height: 18px;
+                        border-radius: 4px;
+                        background: ${color.hex_code};
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 10px;
+                        color: white;
+                    ">${getPatternIcon(color.pattern_icon)}</span>
+                    <span style="color: ${color.hex_code}; font-weight: 500;">${sanitizeHTML(color.name)}</span>
+                </label>
+            `).join('');
+        }
+
+        function getPatternIcon(pattern) {
+            const icons = {
+                'circle': '●',
+                'triangle': '▲',
+                'square': '■',
+                'diamond': '◆',
+                'pentagon': '⬠',
+                'hexagon': '⬡',
+                'star': '★',
+                'heart': '♥',
+                'cross': '✚',
+                'spade': '♠',
+                'club': '♣',
+                'moon': '☽',
+                'sun': '☀',
+                'ring': '○',
+                'target': '◎'
+            };
+            return icons[pattern] || '●';
+        }
+
+        function getColorBadgeHtml(color) {
+            if (!color) return '';
+            return `
+                <span class="color-badge-mini" style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 3px;
+                    padding: 3px 8px;
+                    border-radius: 10px;
+                    font-size: 0.7rem;
+                    font-weight: 500;
+                    background: ${color.hex_code}20;
+                    border: 1px solid ${color.hex_code};
+                    color: ${color.hex_code};
+                ">
+                    ${getPatternIcon(color.pattern_icon)} ${sanitizeHTML(color.name)}
+                </span>
+            `;
+        }
 
         async function loadUsers() {
             try {
@@ -264,7 +352,6 @@
             container.innerHTML = users.map(user => {
                 const statusClass = user.is_active ? 'alert-success' : 'alert-error';
                 const statusLabel = user.is_active ? 'Aktiv' : 'Inaktiv';
-                const levelLabel = getLevelLabel(user.experience_level);
 
                 // Sanitize user data to prevent XSS
                 const safeFirstName = sanitizeHTML(user.first_name || '');
@@ -273,6 +360,12 @@
                 const safeEmail = sanitizeHTML(user.email || 'N/A');
                 const safePhone = sanitizeHTML(user.phone || 'N/A');
                 const safeReason = user.deactivation_reason ? sanitizeHTML(user.deactivation_reason) : '';
+
+                // Build user colors display
+                const userColors = user.colors || [];
+                const colorsHtml = userColors.length > 0
+                    ? userColors.map(c => getColorBadgeHtml(c)).join(' ')
+                    : '<span style="color: #999; font-size: 0.8rem;">Keine Farben</span>';
 
                 // Determine role badge
                 let roleBadge = '';
@@ -291,7 +384,6 @@
                                 <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
                                     <h4 style="margin: 0; white-space: nowrap;">${safeName}</h4>
                                     <span class="badge-status ${statusClass}">${statusLabel}</span>
-                                    <span class="badge-level ${user.experience_level}">${levelLabel}</span>
                                     ${roleBadge}
                                 </div>
                                 <p style="margin: 5px 0; color: #666;">
@@ -299,6 +391,9 @@
                                 </p>
                                 <p style="margin: 5px 0; color: #666;">
                                     <strong>Telefon:</strong> ${safePhone}
+                                </p>
+                                <p style="margin: 5px 0; color: #666;">
+                                    <strong>Farben:</strong> ${colorsHtml}
                                 </p>
                                 <p style="margin: 5px 0; color: #666;">
                                     <strong>Letzte Aktivität:</strong> ${user.last_activity_at ? new Date(user.last_activity_at).toLocaleDateString('de-DE') : 'N/A'}
@@ -344,10 +439,7 @@
             }).join('');
         }
 
-        function getLevelLabel(level) {
-            const labels = { green: 'Grün', blue: 'Blau', orange: 'Orange' };
-            return labels[level] || level;
-        }
+        // getLevelLabel removed - replaced with color badges
 
         async function deactivateUser(id) {
             const reason = prompt('Grund für die Deaktivierung:');
@@ -452,7 +544,13 @@
             document.getElementById('edit-last-name').value = user.last_name || '';
             document.getElementById('edit-email').value = user.email || '';
             document.getElementById('edit-phone').value = user.phone || '';
-            document.getElementById('edit-level').value = user.experience_level || 'green';
+
+            // Set color checkboxes based on user's colors
+            const userColorIds = (user.colors || []).map(c => c.id);
+            const checkboxes = document.querySelectorAll('#edit-colors-container input[type="checkbox"]');
+            checkboxes.forEach(cb => {
+                cb.checked = userColorIds.includes(parseInt(cb.value));
+            });
 
             document.getElementById('edit-modal').style.display = 'flex';
         }
@@ -466,16 +564,25 @@
             event.preventDefault();
 
             const userId = parseInt(document.getElementById('edit-user-id').value);
+
+            // Get selected color IDs
+            const colorCheckboxes = document.querySelectorAll('#edit-colors-container input[type="checkbox"]:checked');
+            const colorIds = Array.from(colorCheckboxes).map(cb => parseInt(cb.value));
+
             const data = {
                 first_name: document.getElementById('edit-first-name').value.trim(),
                 last_name: document.getElementById('edit-last-name').value.trim(),
                 email: document.getElementById('edit-email').value.trim(),
-                phone: document.getElementById('edit-phone').value.trim() || null,
-                experience_level: document.getElementById('edit-level').value
+                phone: document.getElementById('edit-phone').value.trim() || null
             };
 
             try {
+                // Update user data
                 await api.adminUpdateUser(userId, data);
+
+                // Update user colors
+                await api.setUserColors(userId, colorIds);
+
                 showAlert('success', 'Benutzer erfolgreich aktualisiert');
                 closeEditModal();
                 loadUsers();
@@ -514,12 +621,16 @@
         async function createUser(event) {
             event.preventDefault();
 
+            // Get selected color IDs
+            const colorCheckboxes = document.querySelectorAll('#create-colors-container input[type="checkbox"]:checked');
+            const colorIds = Array.from(colorCheckboxes).map(cb => parseInt(cb.value));
+
             const data = {
                 first_name: document.getElementById('create-first-name').value.trim(),
                 last_name: document.getElementById('create-last-name').value.trim(),
                 email: document.getElementById('create-email').value.trim(),
                 phone: document.getElementById('create-phone').value.trim() || null,
-                experience_level: document.getElementById('create-level').value,
+                color_ids: colorIds,
                 is_admin: document.getElementById('create-is-admin').checked
             };
 
@@ -696,6 +807,13 @@
 
         .btn-info:hover {
             background-color: #138496;
+        }
+
+        /* Color checkbox grid */
+        .colors-checkbox-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 8px;
         }
     </style>
 </body>

@@ -23,10 +23,11 @@ import (
 
 // UserHandler handles user-related endpoints
 type UserHandler struct {
-	userRepo     *repository.UserRepository
-	authService  *services.AuthService
-	emailService *services.EmailService
-	config       *config.Config
+	userRepo      *repository.UserRepository
+	userColorRepo *repository.UserColorRepository
+	authService   *services.AuthService
+	emailService  *services.EmailService
+	config        *config.Config
 }
 
 // NewUserHandler creates a new user handler
@@ -37,10 +38,11 @@ func NewUserHandler(db *sql.DB, cfg *config.Config) *UserHandler {
 	}
 
 	return &UserHandler{
-		userRepo:     repository.NewUserRepository(db),
-		authService:  services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours),
-		emailService: emailService,
-		config:       cfg,
+		userRepo:      repository.NewUserRepository(db),
+		userColorRepo: repository.NewUserColorRepository(db),
+		authService:   services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours),
+		emailService:  emailService,
+		config:        cfg,
 	}
 }
 
@@ -73,6 +75,20 @@ func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	user.PasswordHash = nil
 	user.VerificationToken = nil
 	user.PasswordResetToken = nil
+
+	// Fetch user's colors
+	colorPtrs, err := h.userColorRepo.GetUserColors(userID)
+	if err != nil {
+		log.Printf("Warning: Failed to get user colors: %v", err)
+		colorPtrs = []*models.ColorCategory{}
+	}
+	// Convert []*ColorCategory to []ColorCategory
+	user.Colors = make([]models.ColorCategory, len(colorPtrs))
+	for i, c := range colorPtrs {
+		if c != nil {
+			user.Colors[i] = *c
+		}
+	}
 
 	// Create response with user data + is_admin flag + impersonation info
 	// Keep user fields at top level for backward compatibility
@@ -355,11 +371,24 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Don't return sensitive data
+	// Don't return sensitive data and fetch colors for each user
 	for _, user := range users {
 		user.PasswordHash = nil
 		user.VerificationToken = nil
 		user.PasswordResetToken = nil
+
+		// Fetch user's colors
+		if h.userColorRepo != nil {
+			colorPtrs, err := h.userColorRepo.GetUserColors(user.ID)
+			if err == nil && colorPtrs != nil {
+				user.Colors = make([]models.ColorCategory, len(colorPtrs))
+				for i, c := range colorPtrs {
+					if c != nil {
+						user.Colors[i] = *c
+					}
+				}
+			}
+		}
 	}
 
 	respondJSON(w, http.StatusOK, users)
@@ -389,6 +418,19 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	user.PasswordHash = nil
 	user.VerificationToken = nil
 	user.PasswordResetToken = nil
+
+	// Fetch user's colors
+	if h.userColorRepo != nil {
+		colorPtrs, err := h.userColorRepo.GetUserColors(userID)
+		if err == nil && colorPtrs != nil {
+			user.Colors = make([]models.ColorCategory, len(colorPtrs))
+			for i, c := range colorPtrs {
+				if c != nil {
+					user.Colors[i] = *c
+				}
+			}
+		}
+	}
 
 	respondJSON(w, http.StatusOK, user)
 }

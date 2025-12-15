@@ -12,6 +12,11 @@
             window.location.href = '/dashboard.html';
             return;
         }
+        // Show colors link for super-admins
+        if (userData.is_super_admin) {
+            const colorsLink = document.getElementById('super-admin-colors-link');
+            if (colorsLink) colorsLink.style.display = '';
+        }
     } catch (error) {
         console.error('Failed to verify admin status:', error);
         window.location.href = '/dashboard.html';

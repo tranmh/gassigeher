@@ -41,6 +41,7 @@ func setupTestDB(t *testing.T) *sql.DB {
 			size TEXT,
 			age INTEGER,
 			category TEXT,
+			color_id INTEGER,
 			photo TEXT,
 			photo_thumbnail TEXT,
 			special_needs TEXT,

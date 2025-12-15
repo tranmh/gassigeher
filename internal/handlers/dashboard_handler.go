@@ -18,7 +18,7 @@ type DashboardHandler struct {
 	bookingRepo          *repository.BookingRepository
 	userRepo             *repository.UserRepository
 	dogRepo              *repository.DogRepository
-	experienceRepo       *repository.ExperienceRequestRepository
+	colorRequestRepo     *repository.ColorRequestRepository
 	reactivationRepo     *repository.ReactivationRequestRepository
 }
 
@@ -30,7 +30,7 @@ func NewDashboardHandler(db *sql.DB, cfg *config.Config) *DashboardHandler {
 		bookingRepo:      repository.NewBookingRepository(db),
 		userRepo:         repository.NewUserRepository(db),
 		dogRepo:          repository.NewDogRepository(db),
-		experienceRepo:   repository.NewExperienceRequestRepository(db),
+		colorRequestRepo: repository.NewColorRequestRepository(db),
 		reactivationRepo: repository.NewReactivationRequestRepository(db),
 	}
 }
@@ -90,10 +90,10 @@ func (h *DashboardHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 		stats.UnavailableDogs = len(unavailableDogs)
 	}
 
-	// Get pending experience requests
-	pendingExperienceReqs, err := h.experienceRepo.FindAllPending()
+	// Get pending color requests
+	pendingColorReqs, err := h.colorRequestRepo.FindAllPending()
 	if err == nil {
-		stats.PendingExperienceReqs = len(pendingExperienceReqs)
+		stats.PendingExperienceReqs = len(pendingColorReqs)
 	}
 
 	// Get pending reactivation requests

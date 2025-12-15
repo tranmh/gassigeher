@@ -809,3 +809,91 @@ func TestCanUserAccessDog(t *testing.T) {
 		})
 	}
 }
+
+// TestCanUserAccessDogByColor tests color-based access control (new system)
+func TestCanUserAccessDogByColor(t *testing.T) {
+	tests := []struct {
+		name           string
+		userColorIDs   []int
+		dogColorID     int
+		expectedAccess bool
+	}{
+		// User has matching color
+		{
+			name:           "user with matching color can access",
+			userColorIDs:   []int{1, 2, 3},
+			dogColorID:     2,
+			expectedAccess: true,
+		},
+		{
+			name:           "user with single matching color can access",
+			userColorIDs:   []int{5},
+			dogColorID:     5,
+			expectedAccess: true,
+		},
+
+		// User does not have matching color
+		{
+			name:           "user without matching color cannot access",
+			userColorIDs:   []int{1, 2, 3},
+			dogColorID:     4,
+			expectedAccess: false,
+		},
+		{
+			name:           "user with different single color cannot access",
+			userColorIDs:   []int{5},
+			dogColorID:     3,
+			expectedAccess: false,
+		},
+
+		// Edge cases
+		{
+			name:           "user with no colors cannot access any dog",
+			userColorIDs:   []int{},
+			dogColorID:     1,
+			expectedAccess: false,
+		},
+		{
+			name:           "nil color list cannot access any dog",
+			userColorIDs:   nil,
+			dogColorID:     1,
+			expectedAccess: false,
+		},
+		{
+			name:           "dog with color ID 0 cannot be accessed",
+			userColorIDs:   []int{1, 2, 3},
+			dogColorID:     0,
+			expectedAccess: false,
+		},
+
+		// Multiple colors - user has many
+		{
+			name:           "user with many colors - first matches",
+			userColorIDs:   []int{1, 2, 3, 4, 5, 6, 7},
+			dogColorID:     1,
+			expectedAccess: true,
+		},
+		{
+			name:           "user with many colors - last matches",
+			userColorIDs:   []int{1, 2, 3, 4, 5, 6, 7},
+			dogColorID:     7,
+			expectedAccess: true,
+		},
+		{
+			name:           "user with many colors - middle matches",
+			userColorIDs:   []int{1, 2, 3, 4, 5, 6, 7},
+			dogColorID:     4,
+			expectedAccess: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := CanUserAccessDogByColor(tt.userColorIDs, tt.dogColorID)
+			if result != tt.expectedAccess {
+				t.Errorf("CanUserAccessDogByColor(%v, %d) = %v, expected %v",
+					tt.userColorIDs, tt.dogColorID, result, tt.expectedAccess)
+			}
+		})
+	}
+}

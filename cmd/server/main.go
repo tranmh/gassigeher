@@ -113,6 +113,9 @@ func main() {
 	dashboardHandler := handlers.NewDashboardHandler(db, cfg)
 	healthHandler := handlers.NewHealthHandler()
 	walkReportHandler := handlers.NewWalkReportHandler(db, cfg)
+	colorCategoryHandler := handlers.NewColorCategoryHandler(db, cfg)
+	colorRequestHandler := handlers.NewColorRequestHandler(db, cfg)
+	userColorHandler := handlers.NewUserColorHandler(db, cfg)
 	router.HandleFunc("/api/health", healthHandler.Health).Methods("GET")
 
 	// Initialize booking time repositories and services
@@ -159,6 +162,9 @@ func main() {
 	// Featured dogs (public - for homepage)
 	router.HandleFunc("/api/dogs/featured", dogHandler.GetFeaturedDogs).Methods("GET")
 
+	// Color categories (public - for filters)
+	router.HandleFunc("/api/colors", colorCategoryHandler.ListColors).Methods("GET")
+
 	// Site logo (public - for displaying logo on all pages)
 	router.HandleFunc("/api/settings/logo", settingsHandler.GetLogo).Methods("GET")
 
@@ -198,6 +204,11 @@ func main() {
 	protected.HandleFunc("/experience-requests", experienceHandler.CreateRequest).Methods("POST")
 	protected.HandleFunc("/experience-requests", experienceHandler.ListRequests).Methods("GET")
 
+	// Color requests (authenticated users)
+	protected.HandleFunc("/color-requests", colorRequestHandler.CreateRequest).Methods("POST")
+	protected.HandleFunc("/color-requests", colorRequestHandler.ListRequests).Methods("GET")
+	protected.HandleFunc("/color-requests/{id}", colorRequestHandler.GetRequest).Methods("GET")
+
 	// Walk reports (authenticated users)
 	protected.HandleFunc("/walk-reports", walkReportHandler.CreateReport).Methods("POST")
 	protected.HandleFunc("/walk-reports/by-booking/{bookingId}", walkReportHandler.GetReportByBooking).Methods("GET")
@@ -236,6 +247,16 @@ func main() {
 	// Experience requests management (admin only)
 	admin.HandleFunc("/experience-requests/{id}/approve", experienceHandler.ApproveRequest).Methods("PUT")
 	admin.HandleFunc("/experience-requests/{id}/deny", experienceHandler.DenyRequest).Methods("PUT")
+
+	// Color requests management (admin only)
+	admin.HandleFunc("/color-requests/{id}/approve", colorRequestHandler.ApproveRequest).Methods("PUT")
+	admin.HandleFunc("/color-requests/{id}/deny", colorRequestHandler.DenyRequest).Methods("PUT")
+
+	// User colors management (admin only)
+	admin.HandleFunc("/users/{id}/colors", userColorHandler.GetUserColors).Methods("GET")
+	admin.HandleFunc("/users/{id}/colors", userColorHandler.AddColorToUser).Methods("POST")
+	admin.HandleFunc("/users/{id}/colors", userColorHandler.SetUserColors).Methods("PUT")
+	admin.HandleFunc("/users/{id}/colors/{colorId}", userColorHandler.RemoveColorFromUser).Methods("DELETE")
 
 	// User management (admin only)
 	admin.HandleFunc("/users", userHandler.ListUsers).Methods("GET")
@@ -277,6 +298,13 @@ func main() {
 	superAdmin.HandleFunc("/admin/users/{id}/promote", userHandler.PromoteToAdmin).Methods("POST")
 	superAdmin.HandleFunc("/admin/users/{id}/demote", userHandler.DemoteAdmin).Methods("POST")
 	superAdmin.HandleFunc("/admin/users/{id}/impersonate", userHandler.ImpersonateUser).Methods("POST")
+
+	// Color category management (super-admin only)
+	superAdmin.HandleFunc("/colors", colorCategoryHandler.CreateColor).Methods("POST")
+	superAdmin.HandleFunc("/colors/{id}", colorCategoryHandler.GetColor).Methods("GET")
+	superAdmin.HandleFunc("/colors/{id}", colorCategoryHandler.UpdateColor).Methods("PUT")
+	superAdmin.HandleFunc("/colors/{id}", colorCategoryHandler.DeleteColor).Methods("DELETE")
+	superAdmin.HandleFunc("/colors/{id}/stats", colorCategoryHandler.GetColorStats).Methods("GET")
 	// NOTE: EndImpersonation is on 'protected' router (not superAdmin) because when
 	// impersonating a regular user, the token has is_super_admin=false
 	protected.HandleFunc("/end-impersonation", userHandler.EndImpersonation).Methods("POST")

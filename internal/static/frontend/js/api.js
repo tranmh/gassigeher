@@ -304,6 +304,64 @@ class API {
         return this.request('PUT', `/experience-requests/${id}/deny`, { message });
     }
 
+    // COLOR CATEGORY ENDPOINTS (public list, super-admin management)
+
+    async getColors() {
+        return this.request('GET', '/colors');
+    }
+
+    async createColor(data) {
+        return this.request('POST', '/colors', data);
+    }
+
+    async updateColor(id, data) {
+        return this.request('PUT', `/colors/${id}`, data);
+    }
+
+    async deleteColor(id) {
+        return this.request('DELETE', `/colors/${id}`);
+    }
+
+    async getColorStats(id) {
+        return this.request('GET', `/colors/${id}/stats`);
+    }
+
+    // COLOR REQUEST ENDPOINTS (user creates, admin approves/denies)
+
+    async createColorRequest(colorId) {
+        return this.request('POST', '/color-requests', { color_id: colorId });
+    }
+
+    async getColorRequests() {
+        return this.request('GET', '/color-requests');
+    }
+
+    async approveColorRequest(id, message = null) {
+        return this.request('PUT', `/color-requests/${id}/approve`, { message });
+    }
+
+    async denyColorRequest(id, message = null) {
+        return this.request('PUT', `/color-requests/${id}/deny`, { message });
+    }
+
+    // USER COLOR MANAGEMENT ENDPOINTS (admin only)
+
+    async getUserColors(userId) {
+        return this.request('GET', `/users/${userId}/colors`);
+    }
+
+    async addColorToUser(userId, colorId) {
+        return this.request('POST', `/users/${userId}/colors`, { color_id: colorId });
+    }
+
+    async removeColorFromUser(userId, colorId) {
+        return this.request('DELETE', `/users/${userId}/colors/${colorId}`);
+    }
+
+    async setUserColors(userId, colorIds) {
+        return this.request('PUT', `/users/${userId}/colors`, { color_ids: colorIds });
+    }
+
     // ACCOUNT DELETION & GDPR ENDPOINTS
 
     async deleteAccount(password) {

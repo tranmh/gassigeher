@@ -28,11 +28,12 @@
                         <a href="#">Benutzer</a>
                         <div class="nav-dropdown-menu">
                             <a href="/admin-users.html">👥 Alle Benutzer</a>
-                            <a href="/admin-experience-requests.html">⭐ Level-Anfragen</a>
+                            <a href="/admin-color-requests.html">🎨 Farb-Anfragen</a>
                             <a href="/admin-reactivation-requests.html">🔄 Reaktivierungen</a>
                         </div>
                     </li>
                     <li><a href="/admin-settings.html" data-i18n="admin_dashboard.system_settings">Einstellungen</a></li>
+                    <li id="super-admin-colors-link" style="display:none;"><a href="/admin-colors.html">🎨 Farben</a></li>
                     <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
                     <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
@@ -76,11 +77,9 @@
                         <input type="number" id="dog-age" min="0" required>
                     </div>
                     <div class="form-group">
-                        <label data-i18n="dogs.category">Kategorie</label>
-                        <select id="dog-category" required>
-                            <option value="green" data-i18n="dogs.category_green">Grün</option>
-                            <option value="blue" data-i18n="dogs.category_blue">Blau</option>
-                            <option value="orange" data-i18n="dogs.category_orange">Orange</option>
+                        <label data-i18n="colors.color">Farbe</label>
+                        <select id="dog-color" required>
+                            <!-- Dynamic color options loaded from API -->
                         </select>
                     </div>
 
@@ -138,6 +137,7 @@
     <script src="/js/impersonation-banner.js"></script>
     <script>
         let currentDogs = [];
+        let allColors = [];
 
         document.addEventListener('DOMContentLoaded', async () => {
             if (!api.isAuthenticated()) {
@@ -152,6 +152,11 @@
                     alert('Zugriff verweigert: Diese Seite ist nur für Administratoren zugänglich.');
                     window.location.href = '/dashboard.html';
                     return;
+                }
+                // Show colors link for super-admins
+                if (userData.is_super_admin) {
+                    const colorsLink = document.getElementById('super-admin-colors-link');
+                    if (colorsLink) colorsLink.style.display = '';
                 }
             } catch (error) {
                 console.error('Failed to verify admin status:', error);
@@ -168,6 +173,8 @@
             // Initialize impersonation banner (shows if impersonating)
             await ImpersonationBanner.init();
 
+            // Load colors first, then dogs
+            await loadColors();
             loadDogs();
 
             document.getElementById('dog-form').addEventListener('submit', handleFormSubmit);
@@ -199,6 +206,60 @@
             }
         }
 
+        async function loadColors() {
+            try {
+                const response = await api.getColors();
+                allColors = response.colors || [];
+                const colorSelect = document.getElementById('dog-color');
+                colorSelect.innerHTML = '';
+                allColors.forEach(color => {
+                    const option = document.createElement('option');
+                    option.value = color.id;
+                    option.textContent = `${getPatternIcon(color.pattern_icon)} ${color.name}`;
+                    option.style.color = color.hex_code;
+                    colorSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Failed to load colors:', error);
+            }
+        }
+
+        function getPatternIcon(pattern) {
+            const icons = {
+                'circle': '●',
+                'triangle': '▲',
+                'square': '■',
+                'diamond': '◆',
+                'pentagon': '⬠',
+                'hexagon': '⬡',
+                'star': '★',
+                'heart': '♥',
+                'cross': '✚',
+                'spade': '♠',
+                'club': '♣',
+                'moon': '☽',
+                'sun': '☀',
+                'ring': '○',
+                'target': '◎'
+            };
+            return icons[pattern] || '●';
+        }
+
+        function getColorBadgeHtml(color) {
+            if (!color) {
+                return '<span class="dog-category-badge">Keine Farbe</span>';
+            }
+            return `
+                <span class="dog-category-badge" style="
+                    background: ${color.hex_code}20;
+                    border: 2px solid ${color.hex_code};
+                    color: ${color.hex_code};
+                ">
+                    ${getPatternIcon(color.pattern_icon)} ${sanitizeHTML(color.name)}
+                </span>
+            `;
+        }
+
         async function loadDogs() {
             try {
                 currentDogs = await api.getDogs();
@@ -222,6 +283,8 @@
                 const safeDogName = sanitizeHTML(dog.name);
                 const safeUnavailableReason = dog.unavailable_reason ? sanitizeHTML(dog.unavailable_reason) : 'Nicht verfügbar';
                 const safeDogBreed = sanitizeHTML(dog.breed);
+                const dogColor = dog.color || allColors.find(c => c.id === dog.color_id);
+                const colorBadgeHtml = getColorBadgeHtml(dogColor);
 
                 return `
                 <div class="dog-card ${!dog.is_available ? 'unavailable' : ''}">
@@ -229,7 +292,7 @@
                     ${dog.is_featured ? `<div class="dog-featured-badge" title="Auf Startseite angezeigt">⭐</div>` : ''}
                     ${getDogPhotoHtml(dog, false, 'dog-card-image', true, true)}
                     <div class="dog-card-body">
-                        <div class="dog-category-badge ${dog.category}">${getCategoryLabel(dog.category)}</div>
+                        ${colorBadgeHtml}
                         <h3 class="dog-card-title">${safeDogName}</h3>
                         <p class="dog-card-info">${safeDogBreed} • ${getSizeLabel(dog.size)} • ${dog.age} Jahre</p>
                         <div style="display: flex; gap: 5px; margin-top: 10px;">
@@ -246,11 +309,6 @@
                 </div>
                 `;
             }).join('');
-        }
-
-        function getCategoryLabel(category) {
-            const labels = { green: 'Grün', blue: 'Blau', orange: 'Orange' };
-            return labels[category] || category;
         }
 
         function getSizeLabel(size) {
@@ -281,7 +339,7 @@
             document.getElementById('dog-breed').value = dog.breed;
             document.getElementById('dog-size').value = dog.size;
             document.getElementById('dog-age').value = dog.age;
-            document.getElementById('dog-category').value = dog.category;
+            document.getElementById('dog-color').value = dog.color_id || '';
             document.getElementById('dog-external-link').value = dog.external_link || '';
             document.getElementById('dog-form-container').classList.remove('hidden');
 
@@ -301,12 +359,13 @@
 
             const id = document.getElementById('dog-id').value;
             const externalLink = document.getElementById('dog-external-link').value.trim();
+            const colorId = document.getElementById('dog-color').value;
             const data = {
                 name: document.getElementById('dog-name').value,
                 breed: document.getElementById('dog-breed').value,
                 size: document.getElementById('dog-size').value,
                 age: parseInt(document.getElementById('dog-age').value),
-                category: document.getElementById('dog-category').value,
+                color_id: colorId ? parseInt(colorId) : null,
                 external_link: externalLink || null,
             };
 

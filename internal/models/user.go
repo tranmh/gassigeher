@@ -9,16 +9,17 @@ import (
 
 // User represents a user in the system
 type User struct {
-	ID                       int        `json:"id"`
-	FirstName                string     `json:"first_name"`
-	LastName                 string     `json:"last_name"`
-	Email                    *string    `json:"email,omitempty"`
-	Phone                    *string    `json:"phone,omitempty"`
-	PasswordHash             *string    `json:"-"`
-	ExperienceLevel          string     `json:"experience_level"`
+	ID                       int              `json:"id"`
+	FirstName                string           `json:"first_name"`
+	LastName                 string           `json:"last_name"`
+	Email                    *string          `json:"email,omitempty"`
+	Phone                    *string          `json:"phone,omitempty"`
+	PasswordHash             *string          `json:"-"`
+	ExperienceLevel          string           `json:"experience_level"`
+	Colors                   []ColorCategory  `json:"colors,omitempty"`
 	// DONE: Admin flags
-	IsAdmin                  bool       `json:"is_admin"`
-	IsSuperAdmin             bool       `json:"is_super_admin"`
+	IsAdmin                  bool             `json:"is_admin"`
+	IsSuperAdmin             bool             `json:"is_super_admin"`
 	IsVerified               bool       `json:"is_verified"`
 	IsActive                 bool       `json:"is_active"`
 	IsDeleted                bool       `json:"is_deleted"`
