@@ -167,9 +167,26 @@ func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Category != "green" && req.Category != "blue" && req.Category != "orange" {
-		respondError(w, http.StatusBadRequest, "Category must be green, blue, or orange")
+	// Validate color_id is provided (new color system)
+	// Category is now legacy - if color_id is provided, category validation is skipped
+	if req.ColorID == nil && req.Category == "" {
+		respondError(w, http.StatusBadRequest, "Color is required")
 		return
+	}
+
+	// If only legacy category is provided, validate it
+	if req.ColorID == nil && req.Category != "" {
+		if req.Category != "green" && req.Category != "blue" && req.Category != "orange" {
+			respondError(w, http.StatusBadRequest, "Category must be green, blue, or orange")
+			return
+		}
+	}
+
+	// Set default category for database CHECK constraint (legacy field)
+	// When using new color system, category is not sent but DB requires valid value
+	category := req.Category
+	if category == "" {
+		category = "green" // Default to satisfy CHECK constraint
 	}
 
 	// Create dog
@@ -178,7 +195,7 @@ func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) {
 		Breed:               req.Breed,
 		Size:                req.Size,
 		Age:                 req.Age,
-		Category:            req.Category,
+		Category:            category,
 		ColorID:             req.ColorID,
 		SpecialNeeds:        req.SpecialNeeds,
 		PickupLocation:      req.PickupLocation,
@@ -192,6 +209,7 @@ func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.dogRepo.Create(dog); err != nil {
+		log.Printf("ERROR: Failed to create dog: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to create dog")
 		return
 	}

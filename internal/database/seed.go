@@ -61,11 +61,11 @@ func SeedDatabase(db *sql.DB, superAdminEmail string) error {
 	now := time.Now()
 	_, err = db.Exec(`
 		INSERT INTO users (
-			id, first_name, last_name, email, password_hash, experience_level,
+			id, name, first_name, last_name, email, password_hash, experience_level,
 			is_admin, is_super_admin, is_verified, is_active,
 			terms_accepted_at, last_activity_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, 1, "Super", "Admin", superAdminEmail, string(hashedPassword), "orange",
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, 1, "Super Admin", "Super", "Admin", superAdminEmail, string(hashedPassword), "orange",
 		true, true, true, true, now, now, now, now)
 
 	if err != nil {
@@ -170,12 +170,13 @@ func generateTestUsers(db *sql.DB) ([]TestUser, error) {
 			return nil, fmt.Errorf("failed to hash test user password: %w", err)
 		}
 
+		fullName := users[i].FirstName + " " + users[i].LastName
 		_, err = db.Exec(`
-			INSERT INTO users (first_name, last_name, email, password_hash, experience_level,
+			INSERT INTO users (name, first_name, last_name, email, password_hash, experience_level,
 				is_admin, is_super_admin, is_verified, is_active,
 				terms_accepted_at, last_activity_at, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, users[i].FirstName, users[i].LastName, users[i].Email, string(hashedPassword), users[i].Level,
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, fullName, users[i].FirstName, users[i].LastName, users[i].Email, string(hashedPassword), users[i].Level,
 			false, false, true, true, now, now, now, now)
 
 		if err != nil {
