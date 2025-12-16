@@ -86,25 +86,31 @@ func SeedDatabase(db *sql.DB, superAdminEmail string) error {
 		return fmt.Errorf("failed to generate dogs: %w", err)
 	}
 
-	// 6. Generate bookings
+	// 6. Assign colors to users (all users get green/gruen color)
+	err = assignUserColors(db)
+	if err != nil {
+		return fmt.Errorf("failed to assign user colors: %w", err)
+	}
+
+	// 7. Generate bookings
 	err = generateBookings(db)
 	if err != nil {
 		return fmt.Errorf("failed to generate bookings: %w", err)
 	}
 
-	// 7. Initialize default settings (if not exists)
+	// 8. Initialize default settings (if not exists)
 	err = initializeSystemSettings(db)
 	if err != nil {
 		return fmt.Errorf("failed to initialize system settings: %w", err)
 	}
 
-	// 8. Write credentials to file
+	// 9. Write credentials to file
 	err = writeCredentialsFile(superAdminEmail, superAdminPassword)
 	if err != nil {
 		log.Printf("Warning: Failed to write credentials file: %v", err)
 	}
 
-	// 9. Print setup complete message
+	// 10. Print setup complete message
 	printSetupComplete(superAdminEmail, superAdminPassword, testUsers)
 
 	log.Println("✓ Seed data generation completed successfully")
@@ -188,30 +194,31 @@ func generateTestUsers(db *sql.DB) ([]TestUser, error) {
 	return users, nil
 }
 
-// generateDogs creates 5 sample dogs with different categories
-// DONE
+// generateDogs creates 5 sample dogs with different colors
+// Color IDs: 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau
 func generateDogs(db *sql.DB) error {
 	dogs := []struct {
 		Name     string
-		Category string
+		Category string // Legacy field (kept for CHECK constraint)
+		ColorID  int    // New color system
 		Breed    string
 		Size     string
 		Age      int
 	}{
-		{"Bella", "green", "Labrador Retriever", "large", 3},
-		{"Max", "green", "Golden Retriever", "large", 5},
-		{"Luna", "blue", "Deutscher Schäferhund", "large", 4},
-		{"Charlie", "blue", "Border Collie", "medium", 2},
-		{"Rocky", "orange", "Belgischer Malinois", "large", 6},
+		{"Bella", "green", 1, "Labrador Retriever", "large", 3},       // gruen
+		{"Max", "green", 2, "Golden Retriever", "large", 5},           // gelb
+		{"Luna", "green", 3, "Deutscher Schäferhund", "large", 4},     // orange
+		{"Charlie", "green", 4, "Border Collie", "medium", 2},         // hellblau
+		{"Rocky", "green", 5, "Belgischer Malinois", "large", 6},      // dunkelblau
 	}
 
 	now := time.Now()
 	for _, dog := range dogs {
 		_, err := db.Exec(`
-			INSERT INTO dogs (name, category, breed, size, age,
+			INSERT INTO dogs (name, category, color_id, breed, size, age,
 				special_needs, is_available, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, dog.Name, dog.Category, dog.Breed, dog.Size, dog.Age,
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, dog.Name, dog.Category, dog.ColorID, dog.Breed, dog.Size, dog.Age,
 			"Keine besonderen Bedürfnisse", true, now, now)
 		if err != nil {
 			return fmt.Errorf("failed to create dog %s: %w", dog.Name, err)
@@ -219,6 +226,41 @@ func generateDogs(db *sql.DB) error {
 	}
 
 	log.Printf("✓ Created %d dogs", len(dogs))
+	return nil
+}
+
+// assignUserColors assigns the green color (ID 1) to all users
+// This populates the user_colors junction table for the new color system
+func assignUserColors(db *sql.DB) error {
+	const greenColorID = 1 // gruen color
+
+	// Get all user IDs
+	rows, err := db.Query("SELECT id FROM users")
+	if err != nil {
+		return fmt.Errorf("failed to query users: %w", err)
+	}
+	defer rows.Close()
+
+	var userIDs []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return fmt.Errorf("failed to scan user ID: %w", err)
+		}
+		userIDs = append(userIDs, id)
+	}
+
+	for _, userID := range userIDs {
+		_, err := db.Exec(`
+			INSERT INTO user_colors (user_id, color_id)
+			VALUES (?, ?)
+		`, userID, greenColorID)
+		if err != nil {
+			return fmt.Errorf("failed to assign color to user %d: %w", userID, err)
+		}
+	}
+
+	log.Printf("✓ Assigned green color to %d users", len(userIDs))
 	return nil
 }
 
