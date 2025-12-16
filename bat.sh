@@ -36,7 +36,7 @@ echo ""
 
 echo "[3/4] Building application..."
 # Get version info for ldflags
-VERSION="1.2"
+VERSION="1.3"
 GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS="-X github.com/tranmh/gassigeher/internal/version.Version=${VERSION}"
