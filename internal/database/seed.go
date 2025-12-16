@@ -194,39 +194,129 @@ func generateTestUsers(db *sql.DB) ([]TestUser, error) {
 	return users, nil
 }
 
-// generateDogs creates 5 sample dogs with different colors
+// generateDogs creates 5 sample dogs with different colors and care info
 // Color IDs: 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau
 func generateDogs(db *sql.DB) error {
 	dogs := []struct {
-		Name     string
-		Category string // Legacy field (kept for CHECK constraint)
-		ColorID  int    // New color system
-		Breed    string
-		Size     string
-		Age      int
+		Name                string
+		Category            string // Legacy field (kept for CHECK constraint)
+		ColorID             int    // New color system
+		Breed               string
+		Size                string
+		Age                 int
+		SpecialNeeds        *string
+		PickupLocation      *string
+		WalkRoute           *string
+		WalkDuration        *int
+		SpecialInstructions *string
+		DefaultMorningTime  *string
+		DefaultEveningTime  *string
 	}{
-		{"Bella", "green", 1, "Labrador Retriever", "large", 3},       // gruen
-		{"Max", "green", 2, "Golden Retriever", "large", 5},           // gelb
-		{"Luna", "green", 3, "Deutscher Schäferhund", "large", 4},     // orange
-		{"Charlie", "green", 4, "Border Collie", "medium", 2},         // hellblau
-		{"Rocky", "green", 5, "Belgischer Malinois", "large", 6},      // dunkelblau
+		{
+			Name:                "Bella",
+			Category:            "green",
+			ColorID:             1, // gruen
+			Breed:               "Labrador Retriever",
+			Size:                "large",
+			Age:                 3,
+			SpecialNeeds:        strPtr("Keine besonderen Bedürfnisse"),
+			PickupLocation:      strPtr("Zwinger 1, Gebäude A"),
+			WalkRoute:           strPtr("Waldweg hinter dem Tierheim, geradeaus bis zur Bank, dann links zurück"),
+			WalkDuration:        intPtr(45),
+			SpecialInstructions: strPtr("Bella ist sehr freundlich und verträgt sich gut mit anderen Hunden. Liebt es, Stöckchen zu holen!"),
+			DefaultMorningTime:  strPtr("09:00"),
+			DefaultEveningTime:  strPtr("17:00"),
+		},
+		{
+			Name:                "Max",
+			Category:            "green",
+			ColorID:             2, // gelb
+			Breed:               "Golden Retriever",
+			Size:                "large",
+			Age:                 5,
+			SpecialNeeds:        strPtr("Leichte Arthrose - bitte keine langen Spaziergänge"),
+			PickupLocation:      strPtr("Zwinger 3, Gebäude A"),
+			WalkRoute:           strPtr("Kurze Runde um den Teich, ebener Untergrund bevorzugt"),
+			WalkDuration:        intPtr(30),
+			SpecialInstructions: strPtr("Max braucht häufige Pausen. Bei Anzeichen von Müdigkeit bitte umkehren. Nach dem Spaziergang Leckerli als Belohnung."),
+			DefaultMorningTime:  strPtr("10:00"),
+			DefaultEveningTime:  strPtr("16:00"),
+		},
+		{
+			Name:                "Luna",
+			Category:            "green",
+			ColorID:             3, // orange
+			Breed:               "Deutscher Schäferhund",
+			Size:                "large",
+			Age:                 4,
+			SpecialNeeds:        strPtr("Reaktiv gegenüber anderen Hunden - Abstand halten!"),
+			PickupLocation:      strPtr("Zwinger 7, Gebäude B (separater Eingang)"),
+			WalkRoute:           strPtr("Feldweg Richtung Süden, weg von den Hauptwegen. Karte am Zwinger."),
+			WalkDuration:        intPtr(60),
+			SpecialInstructions: strPtr("WICHTIG: Mindestens 10m Abstand zu anderen Hunden. Bei Begegnung: Luna ablenken mit Leckerli. Niemals an der kurzen Leine führen bei Hundebegegnungen."),
+			DefaultMorningTime:  strPtr("08:00"),
+			DefaultEveningTime:  strPtr("18:00"),
+		},
+		{
+			Name:                "Charlie",
+			Category:            "green",
+			ColorID:             4, // hellblau
+			Breed:               "Border Collie",
+			Size:                "medium",
+			Age:                 2,
+			SpecialNeeds:        strPtr("Sehr energiegeladen - braucht viel Beschäftigung"),
+			PickupLocation:      strPtr("Zwinger 2, Gebäude A"),
+			WalkRoute:           strPtr("Große Runde durch den Wald, gerne mit Apportier-Spielen"),
+			WalkDuration:        intPtr(60),
+			SpecialInstructions: strPtr("Charlie liebt Kopfarbeit! Bitte Ball oder Frisbee mitnehmen (liegt am Zwinger). Kommandos: Sitz, Platz, Bleib funktionieren gut."),
+			DefaultMorningTime:  strPtr("08:30"),
+			DefaultEveningTime:  strPtr("17:30"),
+		},
+		{
+			Name:                "Rocky",
+			Category:            "green",
+			ColorID:             5, // dunkelblau
+			Breed:               "Belgischer Malinois",
+			Size:                "large",
+			Age:                 6,
+			SpecialNeeds:        strPtr("Nur für erfahrene Hundeführer - stark und eigenwillig"),
+			PickupLocation:      strPtr("Zwinger 10, Gebäude C (Schlüssel beim Pfleger holen)"),
+			WalkRoute:           strPtr("Trainingsgelände hinter Gebäude C, dann Waldweg Nord"),
+			WalkDuration:        intPtr(45),
+			SpecialInstructions: strPtr("Rocky braucht klare Führung. Immer Leckerlis dabei haben. Bei Unsicherheit: Spaziergang abbrechen und zurückkehren. Notfall-Nummer Pfleger: Am Zwinger ausgehängt."),
+			DefaultMorningTime:  strPtr("07:30"),
+			DefaultEveningTime:  strPtr("16:30"),
+		},
 	}
 
 	now := time.Now()
 	for _, dog := range dogs {
 		_, err := db.Exec(`
 			INSERT INTO dogs (name, category, color_id, breed, size, age,
-				special_needs, is_available, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				special_needs, pickup_location, walk_route, walk_duration,
+				special_instructions, default_morning_time, default_evening_time,
+				is_available, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`, dog.Name, dog.Category, dog.ColorID, dog.Breed, dog.Size, dog.Age,
-			"Keine besonderen Bedürfnisse", true, now, now)
+			dog.SpecialNeeds, dog.PickupLocation, dog.WalkRoute, dog.WalkDuration,
+			dog.SpecialInstructions, dog.DefaultMorningTime, dog.DefaultEveningTime,
+			true, now, now)
 		if err != nil {
 			return fmt.Errorf("failed to create dog %s: %w", dog.Name, err)
 		}
 	}
 
-	log.Printf("✓ Created %d dogs", len(dogs))
+	log.Printf("✓ Created %d dogs with care info", len(dogs))
 	return nil
+}
+
+// Helper functions for creating pointers to values
+func strPtr(s string) *string {
+	return &s
+}
+
+func intPtr(i int) *int {
+	return &i
 }
 
 // assignUserColors assigns the green color (ID 1) to all users

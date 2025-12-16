@@ -115,6 +115,48 @@
                         <small style="color: #888; display: block; margin-top: 5px;" data-i18n="dogs.external_link_hint">Link zur Hundeseite auf der Tierheim-Website</small>
                     </div>
 
+                    <!-- Care Information Section -->
+                    <div style="margin: 25px 0 15px 0; padding-top: 20px; border-top: 1px solid var(--border-light);">
+                        <h4 style="margin: 0 0 15px 0; color: var(--primary-green);">🐕 Pflege- & Spaziergang-Informationen</h4>
+                    </div>
+
+                    <div class="form-group">
+                        <label data-i18n="dogs.special_needs">Besondere Bedürfnisse</label>
+                        <textarea id="dog-special-needs" rows="2" placeholder="z.B. Allergien, Medikamente, Ängste..."></textarea>
+                        <small style="color: #888; display: block; margin-top: 5px;">Wird als Warnung auf der Hundekarte angezeigt</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label data-i18n="dogs.pickup_location">Abholort</label>
+                        <input type="text" id="dog-pickup-location" placeholder="z.B. Zwinger 3, Auslauf B">
+                    </div>
+
+                    <div class="form-group">
+                        <label data-i18n="dogs.walk_route">Spazierweg</label>
+                        <textarea id="dog-walk-route" rows="2" placeholder="z.B. Waldweg hinter dem Tierheim, nicht an der Hauptstraße"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label data-i18n="dogs.walk_duration">Spazierdauer (Minuten)</label>
+                        <input type="number" id="dog-walk-duration" min="5" max="180" placeholder="z.B. 30">
+                    </div>
+
+                    <div class="form-group">
+                        <label data-i18n="dogs.special_instructions">Besondere Anweisungen</label>
+                        <textarea id="dog-special-instructions" rows="3" placeholder="z.B. Nicht mit anderen Hunden zusammenführen, braucht viele Pausen..."></textarea>
+                    </div>
+
+                    <div style="display: flex; gap: 15px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label>Standard Morgenzeit</label>
+                            <input type="time" id="dog-default-morning-time">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>Standard Abendzeit</label>
+                            <input type="time" id="dog-default-evening-time">
+                        </div>
+                    </div>
+
                     <div style="display: flex; gap: 10px;">
                         <button type="submit" class="btn" data-i18n="common.save">Speichern</button>
                         <button type="button" class="btn btn-secondary" onclick="hideForm()" data-i18n="common.cancel">Abbrechen</button>
@@ -341,6 +383,16 @@
             document.getElementById('dog-age').value = dog.age;
             document.getElementById('dog-color').value = dog.color_id || '';
             document.getElementById('dog-external-link').value = dog.external_link || '';
+
+            // Populate care info fields
+            document.getElementById('dog-special-needs').value = dog.special_needs || '';
+            document.getElementById('dog-pickup-location').value = dog.pickup_location || '';
+            document.getElementById('dog-walk-route').value = dog.walk_route || '';
+            document.getElementById('dog-walk-duration').value = dog.walk_duration || '';
+            document.getElementById('dog-special-instructions').value = dog.special_instructions || '';
+            document.getElementById('dog-default-morning-time').value = dog.default_morning_time || '';
+            document.getElementById('dog-default-evening-time').value = dog.default_evening_time || '';
+
             document.getElementById('dog-form-container').classList.remove('hidden');
 
             // Initialize photo UI for this dog
@@ -360,6 +412,16 @@
             const id = document.getElementById('dog-id').value;
             const externalLink = document.getElementById('dog-external-link').value.trim();
             const colorId = document.getElementById('dog-color').value;
+
+            // Get care info fields
+            const specialNeeds = document.getElementById('dog-special-needs').value.trim();
+            const pickupLocation = document.getElementById('dog-pickup-location').value.trim();
+            const walkRoute = document.getElementById('dog-walk-route').value.trim();
+            const walkDurationVal = document.getElementById('dog-walk-duration').value;
+            const specialInstructions = document.getElementById('dog-special-instructions').value.trim();
+            const defaultMorningTime = document.getElementById('dog-default-morning-time').value;
+            const defaultEveningTime = document.getElementById('dog-default-evening-time').value;
+
             const data = {
                 name: document.getElementById('dog-name').value,
                 breed: document.getElementById('dog-breed').value,
@@ -367,6 +429,13 @@
                 age: parseInt(document.getElementById('dog-age').value),
                 color_id: colorId ? parseInt(colorId) : null,
                 external_link: externalLink || null,
+                special_needs: specialNeeds || null,
+                pickup_location: pickupLocation || null,
+                walk_route: walkRoute || null,
+                walk_duration: walkDurationVal ? parseInt(walkDurationVal) : null,
+                special_instructions: specialInstructions || null,
+                default_morning_time: defaultMorningTime || null,
+                default_evening_time: defaultEveningTime || null,
             };
 
             try {

@@ -539,6 +539,271 @@ func TestDogHandler_ToggleAvailability(t *testing.T) {
 	})
 }
 
+// DONE: TestDogHandler_CreateDogWithCareInfo tests creating a dog with care info fields
+func TestDogHandler_CreateDogWithCareInfo(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewDogHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
+
+	t.Run("create dog with all care info fields", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"name":                 "Care Dog",
+			"breed":                "Golden Retriever",
+			"size":                 "large",
+			"age":                  5,
+			"category":             "green",
+			"special_needs":        "Needs gentle handling, afraid of loud noises",
+			"pickup_location":      "Zwinger 3, Auslauf B",
+			"walk_route":           "Waldweg hinter dem Tierheim, nicht an der Hauptstraße",
+			"walk_duration":        45,
+			"special_instructions": "Nicht mit anderen Hunden zusammenführen",
+			"default_morning_time": "09:00",
+			"default_evening_time": "17:00",
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/dogs", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateDog(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Errorf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		// Verify all care info fields are returned
+		if response["special_needs"] != "Needs gentle handling, afraid of loud noises" {
+			t.Errorf("Expected special_needs to match, got %v", response["special_needs"])
+		}
+		if response["pickup_location"] != "Zwinger 3, Auslauf B" {
+			t.Errorf("Expected pickup_location to match, got %v", response["pickup_location"])
+		}
+		if response["walk_route"] != "Waldweg hinter dem Tierheim, nicht an der Hauptstraße" {
+			t.Errorf("Expected walk_route to match, got %v", response["walk_route"])
+		}
+		if response["walk_duration"] != float64(45) {
+			t.Errorf("Expected walk_duration 45, got %v", response["walk_duration"])
+		}
+		if response["special_instructions"] != "Nicht mit anderen Hunden zusammenführen" {
+			t.Errorf("Expected special_instructions to match, got %v", response["special_instructions"])
+		}
+		if response["default_morning_time"] != "09:00" {
+			t.Errorf("Expected default_morning_time '09:00', got %v", response["default_morning_time"])
+		}
+		if response["default_evening_time"] != "17:00" {
+			t.Errorf("Expected default_evening_time '17:00', got %v", response["default_evening_time"])
+		}
+	})
+
+	t.Run("create dog with partial care info", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"name":            "Partial Care Dog",
+			"breed":           "Beagle",
+			"size":            "medium",
+			"age":             3,
+			"category":        "blue",
+			"pickup_location": "Main entrance",
+			"walk_duration":   30,
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/dogs", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateDog(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Errorf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		// Verify partial fields
+		if response["pickup_location"] != "Main entrance" {
+			t.Errorf("Expected pickup_location 'Main entrance', got %v", response["pickup_location"])
+		}
+		if response["walk_duration"] != float64(30) {
+			t.Errorf("Expected walk_duration 30, got %v", response["walk_duration"])
+		}
+
+		// Verify optional fields are null
+		if response["special_needs"] != nil {
+			t.Errorf("Expected special_needs to be nil, got %v", response["special_needs"])
+		}
+		if response["walk_route"] != nil {
+			t.Errorf("Expected walk_route to be nil, got %v", response["walk_route"])
+		}
+	})
+
+	t.Run("create dog without care info", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"name":     "Basic Dog",
+			"breed":    "Poodle",
+			"size":     "small",
+			"age":      2,
+			"category": "green",
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/dogs", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateDog(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Errorf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+}
+
+// DONE: TestDogHandler_UpdateDogCareInfo tests updating dog care info fields
+func TestDogHandler_UpdateDogCareInfo(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewDogHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
+	dogID := testutil.SeedTestDog(t, db, "Bella", "Labrador", "green")
+
+	t.Run("update care info fields", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"special_needs":        "Updated special needs",
+			"pickup_location":      "New pickup location",
+			"walk_route":           "New walking route",
+			"walk_duration":        60,
+			"special_instructions": "New instructions",
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/dogs/"+fmt.Sprintf("%d", dogID), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dogID)})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UpdateDog(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		// Verify by querying database
+		var specialNeeds, pickupLocation, walkRoute, specialInstructions *string
+		var walkDuration *int
+		db.QueryRow(`SELECT special_needs, pickup_location, walk_route, walk_duration, special_instructions
+			FROM dogs WHERE id = ?`, dogID).Scan(&specialNeeds, &pickupLocation, &walkRoute, &walkDuration, &specialInstructions)
+
+		if specialNeeds == nil || *specialNeeds != "Updated special needs" {
+			t.Errorf("Expected special_needs 'Updated special needs', got %v", specialNeeds)
+		}
+		if pickupLocation == nil || *pickupLocation != "New pickup location" {
+			t.Errorf("Expected pickup_location 'New pickup location', got %v", pickupLocation)
+		}
+		if walkRoute == nil || *walkRoute != "New walking route" {
+			t.Errorf("Expected walk_route 'New walking route', got %v", walkRoute)
+		}
+		if walkDuration == nil || *walkDuration != 60 {
+			t.Errorf("Expected walk_duration 60, got %v", walkDuration)
+		}
+		if specialInstructions == nil || *specialInstructions != "New instructions" {
+			t.Errorf("Expected special_instructions 'New instructions', got %v", specialInstructions)
+		}
+	})
+
+	t.Run("update default times", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"default_morning_time": "08:30",
+			"default_evening_time": "18:00",
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/dogs/"+fmt.Sprintf("%d", dogID), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dogID)})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UpdateDog(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		// Verify times
+		var morningTime, eveningTime *string
+		db.QueryRow(`SELECT default_morning_time, default_evening_time FROM dogs WHERE id = ?`, dogID).Scan(&morningTime, &eveningTime)
+
+		if morningTime == nil || *morningTime != "08:30" {
+			t.Errorf("Expected default_morning_time '08:30', got %v", morningTime)
+		}
+		if eveningTime == nil || *eveningTime != "18:00" {
+			t.Errorf("Expected default_evening_time '18:00', got %v", eveningTime)
+		}
+	})
+
+	t.Run("care info fields returned in GET response", func(t *testing.T) {
+		// First update care info
+		reqBody := map[string]interface{}{
+			"special_needs":   "Visible needs",
+			"pickup_location": "Visible location",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/dogs/"+fmt.Sprintf("%d", dogID), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dogID)})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+		handler.UpdateDog(rec, req)
+
+		// Then GET the dog
+		getReq := httptest.NewRequest("GET", "/api/dogs/"+fmt.Sprintf("%d", dogID), nil)
+		getReq = mux.SetURLVars(getReq, map[string]string{"id": fmt.Sprintf("%d", dogID)})
+		ctx = contextWithUser(getReq.Context(), adminID, "admin@example.com", true)
+		getReq = getReq.WithContext(ctx)
+
+		getRec := httptest.NewRecorder()
+		handler.GetDog(getRec, getReq)
+
+		if getRec.Code != http.StatusOK {
+			t.Errorf("Expected GET status 200, got %d", getRec.Code)
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(getRec.Body.Bytes(), &response)
+
+		if response["special_needs"] != "Visible needs" {
+			t.Errorf("Expected special_needs 'Visible needs', got %v", response["special_needs"])
+		}
+		if response["pickup_location"] != "Visible location" {
+			t.Errorf("Expected pickup_location 'Visible location', got %v", response["pickup_location"])
+		}
+	})
+}
+
 // DONE: TestDogHandler_GetBreeds tests getting list of unique breeds
 func TestDogHandler_GetBreeds(t *testing.T) {
 	db := testutil.SetupTestDB(t)

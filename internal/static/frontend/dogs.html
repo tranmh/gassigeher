@@ -490,7 +490,26 @@
                 const safeDogName = sanitizeHTML(dog.name);
                 const safeDogBreed = sanitizeHTML(dog.breed);
                 const safeSpecialNeeds = dog.special_needs ? sanitizeHTML(dog.special_needs) : '';
-                const safeDescription = dog.description ? sanitizeHTML(dog.description) : '';
+                const safePickupLocation = dog.pickup_location ? sanitizeHTML(dog.pickup_location) : '';
+                const safeWalkRoute = dog.walk_route ? sanitizeHTML(dog.walk_route) : '';
+                const safeSpecialInstructions = dog.special_instructions ? sanitizeHTML(dog.special_instructions) : '';
+
+                // Build care info section
+                const hasCareInfo = dog.pickup_location || dog.walk_route || dog.walk_duration || dog.special_instructions;
+                let careInfoHtml = '';
+                if (hasCareInfo) {
+                    careInfoHtml = `
+                        <div style="margin-top: 20px; padding: 15px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 8px; border-left: 3px solid var(--primary-green);">
+                            <h4 style="margin: 0 0 12px 0; font-size: 0.95rem; color: var(--primary-green);">📋 Spaziergang-Informationen</h4>
+                            <div style="display: grid; gap: 8px; font-size: 0.9rem;">
+                                ${safePickupLocation ? `<div><strong>📍 Abholort:</strong> ${safePickupLocation}</div>` : ''}
+                                ${dog.walk_duration ? `<div><strong>⏱️ Dauer:</strong> ca. ${dog.walk_duration} Minuten</div>` : ''}
+                                ${safeWalkRoute ? `<div><strong>🚶 Route:</strong> ${safeWalkRoute}</div>` : ''}
+                                ${safeSpecialInstructions ? `<div style="margin-top: 5px; padding-top: 8px; border-top: 1px solid #dee2e6;"><strong>⚠️ Hinweise:</strong><br>${safeSpecialInstructions}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
 
                 // Build walk history section
                 let walkHistoryHtml = '';
@@ -561,10 +580,10 @@
                             <h2 style="margin: 0 0 10px 0;">${safeDogName}</h2>
                             <p style="margin: 0 0 8px 0; color: #666;">${safeDogBreed} • ${getSizeLabel(dog.size)} • ${dog.age} Jahre</p>
                             ${safeSpecialNeeds ? `<p style="margin: 0 0 8px 0; color: var(--warning-orange); font-size: 0.9rem;">⚠️ ${safeSpecialNeeds}</p>` : ''}
-                            ${safeDescription ? `<p style="margin: 10px 0 0 0; font-size: 0.9rem;">${safeDescription}</p>` : ''}
                             ${dog.external_link ? `<a href="${dog.external_link}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 10px; color: var(--primary-green);">mehr über mich &rarr;</a>` : ''}
                         </div>
                     </div>
+                    ${careInfoHtml}
                     ${walkHistoryHtml}
                     <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid var(--border-light); display: flex; gap: 10px;">
                         <button class="btn" onclick="closeDogDetailModal(); showBookingModal(${dog.id});">🗓️ Spaziergang buchen</button>
