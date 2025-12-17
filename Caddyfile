@@ -1,0 +1,100 @@
+# Caddyfile for Gassigeher SaaS
+# Wildcard SSL for *.gassigeher.org using Hetzner DNS challenge
+
+# Main domain - Landing page and tenant registration
+gassigeher.org {
+    tls {
+        dns hetzner {env.HETZNER_DNS_TOKEN}
+    }
+
+    # API routes for tenant registration
+    handle /api/tenants/* {
+        reverse_proxy app:8080
+    }
+
+    # Landing page routes
+    handle /landing/* {
+        reverse_proxy app:8080
+    }
+
+    # Default: Landing page
+    handle {
+        reverse_proxy app:8080
+    }
+
+    # Security headers
+    header {
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        X-XSS-Protection "1; mode=block"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Compression
+    encode gzip zstd
+
+    # Logging
+    log {
+        output file /var/log/caddy/gassigeher.log
+        format json
+    }
+}
+
+# WWW redirect
+www.gassigeher.org {
+    redir https://gassigeher.org{uri} permanent
+}
+
+# Central admin dashboard
+admin.gassigeher.org {
+    tls {
+        dns hetzner {env.HETZNER_DNS_TOKEN}
+    }
+
+    reverse_proxy app:8080
+
+    # Security headers
+    header {
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        X-XSS-Protection "1; mode=block"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    encode gzip zstd
+
+    log {
+        output file /var/log/caddy/admin.log
+        format json
+    }
+}
+
+# Wildcard for all tenant subdomains
+# tierheim-goeppingen.gassigeher.org, tierheim-stuttgart.gassigeher.org, etc.
+*.gassigeher.org {
+    tls {
+        dns hetzner {env.HETZNER_DNS_TOKEN}
+    }
+
+    reverse_proxy app:8080
+
+    # Security headers
+    header {
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        X-XSS-Protection "1; mode=block"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Compression
+    encode gzip zstd
+
+    # Logging with tenant subdomain
+    log {
+        output file /var/log/caddy/tenants.log
+        format json
+    }
+}
