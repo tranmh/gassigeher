@@ -37,7 +37,7 @@ func TestAuthMiddleware(t *testing.T) {
 
 	t.Run("valid token", func(t *testing.T) {
 		// Generate valid token
-		token, _ := authService.GenerateJWT(1, "test@example.com", false, false, 0)
+		token, _ := authService.GenerateJWT(1, "test@example.com", false, false, false, 0)
 
 		req := httptest.NewRequest("GET", "/api/test", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -89,7 +89,7 @@ func TestAuthMiddleware(t *testing.T) {
 		// Create service with 0 expiration
 		expiredService := &services.AuthService{}
 		expiredService = services.NewAuthService(jwtSecret, 0)
-		token, _ := expiredService.GenerateJWT(1, "test@example.com", false, false, 0)
+		token, _ := expiredService.GenerateJWT(1, "test@example.com", false, false, false, 0)
 
 		// Wait for expiration
 		time.Sleep(1 * time.Second)
@@ -106,7 +106,7 @@ func TestAuthMiddleware(t *testing.T) {
 	})
 
 	t.Run("admin user context", func(t *testing.T) {
-		token, _ := authService.GenerateJWT(1, "admin@example.com", true, false, 0)
+		token, _ := authService.GenerateJWT(1, "admin@example.com", true, false, false, 0)
 
 		req := httptest.NewRequest("GET", "/api/test", nil)
 		req.Header.Set("Authorization", "Bearer "+token)

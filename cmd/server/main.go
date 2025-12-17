@@ -120,6 +120,7 @@ func main() {
 	userColorHandler := handlers.NewUserColorHandler(db, cfg)
 	themeHandler := handlers.NewThemeHandler(db)
 	tenantHandler := handlers.NewTenantHandler(db, cfg)
+	centralAdminHandler := handlers.NewCentralAdminHandler(db, cfg)
 	router.HandleFunc("/api/health", healthHandler.Health).Methods("GET")
 
 	// Initialize booking time repositories and services
@@ -332,6 +333,22 @@ func main() {
 	// NOTE: EndImpersonation is on 'protected' router (not superAdmin) because when
 	// impersonating a regular user, the token has is_super_admin=false
 	protected.HandleFunc("/end-impersonation", userHandler.EndImpersonation).Methods("POST")
+
+	// SaaS: Central Admin routes (platform-wide administration)
+	centralAdmin := protected.PathPrefix("/central-admin").Subrouter()
+	centralAdmin.Use(middleware.RequireCentralAdmin)
+	centralAdmin.HandleFunc("/stats", centralAdminHandler.GetPlatformStats).Methods("GET")
+	centralAdmin.HandleFunc("/tenants", centralAdminHandler.ListTenants).Methods("GET")
+	centralAdmin.HandleFunc("/tenants/{id}", centralAdminHandler.GetTenant).Methods("GET")
+	centralAdmin.HandleFunc("/tenants/{id}", centralAdminHandler.UpdateTenant).Methods("PUT")
+	centralAdmin.HandleFunc("/tenants/{id}/activate", centralAdminHandler.ActivateTenant).Methods("POST")
+	centralAdmin.HandleFunc("/tenants/{id}/deactivate", centralAdminHandler.DeactivateTenant).Methods("POST")
+	centralAdmin.HandleFunc("/tenants/{id}/users", centralAdminHandler.GetTenantUsers).Methods("GET")
+	centralAdmin.HandleFunc("/tenants/{id}/export", centralAdminHandler.ExportTenantData).Methods("GET")
+	centralAdmin.HandleFunc("/admins", centralAdminHandler.ListCentralAdmins).Methods("GET")
+	centralAdmin.HandleFunc("/admins/{id}/promote", centralAdminHandler.PromoteToCentralAdmin).Methods("POST")
+	centralAdmin.HandleFunc("/admins/{id}/demote", centralAdminHandler.DemoteFromCentralAdmin).Methods("POST")
+	centralAdmin.HandleFunc("/users/search", centralAdminHandler.SearchUsers).Methods("GET")
 
 	// Uploads directory (user photos, dog photos) - must remain on filesystem
 	router.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))

@@ -314,8 +314,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Generate JWT
 	// DONE: Phase 3 - Include isSuperAdmin in JWT
-	// SaaS: Include tenant_id in JWT
-	token, err := h.authService.GenerateJWT(user.ID, req.Email, isAdmin, isSuperAdmin, user.TenantID)
+	// SaaS: Include tenant_id and is_central_admin in JWT
+	token, err := h.authService.GenerateJWT(user.ID, req.Email, isAdmin, isSuperAdmin, user.IsCentralAdmin, user.TenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to generate token")
 		return

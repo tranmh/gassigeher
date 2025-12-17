@@ -65,7 +65,7 @@ func TestAuthService_GenerateToken(t *testing.T) {
 func TestAuthService_GenerateJWT(t *testing.T) {
 	service := NewAuthService("test-secret", 24)
 
-	tokenString, err := service.GenerateJWT(1, "test@example.com", false, false, 0)
+	tokenString, err := service.GenerateJWT(1, "test@example.com", false, false, false, 0)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -110,7 +110,7 @@ func TestAuthService_ValidateJWT(t *testing.T) {
 	service := NewAuthService("test-secret", 24)
 
 	// Generate valid token
-	tokenString, _ := service.GenerateJWT(1, "test@example.com", true, false, 0)
+	tokenString, _ := service.GenerateJWT(1, "test@example.com", true, false, false, 0)
 
 	// Validate token
 	claims, err := service.ValidateJWT(tokenString)
@@ -168,7 +168,7 @@ func TestAuthService_JWTExpiration(t *testing.T) {
 	}
 
 	// Generate token that expires immediately
-	tokenString, _ := service.GenerateJWT(1, "test@example.com", false, false, 0)
+	tokenString, _ := service.GenerateJWT(1, "test@example.com", false, false, false, 0)
 
 	// Wait a moment
 	time.Sleep(1 * time.Second)
@@ -217,7 +217,7 @@ func TestAuthService_GenerateJWT_AdminClaims(t *testing.T) {
 	service := NewAuthService("test-secret", 24)
 
 	t.Run("admin user", func(t *testing.T) {
-		tokenString, err := service.GenerateJWT(1, "admin@example.com", true, false, 0)
+		tokenString, err := service.GenerateJWT(1, "admin@example.com", true, false, false, 0)
 		if err != nil {
 			t.Fatalf("GenerateJWT() failed: %v", err)
 		}
@@ -233,7 +233,7 @@ func TestAuthService_GenerateJWT_AdminClaims(t *testing.T) {
 	})
 
 	t.Run("non-admin user", func(t *testing.T) {
-		tokenString, err := service.GenerateJWT(2, "user@example.com", false, false, 0)
+		tokenString, err := service.GenerateJWT(2, "user@example.com", false, false, false, 0)
 		if err != nil {
 			t.Fatalf("GenerateJWT() failed: %v", err)
 		}
@@ -282,7 +282,7 @@ func TestAuthService_ValidateJWT_WrongSecret(t *testing.T) {
 	service2 := NewAuthService("secret-2", 24)
 
 	// Generate token with service1
-	tokenString, _ := service1.GenerateJWT(1, "test@example.com", false, false, 0)
+	tokenString, _ := service1.GenerateJWT(1, "test@example.com", false, false, false, 0)
 
 	// Try to validate with service2 (different secret)
 	claims, err := service2.ValidateJWT(tokenString)
@@ -430,7 +430,7 @@ func TestAuthService_GenerateImpersonationJWT(t *testing.T) {
 	service := NewAuthService("test-secret", 24)
 
 	t.Run("generates valid impersonation token", func(t *testing.T) {
-		tokenString, err := service.GenerateImpersonationJWT(2, "user@example.com", false, false, 1, 0)
+		tokenString, err := service.GenerateImpersonationJWT(2, "user@example.com", false, false, false, 1, 0)
 		if err != nil {
 			t.Fatalf("GenerateImpersonationJWT() error = %v", err)
 		}
@@ -461,7 +461,7 @@ func TestAuthService_GenerateImpersonationJWT(t *testing.T) {
 func TestAuthService_GenerateImpersonationJWT_ContainsOriginalUserID(t *testing.T) {
 	service := NewAuthService("test-secret", 24)
 
-	tokenString, err := service.GenerateImpersonationJWT(2, "user@example.com", false, false, 1, 0)
+	tokenString, err := service.GenerateImpersonationJWT(2, "user@example.com", false, false, false, 1, 0)
 	if err != nil {
 		t.Fatalf("GenerateImpersonationJWT() error = %v", err)
 	}
@@ -485,7 +485,7 @@ func TestAuthService_GenerateImpersonationJWT_ContainsOriginalUserID(t *testing.
 func TestAuthService_GenerateImpersonationJWT_ContainsImpersonatingFlag(t *testing.T) {
 	service := NewAuthService("test-secret", 24)
 
-	tokenString, err := service.GenerateImpersonationJWT(2, "user@example.com", false, false, 1, 0)
+	tokenString, err := service.GenerateImpersonationJWT(2, "user@example.com", false, false, false, 1, 0)
 	if err != nil {
 		t.Fatalf("GenerateImpersonationJWT() error = %v", err)
 	}
@@ -510,7 +510,7 @@ func TestAuthService_ValidateJWT_ExtractsImpersonationClaims(t *testing.T) {
 	service := NewAuthService("test-secret", 24)
 
 	// Generate impersonation token with admin impersonating regular user
-	tokenString, err := service.GenerateImpersonationJWT(5, "regular@example.com", false, false, 1, 0)
+	tokenString, err := service.GenerateImpersonationJWT(5, "regular@example.com", false, false, false, 1, 0)
 	if err != nil {
 		t.Fatalf("GenerateImpersonationJWT() error = %v", err)
 	}
@@ -553,7 +553,7 @@ func TestAuthService_GenerateImpersonationJWT_PreservesAdminFlags(t *testing.T) 
 	service := NewAuthService("test-secret", 24)
 
 	t.Run("impersonating regular admin", func(t *testing.T) {
-		tokenString, err := service.GenerateImpersonationJWT(3, "admin@example.com", true, false, 1, 0)
+		tokenString, err := service.GenerateImpersonationJWT(3, "admin@example.com", true, false, false, 1, 0)
 		if err != nil {
 			t.Fatalf("GenerateImpersonationJWT() error = %v", err)
 		}
@@ -572,7 +572,7 @@ func TestAuthService_GenerateImpersonationJWT_PreservesAdminFlags(t *testing.T) 
 	})
 
 	t.Run("impersonating regular user", func(t *testing.T) {
-		tokenString, err := service.GenerateImpersonationJWT(5, "user@example.com", false, false, 1, 0)
+		tokenString, err := service.GenerateImpersonationJWT(5, "user@example.com", false, false, false, 1, 0)
 		if err != nil {
 			t.Fatalf("GenerateImpersonationJWT() error = %v", err)
 		}

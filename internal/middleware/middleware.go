@@ -16,7 +16,8 @@ type contextKey string
 const UserIDKey contextKey = "userID"
 const EmailKey contextKey = "email"
 const IsAdminKey contextKey = "isAdmin"
-const IsSuperAdminKey contextKey = "isSuperAdmin"       // DONE: Phase 3
+const IsSuperAdminKey contextKey = "isSuperAdmin"         // DONE: Phase 3
+const IsCentralAdminKey contextKey = "isCentralAdmin"     // SaaS: Platform-wide admin
 const RequestIDKey contextKey = "requestID"
 const OriginalUserIDKey contextKey = "originalUserID"   // Impersonation: Super-admin's real ID
 const IsImpersonatingKey contextKey = "isImpersonating" // Impersonation: Boolean flag
@@ -179,6 +180,12 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 				isSuperAdmin = false
 			}
 
+			// SaaS: Extract is_central_admin claim
+			isCentralAdmin, ok := (*claims)["is_central_admin"].(bool)
+			if !ok {
+				isCentralAdmin = false
+			}
+
 			// Extract impersonation claims (if present)
 			originalUserID := 0
 			isImpersonating := false
@@ -206,7 +213,8 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 			ctx := context.WithValue(r.Context(), UserIDKey, int(userID))
 			ctx = context.WithValue(ctx, EmailKey, email)
 			ctx = context.WithValue(ctx, IsAdminKey, isAdmin)
-			ctx = context.WithValue(ctx, IsSuperAdminKey, isSuperAdmin) // DONE: Phase 3
+			ctx = context.WithValue(ctx, IsSuperAdminKey, isSuperAdmin)     // DONE: Phase 3
+			ctx = context.WithValue(ctx, IsCentralAdminKey, isCentralAdmin) // SaaS: Central admin
 			ctx = context.WithValue(ctx, IsImpersonatingKey, isImpersonating)
 			ctx = context.WithValue(ctx, OriginalUserIDKey, originalUserID)
 			// SaaS: Add tenant_id to context (prefer subdomain, fallback to JWT)
@@ -247,6 +255,18 @@ func RequireSuperAdmin(next http.Handler) http.Handler {
 }
 
 // DONE: Phase 3 - Middleware updates complete
+
+// RequireCentralAdmin requires central admin access (platform-wide admin, not tied to tenant)
+func RequireCentralAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		isCentralAdmin, ok := r.Context().Value(IsCentralAdminKey).(bool)
+		if !ok || !isCentralAdmin {
+			http.Error(w, `{"error":"Central Admin access required"}`, http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
 
 // SecurityHeadersMiddleware adds security headers
 func SecurityHeadersMiddleware(next http.Handler) http.Handler {

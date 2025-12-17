@@ -20,6 +20,7 @@ type User struct {
 	// DONE: Admin flags
 	IsAdmin                  bool             `json:"is_admin"`
 	IsSuperAdmin             bool             `json:"is_super_admin"`
+	IsCentralAdmin           bool             `json:"is_central_admin"` // SaaS: Platform-wide admin (not tied to tenant)
 	IsVerified               bool       `json:"is_verified"`
 	IsActive                 bool       `json:"is_active"`
 	IsDeleted                bool       `json:"is_deleted"`

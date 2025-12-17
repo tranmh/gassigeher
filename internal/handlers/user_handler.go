@@ -719,12 +719,13 @@ func (h *UserHandler) ImpersonateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate impersonation JWT
-	// SaaS: Include target user's tenant_id
+	// SaaS: Include target user's tenant_id and is_central_admin
 	token, err := h.authService.GenerateImpersonationJWT(
 		targetUserID,
 		targetEmail,
 		targetUser.IsAdmin,
 		targetUser.IsSuperAdmin,
+		targetUser.IsCentralAdmin,
 		currentUserID,
 		targetUser.TenantID,
 	)
@@ -786,12 +787,13 @@ func (h *UserHandler) EndImpersonation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate normal JWT for super-admin (no impersonation claims)
-	// SaaS: Include original user's tenant_id
+	// SaaS: Include original user's tenant_id and is_central_admin
 	token, err := h.authService.GenerateJWT(
 		originalUserID,
 		originalEmail,
 		originalUser.IsAdmin,
 		originalUser.IsSuperAdmin,
+		originalUser.IsCentralAdmin,
 		originalUser.TenantID,
 	)
 	if err != nil {
