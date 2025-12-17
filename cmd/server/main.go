@@ -336,6 +336,14 @@ func main() {
 	// Uploads directory (user photos, dog photos) - must remain on filesystem
 	router.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
 
+	// Get embedded landing page filesystem (for SaaS landing page)
+	landingFS, err := static.LandingFS()
+	if err != nil {
+		log.Fatalf("Failed to get embedded landing pages: %v", err)
+	}
+	// Serve landing pages at /landing/
+	router.PathPrefix("/landing/").Handler(http.StripPrefix("/landing/", http.FileServer(http.FS(landingFS))))
+
 	// Get embedded frontend filesystem
 	frontendFS, err := static.FrontendFS()
 	if err != nil {

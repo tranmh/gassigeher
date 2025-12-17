@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tierheim registrieren - Gassigeher</title>
+    <meta name="description" content="Registrieren Sie Ihr Tierheim bei Gassigeher. Kostenlos und in wenigen Minuten einsatzbereit.">
+    <link rel="stylesheet" href="/landing/assets/css/landing.css">
+    <link rel="icon" href="/assets/images/favicon.ico">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <a href="/landing/" class="logo">
+                <span>Gassigeher</span>
+            </a>
+            <nav class="nav">
+                <a href="/landing/">Startseite</a>
+                <a href="/landing/#features">Funktionen</a>
+                <a href="/landing/faq.html">FAQ</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="register-page">
+        <h1>Tierheim registrieren</h1>
+        <p>Starten Sie in wenigen Minuten mit Gassigeher. Kostenlos und unverbindlich.</p>
+
+        <form id="register-form">
+            <section>
+                <h2>Tierheim-Informationen</h2>
+
+                <div class="form-group">
+                    <label for="organization_name">Name des Tierheims *</label>
+                    <input type="text" id="organization_name" name="organization_name" required
+                           placeholder="z.B. Tierheim Musterstadt">
+                </div>
+
+                <div class="form-group">
+                    <label for="slug">Subdomain *</label>
+                    <div class="slug-input">
+                        <input type="text" id="slug" name="slug" required
+                               pattern="[a-z0-9-]+"
+                               placeholder="tierheim-musterstadt"
+                               autocomplete="off">
+                        <span>.gassigeher.org</span>
+                    </div>
+                    <span id="slug-status"></span>
+                    <small>Nur Kleinbuchstaben, Zahlen und Bindestriche erlaubt. Mindestens 3 Zeichen.</small>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="contact_email">E-Mail *</label>
+                        <input type="email" id="contact_email" name="contact_email" required
+                               placeholder="kontakt@tierheim.de">
+                    </div>
+                    <div class="form-group">
+                        <label for="contact_phone">Telefon</label>
+                        <input type="tel" id="contact_phone" name="contact_phone"
+                               placeholder="07161 12345">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="address">Adresse</label>
+                    <input type="text" id="address" name="address"
+                           placeholder="Musterstraße 1">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="postal_code">PLZ *</label>
+                        <input type="text" id="postal_code" name="postal_code" required
+                               pattern="[0-9]{5}"
+                               placeholder="73033">
+                    </div>
+                    <div class="form-group">
+                        <label for="city">Stadt *</label>
+                        <input type="text" id="city" name="city" required
+                               placeholder="Musterstadt">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="federal_state">Bundesland *</label>
+                    <select id="federal_state" name="federal_state" required>
+                        <option value="">Bitte wählen</option>
+                        <option value="BW">Baden-Württemberg</option>
+                        <option value="BY">Bayern</option>
+                        <option value="BE">Berlin</option>
+                        <option value="BB">Brandenburg</option>
+                        <option value="HB">Bremen</option>
+                        <option value="HH">Hamburg</option>
+                        <option value="HE">Hessen</option>
+                        <option value="MV">Mecklenburg-Vorpommern</option>
+                        <option value="NI">Niedersachsen</option>
+                        <option value="NW">Nordrhein-Westfalen</option>
+                        <option value="RP">Rheinland-Pfalz</option>
+                        <option value="SL">Saarland</option>
+                        <option value="SN">Sachsen</option>
+                        <option value="ST">Sachsen-Anhalt</option>
+                        <option value="SH">Schleswig-Holstein</option>
+                        <option value="TH">Thüringen</option>
+                    </select>
+                    <small>Das Bundesland wird für die automatische Feiertagserkennung verwendet.</small>
+                </div>
+            </section>
+
+            <section>
+                <h2>Administrator-Konto</h2>
+                <p>Erstellen Sie das erste Admin-Konto für Ihr Tierheim.</p>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="admin_first_name">Vorname *</label>
+                        <input type="text" id="admin_first_name" name="admin_first_name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="admin_last_name">Nachname *</label>
+                        <input type="text" id="admin_last_name" name="admin_last_name" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="admin_email">Admin E-Mail *</label>
+                    <input type="email" id="admin_email" name="admin_email" required
+                           placeholder="admin@tierheim.de">
+                    <small>Diese E-Mail wird für die Anmeldung verwendet.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="admin_password">Passwort *</label>
+                    <input type="password" id="admin_password" name="admin_password"
+                           required minlength="8">
+                    <small>Mindestens 8 Zeichen</small>
+                </div>
+            </section>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="terms" required>
+                    Ich akzeptiere die <a href="/landing/privacy.html" target="_blank">Datenschutzerklärung</a>
+                    und <a href="/terms.html" target="_blank">Nutzungsbedingungen</a> *
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Tierheim registrieren</button>
+        </form>
+
+        <div id="success-message" style="display: none;">
+            <h2>Registrierung erfolgreich!</h2>
+            <p>Ihr Tierheim wurde erfolgreich bei Gassigeher registriert.</p>
+            <p>Sie können sich jetzt anmelden und mit der Einrichtung beginnen:</p>
+            <a id="login-link" class="btn btn-primary btn-large" href="">Zum Login</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2025 Gassigeher. <a href="/landing/imprint.html">Impressum</a> | <a href="/landing/privacy.html">Datenschutz</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="/landing/assets/js/landing.js"></script>
+</body>
+</html>
