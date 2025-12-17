@@ -118,6 +118,7 @@ func main() {
 	colorCategoryHandler := handlers.NewColorCategoryHandler(db, cfg)
 	colorRequestHandler := handlers.NewColorRequestHandler(db, cfg)
 	userColorHandler := handlers.NewUserColorHandler(db, cfg)
+	themeHandler := handlers.NewThemeHandler(db)
 	router.HandleFunc("/api/health", healthHandler.Health).Methods("GET")
 
 	// Initialize booking time repositories and services
@@ -172,6 +173,10 @@ func main() {
 
 	// WhatsApp group settings (public - for displaying join button)
 	router.HandleFunc("/api/settings/whatsapp", settingsHandler.GetWhatsAppSettings).Methods("GET")
+
+	// Theme CSS (public - for dynamic styling)
+	router.HandleFunc("/api/theme/css", themeHandler.GetCSS).Methods("GET")
+	router.HandleFunc("/api/theme/presets", themeHandler.GetPresets).Methods("GET")
 
 	// Protected routes (authenticated users)
 	protected := router.PathPrefix("/api").Subrouter()
@@ -288,6 +293,10 @@ func main() {
 	admin.HandleFunc("/admin/holidays", holidayHandler.CreateHoliday).Methods("POST")
 	admin.HandleFunc("/admin/holidays/{id}", holidayHandler.UpdateHoliday).Methods("PUT")
 	admin.HandleFunc("/admin/holidays/{id}", holidayHandler.DeleteHoliday).Methods("DELETE")
+
+	// Theme management (admin only)
+	admin.HandleFunc("/admin/theme", themeHandler.GetCurrentTheme).Methods("GET")
+	admin.HandleFunc("/admin/theme", themeHandler.UpdateTheme).Methods("PUT")
 
 	// Booking approval management (admin only)
 	admin.HandleFunc("/bookings/pending-approvals", bookingHandler.GetPendingApprovals).Methods("GET")
