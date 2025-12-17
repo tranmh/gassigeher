@@ -16,11 +16,12 @@ import (
 
 // ExperienceRequestHandler handles experience request-related HTTP requests
 type ExperienceRequestHandler struct {
-	db         *sql.DB
-	cfg        *config.Config
-	requestRepo *repository.ExperienceRequestRepository
-	userRepo    *repository.UserRepository
-	emailService *services.EmailService
+	db            *sql.DB
+	cfg           *config.Config
+	requestRepo   *repository.ExperienceRequestRepository
+	userRepo      *repository.UserRepository
+	userColorRepo *repository.UserColorRepository
+	emailService  *services.EmailService
 }
 
 // NewExperienceRequestHandler creates a new experience request handler
@@ -32,11 +33,12 @@ func NewExperienceRequestHandler(db *sql.DB, cfg *config.Config) *ExperienceRequ
 	}
 
 	return &ExperienceRequestHandler{
-		db:           db,
-		cfg:          cfg,
-		requestRepo:  repository.NewExperienceRequestRepository(db),
-		userRepo:     repository.NewUserRepository(db),
-		emailService: emailService,
+		db:            db,
+		cfg:           cfg,
+		requestRepo:   repository.NewExperienceRequestRepository(db),
+		userRepo:      repository.NewUserRepository(db),
+		userColorRepo: repository.NewUserColorRepository(db),
+		emailService:  emailService,
 	}
 }
 
@@ -74,7 +76,24 @@ func (h *ExperienceRequestHandler) CreateRequest(w http.ResponseWriter, r *http.
 	}
 
 	// Check if user already has this level or higher
-	currentLevel := user.ExperienceLevel
+	// Determine current level from user's assigned colors
+	// Color IDs: 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau
+	colors, err := h.userColorRepo.GetUserColors(userID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to get user colors")
+		return
+	}
+	currentLevel := "green"
+	for _, color := range colors {
+		if color.ID == 4 || color.ID == 5 {
+			currentLevel = "blue"
+			break
+		}
+		if color.ID == 2 || color.ID == 3 {
+			currentLevel = "orange"
+			// Don't break, continue checking for blue
+		}
+	}
 	requestedLevel := req.RequestedLevel
 
 	if currentLevel == "blue" {
@@ -206,11 +225,18 @@ func (h *ExperienceRequestHandler) ApproveRequest(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Update user experience level
-	user.ExperienceLevel = experienceRequest.RequestedLevel
-	if err := h.userRepo.Update(user); err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to update user level")
-		return
+	// Assign colors based on the requested experience level
+	// Color IDs: 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau
+	colorsByLevel := map[string][]int{
+		"green":  {1},             // only gruen
+		"orange": {1, 2, 3},       // gruen, gelb, orange
+		"blue":   {1, 2, 3, 4, 5}, // all main colors
+	}
+	if colors, ok := colorsByLevel[experienceRequest.RequestedLevel]; ok {
+		if err := h.userColorRepo.SetUserColors(user.ID, colors, reviewerID); err != nil {
+			// Log but don't fail the approval
+			println("Warning: Failed to assign colors to user:", err.Error())
+		}
 	}
 
 	// Send email notification

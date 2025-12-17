@@ -231,18 +231,12 @@ func TestExperienceRequestHandler_ApproveRequest(t *testing.T) {
 			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
 		}
 
-		// Verify request is approved and user level updated
+		// Verify request is approved (color assignments tested separately in TestExperienceRequestHandler_ApproveRequest_AssignsColors)
 		var requestStatus string
-		var userLevel string
 		db.QueryRow("SELECT status FROM experience_requests WHERE id = ?", requestID).Scan(&requestStatus)
-		db.QueryRow("SELECT experience_level FROM users WHERE id = ?", userID).Scan(&userLevel)
 
 		if requestStatus != "approved" {
 			t.Errorf("Expected status 'approved', got %s", requestStatus)
-		}
-
-		if userLevel != "blue" {
-			t.Errorf("Expected user level upgraded to 'blue', got %s", userLevel)
 		}
 	})
 
@@ -263,6 +257,107 @@ func TestExperienceRequestHandler_ApproveRequest(t *testing.T) {
 
 		if rec.Code != http.StatusNotFound {
 			t.Errorf("Expected status 404, got %d", rec.Code)
+		}
+	})
+}
+
+// TestExperienceRequestHandler_ApproveRequest_AssignsColors tests that approving
+// an experience request also assigns the appropriate colors to the user
+func TestExperienceRequestHandler_ApproveRequest_AssignsColors(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewExperienceRequestHandler(db, cfg)
+
+	// Create user without colors for precise control
+	userID := testutil.SeedTestUserWithoutColors(t, db, "colortest@example.com", "Color Test", "green")
+	adminID := testutil.SeedTestUser(t, db, "admin-color@example.com", "Admin", "blue")
+
+	// Color categories are already seeded by migration 024 with IDs 1-7:
+	// 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau, 6=helllila, 7=dunkellila
+
+	t.Run("green_to_orange_assigns_colors_1_2_3", func(t *testing.T) {
+		// Create request from green to orange
+		requestID := testutil.SeedTestExperienceRequest(t, db, userID, "orange", "pending")
+
+		reqBody := map[string]interface{}{
+			"approved": true,
+			"message":  "Welcome to orange!",
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/experience-requests/"+fmt.Sprintf("%d", requestID), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", requestID)})
+		ctx := contextWithUser(req.Context(), adminID, "admin-color@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ApproveRequest(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		// Verify colors were assigned (orange level gets colors 1, 2, 3)
+		var colorCount int
+		err := db.QueryRow("SELECT COUNT(*) FROM user_colors WHERE user_id = ?", userID).Scan(&colorCount)
+		if err != nil {
+			t.Fatalf("Failed to query user colors: %v", err)
+		}
+
+		if colorCount != 3 {
+			t.Errorf("Expected 3 colors (gruen, gelb, orange) for orange level, got %d", colorCount)
+		}
+
+		// Verify specific colors are present
+		var hasGruen, hasGelb, hasOrange int
+		db.QueryRow("SELECT COUNT(*) FROM user_colors WHERE user_id = ? AND color_id = 1", userID).Scan(&hasGruen)
+		db.QueryRow("SELECT COUNT(*) FROM user_colors WHERE user_id = ? AND color_id = 2", userID).Scan(&hasGelb)
+		db.QueryRow("SELECT COUNT(*) FROM user_colors WHERE user_id = ? AND color_id = 3", userID).Scan(&hasOrange)
+
+		if hasGruen != 1 || hasGelb != 1 || hasOrange != 1 {
+			t.Errorf("Expected colors 1,2,3 for orange level. gruen=%d, gelb=%d, orange=%d", hasGruen, hasGelb, hasOrange)
+		}
+	})
+
+	t.Run("orange_to_blue_assigns_colors_1_2_3_4_5", func(t *testing.T) {
+		// Create a new user for this test
+		blueUserID := testutil.SeedTestUserWithoutColors(t, db, "bluetest@example.com", "Blue Test", "orange")
+
+		// Create request from orange to blue
+		requestID := testutil.SeedTestExperienceRequest(t, db, blueUserID, "blue", "pending")
+
+		reqBody := map[string]interface{}{
+			"approved": true,
+			"message":  "Welcome to blue!",
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/experience-requests/"+fmt.Sprintf("%d", requestID), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", requestID)})
+		ctx := contextWithUser(req.Context(), adminID, "admin-color@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ApproveRequest(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		// Verify colors were assigned (blue level gets colors 1, 2, 3, 4, 5)
+		var colorCount int
+		err := db.QueryRow("SELECT COUNT(*) FROM user_colors WHERE user_id = ?", blueUserID).Scan(&colorCount)
+		if err != nil {
+			t.Fatalf("Failed to query user colors: %v", err)
+		}
+
+		if colorCount != 5 {
+			t.Errorf("Expected 5 colors for blue level, got %d", colorCount)
 		}
 	})
 }
@@ -301,18 +396,12 @@ func TestExperienceRequestHandler_DenyRequest(t *testing.T) {
 			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
 		}
 
-		// Verify request is denied and user level unchanged
+		// Verify request is denied
 		var requestStatus string
-		var userLevel string
 		db.QueryRow("SELECT status FROM experience_requests WHERE id = ?", requestID).Scan(&requestStatus)
-		db.QueryRow("SELECT experience_level FROM users WHERE id = ?", userID).Scan(&userLevel)
 
 		if requestStatus != "denied" {
 			t.Errorf("Expected status 'denied', got %s", requestStatus)
-		}
-
-		if userLevel != "green" {
-			t.Errorf("Expected user level to remain 'green', got %s", userLevel)
 		}
 	})
 }

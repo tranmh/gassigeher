@@ -24,6 +24,7 @@ type BookingHandler struct {
 	bookingRepo          *repository.BookingRepository
 	dogRepo              *repository.DogRepository
 	userRepo             *repository.UserRepository
+	userColorRepo        *repository.UserColorRepository
 	blockedDateRepo      *repository.BlockedDateRepository
 	settingsRepo         *repository.SettingsRepository
 	bookingTimeService   *services.BookingTimeService
@@ -51,6 +52,7 @@ func NewBookingHandler(db *sql.DB, cfg *config.Config) *BookingHandler {
 		bookingRepo:          repository.NewBookingRepository(db),
 		dogRepo:              repository.NewDogRepository(db),
 		userRepo:             repository.NewUserRepository(db),
+		userColorRepo:        repository.NewUserColorRepository(db),
 		blockedDateRepo:      repository.NewBlockedDateRepository(db),
 		settingsRepo:         settingsRepo,
 		bookingTimeService:   bookingTimeService,
@@ -114,10 +116,26 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check experience level access (admins and super admins bypass this check)
-	if !user.IsAdmin && !user.IsSuperAdmin && !repository.CanUserAccessDog(user.ExperienceLevel, dog.Category) {
-		respondError(w, http.StatusForbidden, "You don't have the required experience level for this dog")
-		return
+	// Check color-based access (admins and super admins bypass this check)
+	// Uses the NEW color system: user must have the dog's color assigned
+	if !user.IsAdmin && !user.IsSuperAdmin {
+		// Get user's assigned colors
+		userColorIDs, err := h.userColorRepo.GetUserColorIDs(userID)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "Failed to check user permissions")
+			return
+		}
+
+		// Check if user has the dog's color
+		dogColorID := 0
+		if dog.ColorID != nil {
+			dogColorID = *dog.ColorID
+		}
+
+		if !repository.CanUserAccessDogByColor(userColorIDs, dogColorID) {
+			respondError(w, http.StatusForbidden, "Du hast nicht die erforderliche Farbkategorie für diesen Hund")
+			return
+		}
 	}
 
 	// BUGFIX #4: Check if date is in the past with consistent timezone handling

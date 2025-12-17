@@ -17,11 +17,12 @@ import (
 
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
-	userRepo     *repository.UserRepository
-	settingsRepo *repository.SettingsRepository
-	authService  *services.AuthService
-	emailService *services.EmailService
-	config       *config.Config
+	userRepo      *repository.UserRepository
+	userColorRepo *repository.UserColorRepository
+	settingsRepo  *repository.SettingsRepository
+	authService   *services.AuthService
+	emailService  *services.EmailService
+	config        *config.Config
 }
 
 // NewAuthHandler creates a new auth handler
@@ -33,11 +34,12 @@ func NewAuthHandler(db *sql.DB, cfg *config.Config) *AuthHandler {
 	}
 
 	return &AuthHandler{
-		userRepo:     repository.NewUserRepository(db),
-		settingsRepo: repository.NewSettingsRepository(db),
-		authService:  services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours),
-		emailService: emailService,
-		config:       cfg,
+		userRepo:      repository.NewUserRepository(db),
+		userColorRepo: repository.NewUserColorRepository(db),
+		settingsRepo:  repository.NewSettingsRepository(db),
+		authService:   services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours),
+		emailService:  emailService,
+		config:        cfg,
 	}
 }
 
@@ -106,7 +108,6 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		Email:                    &req.Email,
 		Phone:                    &req.Phone,
 		PasswordHash:             &passwordHash,
-		ExperienceLevel:          "green",
 		IsVerified:               false,
 		IsActive:                 true,
 		IsDeleted:                false,
@@ -119,6 +120,15 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	if err := h.userRepo.Create(user); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to create user")
 		return
+	}
+
+	// Assign default color (green = ID 1) to new user
+	// Green users start with only the green color
+	if h.userColorRepo != nil {
+		if err := h.userColorRepo.SetUserColors(user.ID, []int{1}, user.ID); err != nil {
+			// Log but don't fail registration
+			fmt.Printf("Warning: Failed to assign default color to user %d: %v\n", user.ID, err)
+		}
 	}
 
 	// Send verification email

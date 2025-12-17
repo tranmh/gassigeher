@@ -862,9 +862,6 @@ func (h *UserHandler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	if req.Phone != nil {
 		targetUser.Phone = req.Phone
 	}
-	if req.ExperienceLevel != nil {
-		targetUser.ExperienceLevel = *req.ExperienceLevel
-	}
 
 	// Save updates
 	err = h.userRepo.Update(targetUser)
@@ -941,12 +938,6 @@ func (h *UserHandler) AdminCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Determine experience level - admins always get blue level
-	experienceLevel := req.ExperienceLevel
-	if req.IsAdmin {
-		experienceLevel = "blue"
-	}
-
 	// Create user
 	user := &models.User{
 		FirstName:          req.FirstName,
@@ -954,7 +945,6 @@ func (h *UserHandler) AdminCreateUser(w http.ResponseWriter, r *http.Request) {
 		Email:              &req.Email,
 		Phone:              req.Phone,
 		PasswordHash:       &passwordHash,
-		ExperienceLevel:    experienceLevel,
 		IsAdmin:            req.IsAdmin,
 		IsSuperAdmin:       false, // Cannot create super admin via API
 		IsVerified:         true,  // Skip email verification for admin-created users
@@ -968,6 +958,16 @@ func (h *UserHandler) AdminCreateUser(w http.ResponseWriter, r *http.Request) {
 	if err := h.userRepo.Create(user); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to create user")
 		return
+	}
+
+	// Assign colors to user if specified
+	if len(req.ColorIDs) > 0 && h.userColorRepo != nil {
+		// Get current user ID (admin who's creating) for granted_by field
+		currentUserID, _ := r.Context().Value(middleware.UserIDKey).(int)
+		if err := h.userColorRepo.SetUserColors(user.ID, req.ColorIDs, currentUserID); err != nil {
+			// Log error but don't fail the request - user was already created
+			log.Printf("Warning: Failed to assign colors to user %d: %v\n", user.ID, err)
+		}
 	}
 
 	// Send temp password email

@@ -2,26 +2,17 @@
 
 /**
  * Get the photo URL for a dog, with fallback to placeholder
- * @param {Object} dog - Dog object with photo and category fields
+ * @param {Object} dog - Dog object with photo and color fields
  * @param {boolean} useThumbnail - Whether to use thumbnail (default: false)
- * @param {boolean} useCategoryPlaceholder - Whether to use category-specific placeholder (default: true)
  * @returns {string} - Photo URL or placeholder URL
  */
-function getDogPhotoUrl(dog, useThumbnail = false, useCategoryPlaceholder = true) {
+function getDogPhotoUrl(dog, useThumbnail = false) {
     if (dog.photo) {
         // Use thumbnail if available and requested, otherwise use full photo
         const photoField = useThumbnail && dog.photo_thumbnail
             ? dog.photo_thumbnail
             : dog.photo;
         return `/uploads/${photoField}`;
-    }
-
-    // Return category-specific placeholder or generic placeholder
-    if (useCategoryPlaceholder && dog.category) {
-        const category = dog.category.toLowerCase();
-        if (['green', 'blue', 'orange'].includes(category)) {
-            return `/assets/images/placeholders/dog-placeholder-${category}.svg`;
-        }
     }
 
     return '/assets/images/placeholders/dog-placeholder.svg';
@@ -48,12 +39,11 @@ function getDogPhotoAlt(dog) {
  * @param {boolean} useThumbnail - Whether to use thumbnail (default: false)
  * @param {string} className - CSS class for img element (default: 'dog-card-image')
  * @param {boolean} lazyLoad - Whether to use lazy loading (default: true)
- * @param {boolean} useCategoryPlaceholder - Whether to use category-specific placeholder (default: true)
  * @param {boolean} withSkeleton - Whether to wrap in skeleton loader (default: true)
  * @returns {string} - HTML string for img element (or container with skeleton)
  */
-function getDogPhotoHtml(dog, useThumbnail = false, className = 'dog-card-image', lazyLoad = true, useCategoryPlaceholder = true, withSkeleton = true) {
-    const photoUrl = getDogPhotoUrl(dog, useThumbnail, useCategoryPlaceholder);
+function getDogPhotoHtml(dog, useThumbnail = false, className = 'dog-card-image', lazyLoad = true, withSkeleton = true) {
+    const photoUrl = getDogPhotoUrl(dog, useThumbnail);
     const altText = getDogPhotoAlt(dog);
     const loadingAttr = lazyLoad ? ' loading="lazy"' : '';
     const uniqueId = `dog-img-${dog.id || Math.random().toString(36).substr(2, 9)}`;
@@ -119,17 +109,10 @@ function setDogPhotoSrc(imgElement, dog, useThumbnail = false) {
 }
 
 /**
- * Get placeholder URL for a specific category
- * @param {string} category - 'green', 'blue', or 'orange'
+ * Get placeholder URL for dogs without photos
  * @returns {string} - Placeholder URL
  */
-function getPlaceholderUrl(category = null) {
-    if (category) {
-        const cat = category.toLowerCase();
-        if (['green', 'blue', 'orange'].includes(cat)) {
-            return `/assets/images/placeholders/dog-placeholder-${cat}.svg`;
-        }
-    }
+function getPlaceholderUrl() {
     return '/assets/images/placeholders/dog-placeholder.svg';
 }
 
@@ -180,64 +163,47 @@ function preloadCriticalDogImages(dogs, count = 3) {
 
 /**
  * Generate HTML for calendar dog cell with photo
- * @param {Object} dog - Dog object
- * @param {Object} color - Color object from color_categories (optional)
+ * @param {Object} dog - Dog object (may include embedded color object)
+ * @param {Object} color - Color object from color_categories (optional, uses dog.color if not provided)
  * @returns {string} - HTML for calendar dog name cell
  */
 function getCalendarDogCell(dog, color) {
-    const photoUrl = getDogPhotoUrl(dog, true, true); // Use thumbnail
+    const photoUrl = getDogPhotoUrl(dog, true); // Use thumbnail
     const altText = getDogPhotoAlt(dog);
     const safeDogName = typeof sanitizeHTML !== 'undefined' ? sanitizeHTML(dog.name) : dog.name;
 
-    // Use new color system if color object provided
-    if (color && color.hex_code) {
+    // Use color parameter or embedded dog.color
+    const dogColor = color || dog.color;
+
+    // Display color badge if color is available
+    if (dogColor && dogColor.hex_code) {
         const patternIcons = {
             'circle': '●', 'triangle': '▲', 'square': '■', 'diamond': '◆',
             'pentagon': '⬠', 'hexagon': '⬡', 'star': '★', 'heart': '♥',
             'cross': '✚', 'spade': '♠', 'club': '♣', 'moon': '☽',
             'sun': '☀', 'ring': '○', 'target': '◎'
         };
-        const icon = patternIcons[color.pattern_icon] || '●';
+        const icon = patternIcons[dogColor.pattern_icon] || '●';
+        const safeColorName = typeof sanitizeHTML !== 'undefined' ? sanitizeHTML(dogColor.name) : dogColor.name;
 
         return `<div class="calendar-dog-name-cell">
             <img src="${photoUrl}" alt="${altText}" class="calendar-dog-photo" loading="lazy">
             <div>
                 <div style="font-weight: 700; font-size: 1rem; color: var(--text-dark);">${safeDogName}</div>
-                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 0.7rem; padding: 2px 8px; background: ${color.hex_code}20; border: 1px solid ${color.hex_code}; color: ${color.hex_code}; border-radius: 4px; margin-top: 4px;">
-                    ${icon} ${color.name}
+                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 0.7rem; padding: 2px 8px; background: ${dogColor.hex_code}20; border: 1px solid ${dogColor.hex_code}; color: ${dogColor.hex_code}; border-radius: 4px; margin-top: 4px;">
+                    ${icon} ${safeColorName}
                 </span>
             </div>
         </div>`;
     }
 
-    // Fallback to old category system
-    const categoryEmoji = {
-        'green': '🟢',
-        'blue': '🔵',
-        'orange': '🟠'
-    }[dog.category] || '⚪';
-
-    const categoryColor = {
-        'green': '#c3e6cb',
-        'blue': '#bee5eb',
-        'orange': '#ffe69c'
-    }[dog.category] || '#e0e0e0';
-
-    const categoryLabel = {
-        'green': 'Grün',
-        'blue': 'Blau',
-        'orange': 'Orange'
-    }[dog.category] || dog.category;
-
+    // Fallback for dogs without a color assigned
     return `<div class="calendar-dog-name-cell">
-        <img src="${photoUrl}"
-             alt="${altText}"
-             class="calendar-dog-photo"
-             loading="lazy">
+        <img src="${photoUrl}" alt="${altText}" class="calendar-dog-photo" loading="lazy">
         <div>
             <div style="font-weight: 700; font-size: 1rem; color: var(--text-dark);">${safeDogName}</div>
-            <span style="display: inline-block; font-size: 0.7rem; padding: 2px 8px; background: ${categoryColor}; border-radius: 4px; margin-top: 4px;">
-                ${categoryEmoji} ${categoryLabel}
+            <span style="display: inline-block; font-size: 0.7rem; padding: 2px 8px; background: #e0e0e0; color: #666; border-radius: 4px; margin-top: 4px;">
+                Keine Kategorie
             </span>
         </div>
     </div>`;

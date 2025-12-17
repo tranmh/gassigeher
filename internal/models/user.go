@@ -15,7 +15,6 @@ type User struct {
 	Email                    *string          `json:"email,omitempty"`
 	Phone                    *string          `json:"phone,omitempty"`
 	PasswordHash             *string          `json:"-"`
-	ExperienceLevel          string           `json:"experience_level"`
 	Colors                   []ColorCategory  `json:"colors,omitempty"`
 	// DONE: Admin flags
 	IsAdmin                  bool             `json:"is_admin"`
@@ -105,13 +104,12 @@ type UpdateProfileRequest struct {
 	Phone *string `json:"phone,omitempty"`
 }
 
-// AdminUpdateUserRequest represents admin profile update payload (can edit names and experience level)
+// AdminUpdateUserRequest represents admin profile update payload (can edit names)
 type AdminUpdateUserRequest struct {
-	FirstName       *string `json:"first_name,omitempty"`
-	LastName        *string `json:"last_name,omitempty"`
-	Email           *string `json:"email,omitempty"`
-	Phone           *string `json:"phone,omitempty"`
-	ExperienceLevel *string `json:"experience_level,omitempty"`
+	FirstName *string `json:"first_name,omitempty"`
+	LastName  *string `json:"last_name,omitempty"`
+	Email     *string `json:"email,omitempty"`
+	Phone     *string `json:"phone,omitempty"`
 }
 
 // Phone regex: allows digits, country code, separators, and balanced parentheses
@@ -224,23 +222,17 @@ func (a *AdminUpdateUserRequest) Validate() error {
 			return err
 		}
 	}
-	if a.ExperienceLevel != nil {
-		validLevels := map[string]bool{"green": true, "orange": true, "blue": true}
-		if !validLevels[*a.ExperienceLevel] {
-			return errors.New("Ungültiges Erfahrungslevel (green, orange, blue)")
-		}
-	}
 	return nil
 }
 
 // AdminCreateUserRequest represents admin user creation payload
 type AdminCreateUserRequest struct {
-	FirstName       string  `json:"first_name"`
-	LastName        string  `json:"last_name"`
-	Email           string  `json:"email"`
-	Phone           *string `json:"phone,omitempty"`
-	ExperienceLevel string  `json:"experience_level"`
-	IsAdmin         bool    `json:"is_admin"`
+	FirstName string  `json:"first_name"`
+	LastName  string  `json:"last_name"`
+	Email     string  `json:"email"`
+	Phone     *string `json:"phone,omitempty"`
+	IsAdmin   bool    `json:"is_admin"`
+	ColorIDs  []int   `json:"color_ids,omitempty"` // Color categories to assign to user
 }
 
 // Validate validates the AdminCreateUserRequest and trims whitespace from fields
@@ -258,11 +250,6 @@ func (r *AdminCreateUserRequest) Validate() error {
 	}
 	if r.Email == "" {
 		return errors.New("E-Mail ist erforderlich")
-	}
-	// Validate experience level
-	validLevels := map[string]bool{"green": true, "orange": true, "blue": true}
-	if !validLevels[r.ExperienceLevel] {
-		return errors.New("Ungültiges Erfahrungslevel (green, orange, blue)")
 	}
 	if r.Phone != nil && *r.Phone != "" {
 		trimmedPhone := strings.TrimSpace(*r.Phone)

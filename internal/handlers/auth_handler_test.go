@@ -239,6 +239,75 @@ func TestAuthHandler_Register(t *testing.T) {
 	})
 }
 
+// TestAuthHandler_Register_AssignsDefaultColor tests that registration assigns
+// the default color (green/color_id=1) to new users
+func TestAuthHandler_Register_AssignsDefaultColor(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewAuthHandler(db, cfg)
+
+	// Set up a known registration password for testing
+	const testRegPassword = "TEST1234"
+	db.Exec(`UPDATE system_settings SET value = ? WHERE key = 'registration_password'`, testRegPassword)
+
+	// Color categories are already seeded by migration 024 with IDs 1-7:
+	// 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau, 6=helllila, 7=dunkellila
+
+	t.Run("new_user_gets_green_color_assigned", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"first_name":            "Color",
+			"last_name":             "TestUser",
+			"email":                 "coloruser@example.com",
+			"phone":                 "+49 123 456789",
+			"password":              "Test1234",
+			"confirm_password":      "Test1234",
+			"accept_terms":          true,
+			"registration_password": testRegPassword,
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/auth/register", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		rec := httptest.NewRecorder()
+		handler.Register(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Errorf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		userID := int(response["user_id"].(float64))
+
+		// Verify the green color (ID=1) was assigned to the user
+		var colorCount int
+		err := db.QueryRow("SELECT COUNT(*) FROM user_colors WHERE user_id = ? AND color_id = 1", userID).Scan(&colorCount)
+		if err != nil {
+			t.Fatalf("Failed to query user colors: %v", err)
+		}
+
+		if colorCount != 1 {
+			t.Errorf("Expected green color (ID=1) to be assigned to new user, but found %d", colorCount)
+		}
+
+		// Verify only one color is assigned (green)
+		var totalColors int
+		err = db.QueryRow("SELECT COUNT(*) FROM user_colors WHERE user_id = ?", userID).Scan(&totalColors)
+		if err != nil {
+			t.Fatalf("Failed to query user colors: %v", err)
+		}
+
+		if totalColors != 1 {
+			t.Errorf("Expected exactly 1 color for new green user, but found %d", totalColors)
+		}
+	})
+}
+
 // DONE: TestAuthHandler_Login tests user login endpoint
 func TestAuthHandler_Login(t *testing.T) {
 	db := testutil.SetupTestDB(t)
@@ -259,7 +328,6 @@ func TestAuthHandler_Login(t *testing.T) {
 		LastName:        "User",
 		Email:           &email,
 		PasswordHash:    &hash,
-		ExperienceLevel: "green",
 		IsVerified:      true,
 		IsActive:        true,
 		TermsAcceptedAt: time.Now(),
@@ -340,8 +408,7 @@ func TestAuthHandler_Login(t *testing.T) {
 			LastName:        "User",
 			Email:           &unverifiedEmail,
 			PasswordHash:    &hash,
-			ExperienceLevel: "green",
-			IsVerified:      false,
+				IsVerified:      false,
 			IsActive:        true,
 			TermsAcceptedAt: time.Now(),
 			LastActivityAt:  time.Now(),
@@ -380,8 +447,7 @@ func TestAuthHandler_Login(t *testing.T) {
 			LastName:        "User",
 			Email:           &inactiveEmail,
 			PasswordHash:    &hash,
-			ExperienceLevel: "green",
-			IsVerified:      true,
+				IsVerified:      true,
 			IsActive:        false,
 			TermsAcceptedAt: time.Now(),
 			LastActivityAt:  time.Now(),
@@ -436,8 +502,7 @@ func TestAuthHandler_Login(t *testing.T) {
 			LastName:        "Security Test",
 			Email:           &unverifiedEmail,
 			PasswordHash:    &hash,
-			ExperienceLevel: "green",
-			IsVerified:      false, // UNVERIFIED
+				IsVerified:      false, // UNVERIFIED
 			IsActive:        true,
 			TermsAcceptedAt: time.Now(),
 			LastActivityAt:  time.Now(),
@@ -450,8 +515,7 @@ func TestAuthHandler_Login(t *testing.T) {
 			LastName:        "Security Test",
 			Email:           &deactivatedEmail,
 			PasswordHash:    &hash,
-			ExperienceLevel: "green",
-			IsVerified:      true,
+				IsVerified:      true,
 			IsActive:        false, // DEACTIVATED
 			TermsAcceptedAt: time.Now(),
 			LastActivityAt:  time.Now(),
@@ -551,7 +615,6 @@ func TestAuthHandler_ChangePassword(t *testing.T) {
 		LastName:        "User",
 		Email:           &email,
 		PasswordHash:    &hash,
-		ExperienceLevel: "green",
 		IsVerified:      true,
 		IsActive:        true,
 		TermsAcceptedAt: time.Now(),
@@ -677,7 +740,6 @@ func TestAuthHandler_VerifyEmail(t *testing.T) {
 		LastName:                 "Me",
 		Email:                    &email,
 		PasswordHash:             &hash,
-		ExperienceLevel:          "green",
 		IsVerified:               false,
 		IsActive:                 true,
 		VerificationToken:        &token,
@@ -743,7 +805,6 @@ func TestAuthHandler_VerifyEmail(t *testing.T) {
 			LastName:                 "Token",
 			Email:                    &email2,
 			PasswordHash:             &hash,
-			ExperienceLevel:          "green",
 			IsVerified:               false,
 			IsActive:                 true,
 			VerificationToken:        &expiredToken,

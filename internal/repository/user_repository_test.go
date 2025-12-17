@@ -22,7 +22,6 @@ func TestUserRepository_Create(t *testing.T) {
 			Email:           &email,
 			Phone:           stringPtr("+49 123 456789"),
 			PasswordHash:    stringPtr("hashed_password"),
-			ExperienceLevel: "green",
 			IsVerified:      false,
 			IsActive:        true,
 			TermsAcceptedAt: time.Now(),
@@ -46,7 +45,6 @@ func TestUserRepository_Create(t *testing.T) {
 			LastName:        "One",
 			Email:           &email,
 			PasswordHash:    stringPtr("hash"),
-			ExperienceLevel: "green",
 			TermsAcceptedAt: time.Now(),
 			LastActivityAt:  time.Now(),
 		}
@@ -59,7 +57,6 @@ func TestUserRepository_Create(t *testing.T) {
 			LastName:        "Two",
 			Email:           &email,
 			PasswordHash:    stringPtr("hash"),
-			ExperienceLevel: "green",
 			TermsAcceptedAt: time.Now(),
 			LastActivityAt:  time.Now(),
 		}
@@ -133,10 +130,6 @@ func TestUserRepository_FindByID(t *testing.T) {
 
 		if user.ID != userID {
 			t.Errorf("Expected ID %d, got %d", userID, user.ID)
-		}
-
-		if user.ExperienceLevel != "blue" {
-			t.Errorf("Expected level 'blue', got %s", user.ExperienceLevel)
 		}
 	})
 
@@ -564,10 +557,6 @@ func TestUserRepository_FindByPasswordResetToken(t *testing.T) {
 		if user.PasswordResetToken == nil || *user.PasswordResetToken != resetToken {
 			t.Errorf("Expected token %s, got %v", resetToken, user.PasswordResetToken)
 		}
-
-		if user.ExperienceLevel != "blue" {
-			t.Errorf("Expected level 'blue', got %s", user.ExperienceLevel)
-		}
 	})
 
 	t.Run("token not found", func(t *testing.T) {
@@ -641,7 +630,6 @@ func TestUserRepository_Update(t *testing.T) {
 		user.FirstName = newFirstName
 		user.LastName = newLastName
 		user.Phone = &newPhone
-		user.ExperienceLevel = "blue"
 
 		// Perform update
 		err = repo.Update(user)
@@ -665,10 +653,6 @@ func TestUserRepository_Update(t *testing.T) {
 
 		if updated.Phone == nil || *updated.Phone != newPhone {
 			t.Errorf("Expected phone '%s', got %v", newPhone, updated.Phone)
-		}
-
-		if updated.ExperienceLevel != "blue" {
-			t.Errorf("Expected level 'blue', got %s", updated.ExperienceLevel)
 		}
 	})
 
@@ -736,11 +720,10 @@ func TestUserRepository_Update(t *testing.T) {
 	t.Run("update non-existent user", func(t *testing.T) {
 		email := "nonexistent@example.com"
 		user := &models.User{
-			ID:              99999,
-			FirstName:       "Nonexistent",
-			LastName:        "User",
-			Email:           &email,
-			ExperienceLevel: "green",
+			ID:        99999,
+			FirstName: "Nonexistent",
+			LastName:  "User",
+			Email:     &email,
 		}
 
 		err := repo.Update(user)
@@ -886,7 +869,6 @@ func TestUserRepository_MustChangePasswordField(t *testing.T) {
 			LastName:           "Created",
 			Email:              &email,
 			PasswordHash:       stringPtr("hashed_password"),
-			ExperienceLevel:    "green",
 			IsVerified:         true,
 			IsActive:           true,
 			MustChangePassword: true,
@@ -917,7 +899,6 @@ func TestUserRepository_MustChangePasswordField(t *testing.T) {
 			LastName:           "User",
 			Email:              &email,
 			PasswordHash:       stringPtr("hashed_password"),
-			ExperienceLevel:    "green",
 			IsVerified:         false,
 			IsActive:           true,
 			MustChangePassword: false,
@@ -943,7 +924,6 @@ func TestUserRepository_MustChangePasswordField(t *testing.T) {
 			LastName:           "Preserve",
 			Email:              &email,
 			PasswordHash:       stringPtr("hashed_password"),
-			ExperienceLevel:    "green",
 			IsVerified:         true,
 			IsActive:           true,
 			MustChangePassword: true,
@@ -953,8 +933,8 @@ func TestUserRepository_MustChangePasswordField(t *testing.T) {
 
 		repo.Create(user)
 
-		// Update other fields
-		user.ExperienceLevel = "orange"
+		// Update other fields (update first name instead of experience level)
+		user.FirstName = "Updated"
 		err := repo.Update(user)
 		if err != nil {
 			t.Fatalf("Update() failed: %v", err)
@@ -965,8 +945,8 @@ func TestUserRepository_MustChangePasswordField(t *testing.T) {
 		if !updatedUser.MustChangePassword {
 			t.Error("Expected must_change_password to remain true after update")
 		}
-		if updatedUser.ExperienceLevel != "orange" {
-			t.Error("Expected experience level to be updated to orange")
+		if updatedUser.FirstName != "Updated" {
+			t.Error("Expected first name to be updated")
 		}
 	})
 }

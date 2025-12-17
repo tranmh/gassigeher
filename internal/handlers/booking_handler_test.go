@@ -1374,3 +1374,104 @@ func stringContains(s, substr string) bool {
 	}
 	return false
 }
+
+// TestBookingHandler_ColorBasedPermission tests that booking permission uses the NEW color system
+// not the OLD experience_level/category system.
+// BUG: Currently backend uses CanUserAccessDog(experience_level, category) instead of
+// CanUserAccessDogByColor(userColorIDs, dogColorID)
+func TestBookingHandler_ColorBasedPermission(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewBookingHandler(db, cfg)
+
+	tomorrow := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
+
+	t.Run("user with color can book dog with same color (regardless of experience_level)", func(t *testing.T) {
+		// Create a user with experience_level="green" (lowest in old system)
+		userID := testutil.SeedTestUser(t, db, "color-test@example.com", "Color Test", "green")
+		db.Exec("UPDATE users SET is_verified = 1, is_active = 1 WHERE id = ?", userID)
+
+		// Create a color category (e.g., "Blau" with ID)
+		colorID := testutil.SeedTestColorCategory(t, db, "Blau-Test", "#0000FF", 10)
+
+		// Assign this color to the user
+		testutil.SeedTestUserColor(t, db, userID, colorID)
+
+		// Create a dog with category="blue" (old system) but color_id=colorID (new system)
+		// In old system: green user cannot access blue dog
+		// In new system: user has blue color, so CAN access blue dog
+		now := time.Now()
+		result, _ := db.Exec(`
+			INSERT INTO dogs (name, breed, size, age, category, color_id, is_available, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, "ColorDog", "TestBreed", "medium", 3, "blue", colorID, true, now, now)
+		dogID, _ := result.LastInsertId()
+
+		// Try to book - should SUCCEED because user has the dog's color
+		reqBody := map[string]interface{}{
+			"dog_id":         int(dogID),
+			"date":           tomorrow,
+			"scheduled_time": "10:00",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/bookings", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), userID, "color-test@example.com", false)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateBooking(rec, req)
+
+		// THIS TEST SHOULD PASS after fix, but currently FAILS because backend uses old system
+		if rec.Code != http.StatusCreated {
+			t.Errorf("BUG: User with matching color should be able to book. Got status %d, body: %s",
+				rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("user without color cannot book dog (even with high experience_level)", func(t *testing.T) {
+		// Create a user with experience_level="blue" (highest in old system)
+		userID := testutil.SeedTestUser(t, db, "no-color@example.com", "No Color", "blue")
+		db.Exec("UPDATE users SET is_verified = 1, is_active = 1 WHERE id = ?", userID)
+
+		// Create a NEW color category that user does NOT have
+		colorID := testutil.SeedTestColorCategory(t, db, "Rot-Test", "#FF0000", 20)
+
+		// Do NOT assign this color to the user
+
+		// Create a dog with category="green" (low in old system) but color_id=colorID
+		// In old system: blue user CAN access green dog
+		// In new system: user does NOT have red color, so CANNOT access
+		now := time.Now()
+		result, _ := db.Exec(`
+			INSERT INTO dogs (name, breed, size, age, category, color_id, is_available, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, "RedDog", "TestBreed", "small", 2, "green", colorID, true, now, now)
+		dogID, _ := result.LastInsertId()
+
+		// Try to book - should FAIL because user doesn't have the dog's color
+		reqBody := map[string]interface{}{
+			"dog_id":         int(dogID),
+			"date":           tomorrow,
+			"scheduled_time": "11:00",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/bookings", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), userID, "no-color@example.com", false)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateBooking(rec, req)
+
+		// THIS TEST SHOULD PASS after fix (return 403), but currently FAILS because
+		// backend uses old system and blue>=green, so it allows the booking
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("BUG: User without matching color should NOT be able to book. Got status %d, body: %s",
+				rec.Code, rec.Body.String())
+		}
+	})
+}

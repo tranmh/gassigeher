@@ -88,7 +88,8 @@ func TestUserColorRepository_GetUserColors(t *testing.T) {
 	repo := NewUserColorRepository(db)
 
 	t.Run("user with multiple colors", func(t *testing.T) {
-		userID := testutil.SeedTestUser(t, db, "user5@test.com", "Test User 5", "green")
+		// Use user without default colors for precise control
+		userID := testutil.SeedTestUserWithoutColors(t, db, "user5@test.com", "Test User 5", "green")
 		color1ID := testutil.SeedTestColorCategory(t, db, "color-a", "#aaaaaa", 50)
 		color2ID := testutil.SeedTestColorCategory(t, db, "color-b", "#bbbbbb", 60)
 		color3ID := testutil.SeedTestColorCategory(t, db, "color-c", "#cccccc", 70)
@@ -108,7 +109,8 @@ func TestUserColorRepository_GetUserColors(t *testing.T) {
 	})
 
 	t.Run("user with no colors", func(t *testing.T) {
-		userID := testutil.SeedTestUser(t, db, "user6@test.com", "Test User 6", "green")
+		// Use user without default colors for this test
+		userID := testutil.SeedTestUserWithoutColors(t, db, "user6@test.com", "Test User 6", "green")
 
 		colors, err := repo.GetUserColors(userID)
 		if err != nil {
@@ -161,7 +163,8 @@ func TestUserColorRepository_GetUserColorIDs(t *testing.T) {
 	repo := NewUserColorRepository(db)
 
 	t.Run("user with colors", func(t *testing.T) {
-		userID := testutil.SeedTestUser(t, db, "user8@test.com", "Test User 8", "green")
+		// Use user without default colors for precise control
+		userID := testutil.SeedTestUserWithoutColors(t, db, "user8@test.com", "Test User 8", "green")
 		color1ID := testutil.SeedTestColorCategory(t, db, "id-color-1", "#111111", 100)
 		color2ID := testutil.SeedTestColorCategory(t, db, "id-color-2", "#222222", 110)
 
@@ -193,7 +196,8 @@ func TestUserColorRepository_GetUserColorIDs(t *testing.T) {
 	})
 
 	t.Run("user with no colors returns empty slice", func(t *testing.T) {
-		userID := testutil.SeedTestUser(t, db, "user9@test.com", "Test User 9", "green")
+		// Use user without default colors for this test
+		userID := testutil.SeedTestUserWithoutColors(t, db, "user9@test.com", "Test User 9", "green")
 
 		colorIDs, err := repo.GetUserColorIDs(userID)
 		if err != nil {

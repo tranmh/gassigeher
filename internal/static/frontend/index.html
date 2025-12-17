@@ -74,9 +74,9 @@
                     <p data-i18n="home.feature_booking_desc">Buche deine Spaziergänge über unseren Kalender</p>
                 </div>
                 <div class="feature">
-                    <div class="feature-icon">⭐</div>
-                    <h3 data-i18n="home.feature_levels">Gassi-Kategorien</h3>
-                    <p data-i18n="home.feature_levels_desc">Von Anfängern bis zu erfahrenen Gassigehern</p>
+                    <div class="feature-icon">🎨</div>
+                    <h3 data-i18n="home.feature_levels">Farbkategorien</h3>
+                    <p data-i18n="home.feature_levels_desc">Flexible Farbstufen für jeden Erfahrungsgrad</p>
                 </div>
                 <div class="feature">
                     <div class="feature-icon">📧</div>
@@ -182,9 +182,72 @@
             }
         }
 
+        // Store all colors from API
+        let allColors = [];
+
+        // Load colors from API
+        async function loadColors() {
+            try {
+                const response = await fetch('/api/colors');
+                if (!response.ok) return;
+                const data = await response.json();
+                allColors = data.colors || [];
+            } catch (error) {
+                console.error('Error loading colors:', error);
+            }
+        }
+
+        // Get pattern icon for color badge
+        function getPatternIcon(pattern) {
+            const icons = {
+                'circle': '●',
+                'triangle': '▲',
+                'square': '■',
+                'diamond': '◆',
+                'pentagon': '⬠',
+                'hexagon': '⬡',
+                'star': '★',
+                'heart': '♥',
+                'cross': '✚',
+                'spade': '♠',
+                'club': '♣',
+                'moon': '☽',
+                'sun': '☀',
+                'ring': '○',
+                'target': '◎'
+            };
+            return icons[pattern] || '●';
+        }
+
+        // Generate color badge HTML
+        function getColorBadgeHtml(color) {
+            if (!color) {
+                return '<span style="display: inline-block; padding: 4px 12px; border-radius: var(--border-radius); background: #ccc; color: #666; font-size: 0.85rem;">Keine Kategorie</span>';
+            }
+            return `
+                <span style="
+                    display: inline-block;
+                    padding: 4px 12px;
+                    border-radius: var(--border-radius);
+                    background: ${color.hex_code}20;
+                    border: 2px solid ${color.hex_code};
+                    color: ${color.hex_code};
+                    font-size: 0.85rem;
+                    font-weight: 500;
+                ">
+                    ${getPatternIcon(color.pattern_icon)} ${sanitizeHTML(color.name)}
+                </span>
+            `;
+        }
+
         // Load featured dogs
         async function loadFeaturedDogs() {
             try {
+                // Load colors first if not already loaded
+                if (allColors.length === 0) {
+                    await loadColors();
+                }
+
                 const response = await fetch('/api/dogs/featured');
                 if (!response.ok) return;
 
@@ -206,18 +269,11 @@
                     const safeDogName = sanitizeHTML(dog.name);
                     const safeDogBreed = sanitizeHTML(dog.breed);
 
-                    const categoryColors = {
-                        green: '#82b965',
-                        blue: '#4a90e2',
-                        orange: '#ff8c42'
-                    };
-                    const categoryLabels = {
-                        green: 'Anfänger',
-                        blue: 'Fortgeschritten',
-                        orange: 'Erfahren'
-                    };
+                    // Get dog's color from embedded object or find in allColors
+                    const dogColor = dog.color || allColors.find(c => c.id === dog.color_id);
+                    const borderColor = dogColor ? dogColor.hex_code : '#82b965';
 
-                    const photoUrl = dog.photo ? `/uploads/${dog.photo}` : `/assets/images/placeholders/dog-placeholder-${dog.category || 'green'}.svg`;
+                    const photoUrl = dog.photo ? `/uploads/${dog.photo}` : '/assets/images/placeholders/dog-placeholder.svg';
 
                     const externalLinkHtml = dog.external_link
                         ? `<a href="${dog.external_link}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 12px; color: var(--primary-green); text-decoration: none; font-weight: 500;">mehr über mich &rarr;</a>`
@@ -225,14 +281,12 @@
 
                     return `
                         <div class="card" style="text-align: center; padding: 20px;">
-                            <div style="width: 150px; height: 150px; margin: 0 auto 15px; border-radius: 50%; overflow: hidden; border: 4px solid ${categoryColors[dog.category] || '#82b965'};">
+                            <div style="width: 150px; height: 150px; margin: 0 auto 15px; border-radius: 50%; overflow: hidden; border: 4px solid ${borderColor};">
                                 <img src="${photoUrl}" alt="${safeDogName}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='/assets/images/placeholders/dog-placeholder.svg'">
                             </div>
                             <h3 style="margin: 0 0 10px 0; color: var(--text-dark);">${safeDogName}</h3>
                             <p style="margin: 0 0 10px 0; color: var(--text-gray);">${safeDogBreed} · ${dog.age} ${dog.age === 1 ? 'Jahr' : 'Jahre'}</p>
-                            <span style="display: inline-block; padding: 4px 12px; border-radius: var(--border-radius); background: ${categoryColors[dog.category] || '#82b965'}; color: white; font-size: 0.85rem;">
-                                ${categoryLabels[dog.category] || 'Anfänger'}
-                            </span>
+                            ${getColorBadgeHtml(dogColor)}
                             ${externalLinkHtml}
                         </div>
                     `;

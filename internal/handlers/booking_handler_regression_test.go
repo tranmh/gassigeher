@@ -56,12 +56,22 @@ func setupRegressionTest(t *testing.T) (*sql.DB, func()) {
 		t.Fatalf("Expected 3 users inserted, got %d", rowsAffected)
 	}
 
-	result, err = db.Exec(`INSERT INTO dogs (id, name, breed, size, age, category, is_available, created_at, updated_at)
+	// Seed user_colors for the new color system
+	// Color IDs: 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau
+	// Green user (ID 1) gets only color 1 (gruen)
+	db.Exec(`INSERT INTO user_colors (user_id, color_id) VALUES (1, 1)`)
+	// Blue user (ID 2) gets all main colors (1-5)
+	db.Exec(`INSERT INTO user_colors (user_id, color_id) VALUES (2, 1), (2, 2), (2, 3), (2, 4), (2, 5)`)
+	// Orange user (ID 3) gets colors 1, 2, 3
+	db.Exec(`INSERT INTO user_colors (user_id, color_id) VALUES (3, 1), (3, 2), (3, 3)`)
+
+	// Seed dogs with color_id for the new color system
+	result, err = db.Exec(`INSERT INTO dogs (id, name, breed, size, age, category, color_id, is_available, created_at, updated_at)
 		VALUES
-		(1, 'Green Dog', 'Labrador', 'medium', 5, 'green', 1, ?, ?),
-		(2, 'Blue Dog', 'German Shepherd', 'large', 6, 'blue', 1, ?, ?),
-		(3, 'Orange Dog', 'Husky', 'large', 7, 'orange', 1, ?, ?),
-		(4, 'Unavailable Dog', 'Beagle', 'small', 4, 'green', 0, ?, ?)`,
+		(1, 'Green Dog', 'Labrador', 'medium', 5, 'green', 1, 1, ?, ?),
+		(2, 'Blue Dog', 'German Shepherd', 'large', 6, 'blue', 5, 1, ?, ?),
+		(3, 'Orange Dog', 'Husky', 'large', 7, 'orange', 3, 1, ?, ?),
+		(4, 'Unavailable Dog', 'Beagle', 'small', 4, 'green', 1, 0, ?, ?)`,
 		now, now, now, now, now, now, now, now)
 	if err != nil {
 		t.Fatalf("Failed to seed dogs: %v", err)

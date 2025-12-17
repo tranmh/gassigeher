@@ -319,38 +319,61 @@ func intPtr(i int) *int {
 	return &i
 }
 
-// assignUserColors assigns the green color (ID 1) to all users
-// This populates the user_colors junction table for the new color system
+// assignUserColors assigns colors to users based on their experience_level
+// Color IDs: 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau, 6=helllila, 7=dunkellila
+// - green users: only gruen (1)
+// - orange users: gruen (1), gelb (2), orange (3)
+// - blue users: all colors (1-5)
 func assignUserColors(db *sql.DB) error {
-	const greenColorID = 1 // gruen color
+	// Define which colors each experience level gets
+	colorsByLevel := map[string][]int{
+		"green":  {1},                // only gruen
+		"orange": {1, 2, 3},          // gruen, gelb, orange
+		"blue":   {1, 2, 3, 4, 5},    // all main colors
+	}
 
-	// Get all user IDs
-	rows, err := db.Query("SELECT id FROM users")
+	// Get all users with their experience levels
+	rows, err := db.Query("SELECT id, experience_level FROM users")
 	if err != nil {
 		return fmt.Errorf("failed to query users: %w", err)
 	}
 	defer rows.Close()
 
-	var userIDs []int
+	type userInfo struct {
+		id    int
+		level string
+	}
+	var users []userInfo
+
 	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
-			return fmt.Errorf("failed to scan user ID: %w", err)
+		var u userInfo
+		if err := rows.Scan(&u.id, &u.level); err != nil {
+			return fmt.Errorf("failed to scan user: %w", err)
 		}
-		userIDs = append(userIDs, id)
+		users = append(users, u)
 	}
 
-	for _, userID := range userIDs {
-		_, err := db.Exec(`
-			INSERT INTO user_colors (user_id, color_id)
-			VALUES (?, ?)
-		`, userID, greenColorID)
-		if err != nil {
-			return fmt.Errorf("failed to assign color to user %d: %w", userID, err)
+	totalAssignments := 0
+	for _, user := range users {
+		colors, ok := colorsByLevel[user.level]
+		if !ok {
+			// Default to green if unknown level
+			colors = colorsByLevel["green"]
+		}
+
+		for _, colorID := range colors {
+			_, err := db.Exec(`
+				INSERT INTO user_colors (user_id, color_id)
+				VALUES (?, ?)
+			`, user.id, colorID)
+			if err != nil {
+				return fmt.Errorf("failed to assign color %d to user %d: %w", colorID, user.id, err)
+			}
+			totalAssignments++
 		}
 	}
 
-	log.Printf("✓ Assigned green color to %d users", len(userIDs))
+	log.Printf("✓ Assigned %d colors to %d users based on experience levels", totalAssignments, len(users))
 	return nil
 }
 

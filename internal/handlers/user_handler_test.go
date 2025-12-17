@@ -39,7 +39,6 @@ func TestUserHandler_GetMe(t *testing.T) {
 		LastName:        "User",
 		Email:           &email,
 		PasswordHash:    &hash,
-		ExperienceLevel: "blue",
 		IsVerified:      true,
 		IsActive:        true,
 		TermsAcceptedAt: time.Now(),
@@ -68,10 +67,6 @@ func TestUserHandler_GetMe(t *testing.T) {
 
 		if response.FullName() != "Get Me User" {
 			t.Errorf("Expected name 'Get Me User', got %s", response.FullName())
-		}
-
-		if response.ExperienceLevel != "blue" {
-			t.Errorf("Expected level 'blue', got %s", response.ExperienceLevel)
 		}
 	})
 
@@ -123,7 +118,6 @@ func TestUserHandler_UpdateMe(t *testing.T) {
 		Email:           &email,
 		Phone:           &phone,
 		PasswordHash:    &hash,
-		ExperienceLevel: "green",
 		IsVerified:      true,
 		IsActive:        true,
 		TermsAcceptedAt: time.Now(),
@@ -238,7 +232,6 @@ func TestUserHandler_DeleteAccount(t *testing.T) {
 		LastName:        "Me",
 		Email:           &email,
 		PasswordHash:    &hash,
-		ExperienceLevel: "green",
 		IsVerified:      true,
 		IsActive:        true,
 		TermsAcceptedAt: time.Now(),
@@ -809,52 +802,6 @@ func TestUserHandler_AdminUpdateUser(t *testing.T) {
 		}
 	})
 
-	t.Run("successful experience level update", func(t *testing.T) {
-		reqBody := map[string]interface{}{
-			"experience_level": "blue",
-		}
-		body, _ := json.Marshal(reqBody)
-		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/admin/users/%d", testUserID), bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", testUserID)})
-		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
-		req = req.WithContext(ctx)
-
-		rec := httptest.NewRecorder()
-		handler.AdminUpdateUser(rec, req)
-
-		if rec.Code != http.StatusOK {
-			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
-		}
-
-		var response map[string]interface{}
-		json.Unmarshal(rec.Body.Bytes(), &response)
-
-		user := response["user"].(map[string]interface{})
-		if user["experience_level"] != "blue" {
-			t.Errorf("Expected experience_level 'blue', got %v", user["experience_level"])
-		}
-	})
-
-	t.Run("invalid experience level fails validation", func(t *testing.T) {
-		reqBody := map[string]interface{}{
-			"experience_level": "invalid",
-		}
-		body, _ := json.Marshal(reqBody)
-		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/admin/users/%d", testUserID), bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", testUserID)})
-		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
-		req = req.WithContext(ctx)
-
-		rec := httptest.NewRecorder()
-		handler.AdminUpdateUser(rec, req)
-
-		if rec.Code != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d. Body: %s", rec.Code, rec.Body.String())
-		}
-	})
-
 	t.Run("invalid request body", func(t *testing.T) {
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/admin/users/%d", testUserID), bytes.NewReader([]byte("invalid json")))
 		req.Header.Set("Content-Type", "application/json")
@@ -933,9 +880,6 @@ func TestUserHandler_AdminCreateUser(t *testing.T) {
 		if user["first_name"] != "New" {
 			t.Errorf("Expected first_name 'New', got %v", user["first_name"])
 		}
-		if user["experience_level"] != "green" {
-			t.Errorf("Expected experience_level 'green', got %v", user["experience_level"])
-		}
 
 		// Verify user was created with must_change_password = true
 		createdUser, _ := userRepo.FindByEmail("newuser@example.com")
@@ -1000,10 +944,6 @@ func TestUserHandler_AdminCreateUser(t *testing.T) {
 		if user["is_admin"] != true {
 			t.Error("Created user should be admin")
 		}
-		// Admin users should automatically get blue experience level
-		if user["experience_level"] != "blue" {
-			t.Errorf("Admin user should have experience_level 'blue', got %v", user["experience_level"])
-		}
 	})
 
 	t.Run("duplicate email fails", func(t *testing.T) {
@@ -1051,34 +991,12 @@ func TestUserHandler_AdminCreateUser(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid experience level fails validation", func(t *testing.T) {
-		reqBody := map[string]interface{}{
-			"first_name":       "Test",
-			"last_name":        "User",
-			"email":            "invalidlevel@example.com",
-			"experience_level": "invalid",
-		}
-		body, _ := json.Marshal(reqBody)
-		req := httptest.NewRequest("POST", "/api/users", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
-		req = req.WithContext(ctx)
-
-		rec := httptest.NewRecorder()
-		handler.AdminCreateUser(rec, req)
-
-		if rec.Code != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d. Body: %s", rec.Code, rec.Body.String())
-		}
-	})
-
 	t.Run("create user with phone", func(t *testing.T) {
 		reqBody := map[string]interface{}{
-			"first_name":       "Phone",
-			"last_name":        "User",
-			"email":            "phoneuser@example.com",
-			"phone":            "+49 123 456789",
-			"experience_level": "orange",
+			"first_name": "Phone",
+			"last_name":  "User",
+			"email":      "phoneuser@example.com",
+			"phone":      "+49 123 456789",
 		}
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/api/users", bytes.NewReader(body))
@@ -1158,6 +1076,67 @@ func TestUserHandler_AdminCreateUser(t *testing.T) {
 
 		if rec.Code != http.StatusBadRequest {
 			t.Errorf("Expected status 400, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	// BUG FIX TEST: Admin should be able to assign colors when creating a user
+	t.Run("admin can create user with color_ids", func(t *testing.T) {
+		// Create test color categories
+		colorID1 := testutil.SeedTestColorCategory(t, db, "Grün-Test", "#00FF00", 1)
+		colorID2 := testutil.SeedTestColorCategory(t, db, "Blau-Test", "#0000FF", 2)
+
+		reqBody := map[string]interface{}{
+			"first_name":       "Color",
+			"last_name":        "User",
+			"email":            "coloruser@example.com",
+			"experience_level": "green",
+			"is_admin":         false,
+			"color_ids":        []int{colorID1, colorID2},
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/users", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminCreateUser(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Errorf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		// Verify user was created
+		createdUser, err := userRepo.FindByEmail("coloruser@example.com")
+		if err != nil || createdUser == nil {
+			t.Fatal("User should have been created")
+		}
+
+		// Verify colors were assigned - this is the BUG we're testing
+		userColorRepo := repository.NewUserColorRepository(db)
+		userColorIDs, err := userColorRepo.GetUserColorIDs(createdUser.ID)
+		if err != nil {
+			t.Fatalf("Failed to get user colors: %v", err)
+		}
+
+		// Should have both colors assigned
+		if len(userColorIDs) != 2 {
+			t.Errorf("BUG: User should have 2 colors assigned, got %d. color_ids parameter is being ignored!", len(userColorIDs))
+		}
+
+		// Verify correct colors
+		hasColor1 := false
+		hasColor2 := false
+		for _, cid := range userColorIDs {
+			if cid == colorID1 {
+				hasColor1 = true
+			}
+			if cid == colorID2 {
+				hasColor2 = true
+			}
+		}
+		if !hasColor1 || !hasColor2 {
+			t.Errorf("BUG: User should have colors %d and %d, got %v", colorID1, colorID2, userColorIDs)
 		}
 	})
 }

@@ -13,7 +13,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
-	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
 	"github.com/tranmh/gassigeher/internal/services"
@@ -98,25 +97,8 @@ func (h *DogHandler) ListDogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If user is authenticated, filter based on their experience level
-	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
-	if ok {
-		user, err := h.userRepo.FindByID(userID)
-		if err == nil && user != nil {
-			filteredDogs := []*models.Dog{}
-			for _, dog := range dogs {
-				// Check if user can access this dog
-				if repository.CanUserAccessDog(user.ExperienceLevel, dog.Category) {
-					filteredDogs = append(filteredDogs, dog)
-				} else {
-					// Include but mark as inaccessible (frontend will handle display)
-					filteredDogs = append(filteredDogs, dog)
-				}
-			}
-			dogs = filteredDogs
-		}
-	}
-
+	// Return all dogs - frontend handles permission display using color_id
+	// Users can see all dogs but locked dogs (those without matching color) show a banner
 	respondJSON(w, http.StatusOK, dogs)
 }
 
