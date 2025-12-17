@@ -1,0 +1,111 @@
+package services
+
+import (
+	"database/sql"
+)
+
+// ProvisioningService handles default data setup for new tenants
+type ProvisioningService struct {
+	db *sql.DB
+}
+
+// NewProvisioningService creates a new provisioning service
+func NewProvisioningService(db *sql.DB) *ProvisioningService {
+	return &ProvisioningService{db: db}
+}
+
+// CreateDefaultColors creates default color categories for a tenant
+func (s *ProvisioningService) CreateDefaultColors(tx *sql.Tx, tenantID int) error {
+	colors := []struct {
+		Name      string
+		HexCode   string
+		SortOrder int
+	}{
+		{"Grün", "#22c55e", 1},
+		{"Gelb", "#eab308", 2},
+		{"Orange", "#f97316", 3},
+		{"Rot", "#ef4444", 4},
+		{"Blau", "#3b82f6", 5},
+	}
+
+	for _, c := range colors {
+		_, err := tx.Exec(
+			`INSERT INTO color_categories (tenant_id, name, hex_code, sort_order) VALUES (?, ?, ?, ?)`,
+			tenantID, c.Name, c.HexCode, c.SortOrder,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// CreateDefaultBookingRules creates default booking time rules for a tenant
+func (s *ProvisioningService) CreateDefaultBookingRules(tx *sql.Tx, tenantID int) error {
+	rules := []struct {
+		DayType   string
+		RuleName  string
+		StartTime string
+		EndTime   string
+		IsBlocked bool
+	}{
+		{"weekday", "morning", "08:00", "12:00", false},
+		{"weekday", "lunch", "12:00", "14:00", true},
+		{"weekday", "afternoon", "14:00", "18:00", false},
+		{"weekend", "morning", "09:00", "12:00", false},
+		{"weekend", "afternoon", "14:00", "17:00", false},
+		{"holiday", "morning", "10:00", "12:00", false},
+		{"holiday", "afternoon", "14:00", "16:00", false},
+	}
+
+	for _, r := range rules {
+		_, err := tx.Exec(
+			`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked) VALUES (?, ?, ?, ?, ?, ?)`,
+			tenantID, r.DayType, r.RuleName, r.StartTime, r.EndTime, r.IsBlocked,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// CreateDefaultSettings creates default system settings for a tenant
+func (s *ProvisioningService) CreateDefaultSettings(tx *sql.Tx, tenantID int) error {
+	settings := map[string]string{
+		"booking_advance_days":      "14",
+		"cancellation_notice_hours": "12",
+		"auto_deactivation_days":    "365",
+	}
+
+	for key, value := range settings {
+		_, err := tx.Exec(
+			`INSERT INTO system_settings (tenant_id, key, value) VALUES (?, ?, ?)`,
+			tenantID, key, value,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ProvisionTenant creates all default data for a new tenant
+func (s *ProvisioningService) ProvisionTenant(tx *sql.Tx, tenantID int) error {
+	// Create default color categories
+	if err := s.CreateDefaultColors(tx, tenantID); err != nil {
+		return err
+	}
+
+	// Create default booking time rules
+	if err := s.CreateDefaultBookingRules(tx, tenantID); err != nil {
+		return err
+	}
+
+	// Create default system settings
+	if err := s.CreateDefaultSettings(tx, tenantID); err != nil {
+		return err
+	}
+
+	return nil
+}

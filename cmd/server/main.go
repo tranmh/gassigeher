@@ -119,6 +119,7 @@ func main() {
 	colorRequestHandler := handlers.NewColorRequestHandler(db, cfg)
 	userColorHandler := handlers.NewUserColorHandler(db, cfg)
 	themeHandler := handlers.NewThemeHandler(db)
+	tenantHandler := handlers.NewTenantHandler(db, cfg)
 	router.HandleFunc("/api/health", healthHandler.Health).Methods("GET")
 
 	// Initialize booking time repositories and services
@@ -178,6 +179,10 @@ func main() {
 	router.HandleFunc("/api/theme/css", themeHandler.GetCSS).Methods("GET")
 	router.HandleFunc("/api/theme/presets", themeHandler.GetPresets).Methods("GET")
 
+	// Tenant registration (public - for self-service signup)
+	router.HandleFunc("/api/tenants/register", tenantHandler.Register).Methods("POST")
+	router.HandleFunc("/api/tenants/check-slug", tenantHandler.CheckSlug).Methods("GET")
+
 	// Protected routes (authenticated users)
 	protected := router.PathPrefix("/api").Subrouter()
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
@@ -190,6 +195,9 @@ func main() {
 	protected.HandleFunc("/users/me", userHandler.UpdateMe).Methods("PUT")
 	protected.HandleFunc("/users/me/photo", userHandler.UploadPhoto).Methods("POST")
 	protected.HandleFunc("/users/me", userHandler.DeleteAccount).Methods("DELETE")
+
+	// Tenant info (authenticated users)
+	protected.HandleFunc("/tenants/me", tenantHandler.GetCurrentTenant).Methods("GET")
 
 	// Dogs (read-only for authenticated users)
 	protected.HandleFunc("/dogs", dogHandler.ListDogs).Methods("GET")
@@ -297,6 +305,11 @@ func main() {
 	// Theme management (admin only)
 	admin.HandleFunc("/admin/theme", themeHandler.GetCurrentTheme).Methods("GET")
 	admin.HandleFunc("/admin/theme", themeHandler.UpdateTheme).Methods("PUT")
+
+	// Tenant management (admin only)
+	admin.HandleFunc("/admin/tenant", tenantHandler.GetCurrentTenant).Methods("GET")
+	admin.HandleFunc("/admin/tenant", tenantHandler.UpdateTenant).Methods("PUT")
+	admin.HandleFunc("/admin/tenant/stats", tenantHandler.GetTenantStats).Methods("GET")
 
 	// Booking approval management (admin only)
 	admin.HandleFunc("/bookings/pending-approvals", bookingHandler.GetPendingApprovals).Methods("GET")

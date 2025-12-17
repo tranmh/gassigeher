@@ -69,6 +69,56 @@ func (r *UserRepository) Create(user *models.User) error {
 	return nil
 }
 
+// CreateTx creates a new user within a transaction
+func (r *UserRepository) CreateTx(tx *sql.Tx, user *models.User) error {
+	query := `
+		INSERT INTO users (
+			tenant_id, first_name, last_name, email, phone, password_hash,
+			is_admin, is_super_admin, is_verified, is_active, must_change_password,
+			verification_token, verification_token_expires,
+			terms_accepted_at, last_activity_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+	// SaaS: Convert TenantID=0 to NULL for single-tenant mode
+	var tenantIDParam interface{}
+	if user.TenantID > 0 {
+		tenantIDParam = user.TenantID
+	} else {
+		tenantIDParam = nil
+	}
+
+	result, err := tx.Exec(
+		query,
+		tenantIDParam, // SaaS: Include tenant_id (NULL for single-tenant)
+		user.FirstName,
+		user.LastName,
+		user.Email,
+		user.Phone,
+		user.PasswordHash,
+		user.IsAdmin,
+		user.IsSuperAdmin,
+		user.IsVerified,
+		user.IsActive,
+		user.MustChangePassword,
+		user.VerificationToken,
+		user.VerificationTokenExpires,
+		user.TermsAcceptedAt,
+		user.LastActivityAt,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create user: %w", err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("failed to get user ID: %w", err)
+	}
+
+	user.ID = int(id)
+	return nil
+}
+
 // FindByEmail finds a user by email within a tenant
 // SaaS: tenantID=0 searches globally (backward compatibility), otherwise filters by tenant
 func (r *UserRepository) FindByEmail(email string, tenantID int) (*models.User, error) {
