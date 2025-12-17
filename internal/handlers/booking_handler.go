@@ -68,6 +68,8 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Parse request
 	var req models.CreateBookingRequest
@@ -172,7 +174,7 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if date is blocked for this specific dog
-	isBlocked, err := h.blockedDateRepo.IsBlockedForDog(req.Date, req.DogID)
+	isBlocked, err := h.blockedDateRepo.IsBlockedForDog(req.Date, req.DogID, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check blocked dates")
 		return
@@ -515,6 +517,8 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 
 	// Get admin user ID
 	userID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Parse request
 	var req models.MoveBookingRequest
@@ -551,7 +555,7 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 	oldTime := booking.ScheduledTime
 
 	// Check if new date is blocked for this dog
-	isBlocked, err := h.blockedDateRepo.IsBlockedForDog(req.Date, booking.DogID)
+	isBlocked, err := h.blockedDateRepo.IsBlockedForDog(req.Date, booking.DogID, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check blocked dates")
 		return
@@ -618,12 +622,15 @@ func (h *BookingHandler) GetCalendarData(w http.ResponseWriter, r *http.Request)
 
 	// Get user ID from context
 	userID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Get bookings for the month
 	filter := &models.BookingFilterRequest{
-		UserID: &userID,
-		Year:   &year,
-		Month:  &month,
+		TenantID: &tenantID, // SaaS: Filter by tenant
+		UserID:   &userID,
+		Year:     &year,
+		Month:    &month,
 	}
 	bookings, err := h.bookingRepo.FindAll(filter)
 	if err != nil {
@@ -632,7 +639,7 @@ func (h *BookingHandler) GetCalendarData(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Get blocked dates
-	blockedDates, err := h.blockedDateRepo.FindAll()
+	blockedDates, err := h.blockedDateRepo.FindAll(tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get blocked dates")
 		return
@@ -700,7 +707,10 @@ func (h *BookingHandler) GetPendingApprovals(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	bookings, err := h.bookingRepo.GetPendingApprovalBookings()
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	bookings, err := h.bookingRepo.GetPendingApprovalBookings(tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to load pending bookings")
 		return

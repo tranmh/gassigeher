@@ -28,10 +28,11 @@ func NewBookingRepository(db *sql.DB) *BookingRepository {
 }
 
 // Create creates a new booking
+// SaaS: Now includes tenant_id for multi-tenancy
 func (r *BookingRepository) Create(booking *models.Booking) error {
 	query := `
-		INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, requires_approval, approval_status, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, requires_approval, approval_status, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	now := time.Now()
@@ -48,7 +49,16 @@ func (r *BookingRepository) Create(booking *models.Booking) error {
 		}
 	}
 
+	// SaaS: Convert TenantID=0 to NULL for single-tenant mode
+	var tenantIDParam interface{}
+	if booking.TenantID > 0 {
+		tenantIDParam = booking.TenantID
+	} else {
+		tenantIDParam = nil
+	}
+
 	result, err := r.db.Exec(query,
+		tenantIDParam,
 		booking.UserID,
 		booking.DogID,
 		booking.Date,
@@ -77,17 +87,20 @@ func (r *BookingRepository) Create(booking *models.Booking) error {
 }
 
 // FindByID finds a booking by ID
+// SaaS: Now includes tenant_id in result
 func (r *BookingRepository) FindByID(id int) (*models.Booking, error) {
 	query := `
-		SELECT id, user_id, dog_id, date, scheduled_time, status,
+		SELECT id, tenant_id, user_id, dog_id, date, scheduled_time, status,
 		       completed_at, user_notes, admin_cancellation_reason, created_at, updated_at
 		FROM bookings
 		WHERE id = ?
 	`
 
 	booking := &models.Booking{}
+	var tenantID sql.NullInt64
 	err := r.db.QueryRow(query, id).Scan(
 		&booking.ID,
+		&tenantID,
 		&booking.UserID,
 		&booking.DogID,
 		&booking.Date,
@@ -108,14 +121,18 @@ func (r *BookingRepository) FindByID(id int) (*models.Booking, error) {
 		return nil, fmt.Errorf("failed to find booking: %w", err)
 	}
 
+	if tenantID.Valid {
+		booking.TenantID = int(tenantID.Int64)
+	}
 	booking.Date = normalizeDate(booking.Date)
 	return booking, nil
 }
 
 // FindAll finds all bookings with optional filters
+// SaaS: Now includes tenant filtering - use filter.TenantID or pass 0 for global admin
 func (r *BookingRepository) FindAll(filter *models.BookingFilterRequest) ([]*models.Booking, error) {
 	query := `
-		SELECT id, user_id, dog_id, date, scheduled_time, status,
+		SELECT id, tenant_id, user_id, dog_id, date, scheduled_time, status,
 		       completed_at, user_notes, admin_cancellation_reason, created_at, updated_at
 		FROM bookings
 		WHERE 1=1
@@ -123,6 +140,12 @@ func (r *BookingRepository) FindAll(filter *models.BookingFilterRequest) ([]*mod
 	args := []interface{}{}
 
 	if filter != nil {
+		// SaaS: Filter by tenant if specified
+		if filter.TenantID != nil && *filter.TenantID > 0 {
+			query += " AND tenant_id = ?"
+			args = append(args, *filter.TenantID)
+		}
+
 		if filter.UserID != nil {
 			query += " AND user_id = ?"
 			args = append(args, *filter.UserID)
@@ -171,8 +194,10 @@ func (r *BookingRepository) FindAll(filter *models.BookingFilterRequest) ([]*mod
 	bookings := []*models.Booking{}
 	for rows.Next() {
 		booking := &models.Booking{}
+		var tenantID sql.NullInt64
 		err := rows.Scan(
 			&booking.ID,
+			&tenantID,
 			&booking.UserID,
 			&booking.DogID,
 			&booking.Date,
@@ -186,6 +211,9 @@ func (r *BookingRepository) FindAll(filter *models.BookingFilterRequest) ([]*mod
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan booking: %w", err)
+		}
+		if tenantID.Valid {
+			booking.TenantID = int(tenantID.Int64)
 		}
 		booking.Date = normalizeDate(booking.Date)
 		bookings = append(bookings, booking)
@@ -283,9 +311,10 @@ func (r *BookingRepository) AutoComplete() (int, error) {
 }
 
 // GetUpcoming gets upcoming bookings for a user
+// SaaS: Now includes tenant_id in result
 func (r *BookingRepository) GetUpcoming(userID int, limit int) ([]*models.Booking, error) {
 	query := `
-		SELECT id, user_id, dog_id, date, scheduled_time, status,
+		SELECT id, tenant_id, user_id, dog_id, date, scheduled_time, status,
 		       completed_at, user_notes, admin_cancellation_reason, created_at, updated_at
 		FROM bookings
 		WHERE user_id = ? AND status = 'scheduled' AND date >= ?
@@ -303,8 +332,10 @@ func (r *BookingRepository) GetUpcoming(userID int, limit int) ([]*models.Bookin
 	bookings := []*models.Booking{}
 	for rows.Next() {
 		booking := &models.Booking{}
+		var tenantID sql.NullInt64
 		err := rows.Scan(
 			&booking.ID,
+			&tenantID,
 			&booking.UserID,
 			&booking.DogID,
 			&booking.Date,
@@ -319,6 +350,9 @@ func (r *BookingRepository) GetUpcoming(userID int, limit int) ([]*models.Bookin
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan booking: %w", err)
 		}
+		if tenantID.Valid {
+			booking.TenantID = int(tenantID.Int64)
+		}
 		booking.Date = normalizeDate(booking.Date)
 		bookings = append(bookings, booking)
 	}
@@ -328,6 +362,7 @@ func (r *BookingRepository) GetUpcoming(userID int, limit int) ([]*models.Bookin
 
 // GetForReminders gets bookings that need reminders (1 hour before scheduled time)
 // Returns bookings with user and dog details, excluding already-sent reminders
+// SaaS: Global operation (cron job), includes tenant_id in result
 func (r *BookingRepository) GetForReminders() ([]*models.Booking, error) {
 	// Get bookings scheduled within the next 1-2 hours
 	now := time.Now()
@@ -340,7 +375,7 @@ func (r *BookingRepository) GetForReminders() ([]*models.Booking, error) {
 
 	// Query with user and dog details, excluding already-sent reminders
 	query := `
-		SELECT b.id, b.user_id, b.dog_id, b.date, b.scheduled_time, b.status,
+		SELECT b.id, b.tenant_id, b.user_id, b.dog_id, b.date, b.scheduled_time, b.status,
 		       b.completed_at, b.user_notes, b.admin_cancellation_reason, b.created_at, b.updated_at,
 		       u.first_name as user_first_name, u.last_name as user_last_name, u.email as user_email,
 		       d.name as dog_name
@@ -366,10 +401,12 @@ func (r *BookingRepository) GetForReminders() ([]*models.Booking, error) {
 			User: &models.User{},
 			Dog:  &models.Dog{},
 		}
+		var tenantID sql.NullInt64
 		var userFirstName, userLastName, userEmail, dogName sql.NullString
 
 		err := rows.Scan(
 			&booking.ID,
+			&tenantID,
 			&booking.UserID,
 			&booking.DogID,
 			&booking.Date,
@@ -389,6 +426,9 @@ func (r *BookingRepository) GetForReminders() ([]*models.Booking, error) {
 			return nil, fmt.Errorf("failed to scan booking: %w", err)
 		}
 
+		if tenantID.Valid {
+			booking.TenantID = int(tenantID.Int64)
+		}
 		booking.Date = normalizeDate(booking.Date)
 
 		// Populate user details
@@ -446,10 +486,11 @@ func (r *BookingRepository) Update(booking *models.Booking) error {
 }
 
 // FindByIDWithDetails finds a booking by ID with user and dog details
+// SaaS: Now includes tenant_id in result
 func (r *BookingRepository) FindByIDWithDetails(id int) (*models.Booking, error) {
 	query := `
 		SELECT
-			b.id, b.user_id, b.dog_id, b.date, b.scheduled_time, b.status,
+			b.id, b.tenant_id, b.user_id, b.dog_id, b.date, b.scheduled_time, b.status,
 			b.completed_at, b.user_notes, b.admin_cancellation_reason, b.created_at, b.updated_at,
 			u.first_name as user_first_name, u.last_name as user_last_name, u.email as user_email, u.phone as user_phone,
 			d.name as dog_name, d.breed, d.size, d.age
@@ -464,12 +505,14 @@ func (r *BookingRepository) FindByIDWithDetails(id int) (*models.Booking, error)
 		Dog:  &models.Dog{},
 	}
 
+	var tenantID sql.NullInt64
 	var userFirstName, userLastName, userEmail, userPhone sql.NullString
 	var dogName, breed, size string
 	var age int
 
 	err := r.db.QueryRow(query, id).Scan(
 		&booking.ID,
+		&tenantID,
 		&booking.UserID,
 		&booking.DogID,
 		&booking.Date,
@@ -498,6 +541,9 @@ func (r *BookingRepository) FindByIDWithDetails(id int) (*models.Booking, error)
 		return nil, fmt.Errorf("failed to find booking with details: %w", err)
 	}
 
+	if tenantID.Valid {
+		booking.TenantID = int(tenantID.Int64)
+	}
 	booking.Date = normalizeDate(booking.Date)
 
 	// Populate user details
@@ -530,9 +576,10 @@ func (r *BookingRepository) FindByIDWithDetails(id int) (*models.Booking, error)
 }
 
 // GetPendingApprovalBookings returns all bookings awaiting approval
-func (r *BookingRepository) GetPendingApprovalBookings() ([]*models.Booking, error) {
+// SaaS: Now includes tenant_id and supports tenant filtering (tenantID=0 for all tenants)
+func (r *BookingRepository) GetPendingApprovalBookings(tenantID int) ([]*models.Booking, error) {
 	query := `
-		SELECT b.id, b.user_id, b.dog_id, b.date, b.scheduled_time,
+		SELECT b.id, b.tenant_id, b.user_id, b.dog_id, b.date, b.scheduled_time,
 		       b.status, b.completed_at, b.user_notes, b.admin_cancellation_reason,
 		       b.created_at, b.updated_at,
 		       b.requires_approval, b.approval_status, b.approved_by, b.approved_at, b.rejection_reason,
@@ -542,10 +589,18 @@ func (r *BookingRepository) GetPendingApprovalBookings() ([]*models.Booking, err
 		JOIN users u ON b.user_id = u.id
 		JOIN dogs d ON b.dog_id = d.id
 		WHERE b.approval_status = 'pending'
-		ORDER BY b.date ASC, b.scheduled_time ASC
 	`
+	args := []interface{}{}
 
-	rows, err := r.db.Query(query)
+	// SaaS: Filter by tenant if specified
+	if tenantID > 0 {
+		query += " AND b.tenant_id = ?"
+		args = append(args, tenantID)
+	}
+
+	query += " ORDER BY b.date ASC, b.scheduled_time ASC"
+
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -558,6 +613,7 @@ func (r *BookingRepository) GetPendingApprovalBookings() ([]*models.Booking, err
 			Dog:  &models.Dog{},
 		}
 
+		var bookingTenantID sql.NullInt64
 		var completedAt, approvedAt sql.NullTime
 		var userNotes, adminCancellationReason, rejectionReason sql.NullString
 		var userEmail, userPhone sql.NullString
@@ -569,7 +625,7 @@ func (r *BookingRepository) GetPendingApprovalBookings() ([]*models.Booking, err
 		var age sql.NullInt64
 
 		err := rows.Scan(
-			&booking.ID, &booking.UserID, &booking.DogID,
+			&booking.ID, &bookingTenantID, &booking.UserID, &booking.DogID,
 			&booking.Date, &booking.ScheduledTime,
 			&booking.Status, &completedAt, &userNotes, &adminCancellationReason,
 			&booking.CreatedAt, &booking.UpdatedAt,
@@ -581,6 +637,9 @@ func (r *BookingRepository) GetPendingApprovalBookings() ([]*models.Booking, err
 			return nil, err
 		}
 
+		if bookingTenantID.Valid {
+			booking.TenantID = int(bookingTenantID.Int64)
+		}
 		booking.Date = normalizeDate(booking.Date)
 
 		// Convert nullable fields

@@ -63,7 +63,7 @@ func TestBlockedDateRepository_FindAll(t *testing.T) {
 	adminID := testutil.SeedTestUser(t, db, "admin@test.com", "Admin", "orange")
 
 	t.Run("empty list", func(t *testing.T) {
-		dates, err := repo.FindAll()
+		dates, err := repo.FindAll(0)
 		if err != nil {
 			t.Fatalf("FindAll() failed: %v", err)
 		}
@@ -77,7 +77,7 @@ func TestBlockedDateRepository_FindAll(t *testing.T) {
 		testutil.SeedTestBlockedDate(t, db, "2025-12-25", "Christmas", adminID)
 		testutil.SeedTestBlockedDate(t, db, "2025-12-26", "Boxing Day", adminID)
 
-		dates, err := repo.FindAll()
+		dates, err := repo.FindAll(0)
 		if err != nil {
 			t.Fatalf("FindAll() failed: %v", err)
 		}
@@ -99,7 +99,7 @@ func TestBlockedDateRepository_FindByDate(t *testing.T) {
 	testutil.SeedTestBlockedDate(t, db, testDate, "Christmas", adminID)
 
 	t.Run("date exists", func(t *testing.T) {
-		blockedDate, err := repo.FindByDate(testDate)
+		blockedDate, err := repo.FindByDate(testDate, 0)
 		if err != nil {
 			t.Fatalf("FindByDate() failed: %v", err)
 		}
@@ -115,14 +115,14 @@ func TestBlockedDateRepository_FindByDate(t *testing.T) {
 	})
 
 	t.Run("date not found", func(t *testing.T) {
-		blockedDate, _ := repo.FindByDate("2025-01-01")
+		blockedDate, _ := repo.FindByDate("2025-01-01", 0)
 		if blockedDate != nil {
 			t.Error("Expected nil for non-existent date")
 		}
 	})
 
 	t.Run("empty date string", func(t *testing.T) {
-		blockedDate, _ := repo.FindByDate("")
+		blockedDate, _ := repo.FindByDate("", 0)
 		if blockedDate != nil {
 			t.Error("Expected nil for empty date")
 		}
@@ -140,7 +140,7 @@ func TestBlockedDateRepository_IsBlocked(t *testing.T) {
 	testutil.SeedTestBlockedDate(t, db, blockedDate, "Christmas", adminID)
 
 	t.Run("date is blocked", func(t *testing.T) {
-		isBlocked, err := repo.IsBlocked(blockedDate)
+		isBlocked, err := repo.IsBlocked(blockedDate, 0)
 		if err != nil {
 			t.Fatalf("IsBlocked() failed: %v", err)
 		}
@@ -151,7 +151,7 @@ func TestBlockedDateRepository_IsBlocked(t *testing.T) {
 	})
 
 	t.Run("date is not blocked", func(t *testing.T) {
-		isBlocked, err := repo.IsBlocked("2025-01-01")
+		isBlocked, err := repo.IsBlocked("2025-01-01", 0)
 		if err != nil {
 			t.Fatalf("IsBlocked() failed: %v", err)
 		}
@@ -162,7 +162,7 @@ func TestBlockedDateRepository_IsBlocked(t *testing.T) {
 	})
 
 	t.Run("empty date", func(t *testing.T) {
-		isBlocked, err := repo.IsBlocked("")
+		isBlocked, err := repo.IsBlocked("", 0)
 		if err != nil {
 			t.Logf("IsBlocked('') returned error: %v", err)
 		}
@@ -189,7 +189,7 @@ func TestBlockedDateRepository_Delete(t *testing.T) {
 		}
 
 		// Verify deletion
-		isBlocked, _ := repo.IsBlocked("2025-12-25")
+		isBlocked, _ := repo.IsBlocked("2025-12-25", 0)
 		if isBlocked {
 			t.Error("Date should no longer be blocked after deletion")
 		}
@@ -310,7 +310,7 @@ func TestBlockedDateRepository_IsBlockedForDog(t *testing.T) {
 
 	t.Run("global block affects all dogs", func(t *testing.T) {
 		// Dog1 should be blocked on global date
-		isBlocked, err := repo.IsBlockedForDog(globalDate, dog1ID)
+		isBlocked, err := repo.IsBlockedForDog(globalDate, dog1ID, 0)
 		if err != nil {
 			t.Fatalf("IsBlockedForDog() failed: %v", err)
 		}
@@ -319,7 +319,7 @@ func TestBlockedDateRepository_IsBlockedForDog(t *testing.T) {
 		}
 
 		// Dog2 should also be blocked on global date
-		isBlocked, err = repo.IsBlockedForDog(globalDate, dog2ID)
+		isBlocked, err = repo.IsBlockedForDog(globalDate, dog2ID, 0)
 		if err != nil {
 			t.Fatalf("IsBlockedForDog() failed: %v", err)
 		}
@@ -330,7 +330,7 @@ func TestBlockedDateRepository_IsBlockedForDog(t *testing.T) {
 
 	t.Run("dog-specific block only affects that dog", func(t *testing.T) {
 		// Dog1 should be blocked on dog-specific date
-		isBlocked, err := repo.IsBlockedForDog(dogSpecificDate, dog1ID)
+		isBlocked, err := repo.IsBlockedForDog(dogSpecificDate, dog1ID, 0)
 		if err != nil {
 			t.Fatalf("IsBlockedForDog() failed: %v", err)
 		}
@@ -339,7 +339,7 @@ func TestBlockedDateRepository_IsBlockedForDog(t *testing.T) {
 		}
 
 		// Dog2 should NOT be blocked on dog1's specific date
-		isBlocked, err = repo.IsBlockedForDog(dogSpecificDate, dog2ID)
+		isBlocked, err = repo.IsBlockedForDog(dogSpecificDate, dog2ID, 0)
 		if err != nil {
 			t.Fatalf("IsBlockedForDog() failed: %v", err)
 		}
@@ -349,7 +349,7 @@ func TestBlockedDateRepository_IsBlockedForDog(t *testing.T) {
 	})
 
 	t.Run("unblocked date is not blocked", func(t *testing.T) {
-		isBlocked, err := repo.IsBlockedForDog("2025-12-30", dog1ID)
+		isBlocked, err := repo.IsBlockedForDog("2025-12-30", dog1ID, 0)
 		if err != nil {
 			t.Fatalf("IsBlockedForDog() failed: %v", err)
 		}
@@ -376,7 +376,7 @@ func TestBlockedDateRepository_GetBlockedDogsForDate(t *testing.T) {
 	testutil.SeedTestBlockedDateForDog(t, db, testDate, "Block dog2", adminID, dog2ID)
 
 	t.Run("returns blocked dog IDs", func(t *testing.T) {
-		globalBlock, blockedIDs, err := repo.GetBlockedDogsForDate(testDate)
+		globalBlock, blockedIDs, err := repo.GetBlockedDogsForDate(testDate, 0)
 		if err != nil {
 			t.Fatalf("GetBlockedDogsForDate() failed: %v", err)
 		}
@@ -412,7 +412,7 @@ func TestBlockedDateRepository_GetBlockedDogsForDate(t *testing.T) {
 	})
 
 	t.Run("returns empty list for unblocked date", func(t *testing.T) {
-		globalBlock, blockedIDs, err := repo.GetBlockedDogsForDate("2025-12-30")
+		globalBlock, blockedIDs, err := repo.GetBlockedDogsForDate("2025-12-30", 0)
 		if err != nil {
 			t.Fatalf("GetBlockedDogsForDate() failed: %v", err)
 		}
@@ -430,7 +430,7 @@ func TestBlockedDateRepository_GetBlockedDogsForDate(t *testing.T) {
 		globalDate := "2025-12-31"
 		testutil.SeedTestBlockedDate(t, db, globalDate, "New Year - Global", adminID)
 
-		globalBlock, _, err := repo.GetBlockedDogsForDate(globalDate)
+		globalBlock, _, err := repo.GetBlockedDogsForDate(globalDate, 0)
 		if err != nil {
 			t.Fatalf("GetBlockedDogsForDate() failed: %v", err)
 		}
@@ -454,7 +454,7 @@ func TestBlockedDateRepository_FindByDateAndDog(t *testing.T) {
 
 	t.Run("finds existing dog-specific block", func(t *testing.T) {
 		dogIDPtr := dogID
-		blocked, err := repo.FindByDateAndDog(testDate, &dogIDPtr)
+		blocked, err := repo.FindByDateAndDog(testDate, &dogIDPtr, 0)
 		if err != nil {
 			t.Fatalf("FindByDateAndDog() failed: %v", err)
 		}
@@ -475,7 +475,7 @@ func TestBlockedDateRepository_FindByDateAndDog(t *testing.T) {
 	t.Run("returns nil for non-blocked dog", func(t *testing.T) {
 		otherDogID := testutil.SeedTestDog(t, db, "Other", "Poodle", "green")
 		otherDogIDPtr := otherDogID
-		blocked, err := repo.FindByDateAndDog(testDate, &otherDogIDPtr)
+		blocked, err := repo.FindByDateAndDog(testDate, &otherDogIDPtr, 0)
 		if err != nil {
 			t.Fatalf("FindByDateAndDog() failed: %v", err)
 		}
@@ -487,7 +487,7 @@ func TestBlockedDateRepository_FindByDateAndDog(t *testing.T) {
 
 	t.Run("returns nil for non-blocked date", func(t *testing.T) {
 		dogIDPtr := dogID
-		blocked, err := repo.FindByDateAndDog("2025-12-30", &dogIDPtr)
+		blocked, err := repo.FindByDateAndDog("2025-12-30", &dogIDPtr, 0)
 		if err != nil {
 			t.Fatalf("FindByDateAndDog() failed: %v", err)
 		}
@@ -513,7 +513,7 @@ func TestBlockedDateRepository_FindAllWithDogInfo(t *testing.T) {
 	testutil.SeedTestBlockedDateForDog(t, db, "2025-12-26", "Vet for Buddy", adminID, dogID)
 
 	t.Run("returns both global and dog-specific blocks with dog info", func(t *testing.T) {
-		dates, err := repo.FindAll()
+		dates, err := repo.FindAll(0)
 		if err != nil {
 			t.Fatalf("FindAll() failed: %v", err)
 		}

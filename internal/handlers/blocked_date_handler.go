@@ -47,7 +47,10 @@ func NewBlockedDateHandler(db *sql.DB, cfg *config.Config) *BlockedDateHandler {
 
 // ListBlockedDates lists all blocked dates
 func (h *BlockedDateHandler) ListBlockedDates(w http.ResponseWriter, r *http.Request) {
-	blockedDates, err := h.blockedDateRepo.FindAll()
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	blockedDates, err := h.blockedDateRepo.FindAll(tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get blocked dates")
 		return
@@ -61,6 +64,8 @@ func (h *BlockedDateHandler) ListBlockedDates(w http.ResponseWriter, r *http.Req
 func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Request) {
 	// Get admin user ID from context
 	userID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Parse request
 	var req models.CreateBlockedDateRequest
@@ -92,6 +97,7 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
 
 	// Create blocked date
 	blockedDate := &models.BlockedDate{
+		TenantID:  tenantID, // SaaS: Set tenant ID
 		Date:      req.Date,
 		DogID:     req.DogID,
 		Reason:    req.Reason,
@@ -111,6 +117,7 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
 	// Find bookings to cancel based on block type
 	status := "scheduled"
 	filter := &models.BookingFilterRequest{
+		TenantID: &tenantID, // SaaS: Filter by tenant
 		DateFrom: &req.Date,
 		DateTo:   &req.Date,
 		Status:   &status,

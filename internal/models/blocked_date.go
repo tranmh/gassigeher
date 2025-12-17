@@ -7,9 +7,10 @@ import "time"
 // If DogID is set, the block applies only to that specific dog
 type BlockedDate struct {
 	ID        int       `json:"id"`
-	Date      string    `json:"date"`                    // YYYY-MM-DD format
-	DogID     *int      `json:"dog_id"`                  // NULL = all dogs, specific ID = that dog only
-	DogName   *string   `json:"dog_name,omitempty"`      // Populated via JOIN for display
+	TenantID  int       `json:"tenant_id,omitempty"` // SaaS: Tenant this blocked date belongs to
+	Date      string    `json:"date"`                // YYYY-MM-DD format
+	DogID     *int      `json:"dog_id"`              // NULL = all dogs, specific ID = that dog only
+	DogName   *string   `json:"dog_name,omitempty"`  // Populated via JOIN for display
 	Reason    string    `json:"reason"`
 	CreatedBy int       `json:"created_by"`
 	CreatedAt time.Time `json:"created_at"`

@@ -5,6 +5,7 @@ import "time"
 // Booking represents a dog walking booking
 type Booking struct {
 	ID                      int        `json:"id"`
+	TenantID                int        `json:"tenant_id,omitempty"` // SaaS: Tenant this booking belongs to
 	UserID                  int        `json:"user_id"`
 	DogID                   int        `json:"dog_id"`
 	Date                    string     `json:"date"` // YYYY-MM-DD format
@@ -80,6 +81,7 @@ func (r *MoveBookingRequest) Validate() error {
 
 // BookingFilterRequest represents filters for listing bookings
 type BookingFilterRequest struct {
+	TenantID *int    `json:"tenant_id,omitempty"` // SaaS: Filter by tenant
 	UserID   *int    `json:"user_id,omitempty"`
 	DogID    *int    `json:"dog_id,omitempty"`
 	DateFrom *string `json:"date_from,omitempty"`

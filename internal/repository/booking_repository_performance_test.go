@@ -252,7 +252,7 @@ func TestConcurrentApprovalUpdates(t *testing.T) {
 	approvedCount := 0
 	var mu sync.Mutex
 
-	bookings, err := bookingRepo.GetPendingApprovalBookings()
+	bookings, err := bookingRepo.GetPendingApprovalBookings(0)
 	if err != nil {
 		t.Fatalf("Failed to get pending approval bookings: %v", err)
 	}
@@ -387,7 +387,7 @@ func TestBookingCreation_RaceConditions(t *testing.T) {
 			case 1: // Read
 				_, _ = bookingRepo.GetUpcoming(1, 10)
 			case 2: // GetPending
-				_, _ = bookingRepo.GetPendingApprovalBookings()
+				_, _ = bookingRepo.GetPendingApprovalBookings(0)
 			}
 		}(i)
 	}

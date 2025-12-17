@@ -1102,7 +1102,7 @@ func TestGetPendingApprovalBookings_QueryFiltering(t *testing.T) {
 		}
 
 		// Get pending approvals
-		pending, err := repo.GetPendingApprovalBookings()
+		pending, err := repo.GetPendingApprovalBookings(0)
 		if err != nil {
 			t.Fatalf("GetPendingApprovalBookings failed: %v", err)
 		}
@@ -1141,7 +1141,7 @@ func TestGetPendingApprovalBookings_QueryFiltering(t *testing.T) {
 			}
 		}
 
-		pending, err := repo2.GetPendingApprovalBookings()
+		pending, err := repo2.GetPendingApprovalBookings(0)
 		if err != nil {
 			t.Fatalf("GetPendingApprovalBookings failed: %v", err)
 		}
@@ -1182,7 +1182,7 @@ func TestGetPendingApprovalBookings_QueryFiltering(t *testing.T) {
 			t.Fatalf("Failed to create rejected booking: %v", err)
 		}
 
-		pending, err := repo3.GetPendingApprovalBookings()
+		pending, err := repo3.GetPendingApprovalBookings(0)
 		if err != nil {
 			t.Fatalf("GetPendingApprovalBookings failed: %v", err)
 		}
