@@ -111,6 +111,21 @@ func SetupTestDBWithType(t *testing.T, dbType string) *sql.DB {
 		t.Fatalf("Failed to run migrations on %s: %v", dbType, err)
 	}
 
+	// Create a test tenant with id=1 for all tests
+	_, err = db.Exec(`
+		INSERT INTO tenants (id, slug, name, status, contact_email, federal_state, created_at, updated_at)
+		VALUES (1, 'test-tenant', 'Test Tenant', 'active', 'test@example.com', 'BW', datetime('now'), datetime('now'))
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create test tenant: %v", err)
+	}
+
+	// Update all default seed data to belong to test tenant
+	// This updates the default data inserted by migration 002 which has tenant_id = NULL
+	_, _ = db.Exec(`UPDATE color_categories SET tenant_id = 1 WHERE tenant_id IS NULL`)
+	_, _ = db.Exec(`UPDATE booking_time_rules SET tenant_id = 1 WHERE tenant_id IS NULL`)
+	_, _ = db.Exec(`UPDATE system_settings SET tenant_id = 1 WHERE tenant_id IS NULL`)
+
 	// Cleanup after test
 	t.Cleanup(func() {
 		db.Close()
@@ -163,8 +178,8 @@ func SeedTestUser(t *testing.T, db *sql.DB, email, name, level string) int {
 	}
 
 	result, err := db.Exec(`
-		INSERT INTO users (email, first_name, last_name, phone, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
-		VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?, ?)
+		INSERT INTO users (tenant_id, email, first_name, last_name, phone, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
+		VALUES (1, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?)
 	`, email, firstName, lastName, "+49 123 456789", "test_hash", now, now, now)
 
 	if err != nil {
@@ -186,7 +201,7 @@ func SeedTestUser(t *testing.T, db *sql.DB, email, name, level string) int {
 	}
 
 	for _, colorID := range colors {
-		_, err := db.Exec(`INSERT INTO user_colors (user_id, color_id) VALUES (?, ?)`, userID, colorID)
+		_, err := db.Exec(`INSERT INTO user_colors (tenant_id, user_id, color_id) VALUES (1, ?, ?)`, userID, colorID)
 		if err != nil {
 			// Color might not exist in test DB - that's ok for some tests
 			// Just log but don't fail
@@ -213,8 +228,8 @@ func SeedTestUserWithoutColors(t *testing.T, db *sql.DB, email, name, level stri
 	}
 
 	result, err := db.Exec(`
-		INSERT INTO users (email, first_name, last_name, phone, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
-		VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?, ?)
+		INSERT INTO users (tenant_id, email, first_name, last_name, phone, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
+		VALUES (1, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?)
 	`, email, firstName, lastName, "+49 123 456789", "test_hash", now, now, now)
 
 	if err != nil {
@@ -278,8 +293,8 @@ func SeedTestDog(t *testing.T, db *sql.DB, name, breed, category string) int {
 	}
 
 	result, err := db.Exec(`
-		INSERT INTO dogs (name, breed, size, age, color_id, is_available, created_at)
-		VALUES (?, ?, ?, ?, ?, 1, ?)
+		INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at)
+		VALUES (1, ?, ?, ?, ?, ?, 1, ?)
 	`, name, breed, "medium", 5, colorID, now)
 
 	if err != nil {
@@ -294,8 +309,8 @@ func SeedTestDog(t *testing.T, db *sql.DB, name, breed, category string) int {
 func SeedTestBooking(t *testing.T, db *sql.DB, userID, dogID int, date, scheduledTime, status string) int {
 	now := time.Now()
 	result, err := db.Exec(`
-		INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at)
+		VALUES (1, ?, ?, ?, ?, ?, ?)
 	`, userID, dogID, date, scheduledTime, status, now)
 
 	if err != nil {
@@ -310,8 +325,8 @@ func SeedTestBooking(t *testing.T, db *sql.DB, userID, dogID int, date, schedule
 func SeedTestBlockedDate(t *testing.T, db *sql.DB, date, reason string, createdBy int) int {
 	now := time.Now()
 	result, err := db.Exec(`
-		INSERT INTO blocked_dates (date, reason, created_by, created_at)
-		VALUES (?, ?, ?, ?)
+		INSERT INTO blocked_dates (tenant_id, date, reason, created_by, created_at)
+		VALUES (1, ?, ?, ?, ?)
 	`, date, reason, createdBy, now)
 
 	if err != nil {
@@ -326,8 +341,8 @@ func SeedTestBlockedDate(t *testing.T, db *sql.DB, date, reason string, createdB
 func SeedTestBlockedDateForDog(t *testing.T, db *sql.DB, date, reason string, createdBy int, dogID int) int {
 	now := time.Now()
 	result, err := db.Exec(`
-		INSERT INTO blocked_dates (date, reason, created_by, dog_id, created_at)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO blocked_dates (tenant_id, date, reason, created_by, dog_id, created_at)
+		VALUES (1, ?, ?, ?, ?, ?)
 	`, date, reason, createdBy, dogID, now)
 
 	if err != nil {
@@ -342,8 +357,8 @@ func SeedTestBlockedDateForDog(t *testing.T, db *sql.DB, date, reason string, cr
 func SeedTestExperienceRequest(t *testing.T, db *sql.DB, userID int, requestedLevel, status string) int {
 	now := time.Now()
 	result, err := db.Exec(`
-		INSERT INTO experience_requests (user_id, requested_level, status, created_at)
-		VALUES (?, ?, ?, ?)
+		INSERT INTO experience_requests (tenant_id, user_id, requested_level, status, created_at)
+		VALUES (1, ?, ?, ?, ?)
 	`, userID, requestedLevel, status, now)
 
 	if err != nil {
@@ -358,8 +373,8 @@ func SeedTestExperienceRequest(t *testing.T, db *sql.DB, userID int, requestedLe
 func SeedTestWalkReport(t *testing.T, db *sql.DB, bookingID int, behaviorRating int, energyLevel, notes string) int {
 	now := time.Now()
 	result, err := db.Exec(`
-		INSERT INTO walk_reports (booking_id, behavior_rating, energy_level, notes, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO walk_reports (tenant_id, booking_id, behavior_rating, energy_level, notes, created_at, updated_at)
+		VALUES (1, ?, ?, ?, ?, ?, ?)
 	`, bookingID, behaviorRating, energyLevel, notes, now, now)
 
 	if err != nil {
@@ -374,8 +389,8 @@ func SeedTestWalkReport(t *testing.T, db *sql.DB, bookingID int, behaviorRating 
 func SeedTestColorCategory(t *testing.T, db *sql.DB, name, hexCode string, sortOrder int) int {
 	now := time.Now()
 	result, err := db.Exec(`
-		INSERT INTO color_categories (name, hex_code, pattern_icon, sort_order, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO color_categories (tenant_id, name, hex_code, pattern_icon, sort_order, created_at, updated_at)
+		VALUES (1, ?, ?, ?, ?, ?, ?)
 	`, name, hexCode, "circle", sortOrder, now, now)
 
 	if err != nil {
@@ -390,8 +405,8 @@ func SeedTestColorCategory(t *testing.T, db *sql.DB, name, hexCode string, sortO
 func SeedTestUserColor(t *testing.T, db *sql.DB, userID, colorID int) {
 	now := time.Now()
 	_, err := db.Exec(`
-		INSERT INTO user_colors (user_id, color_id, granted_at)
-		VALUES (?, ?, ?)
+		INSERT INTO user_colors (tenant_id, user_id, color_id, granted_at)
+		VALUES (1, ?, ?, ?)
 	`, userID, colorID, now)
 
 	if err != nil {
@@ -403,8 +418,8 @@ func SeedTestUserColor(t *testing.T, db *sql.DB, userID, colorID int) {
 func SeedTestColorRequest(t *testing.T, db *sql.DB, userID, colorID int, status string) int {
 	now := time.Now()
 	result, err := db.Exec(`
-		INSERT INTO color_requests (user_id, color_id, status, created_at)
-		VALUES (?, ?, ?, ?)
+		INSERT INTO color_requests (tenant_id, user_id, color_id, status, created_at)
+		VALUES (1, ?, ?, ?, ?)
 	`, userID, colorID, status, now)
 
 	if err != nil {
@@ -413,6 +428,33 @@ func SeedTestColorRequest(t *testing.T, db *sql.DB, userID, colorID int, status 
 
 	id, _ := result.LastInsertId()
 	return int(id)
+}
+
+// SeedTestDogCustom creates a test dog with custom parameters and returns the ID
+// colorID should be a valid color ID from color_categories table
+func SeedTestDogCustom(t *testing.T, db *sql.DB, name, breed, size string, age int, colorID int) int {
+	now := time.Now()
+	result, err := db.Exec(`
+		INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at, updated_at)
+		VALUES (1, ?, ?, ?, ?, ?, 1, ?, ?)
+	`, name, breed, size, age, colorID, now, now)
+
+	if err != nil {
+		t.Fatalf("Failed to seed test dog: %v", err)
+	}
+
+	id, _ := result.LastInsertId()
+	return int(id)
+}
+
+// SeedUserColor is an alias for SeedTestUserColor for backward compatibility
+func SeedUserColor(t *testing.T, db *sql.DB, userID, colorID int) {
+	SeedTestUserColor(t, db, userID, colorID)
+}
+
+// GetFutureDate returns a date string N days in the future
+func GetFutureDate(daysFromNow int) string {
+	return time.Now().AddDate(0, 0, daysFromNow).Format("2006-01-02")
 }
 
 // DONE: CountRows returns the count of rows in a table

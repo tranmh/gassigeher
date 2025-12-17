@@ -258,6 +258,15 @@ func TestUniqueConstraints(t *testing.T) {
 		t.Fatalf("Migration failed: %v", err)
 	}
 
+	// Create a test tenant for foreign key constraints
+	_, err = db.Exec(`
+		INSERT INTO tenants (id, slug, name, status, contact_email, federal_state, created_at, updated_at)
+		VALUES (1, 'test-tenant', 'Test Tenant', 'active', 'test@example.com', 'BW', datetime('now'), datetime('now'))
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create test tenant: %v", err)
+	}
+
 	bookingTimeRepo := repository.NewBookingTimeRepository(db)
 	holidayRepo := repository.NewHolidayRepository(db)
 
@@ -362,6 +371,15 @@ func TestIndexEffectiveness(t *testing.T) {
 	err = RunMigrationsWithDialect(db, dialect)
 	if err != nil {
 		t.Fatalf("Migration failed: %v", err)
+	}
+
+	// Create a test tenant for foreign key constraints
+	_, err = db.Exec(`
+		INSERT INTO tenants (id, slug, name, status, contact_email, federal_state, created_at, updated_at)
+		VALUES (1, 'test-tenant', 'Test Tenant', 'active', 'test@example.com', 'BW', datetime('now'), datetime('now'))
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create test tenant: %v", err)
 	}
 
 	holidayRepo := repository.NewHolidayRepository(db)

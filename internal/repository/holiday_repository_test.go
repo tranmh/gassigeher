@@ -7,54 +7,13 @@ import (
 	"time"
 
 	"github.com/tranmh/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/testutil"
 	_ "modernc.org/sqlite"
 )
 
-// setupTestDBForHolidays creates a test database with custom_holidays and feiertage_cache tables
+// setupTestDBForHolidays creates a test database using standard testutil
 func setupTestDBForHolidays(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("Failed to open test database: %v", err)
-	}
-
-	// Create custom_holidays table
-	createHolidaysSQL := `
-	CREATE TABLE IF NOT EXISTS custom_holidays (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		date TEXT NOT NULL UNIQUE,
-		name TEXT NOT NULL,
-		is_active INTEGER DEFAULT 1,
-		source TEXT DEFAULT 'admin',
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		created_by INTEGER,
-		FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
-	);
-	`
-
-	// Create feiertage_cache table
-	createCacheSQL := `
-	CREATE TABLE IF NOT EXISTS feiertage_cache (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		year INTEGER NOT NULL,
-		state TEXT NOT NULL,
-		data TEXT NOT NULL,
-		fetched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		expires_at DATETIME NOT NULL,
-		UNIQUE(year, state)
-	);
-	`
-
-	_, err = db.Exec(createHolidaysSQL)
-	if err != nil {
-		t.Fatalf("Failed to create custom_holidays table: %v", err)
-	}
-
-	_, err = db.Exec(createCacheSQL)
-	if err != nil {
-		t.Fatalf("Failed to create feiertage_cache table: %v", err)
-	}
-
-	return db
+	return testutil.SetupTestDB(t)
 }
 
 // seedHolidays seeds the database with test holiday data
@@ -77,8 +36,8 @@ func seedHolidays(t *testing.T, db *sql.DB) {
 
 	for _, h := range holidays {
 		_, err := db.Exec(`
-			INSERT INTO custom_holidays (date, name, is_active, source)
-			VALUES (?, ?, ?, ?)
+			INSERT INTO custom_holidays (tenant_id, date, name, is_active, source)
+			VALUES (1, ?, ?, ?, ?)
 		`, h.date, h.name, h.isActive, h.source)
 		if err != nil {
 			t.Fatalf("Failed to seed holiday %s: %v", h.name, err)
@@ -107,7 +66,7 @@ func TestIsHoliday_KnownHoliday(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.date, func(t *testing.T) {
-			isHoliday, err := repo.IsHoliday(tc.date)
+			isHoliday, err := repo.IsHoliday(1, tc.date) // tenantID = 1
 			if err != nil {
 				t.Fatalf("IsHoliday failed: %v", err)
 			}
@@ -127,8 +86,8 @@ func TestIsHoliday_Performance(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		date := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, i).Format("2006-01-02")
 		_, err := db.Exec(`
-			INSERT INTO custom_holidays (date, name, is_active, source)
-			VALUES (?, ?, 1, 'test')
+			INSERT INTO custom_holidays (tenant_id, date, name, is_active, source)
+			VALUES (1, ?, ?, 1, 'test')
 		`, date, fmt.Sprintf("Holiday %d", i))
 		if err != nil {
 			t.Fatalf("Failed to insert holiday: %v", err)
@@ -140,7 +99,7 @@ func TestIsHoliday_Performance(t *testing.T) {
 	// Benchmark lookup
 	start := time.Now()
 	for i := 0; i < 1000; i++ {
-		_, err := repo.IsHoliday("2025-06-15")
+		_, err := repo.IsHoliday(1, "2025-06-15") // tenantID = 1
 		if err != nil {
 			t.Fatalf("IsHoliday failed: %v", err)
 		}
@@ -167,7 +126,7 @@ func TestCreateHoliday_UniqueDate(t *testing.T) {
 		Source:   "admin",
 	}
 
-	err := repo.CreateHoliday(holiday)
+	err := repo.CreateHoliday(1, holiday) // tenantID = 1
 	if err != nil {
 		t.Fatalf("CreateHoliday failed: %v", err)
 	}
@@ -178,7 +137,7 @@ func TestCreateHoliday_UniqueDate(t *testing.T) {
 	}
 
 	// Verify holiday created
-	isHoliday, err := repo.IsHoliday("2025-07-01")
+	isHoliday, err := repo.IsHoliday(1, "2025-07-01") // tenantID = 1
 	if err != nil {
 		t.Fatalf("IsHoliday failed: %v", err)
 	}
@@ -203,7 +162,7 @@ func TestCreateHoliday_DuplicateDate(t *testing.T) {
 		Source:   "admin",
 	}
 
-	err := repo.CreateHoliday(holiday)
+	err := repo.CreateHoliday(1, holiday) // tenantID = 1
 	if err == nil {
 		t.Error("Expected error for duplicate date, got nil")
 	}
@@ -345,7 +304,7 @@ func TestGetHolidaysByYear_2025(t *testing.T) {
 	seedHolidays(t, db)
 	repo := NewHolidayRepository(db)
 
-	holidays, err := repo.GetHolidaysByYear(2025)
+	holidays, err := repo.GetHolidaysByYear(1, 2025) // tenantID = 1
 	if err != nil {
 		t.Fatalf("GetHolidaysByYear failed: %v", err)
 	}
@@ -385,7 +344,7 @@ func TestGetHolidaysByYear_2026_Empty(t *testing.T) {
 	seedHolidays(t, db)
 	repo := NewHolidayRepository(db)
 
-	holidays, err := repo.GetHolidaysByYear(2026)
+	holidays, err := repo.GetHolidaysByYear(1, 2026) // tenantID = 1
 	if err != nil {
 		t.Fatalf("GetHolidaysByYear failed: %v", err)
 	}
@@ -404,7 +363,7 @@ func TestUpdateHoliday_ToggleActive(t *testing.T) {
 	repo := NewHolidayRepository(db)
 
 	// Get first holiday
-	holidays, _ := repo.GetHolidaysByYear(2025)
+	holidays, _ := repo.GetHolidaysByYear(1, 2025) // tenantID = 1
 	if len(holidays) == 0 {
 		t.Fatal("No holidays found")
 	}
@@ -417,13 +376,13 @@ func TestUpdateHoliday_ToggleActive(t *testing.T) {
 		IsActive: false, // Toggle to false
 	}
 
-	err := repo.UpdateHoliday(originalHoliday.ID, updatedHoliday)
+	err := repo.UpdateHoliday(1, originalHoliday.ID, updatedHoliday) // tenantID = 1
 	if err != nil {
 		t.Fatalf("UpdateHoliday failed: %v", err)
 	}
 
 	// Verify update
-	isHoliday, _ := repo.IsHoliday(originalHoliday.Date)
+	isHoliday, _ := repo.IsHoliday(1, originalHoliday.Date) // tenantID = 1
 	if isHoliday {
 		t.Error("Expected holiday to be inactive (not found by IsHoliday)")
 	}
@@ -437,7 +396,7 @@ func TestUpdateHoliday_ChangeName(t *testing.T) {
 	repo := NewHolidayRepository(db)
 
 	// Get first holiday
-	holidays, _ := repo.GetHolidaysByYear(2025)
+	holidays, _ := repo.GetHolidaysByYear(1, 2025) // tenantID = 1
 	if len(holidays) == 0 {
 		t.Fatal("No holidays found")
 	}
@@ -450,13 +409,13 @@ func TestUpdateHoliday_ChangeName(t *testing.T) {
 		IsActive: originalHoliday.IsActive,
 	}
 
-	err := repo.UpdateHoliday(originalHoliday.ID, updatedHoliday)
+	err := repo.UpdateHoliday(1, originalHoliday.ID, updatedHoliday) // tenantID = 1
 	if err != nil {
 		t.Fatalf("UpdateHoliday failed: %v", err)
 	}
 
 	// Verify update
-	holidays, _ = repo.GetHolidaysByYear(2025)
+	holidays, _ = repo.GetHolidaysByYear(1, 2025) // tenantID = 1
 	found := false
 	for _, h := range holidays {
 		if h.ID == originalHoliday.ID {
@@ -481,7 +440,7 @@ func TestDeleteHoliday_ExistingHoliday(t *testing.T) {
 	repo := NewHolidayRepository(db)
 
 	// Get count before delete
-	holidaysBefore, _ := repo.GetHolidaysByYear(2025)
+	holidaysBefore, _ := repo.GetHolidaysByYear(1, 2025) // tenantID = 1
 	countBefore := len(holidaysBefore)
 
 	if countBefore == 0 {
@@ -489,13 +448,13 @@ func TestDeleteHoliday_ExistingHoliday(t *testing.T) {
 	}
 
 	// Delete first holiday
-	err := repo.DeleteHoliday(holidaysBefore[0].ID)
+	err := repo.DeleteHoliday(1, holidaysBefore[0].ID) // tenantID = 1
 	if err != nil {
 		t.Fatalf("DeleteHoliday failed: %v", err)
 	}
 
 	// Verify deletion
-	holidaysAfter, _ := repo.GetHolidaysByYear(2025)
+	holidaysAfter, _ := repo.GetHolidaysByYear(1, 2025) // tenantID = 1
 	countAfter := len(holidaysAfter)
 
 	if countAfter != countBefore-1 {
@@ -503,7 +462,7 @@ func TestDeleteHoliday_ExistingHoliday(t *testing.T) {
 	}
 
 	// Verify holiday no longer exists
-	isHoliday, _ := repo.IsHoliday(holidaysBefore[0].Date)
+	isHoliday, _ := repo.IsHoliday(1, holidaysBefore[0].Date) // tenantID = 1
 	if isHoliday {
 		t.Error("Deleted holiday still exists")
 	}
@@ -517,13 +476,13 @@ func TestDeleteHoliday_NonExistentID(t *testing.T) {
 	repo := NewHolidayRepository(db)
 
 	// Delete non-existent holiday
-	err := repo.DeleteHoliday(9999)
+	err := repo.DeleteHoliday(1, 9999) // tenantID = 1
 	if err != nil {
 		t.Fatalf("DeleteHoliday with non-existent ID should not error, got: %v", err)
 	}
 
 	// Verify count unchanged
-	holidays, _ := repo.GetHolidaysByYear(2025)
+	holidays, _ := repo.GetHolidaysByYear(1, 2025) // tenantID = 1
 	if len(holidays) != 7 {
 		t.Errorf("Expected 7 holidays (unchanged), got %d", len(holidays))
 	}
@@ -574,25 +533,27 @@ func BenchmarkIsHoliday(b *testing.B) {
 	}
 	defer db.Close()
 
-	// Create tables with indexes
+	// Create tables with indexes (tenant-aware)
 	_, _ = db.Exec(`
 		CREATE TABLE IF NOT EXISTS custom_holidays (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			date TEXT NOT NULL UNIQUE,
+			tenant_id INTEGER NOT NULL DEFAULT 1,
+			date TEXT NOT NULL,
 			name TEXT NOT NULL,
 			is_active INTEGER DEFAULT 1,
 			source TEXT DEFAULT 'admin',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			created_by INTEGER
+			created_by INTEGER,
+			UNIQUE(tenant_id, date)
 		);
-		CREATE INDEX IF NOT EXISTS idx_custom_holidays_date ON custom_holidays(date);
+		CREATE INDEX IF NOT EXISTS idx_custom_holidays_tenant_date ON custom_holidays(tenant_id, date);
 		CREATE INDEX IF NOT EXISTS idx_custom_holidays_active ON custom_holidays(is_active);
 	`)
 
 	// Insert 1000 holidays
 	for i := 0; i < 1000; i++ {
 		date := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, i).Format("2006-01-02")
-		_, _ = db.Exec(`INSERT INTO custom_holidays (date, name, is_active, source) VALUES (?, ?, 1, 'test')`,
+		_, _ = db.Exec(`INSERT INTO custom_holidays (tenant_id, date, name, is_active, source) VALUES (1, ?, ?, 1, 'test')`,
 			date, fmt.Sprintf("Holiday %d", i))
 	}
 
@@ -600,7 +561,7 @@ func BenchmarkIsHoliday(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = repo.IsHoliday("2025-06-15")
+		_, _ = repo.IsHoliday(1, "2025-06-15") // tenantID = 1
 	}
 }
 
@@ -612,25 +573,27 @@ func BenchmarkIsHoliday_LargeDataset(b *testing.B) {
 	}
 	defer db.Close()
 
-	// Create tables with indexes
+	// Create tables with indexes (tenant-aware)
 	_, _ = db.Exec(`
 		CREATE TABLE IF NOT EXISTS custom_holidays (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			date TEXT NOT NULL UNIQUE,
+			tenant_id INTEGER NOT NULL DEFAULT 1,
+			date TEXT NOT NULL,
 			name TEXT NOT NULL,
 			is_active INTEGER DEFAULT 1,
 			source TEXT DEFAULT 'admin',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			created_by INTEGER
+			created_by INTEGER,
+			UNIQUE(tenant_id, date)
 		);
-		CREATE INDEX IF NOT EXISTS idx_custom_holidays_date ON custom_holidays(date);
+		CREATE INDEX IF NOT EXISTS idx_custom_holidays_tenant_date ON custom_holidays(tenant_id, date);
 		CREATE INDEX IF NOT EXISTS idx_custom_holidays_active ON custom_holidays(is_active);
 	`)
 
 	// Insert 10,000 holidays for stress test
 	for i := 0; i < 10000; i++ {
 		date := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, i).Format("2006-01-02")
-		_, _ = db.Exec(`INSERT INTO custom_holidays (date, name, is_active, source) VALUES (?, ?, 1, 'test')`,
+		_, _ = db.Exec(`INSERT INTO custom_holidays (tenant_id, date, name, is_active, source) VALUES (1, ?, ?, 1, 'test')`,
 			date, fmt.Sprintf("Holiday %d", i))
 	}
 
@@ -638,7 +601,7 @@ func BenchmarkIsHoliday_LargeDataset(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = repo.IsHoliday("2030-06-15")
+		_, _ = repo.IsHoliday(1, "2030-06-15") // tenantID = 1
 	}
 }
 
@@ -650,18 +613,20 @@ func BenchmarkGetHolidaysByYear(b *testing.B) {
 	}
 	defer db.Close()
 
-	// Create tables
+	// Create tables (tenant-aware)
 	_, _ = db.Exec(`
 		CREATE TABLE IF NOT EXISTS custom_holidays (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			date TEXT NOT NULL UNIQUE,
+			tenant_id INTEGER NOT NULL DEFAULT 1,
+			date TEXT NOT NULL,
 			name TEXT NOT NULL,
 			is_active INTEGER DEFAULT 1,
 			source TEXT DEFAULT 'admin',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			created_by INTEGER
+			created_by INTEGER,
+			UNIQUE(tenant_id, date)
 		);
-		CREATE INDEX IF NOT EXISTS idx_custom_holidays_date ON custom_holidays(date);
+		CREATE INDEX IF NOT EXISTS idx_custom_holidays_tenant_date ON custom_holidays(tenant_id, date);
 		CREATE INDEX IF NOT EXISTS idx_custom_holidays_active ON custom_holidays(is_active);
 	`)
 
@@ -669,7 +634,7 @@ func BenchmarkGetHolidaysByYear(b *testing.B) {
 	for year := 2025; year <= 2030; year++ {
 		for i := 0; i < 20; i++ {
 			date := time.Date(year, time.Month(i%12+1), (i%28)+1, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
-			_, _ = db.Exec(`INSERT INTO custom_holidays (date, name, is_active, source) VALUES (?, ?, 1, 'test')`,
+			_, _ = db.Exec(`INSERT INTO custom_holidays (tenant_id, date, name, is_active, source) VALUES (1, ?, ?, 1, 'test')`,
 				date, fmt.Sprintf("Holiday %d", i))
 		}
 	}
@@ -678,7 +643,7 @@ func BenchmarkGetHolidaysByYear(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = repo.GetHolidaysByYear(2027)
+		_, _ = repo.GetHolidaysByYear(1, 2027) // tenantID = 1
 	}
 }
 

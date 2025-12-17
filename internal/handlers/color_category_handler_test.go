@@ -21,6 +21,7 @@ func colorCtxSuperAdmin(ctx context.Context, userID int, email string) context.C
 	ctx = context.WithValue(ctx, middleware.EmailKey, email)
 	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
 	ctx = context.WithValue(ctx, middleware.IsSuperAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.TenantIDKey, 1) // Use test tenant
 	return ctx
 }
 
@@ -30,6 +31,7 @@ func colorCtxAdmin(ctx context.Context, userID int, email string) context.Contex
 	ctx = context.WithValue(ctx, middleware.EmailKey, email)
 	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
 	ctx = context.WithValue(ctx, middleware.IsSuperAdminKey, false)
+	ctx = context.WithValue(ctx, middleware.TenantIDKey, 1) // Use test tenant
 	return ctx
 }
 
@@ -44,6 +46,8 @@ func TestColorCategoryHandler_ListColors(t *testing.T) {
 
 	t.Run("returns all colors - public endpoint", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/colors", nil)
+		ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 1) // Use test tenant
+		req = req.WithContext(ctx)
 		rec := httptest.NewRecorder()
 
 		handler.ListColors(rec, req)
@@ -210,8 +214,8 @@ func TestColorCategoryHandler_DeleteColor(t *testing.T) {
 		colorID := testutil.SeedTestColorCategory(t, db, "has-dogs", "#444444", 300)
 
 		// Create a dog with this color
-		_, err := db.Exec(`INSERT INTO dogs (name, breed, size, age, color_id, is_available, created_at)
-			VALUES (?, ?, ?, ?, ?, 1, datetime('now'))`, "TestDog", "Mix", "medium", 3, colorID)
+		_, err := db.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at)
+			VALUES (1, ?, ?, ?, ?, ?, 1, datetime('now'))`, "TestDog", "Mix", "medium", 3, colorID)
 		if err != nil {
 			t.Fatalf("Failed to create test dog: %v", err)
 		}

@@ -22,7 +22,7 @@ func TestColorRequestRepository_Create(t *testing.T) {
 			Status:  "pending",
 		}
 
-		err := repo.Create(req)
+		err := repo.Create(1, req) // tenantID = 1
 		if err != nil {
 			t.Fatalf("Create() failed: %v", err)
 		}
@@ -43,7 +43,7 @@ func TestColorRequestRepository_FindByID(t *testing.T) {
 		colorID := testutil.SeedTestColorCategory(t, db, "find-color", "#aabbcc", 20)
 		reqID := testutil.SeedTestColorRequest(t, db, userID, colorID, "pending")
 
-		request, err := repo.FindByID(reqID)
+		request, err := repo.FindByID(1, reqID) // tenantID = 1
 		if err != nil {
 			t.Fatalf("FindByID() failed: %v", err)
 		}
@@ -62,7 +62,7 @@ func TestColorRequestRepository_FindByID(t *testing.T) {
 	})
 
 	t.Run("request not found", func(t *testing.T) {
-		request, _ := repo.FindByID(99999)
+		request, _ := repo.FindByID(1, 99999) // tenantID = 1
 		if request != nil {
 			t.Error("Expected nil for non-existent ID")
 		}
@@ -87,7 +87,7 @@ func TestColorRequestRepository_FindByUserID(t *testing.T) {
 	testutil.SeedTestColorRequest(t, db, user2ID, color1ID, "pending")
 
 	t.Run("user has multiple requests", func(t *testing.T) {
-		requests, err := repo.FindByUserID(user1ID)
+		requests, err := repo.FindByUserID(1, user1ID) // tenantID = 1
 		if err != nil {
 			t.Fatalf("FindByUserID() failed: %v", err)
 		}
@@ -100,7 +100,7 @@ func TestColorRequestRepository_FindByUserID(t *testing.T) {
 	t.Run("user has no requests", func(t *testing.T) {
 		user3ID := testutil.SeedTestUser(t, db, "user5@test.com", "User 5", "green")
 
-		requests, err := repo.FindByUserID(user3ID)
+		requests, err := repo.FindByUserID(1, user3ID) // tenantID = 1
 		if err != nil {
 			t.Fatalf("FindByUserID() failed: %v", err)
 		}
@@ -128,7 +128,7 @@ func TestColorRequestRepository_FindAllPending(t *testing.T) {
 	testutil.SeedTestColorRequest(t, db, user2ID, color1ID, "denied")
 
 	t.Run("find only pending requests", func(t *testing.T) {
-		requests, err := repo.FindAllPending()
+		requests, err := repo.FindAllPending(1) // tenantID = 1
 		if err != nil {
 			t.Fatalf("FindAllPending() failed: %v", err)
 		}
@@ -159,13 +159,13 @@ func TestColorRequestRepository_Approve(t *testing.T) {
 		reqID := testutil.SeedTestColorRequest(t, db, userID, colorID, "pending")
 
 		message := "Willkommen!"
-		err := repo.Approve(reqID, adminID, &message)
+		err := repo.Approve(1, reqID, adminID, &message) // tenantID = 1
 		if err != nil {
 			t.Fatalf("Approve() failed: %v", err)
 		}
 
 		// Verify approval
-		request, _ := repo.FindByID(reqID)
+		request, _ := repo.FindByID(1, reqID) // tenantID = 1
 		if request.Status != "approved" {
 			t.Errorf("Expected status 'approved', got %s", request.Status)
 		}
@@ -194,13 +194,13 @@ func TestColorRequestRepository_Deny(t *testing.T) {
 		reqID := testutil.SeedTestColorRequest(t, db, userID, colorID, "pending")
 
 		message := "Bitte erst Einweisung absolvieren"
-		err := repo.Deny(reqID, adminID, &message)
+		err := repo.Deny(1, reqID, adminID, &message) // tenantID = 1
 		if err != nil {
 			t.Fatalf("Deny() failed: %v", err)
 		}
 
 		// Verify denial
-		request, _ := repo.FindByID(reqID)
+		request, _ := repo.FindByID(1, reqID) // tenantID = 1
 		if request.Status != "denied" {
 			t.Errorf("Expected status 'denied', got %s", request.Status)
 		}
@@ -222,7 +222,7 @@ func TestColorRequestRepository_HasPendingRequest(t *testing.T) {
 	t.Run("user has pending request", func(t *testing.T) {
 		testutil.SeedTestColorRequest(t, db, userID, color1ID, "pending")
 
-		hasPending, err := repo.HasPendingRequest(userID)
+		hasPending, err := repo.HasPendingRequest(1, userID) // tenantID = 1
 		if err != nil {
 			t.Fatalf("HasPendingRequest() failed: %v", err)
 		}
@@ -236,7 +236,7 @@ func TestColorRequestRepository_HasPendingRequest(t *testing.T) {
 		user2ID := testutil.SeedTestUser(t, db, "user11@test.com", "User 11", "green")
 		testutil.SeedTestColorRequest(t, db, user2ID, color2ID, "approved")
 
-		hasPending, err := repo.HasPendingRequest(user2ID)
+		hasPending, err := repo.HasPendingRequest(1, user2ID) // tenantID = 1
 		if err != nil {
 			t.Fatalf("HasPendingRequest() failed: %v", err)
 		}
@@ -250,7 +250,7 @@ func TestColorRequestRepository_HasPendingRequest(t *testing.T) {
 		user3ID := testutil.SeedTestUser(t, db, "user12@test.com", "User 12", "green")
 		testutil.SeedTestColorRequest(t, db, user3ID, color1ID, "denied")
 
-		hasPending, err := repo.HasPendingRequest(user3ID)
+		hasPending, err := repo.HasPendingRequest(1, user3ID) // tenantID = 1
 		if err != nil {
 			t.Fatalf("HasPendingRequest() failed: %v", err)
 		}

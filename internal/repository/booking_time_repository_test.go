@@ -6,41 +6,20 @@ import (
 	"time"
 
 	"github.com/tranmh/gassigeher/internal/models"
+	"github.com/tranmh/gassigeher/internal/testutil"
 	_ "modernc.org/sqlite"
 )
 
-// setupTestDBForBookingTime creates a test database with booking_time_rules table
+// setupTestDBForBookingTime creates a test database using standard testutil
 func setupTestDBForBookingTime(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("Failed to open test database: %v", err)
-	}
-
-	// Create booking_time_rules table
-	createTableSQL := `
-	CREATE TABLE IF NOT EXISTS booking_time_rules (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		day_type TEXT NOT NULL,
-		rule_name TEXT NOT NULL,
-		start_time TEXT NOT NULL,
-		end_time TEXT NOT NULL,
-		is_blocked INTEGER DEFAULT 0,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		UNIQUE(day_type, rule_name)
-	);
-	`
-
-	_, err = db.Exec(createTableSQL)
-	if err != nil {
-		t.Fatalf("Failed to create table: %v", err)
-	}
-
-	return db
+	return testutil.SetupTestDB(t)
 }
 
 // seedBookingTimeRules seeds the database with test data
 func seedBookingTimeRules(t *testing.T, db *sql.DB) {
+	// First, clear any default rules from migration that might conflict
+	db.Exec(`DELETE FROM booking_time_rules WHERE tenant_id = 1`)
+
 	rules := []struct {
 		dayType   string
 		ruleName  string
@@ -61,8 +40,8 @@ func seedBookingTimeRules(t *testing.T, db *sql.DB) {
 
 	for _, r := range rules {
 		_, err := db.Exec(`
-			INSERT INTO booking_time_rules (day_type, rule_name, start_time, end_time, is_blocked)
-			VALUES (?, ?, ?, ?, ?)
+			INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked)
+			VALUES (1, ?, ?, ?, ?, ?)
 		`, r.dayType, r.ruleName, r.startTime, r.endTime, r.isBlocked)
 		if err != nil {
 			t.Fatalf("Failed to seed rule %s: %v", r.ruleName, err)
@@ -152,6 +131,9 @@ func TestGetRulesByDayType_Invalid(t *testing.T) {
 func TestCreateRule_ValidWeekdayRule(t *testing.T) {
 	db := setupTestDBForBookingTime(t)
 	defer db.Close()
+
+	// Clear any default rules from migration
+	db.Exec(`DELETE FROM booking_time_rules WHERE tenant_id = 1`)
 
 	repo := NewBookingTimeRepository(db)
 
@@ -388,7 +370,7 @@ func TestDeleteRule_IDZero(t *testing.T) {
 	repo := NewBookingTimeRepository(db)
 
 	// Delete with ID = 0
-	err := repo.DeleteRule(0)
+	err := repo.DeleteRule(1, 0) // tenantID = 1
 	if err != nil {
 		t.Fatalf("DeleteRule with ID=0 should not error, got: %v", err)
 	}
@@ -408,7 +390,7 @@ func TestGetAllRules_GroupedByDayType(t *testing.T) {
 	seedBookingTimeRules(t, db)
 	repo := NewBookingTimeRepository(db)
 
-	rules, err := repo.GetAllRules()
+	rules, err := repo.GetAllRules(1) // tenantID = 1
 	if err != nil {
 		t.Fatalf("GetAllRules failed: %v", err)
 	}
@@ -449,7 +431,7 @@ func TestCreateRule_TimestampsSet(t *testing.T) {
 		IsBlocked: false,
 	}
 
-	err := repo.CreateRule(rule)
+	err := repo.CreateRule(1, rule) // tenantID = 1
 	if err != nil {
 		t.Fatalf("CreateRule failed: %v", err)
 	}

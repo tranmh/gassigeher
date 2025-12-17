@@ -14,8 +14,8 @@ import (
 func TestMigrationRegistry(t *testing.T) {
 	migrations := GetAllMigrations()
 
-	t.Run("All_6_migrations_registered", func(t *testing.T) {
-		assert.Len(t, migrations, 6, "Should have 6 migrations (consolidated schema + SaaS)")
+	t.Run("All_8_migrations_registered", func(t *testing.T) {
+		assert.Len(t, migrations, 8, "Should have 8 migrations (consolidated schema + SaaS + lockout + central_admin)")
 	})
 
 	t.Run("Migrations_have_unique_IDs", func(t *testing.T) {
@@ -74,7 +74,7 @@ func TestRunMigrations_SQLite(t *testing.T) {
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 6, count, "Should have 6 applied migrations")
+	assert.Equal(t, 8, count, "Should have 8 applied migrations")
 
 	// Verify all tables created
 	tables := []string{
@@ -120,16 +120,16 @@ func TestRunMigrations_Idempotent(t *testing.T) {
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 6, count)
+	assert.Equal(t, 8, count)
 
 	// Run migrations second time (should be idempotent)
 	err = RunMigrationsWithDialect(db, dialect)
 	assert.NoError(t, err, "Second migration run should succeed (idempotent)")
 
-	// Count should still be 6 (no duplicates)
+	// Count should still be 8 (no duplicates)
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 6, count, "Should still have 6 migrations (no duplicates)")
+	assert.Equal(t, 8, count, "Should still have 8 migrations (no duplicates)")
 }
 
 // TestGetMigrationStatus tests migration status reporting
@@ -147,7 +147,7 @@ func TestGetMigrationStatus(t *testing.T) {
 	applied, pending, err := GetMigrationStatus(db, dialect)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, applied)
-	assert.Equal(t, 6, pending)
+	assert.Equal(t, 8, pending)
 
 	// After migrations
 	err = RunMigrationsWithDialect(db, dialect)
@@ -155,7 +155,7 @@ func TestGetMigrationStatus(t *testing.T) {
 
 	applied, pending, err = GetMigrationStatus(db, dialect)
 	assert.NoError(t, err)
-	assert.Equal(t, 6, applied)
+	assert.Equal(t, 8, applied)
 	assert.Equal(t, 0, pending)
 }
 
@@ -358,6 +358,8 @@ func TestMigrationOrder(t *testing.T) {
 		"004_add_tenant_ids",
 		"005_add_rls",
 		"006_update_constraints",
+		"007_add_lockout_fields",
+		"008_add_central_admin",
 	}
 
 	assert.Len(t, migrations, len(expectedOrder))
@@ -407,7 +409,7 @@ func TestMigrationRunner_PartialApplication(t *testing.T) {
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 6, count, "Should have 6 migrations applied")
+	assert.Equal(t, 8, count, "Should have 8 migrations applied")
 }
 
 // TestIsAlreadyExistsError tests error detection for different databases

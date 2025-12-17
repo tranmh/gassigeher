@@ -70,7 +70,7 @@ func TestSettingsHandler_UpdateSetting(t *testing.T) {
 	userID := testutil.SeedTestUser(t, db, "user@example.com", "User", "green")
 
 	// Insert test setting
-	db.Exec("INSERT INTO system_settings (key, value) VALUES (?, ?)", "booking_advance_days", "14")
+	db.Exec("INSERT INTO system_settings (tenant_id, key, value) VALUES (1, ?, ?)", "booking_advance_days", "14")
 
 	t.Run("admin successfully updates setting", func(t *testing.T) {
 		reqBody := map[string]interface{}{
@@ -292,9 +292,12 @@ func TestSettingsHandler_GetLogo(t *testing.T) {
 		UploadDir:          t.TempDir(),
 	}
 	handler := NewSettingsHandler(db, cfg)
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
 
 	t.Run("returns default logo URL when no custom logo", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/settings/logo", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
 		rec := httptest.NewRecorder()
 
 		handler.GetLogo(rec, req)
@@ -320,7 +323,7 @@ func TestSettingsHandler_GetLogo(t *testing.T) {
 
 	t.Run("returns custom logo URL when uploaded", func(t *testing.T) {
 		// Update the setting to a custom path (with /uploads/ prefix as stored by UploadLogo)
-		db.Exec("UPDATE system_settings SET value = ? WHERE key = ?", "/uploads/settings/site_logo.jpg", "site_logo")
+		db.Exec("UPDATE system_settings SET value = ? WHERE key = ? AND tenant_id = 1", "/uploads/settings/site_logo.jpg", "site_logo")
 
 		// Create the actual logo file
 		settingsDir := filepath.Join(cfg.UploadDir, "settings")
@@ -329,6 +332,8 @@ func TestSettingsHandler_GetLogo(t *testing.T) {
 		os.WriteFile(logoPath, []byte("fake logo content"), 0644)
 
 		req := httptest.NewRequest("GET", "/api/settings/logo", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
 		rec := httptest.NewRecorder()
 
 		handler.GetLogo(rec, req)
@@ -353,11 +358,13 @@ func TestSettingsHandler_GetLogo(t *testing.T) {
 
 	t.Run("no authentication required", func(t *testing.T) {
 		// Reset to default
-		db.Exec("UPDATE system_settings SET value = ? WHERE key = ?",
+		db.Exec("UPDATE system_settings SET value = ? WHERE key = ? AND tenant_id = 1",
 			"https://www.tierheim-goeppingen.de/wp-content/uploads/2017/04/Logo_4c_homepagebanner3.png", "site_logo")
 
-		// Request without any auth context
+		// Request without any auth context - but needs tenant context for multi-tenant
 		req := httptest.NewRequest("GET", "/api/settings/logo", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
 		rec := httptest.NewRecorder()
 
 		handler.GetLogo(rec, req)
@@ -485,7 +492,7 @@ func TestSettingsHandler_ResetLogo(t *testing.T) {
 	os.MkdirAll(settingsDir, 0755)
 	logoPath := filepath.Join(settingsDir, "site_logo.jpg")
 	os.WriteFile(logoPath, []byte("custom logo content"), 0644)
-	db.Exec("UPDATE system_settings SET value = ? WHERE key = ?", "/uploads/settings/site_logo.jpg", "site_logo")
+	db.Exec("UPDATE system_settings SET value = ? WHERE key = ? AND tenant_id = 1", "/uploads/settings/site_logo.jpg", "site_logo")
 
 	t.Run("admin can reset logo to default", func(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/api/settings/logo", nil)
@@ -563,6 +570,8 @@ func TestSettingsHandler_LogoWorkflow(t *testing.T) {
 	// Step 1: Get default logo
 	t.Run("Step 1: Get default logo", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/settings/logo", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
 		rec := httptest.NewRecorder()
 		handler.GetLogo(rec, req)
 
@@ -592,6 +601,8 @@ func TestSettingsHandler_LogoWorkflow(t *testing.T) {
 	// Step 3: Get custom logo
 	t.Run("Step 3: Get custom logo", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/settings/logo", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
 		rec := httptest.NewRecorder()
 		handler.GetLogo(rec, req)
 
@@ -620,6 +631,8 @@ func TestSettingsHandler_LogoWorkflow(t *testing.T) {
 	// Step 5: Verify back to default
 	t.Run("Step 5: Verify back to default", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/settings/logo", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
 		rec := httptest.NewRecorder()
 		handler.GetLogo(rec, req)
 
@@ -640,10 +653,13 @@ func TestSettingsHandler_GetWhatsAppSettings(t *testing.T) {
 		JWTExpirationHours: 24,
 	}
 	handler := NewSettingsHandler(db, cfg)
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
 
 	t.Run("returns disabled when whatsapp not enabled", func(t *testing.T) {
 		// Default from migration is disabled
 		req := httptest.NewRequest("GET", "/api/settings/whatsapp", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
 		rec := httptest.NewRecorder()
 
 		handler.GetWhatsAppSettings(rec, req)
@@ -667,10 +683,12 @@ func TestSettingsHandler_GetWhatsAppSettings(t *testing.T) {
 
 	t.Run("returns enabled with link when configured", func(t *testing.T) {
 		// Enable WhatsApp and set link
-		db.Exec("UPDATE system_settings SET value = ? WHERE key = ?", "true", "whatsapp_group_enabled")
-		db.Exec("UPDATE system_settings SET value = ? WHERE key = ?", "https://chat.whatsapp.com/ABC123", "whatsapp_group_link")
+		db.Exec("UPDATE system_settings SET value = ? WHERE key = ? AND tenant_id = 1", "true", "whatsapp_group_enabled")
+		db.Exec("UPDATE system_settings SET value = ? WHERE key = ? AND tenant_id = 1", "https://chat.whatsapp.com/ABC123", "whatsapp_group_link")
 
 		req := httptest.NewRequest("GET", "/api/settings/whatsapp", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
 		rec := httptest.NewRecorder()
 
 		handler.GetWhatsAppSettings(rec, req)
@@ -702,8 +720,10 @@ func TestSettingsHandler_GetWhatsAppSettings(t *testing.T) {
 	})
 
 	t.Run("no authentication required", func(t *testing.T) {
-		// Request without any auth context
+		// Request without any auth context - but needs tenant context for multi-tenant
 		req := httptest.NewRequest("GET", "/api/settings/whatsapp", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
 		rec := httptest.NewRecorder()
 
 		handler.GetWhatsAppSettings(rec, req)
@@ -887,6 +907,8 @@ func TestSettingsHandler_WhatsAppWorkflow(t *testing.T) {
 	// Step 1: Get initial state (disabled)
 	t.Run("Step 1: WhatsApp disabled by default", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/settings/whatsapp", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
 		rec := httptest.NewRecorder()
 		handler.GetWhatsAppSettings(rec, req)
 
@@ -941,6 +963,8 @@ func TestSettingsHandler_WhatsAppWorkflow(t *testing.T) {
 	// Step 4: Verify WhatsApp is enabled with link
 	t.Run("Step 4: Verify WhatsApp enabled with link", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/settings/whatsapp", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
 		rec := httptest.NewRecorder()
 		handler.GetWhatsAppSettings(rec, req)
 
@@ -979,6 +1003,8 @@ func TestSettingsHandler_WhatsAppWorkflow(t *testing.T) {
 	// Step 6: Verify WhatsApp is disabled (link should still exist)
 	t.Run("Step 6: Verify WhatsApp disabled", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/settings/whatsapp", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
 		rec := httptest.NewRecorder()
 		handler.GetWhatsAppSettings(rec, req)
 

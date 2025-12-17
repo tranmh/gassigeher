@@ -209,7 +209,9 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create booking
+	// SaaS: Include tenant_id for multi-tenant isolation
 	booking := &models.Booking{
+		TenantID:         tenantID,
 		UserID:           userID,
 		DogID:            req.DogID,
 		Date:             req.Date,
@@ -251,9 +253,14 @@ func (h *BookingHandler) ListBookings(w http.ResponseWriter, r *http.Request) {
 	// Get user ID and admin status from context
 	userID, _ := r.Context().Value(middleware.UserIDKey).(int)
 	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Parse query parameters
-	filter := &models.BookingFilterRequest{}
+	// SaaS: Always filter by tenant for multi-tenant isolation
+	filter := &models.BookingFilterRequest{
+		TenantID: &tenantID,
+	}
 
 	if dogIDStr := r.URL.Query().Get("dog_id"); dogIDStr != "" {
 		dogID, _ := strconv.Atoi(dogIDStr)
@@ -307,6 +314,8 @@ func (h *BookingHandler) GetBooking(w http.ResponseWriter, r *http.Request) {
 	// Get user ID and admin status
 	userID, _ := r.Context().Value(middleware.UserIDKey).(int)
 	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Get booking
 	booking, err := h.bookingRepo.FindByID(id)
@@ -315,6 +324,12 @@ func (h *BookingHandler) GetBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if booking == nil {
+		respondError(w, http.StatusNotFound, "Booking not found")
+		return
+	}
+
+	// SaaS: Verify booking belongs to current tenant
+	if tenantID > 0 && booking.TenantID != tenantID {
 		respondError(w, http.StatusNotFound, "Booking not found")
 		return
 	}
@@ -358,6 +373,12 @@ func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if booking == nil {
+		respondError(w, http.StatusNotFound, "Booking not found")
+		return
+	}
+
+	// SaaS: Verify booking belongs to current tenant
+	if tenantID > 0 && booking.TenantID != tenantID {
 		respondError(w, http.StatusNotFound, "Booking not found")
 		return
 	}
@@ -462,6 +483,8 @@ func (h *BookingHandler) AddNotes(w http.ResponseWriter, r *http.Request) {
 
 	// Get user ID
 	userID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Parse request
 	var req models.AddNotesRequest
@@ -482,6 +505,12 @@ func (h *BookingHandler) AddNotes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if booking == nil {
+		respondError(w, http.StatusNotFound, "Booking not found")
+		return
+	}
+
+	// SaaS: Verify booking belongs to current tenant
+	if tenantID > 0 && booking.TenantID != tenantID {
 		respondError(w, http.StatusNotFound, "Booking not found")
 		return
 	}
@@ -542,6 +571,12 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if booking == nil {
+		respondError(w, http.StatusNotFound, "Booking not found")
+		return
+	}
+
+	// SaaS: Verify booking belongs to current tenant
+	if tenantID > 0 && booking.TenantID != tenantID {
 		respondError(w, http.StatusNotFound, "Booking not found")
 		return
 	}
@@ -732,6 +767,8 @@ func (h *BookingHandler) ApprovePendingBooking(w http.ResponseWriter, r *http.Re
 	}
 
 	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Extract booking ID from path
 	pathParts := strings.Split(r.URL.Path, "/")
@@ -745,6 +782,21 @@ func (h *BookingHandler) ApprovePendingBooking(w http.ResponseWriter, r *http.Re
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid booking ID")
+		return
+	}
+
+	// SaaS: Verify booking belongs to current tenant before approving
+	booking, err := h.bookingRepo.FindByID(id)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to get booking")
+		return
+	}
+	if booking == nil {
+		respondError(w, http.StatusNotFound, "Booking not found")
+		return
+	}
+	if tenantID > 0 && booking.TenantID != tenantID {
+		respondError(w, http.StatusNotFound, "Booking not found")
 		return
 	}
 
@@ -783,6 +835,8 @@ func (h *BookingHandler) RejectPendingBooking(w http.ResponseWriter, r *http.Req
 	}
 
 	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Extract booking ID from path
 	pathParts := strings.Split(r.URL.Path, "/")
@@ -814,6 +868,16 @@ func (h *BookingHandler) RejectPendingBooking(w http.ResponseWriter, r *http.Req
 
 	// Get booking details before rejecting (for email)
 	booking, _ := h.bookingRepo.FindByIDWithDetails(id)
+
+	// SaaS: Verify booking belongs to current tenant before rejecting
+	if booking == nil {
+		respondError(w, http.StatusNotFound, "Booking not found")
+		return
+	}
+	if tenantID > 0 && booking.TenantID != tenantID {
+		respondError(w, http.StatusNotFound, "Booking not found")
+		return
+	}
 
 	if err := h.bookingRepo.RejectBooking(id, adminID, req.Reason); err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())

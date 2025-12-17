@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -9,23 +10,16 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/tranmh/gassigeher/internal/database"
+	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
 	"github.com/tranmh/gassigeher/internal/services"
+	"github.com/tranmh/gassigeher/internal/testutil"
 )
 
 func setupHolidayHandlerTest(t *testing.T) (*sql.DB, *HolidayHandler, func()) {
-	// Create in-memory test database
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("Failed to open test database: %v", err)
-	}
-
-	// Run migrations
-	if err := database.RunMigrations(db); err != nil {
-		t.Fatalf("Failed to run migrations: %v", err)
-	}
+	// Use testutil to create test database with test tenant
+	db := testutil.SetupTestDB(t)
 
 	// Setup repositories and services
 	holidayRepo := repository.NewHolidayRepository(db)
@@ -38,6 +32,12 @@ func setupHolidayHandlerTest(t *testing.T) (*sql.DB, *HolidayHandler, func()) {
 	}
 
 	return db, handler, cleanup
+}
+
+// holidayTenantContext adds tenant context to a request
+func holidayTenantContext(req *http.Request) *http.Request {
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 1)
+	return req.WithContext(ctx)
 }
 
 // Test 3.2.1: GET /api/holidays
@@ -139,6 +139,7 @@ func TestGetHolidays(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/api/holidays"+tc.query, nil)
+			req = holidayTenantContext(req)
 			w := httptest.NewRecorder()
 
 			handler.GetHolidays(w, req)
@@ -156,8 +157,11 @@ func TestGetHolidays(t *testing.T) {
 
 // Test 3.2.2: POST /api/holidays
 func TestCreateHoliday(t *testing.T) {
-	_, handler, cleanup := setupHolidayHandlerTest(t)
+	db, handler, cleanup := setupHolidayHandlerTest(t)
 	defer cleanup()
+
+	// Seed admin user
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin User", "orange")
 
 	testCases := []struct {
 		name       string
@@ -173,7 +177,7 @@ func TestCreateHoliday(t *testing.T) {
 				Name:     "Custom Holiday",
 				IsActive: true,
 			},
-			adminID:    1,
+			adminID:    adminID,
 			wantStatus: http.StatusCreated,
 			checkResp: func(t *testing.T, body []byte) {
 				var holiday models.CustomHoliday
@@ -195,7 +199,7 @@ func TestCreateHoliday(t *testing.T) {
 				Name:     "Test Holiday",
 				IsActive: true,
 			},
-			adminID:    1,
+			adminID:    adminID,
 			wantStatus: http.StatusBadRequest,
 			checkResp:  nil,
 		},

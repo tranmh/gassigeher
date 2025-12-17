@@ -101,8 +101,8 @@ func TestCronService_AutoDeactivateInactiveUsers(t *testing.T) {
 		email := "old@example.com"
 
 		_, err := db.Exec(`
-			INSERT INTO users (email, first_name, last_name, password_hash, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
-			VALUES (?, 'Old', 'User', 'hash', 1, 1, ?, ?, ?)
+			INSERT INTO users (tenant_id, email, first_name, last_name, password_hash, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
+			VALUES (1, ?, 'Old', 'User', 'hash', 1, 1, ?, ?, ?)
 		`, email, time.Now(), oldActivity, time.Now())
 		if err != nil {
 			t.Fatalf("Failed to create old user: %v", err)
@@ -137,8 +137,8 @@ func TestCronService_AutoDeactivateInactiveUsers(t *testing.T) {
 		recentActivity := time.Now().AddDate(0, 0, -30) // 30 days ago
 
 		_, err := db.Exec(`
-			INSERT INTO users (email, first_name, last_name, password_hash, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
-			VALUES (?, 'Active', 'User', 'hash', 1, 1, ?, ?, ?)
+			INSERT INTO users (tenant_id, email, first_name, last_name, password_hash, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
+			VALUES (1, ?, 'Active', 'User', 'hash', 1, 1, ?, ?, ?)
 		`, recentEmail, time.Now(), recentActivity, time.Now())
 		if err != nil {
 			t.Fatalf("Failed to create recent user: %v", err)
@@ -162,8 +162,8 @@ func TestCronService_AutoDeactivateInactiveUsers(t *testing.T) {
 		oldActivity := time.Now().AddDate(0, 0, -500)
 
 		_, err := db.Exec(`
-			INSERT INTO users (email, first_name, last_name, password_hash, is_active, is_verified, terms_accepted_at, last_activity_at, deactivated_at, created_at)
-			VALUES (?, 'Deactivated', 'User', 'hash', 0, 1, ?, ?, ?, ?)
+			INSERT INTO users (tenant_id, email, first_name, last_name, password_hash, is_active, is_verified, terms_accepted_at, last_activity_at, deactivated_at, created_at)
+			VALUES (1, ?, 'Deactivated', 'User', 'hash', 0, 1, ?, ?, ?, ?)
 		`, email, time.Now(), oldActivity, time.Now().AddDate(0, 0, -100), time.Now())
 		if err != nil {
 			t.Fatalf("Failed to create deactivated user: %v", err)
@@ -193,8 +193,8 @@ func TestCronService_AutoDeactivateInactiveUsers_SendsEmailNotifications(t *test
 		email := "olduser_email@example.com"
 
 		_, err := db.Exec(`
-			INSERT INTO users (email, first_name, last_name, password_hash, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
-			VALUES (?, 'Old', 'User Email', 'hash', 1, 1, ?, ?, ?)
+			INSERT INTO users (tenant_id, email, first_name, last_name, password_hash, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
+			VALUES (1, ?, 'Old', 'User Email', 'hash', 1, 1, ?, ?, ?)
 		`, email, time.Now(), oldActivity, time.Now())
 		if err != nil {
 			t.Fatalf("Failed to create old user: %v", err)
@@ -223,16 +223,16 @@ func TestCronService_AutoDeactivateInactiveUsers_SendsEmailNotifications(t *test
 		oldActivity2 := time.Now().AddDate(0, 0, -450)
 
 		_, err := db.Exec(`
-			INSERT INTO users (email, first_name, last_name, password_hash, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
-			VALUES (?, 'Multi User', 'One', 'hash', 1, 1, ?, ?, ?)
+			INSERT INTO users (tenant_id, email, first_name, last_name, password_hash, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
+			VALUES (1, ?, 'Multi User', 'One', 'hash', 1, 1, ?, ?, ?)
 		`, "multi1@example.com", time.Now(), oldActivity1, time.Now())
 		if err != nil {
 			t.Fatalf("Failed to create user 1: %v", err)
 		}
 
 		_, err = db.Exec(`
-			INSERT INTO users (email, first_name, last_name, password_hash, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
-			VALUES (?, 'Multi User', 'Two', 'hash', 1, 1, ?, ?, ?)
+			INSERT INTO users (tenant_id, email, first_name, last_name, password_hash, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
+			VALUES (1, ?, 'Multi User', 'Two', 'hash', 1, 1, ?, ?, ?)
 		`, "multi2@example.com", time.Now(), oldActivity2, time.Now())
 		if err != nil {
 			t.Fatalf("Failed to create user 2: %v", err)

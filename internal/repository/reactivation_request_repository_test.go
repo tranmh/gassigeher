@@ -20,7 +20,7 @@ func TestReactivationRequestRepository_Create(t *testing.T) {
 			Status: "pending",
 		}
 
-		err := repo.Create(request)
+		err := repo.Create(1, request) // tenantID = 1
 		if err != nil {
 			t.Fatalf("Create() failed: %v", err)
 		}
@@ -46,10 +46,10 @@ func TestReactivationRequestRepository_FindByID(t *testing.T) {
 		UserID: userID,
 		Status: "pending",
 	}
-	repo.Create(request)
+	repo.Create(1, request) // tenantID = 1
 
 	t.Run("request exists", func(t *testing.T) {
-		found, err := repo.FindByID(request.ID)
+		found, err := repo.FindByID(1, request.ID) // tenantID = 1
 		if err != nil {
 			t.Fatalf("FindByID() failed: %v", err)
 		}
@@ -64,7 +64,7 @@ func TestReactivationRequestRepository_FindByID(t *testing.T) {
 	})
 
 	t.Run("request not found", func(t *testing.T) {
-		found, _ := repo.FindByID(99999)
+		found, _ := repo.FindByID(1, 99999) // tenantID = 1
 		if found != nil {
 			t.Error("Expected nil for non-existent ID")
 		}
@@ -82,15 +82,15 @@ func TestReactivationRequestRepository_FindByUserID(t *testing.T) {
 	// Create multiple requests for user1
 	req1 := &models.ReactivationRequest{UserID: user1ID, Status: "pending"}
 	req2 := &models.ReactivationRequest{UserID: user1ID, Status: "approved"}
-	repo.Create(req1)
-	repo.Create(req2)
+	repo.Create(1, req1) // tenantID = 1
+	repo.Create(1, req2) // tenantID = 1
 
 	// Create request for user2
 	req3 := &models.ReactivationRequest{UserID: user2ID, Status: "pending"}
-	repo.Create(req3)
+	repo.Create(1, req3) // tenantID = 1
 
 	t.Run("user has multiple requests", func(t *testing.T) {
-		requests, err := repo.FindByUserID(user1ID)
+		requests, err := repo.FindByUserID(1, user1ID) // tenantID = 1
 		if err != nil {
 			t.Fatalf("FindByUserID() failed: %v", err)
 		}
@@ -109,7 +109,7 @@ func TestReactivationRequestRepository_FindByUserID(t *testing.T) {
 	t.Run("user has no requests", func(t *testing.T) {
 		user3ID := testutil.SeedTestUser(t, db, "user3@example.com", "User 3", "green")
 
-		requests, err := repo.FindByUserID(user3ID)
+		requests, err := repo.FindByUserID(1, user3ID) // tenantID = 1
 		if err != nil {
 			t.Fatalf("FindByUserID() failed: %v", err)
 		}
@@ -134,23 +134,23 @@ func TestReactivationRequestRepository_FindAllPending(t *testing.T) {
 		// Create pending requests
 		pending1 := &models.ReactivationRequest{UserID: user1ID, Status: "pending"}
 		pending2 := &models.ReactivationRequest{UserID: user2ID, Status: "pending"}
-		repo.Create(pending1)
-		repo.Create(pending2)
+		repo.Create(1, pending1) // tenantID = 1
+		repo.Create(1, pending2) // tenantID = 1
 
 		// Create and approve a request
 		approved := &models.ReactivationRequest{UserID: user3ID, Status: "pending"}
-		repo.Create(approved)
+		repo.Create(1, approved) // tenantID = 1
 		adminMsg := "Approved"
-		repo.Approve(approved.ID, 1, &adminMsg)
+		repo.Approve(1, approved.ID, 1, &adminMsg) // tenantID = 1
 
 		// Create and deny a request
 		denied := &models.ReactivationRequest{UserID: user4ID, Status: "pending"}
-		repo.Create(denied)
+		repo.Create(1, denied) // tenantID = 1
 		denyMsg := "Denied"
-		repo.Deny(denied.ID, 1, &denyMsg)
+		repo.Deny(1, denied.ID, 1, &denyMsg) // tenantID = 1
 
 		// Find all pending
-		requests, err := repo.FindAllPending()
+		requests, err := repo.FindAllPending(1) // tenantID = 1
 		if err != nil {
 			t.Fatalf("FindAllPending() failed: %v", err)
 		}
@@ -174,7 +174,7 @@ func TestReactivationRequestRepository_FindAllPending(t *testing.T) {
 		db := testutil.SetupTestDB(t)
 		repo := NewReactivationRequestRepository(db)
 
-		requests, err := repo.FindAllPending()
+		requests, err := repo.FindAllPending(1) // tenantID = 1
 		if err != nil {
 			t.Fatalf("FindAllPending() failed: %v", err)
 		}
@@ -197,17 +197,17 @@ func TestReactivationRequestRepository_Approve(t *testing.T) {
 		UserID: userID,
 		Status: "pending",
 	}
-	repo.Create(request)
+	repo.Create(1, request) // tenantID = 1
 
 	t.Run("successful approval", func(t *testing.T) {
 		message := "Account reactivated"
-		err := repo.Approve(request.ID, adminID, &message)
+		err := repo.Approve(1, request.ID, adminID, &message) // tenantID = 1
 		if err != nil {
 			t.Fatalf("Approve() failed: %v", err)
 		}
 
 		// Verify approval
-		approved, _ := repo.FindByID(request.ID)
+		approved, _ := repo.FindByID(1, request.ID) // tenantID = 1
 		if approved.Status != "approved" {
 			t.Errorf("Expected status 'approved', got %s", approved.Status)
 		}
@@ -238,17 +238,17 @@ func TestReactivationRequestRepository_Deny(t *testing.T) {
 		UserID: userID,
 		Status: "pending",
 	}
-	repo.Create(request)
+	repo.Create(1, request) // tenantID = 1
 
 	t.Run("successful denial", func(t *testing.T) {
 		message := "Cannot reactivate at this time"
-		err := repo.Deny(request.ID, adminID, &message)
+		err := repo.Deny(1, request.ID, adminID, &message) // tenantID = 1
 		if err != nil {
 			t.Fatalf("Deny() failed: %v", err)
 		}
 
 		// Verify denial
-		denied, _ := repo.FindByID(request.ID)
+		denied, _ := repo.FindByID(1, request.ID) // tenantID = 1
 		if denied.Status != "denied" {
 			t.Errorf("Expected status 'denied', got %s", denied.Status)
 		}
@@ -271,9 +271,9 @@ func TestReactivationRequestRepository_HasPendingRequest(t *testing.T) {
 			UserID: userID,
 			Status: "pending",
 		}
-		repo.Create(request)
+		repo.Create(1, request) // tenantID = 1
 
-		hasPending, err := repo.HasPendingRequest(userID)
+		hasPending, err := repo.HasPendingRequest(1, userID) // tenantID = 1
 		if err != nil {
 			t.Fatalf("HasPendingRequest() failed: %v", err)
 		}
@@ -289,7 +289,7 @@ func TestReactivationRequestRepository_HasPendingRequest(t *testing.T) {
 
 		userID := testutil.SeedTestUser(t, db, "user2@example.com", "User 2", "green")
 
-		hasPending, err := repo.HasPendingRequest(userID)
+		hasPending, err := repo.HasPendingRequest(1, userID) // tenantID = 1
 		if err != nil {
 			t.Fatalf("HasPendingRequest() failed: %v", err)
 		}
@@ -311,9 +311,9 @@ func TestReactivationRequestRepository_HasPendingRequest(t *testing.T) {
 			UserID: userID,
 			Status: "approved",
 		}
-		repo.Create(request)
+		repo.Create(1, request) // tenantID = 1
 
-		hasPending, err := repo.HasPendingRequest(userID)
+		hasPending, err := repo.HasPendingRequest(1, userID) // tenantID = 1
 		if err != nil {
 			t.Fatalf("HasPendingRequest() failed: %v", err)
 		}

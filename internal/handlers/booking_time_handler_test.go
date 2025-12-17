@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -9,23 +10,16 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/tranmh/gassigeher/internal/database"
+	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
 	"github.com/tranmh/gassigeher/internal/services"
+	"github.com/tranmh/gassigeher/internal/testutil"
 )
 
 func setupBookingTimeHandlerTest(t *testing.T) (*sql.DB, *BookingTimeHandler, func()) {
-	// Create in-memory test database
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("Failed to open test database: %v", err)
-	}
-
-	// Run migrations
-	if err := database.RunMigrations(db); err != nil {
-		t.Fatalf("Failed to run migrations: %v", err)
-	}
+	// Use testutil to create test database with test tenant
+	db := testutil.SetupTestDB(t)
 
 	// Setup repositories and services
 	bookingTimeRepo := repository.NewBookingTimeRepository(db)
@@ -40,6 +34,12 @@ func setupBookingTimeHandlerTest(t *testing.T) (*sql.DB, *BookingTimeHandler, fu
 	}
 
 	return db, handler, cleanup
+}
+
+// addTenantContext adds tenant context to a request
+func addTenantContext(req *http.Request) *http.Request {
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 1)
+	return req.WithContext(ctx)
 }
 
 // Test 3.1.1: GET /api/booking-times/available
@@ -117,6 +117,7 @@ func TestGetAvailableSlots(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/api/booking-times/available"+tc.query, nil)
+			req = addTenantContext(req)
 			w := httptest.NewRecorder()
 
 			handler.GetAvailableSlots(w, req)
@@ -500,6 +501,7 @@ func TestGetRulesForDate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/api/booking-times/rules-for-date"+tc.query, nil)
+			req = addTenantContext(req)
 			w := httptest.NewRecorder()
 
 			handler.GetRulesForDate(w, req)

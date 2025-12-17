@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,8 +11,15 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/testutil"
 )
+
+// reactivationTenantContext adds tenant context to a request
+func reactivationTenantContext(req *http.Request) *http.Request {
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 1)
+	return req.WithContext(ctx)
+}
 
 // DONE: TestReactivationRequestHandler_CreateRequest tests creating reactivation requests
 func TestReactivationRequestHandler_CreateRequest(t *testing.T) {
@@ -34,6 +42,7 @@ func TestReactivationRequestHandler_CreateRequest(t *testing.T) {
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/api/reactivation-requests", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
+		req = reactivationTenantContext(req)
 
 		rec := httptest.NewRecorder()
 		handler.CreateRequest(rec, req)
@@ -56,6 +65,7 @@ func TestReactivationRequestHandler_CreateRequest(t *testing.T) {
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/api/reactivation-requests", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
+		req = reactivationTenantContext(req)
 
 		rec := httptest.NewRecorder()
 		handler.CreateRequest(rec, req)
@@ -75,6 +85,7 @@ func TestReactivationRequestHandler_CreateRequest(t *testing.T) {
 		body1, _ := json.Marshal(reqBody1)
 		req1 := httptest.NewRequest("POST", "/api/reactivation-requests", bytes.NewReader(body1))
 		req1.Header.Set("Content-Type", "application/json")
+		req1 = reactivationTenantContext(req1)
 		rec1 := httptest.NewRecorder()
 		handler.CreateRequest(rec1, req1)
 
@@ -83,6 +94,7 @@ func TestReactivationRequestHandler_CreateRequest(t *testing.T) {
 		body2, _ := json.Marshal(reqBody2)
 		req2 := httptest.NewRequest("POST", "/api/reactivation-requests", bytes.NewReader(body2))
 		req2.Header.Set("Content-Type", "application/json")
+		req2 = reactivationTenantContext(req2)
 		rec2 := httptest.NewRecorder()
 		handler.CreateRequest(rec2, req2)
 
@@ -105,8 +117,8 @@ func TestReactivationRequestHandler_ListRequests(t *testing.T) {
 	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
 
 	// Create reactivation requests
-	db.Exec("INSERT INTO reactivation_requests (user_id, status, created_at) VALUES (?, 'pending', datetime('now'))", user1ID)
-	db.Exec("INSERT INTO reactivation_requests (user_id, status, created_at) VALUES (?, 'pending', datetime('now'))", user2ID)
+	db.Exec("INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (1, ?, 'pending', datetime('now'))", user1ID)
+	db.Exec("INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (1, ?, 'pending', datetime('now'))", user2ID)
 
 	t.Run("admin sees all requests", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/reactivation-requests", nil)
@@ -156,7 +168,7 @@ func TestReactivationRequestHandler_ApproveRequest(t *testing.T) {
 	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
 
 	var requestID int
-	db.QueryRow("INSERT INTO reactivation_requests (user_id, status, created_at) VALUES (?, 'pending', datetime('now')) RETURNING id", userID).Scan(&requestID)
+	db.QueryRow("INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (1, ?, 'pending', datetime('now')) RETURNING id", userID).Scan(&requestID)
 
 	t.Run("successful approval reactivates user", func(t *testing.T) {
 		reqBody := map[string]interface{}{
@@ -231,7 +243,7 @@ func TestReactivationRequestHandler_DenyRequest(t *testing.T) {
 	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
 
 	var requestID int
-	db.QueryRow("INSERT INTO reactivation_requests (user_id, status, created_at) VALUES (?, 'pending', datetime('now')) RETURNING id", userID).Scan(&requestID)
+	db.QueryRow("INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (1, ?, 'pending', datetime('now')) RETURNING id", userID).Scan(&requestID)
 
 	t.Run("successful denial keeps user inactive", func(t *testing.T) {
 		reqBody := map[string]interface{}{

@@ -402,8 +402,8 @@ func TestUserRepository_FindInactiveUsers(t *testing.T) {
 
 		email := "old@example.com"
 		_, err := db.Exec(`
-			INSERT INTO users (email, first_name, last_name, password_hash, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
-			VALUES (?, 'Old', 'User', 'hash', 1, 1, ?, ?, ?)
+			INSERT INTO users (tenant_id, email, first_name, last_name, password_hash, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
+			VALUES (1, ?, 'Old', 'User', 'hash', 1, 1, ?, ?, ?)
 		`, email, now, oldActivity, now)
 		if err != nil {
 			t.Fatalf("Failed to seed old user: %v", err)
@@ -413,7 +413,7 @@ func TestUserRepository_FindInactiveUsers(t *testing.T) {
 		testutil.SeedTestUser(t, db, "recent@example.com", "Recent User", "green")
 
 		// Find inactive users (>365 days)
-		inactiveUsers, err := repo.FindInactiveUsers(365)
+		inactiveUsers, err := repo.FindInactiveUsers(1, 365) // tenantID = 1
 		if err != nil {
 			t.Fatalf("FindInactiveUsers() failed: %v", err)
 		}

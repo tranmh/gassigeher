@@ -824,11 +824,13 @@ func contextWithSuperAdmin(ctx context.Context, userID int, email string) contex
 	ctx = context.WithValue(ctx, middleware.EmailKey, email)
 	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
 	ctx = context.WithValue(ctx, middleware.IsSuperAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.TenantIDKey, 1) // Use test tenant
 
 	ctx = context.WithValue(ctx, "user_id", userID)
 	ctx = context.WithValue(ctx, "email", email)
 	ctx = context.WithValue(ctx, "is_admin", true)
 	ctx = context.WithValue(ctx, "is_super_admin", true)
+	ctx = context.WithValue(ctx, "tenant_id", 1)
 
 	return ctx
 }

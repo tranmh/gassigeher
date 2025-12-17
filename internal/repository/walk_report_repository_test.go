@@ -26,7 +26,7 @@ func TestWalkReportRepository_Basic(t *testing.T) {
 		Notes:          &notes,
 	}
 
-	err := repo.Create(report)
+	err := repo.Create(1, report) // tenantID = 1
 	if err != nil {
 		t.Fatalf("Create() failed: %v", err)
 	}
@@ -35,7 +35,7 @@ func TestWalkReportRepository_Basic(t *testing.T) {
 	}
 
 	// Test FindByID
-	found, err := repo.FindByID(report.ID)
+	found, err := repo.FindByID(1, report.ID) // tenantID = 1
 	if err != nil {
 		t.Fatalf("FindByID() failed: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestWalkReportRepository_Basic(t *testing.T) {
 	}
 
 	// Test FindByBookingID
-	byBooking, err := repo.FindByBookingID(bookingID)
+	byBooking, err := repo.FindByBookingID(1, bookingID) // tenantID = 1
 	if err != nil {
 		t.Fatalf("FindByBookingID() failed: %v", err)
 	}
@@ -57,17 +57,17 @@ func TestWalkReportRepository_Basic(t *testing.T) {
 
 	// Test Update
 	report.BehaviorRating = 5
-	err = repo.Update(report)
+	err = repo.Update(1, report) // tenantID = 1
 	if err != nil {
 		t.Fatalf("Update() failed: %v", err)
 	}
-	updated, _ := repo.FindByID(report.ID)
+	updated, _ := repo.FindByID(1, report.ID) // tenantID = 1
 	if updated.BehaviorRating != 5 {
 		t.Errorf("Expected rating 5 after update, got %d", updated.BehaviorRating)
 	}
 
 	// Test helper methods
-	userIDResult, err := repo.GetBookingUserID(bookingID)
+	userIDResult, err := repo.GetBookingUserID(1, bookingID) // tenantID = 1
 	if err != nil {
 		t.Fatalf("GetBookingUserID() failed: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestWalkReportRepository_Basic(t *testing.T) {
 		t.Errorf("Expected user ID %d, got %d", userID, userIDResult)
 	}
 
-	isCompleted, err := repo.IsBookingCompleted(bookingID)
+	isCompleted, err := repo.IsBookingCompleted(1, bookingID) // tenantID = 1
 	if err != nil {
 		t.Fatalf("IsBookingCompleted() failed: %v", err)
 	}
@@ -84,11 +84,11 @@ func TestWalkReportRepository_Basic(t *testing.T) {
 	}
 
 	// Test Delete
-	err = repo.Delete(report.ID)
+	err = repo.Delete(1, report.ID) // tenantID = 1
 	if err != nil {
 		t.Fatalf("Delete() failed: %v", err)
 	}
-	deleted, _ := repo.FindByID(report.ID)
+	deleted, _ := repo.FindByID(1, report.ID) // tenantID = 1
 	if deleted != nil {
 		t.Error("Report should be deleted")
 	}
@@ -109,7 +109,7 @@ func TestWalkReportRepository_FindByDogID(t *testing.T) {
 	testutil.SeedTestWalkReport(t, db, booking1ID, 4, "medium", "Walk 1")
 	testutil.SeedTestWalkReport(t, db, booking2ID, 5, "high", "Walk 2")
 
-	reports, err := repo.FindByDogID(dogID, 10)
+	reports, err := repo.FindByDogID(1, dogID, 10) // tenantID = 1
 	if err != nil {
 		t.Fatalf("FindByDogID() failed: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestWalkReportRepository_Stats(t *testing.T) {
 	testutil.SeedTestWalkReport(t, db, booking1ID, 4, "medium", "Walk 1")
 	testutil.SeedTestWalkReport(t, db, booking2ID, 5, "high", "Walk 2")
 
-	stats, err := repo.GetReportStats(dogID)
+	stats, err := repo.GetReportStats(1, dogID) // tenantID = 1
 	if err != nil {
 		t.Fatalf("GetReportStats() failed: %v", err)
 	}
