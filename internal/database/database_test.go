@@ -269,7 +269,7 @@ func TestUniqueConstraints(t *testing.T) {
 		EndTime:   "11:00",
 		IsBlocked: false,
 	}
-	err = bookingTimeRepo.CreateRule(rule1)
+	err = bookingTimeRepo.CreateRule(1, rule1) // tenantID = 1
 	if err != nil {
 		t.Fatalf("Failed to create first rule: %v", err)
 	}
@@ -282,7 +282,7 @@ func TestUniqueConstraints(t *testing.T) {
 		EndTime:   "15:00",
 		IsBlocked: false,
 	}
-	err = bookingTimeRepo.CreateRule(rule2)
+	err = bookingTimeRepo.CreateRule(1, rule2) // tenantID = 1
 	if err == nil {
 		t.Error("Expected error for duplicate (day_type, rule_name), got nil")
 	}
@@ -294,7 +294,7 @@ func TestUniqueConstraints(t *testing.T) {
 		IsActive: true,
 		Source:   "admin",
 	}
-	err = holidayRepo.CreateHoliday(holiday1)
+	err = holidayRepo.CreateHoliday(1, holiday1) // tenantID = 1
 	if err != nil {
 		t.Fatalf("Failed to create first holiday: %v", err)
 	}
@@ -306,7 +306,7 @@ func TestUniqueConstraints(t *testing.T) {
 		IsActive: true,
 		Source:   "admin",
 	}
-	err = holidayRepo.CreateHoliday(holiday2)
+	err = holidayRepo.CreateHoliday(1, holiday2) // tenantID = 1
 	if err == nil {
 		t.Error("Expected error for duplicate holiday date, got nil")
 	}
@@ -376,7 +376,7 @@ func TestIndexEffectiveness(t *testing.T) {
 			IsActive: true,
 			Source:   "test",
 		}
-		err = holidayRepo.CreateHoliday(holiday)
+		err = holidayRepo.CreateHoliday(1, holiday) // tenantID = 1
 		if err != nil {
 			t.Logf("Warning: Failed to insert holiday %d: %v", i, err)
 		}
@@ -420,7 +420,7 @@ func TestIndexEffectiveness(t *testing.T) {
 	iterations := 1000
 	for i := 0; i < iterations; i++ {
 		date := time.Now().AddDate(0, 0, i%100).Format("2006-01-02")
-		_, _ = holidayRepo.IsHoliday(date)
+		_, _ = holidayRepo.IsHoliday(1, date) // tenantID = 1
 	}
 	duration := time.Since(start)
 	avgTime := duration.Milliseconds() / int64(iterations)

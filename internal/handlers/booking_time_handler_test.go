@@ -201,7 +201,7 @@ func TestUpdateRules(t *testing.T) {
 
 	// Get existing rule to update
 	bookingTimeRepo := repository.NewBookingTimeRepository(db)
-	rules, err := bookingTimeRepo.GetRulesByDayType("weekday")
+	rules, err := bookingTimeRepo.GetRulesByDayType(1, "weekday") // tenantID = 1
 	if err != nil || len(rules) == 0 {
 		t.Fatalf("Failed to get existing rules: %v", err)
 	}
@@ -386,7 +386,7 @@ func TestDeleteRule(t *testing.T) {
 		EndTime:   "21:00",
 		IsBlocked: false,
 	}
-	if err := bookingTimeRepo.CreateRule(testRule); err != nil {
+	if err := bookingTimeRepo.CreateRule(1, testRule); err != nil { // tenantID = 1
 		t.Fatalf("Failed to create test rule: %v", err)
 	}
 

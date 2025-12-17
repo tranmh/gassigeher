@@ -70,7 +70,7 @@ func TestGetHolidays(t *testing.T) {
 
 	for _, holiday := range testHolidays {
 		h := holiday
-		if err := holidayRepo.CreateHoliday(&h); err != nil {
+		if err := holidayRepo.CreateHoliday(1, &h); err != nil { // tenantID = 1
 			t.Fatalf("Failed to create test holiday: %v", err)
 		}
 	}
@@ -239,7 +239,7 @@ func TestUpdateHoliday(t *testing.T) {
 		IsActive: true,
 		Source:   "admin",
 	}
-	if err := holidayRepo.CreateHoliday(testHoliday); err != nil {
+	if err := holidayRepo.CreateHoliday(1, testHoliday); err != nil { // tenantID = 1
 		t.Fatalf("Failed to create test holiday: %v", err)
 	}
 
@@ -342,10 +342,10 @@ func TestDeleteHoliday(t *testing.T) {
 		Source:   "api",
 	}
 
-	if err := holidayRepo.CreateHoliday(adminHoliday); err != nil {
+	if err := holidayRepo.CreateHoliday(1, adminHoliday); err != nil { // tenantID = 1
 		t.Fatalf("Failed to create admin holiday: %v", err)
 	}
-	if err := holidayRepo.CreateHoliday(apiHoliday); err != nil {
+	if err := holidayRepo.CreateHoliday(1, apiHoliday); err != nil { // tenantID = 1
 		t.Fatalf("Failed to create API holiday: %v", err)
 	}
 

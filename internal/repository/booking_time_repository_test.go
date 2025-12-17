@@ -79,7 +79,7 @@ func TestGetRulesByDayType_Weekday(t *testing.T) {
 	repo := NewBookingTimeRepository(db)
 
 	// Test weekday rules
-	rules, err := repo.GetRulesByDayType("weekday")
+	rules, err := repo.GetRulesByDayType(1, "weekday") // tenantID = 1
 	if err != nil {
 		t.Fatalf("GetRulesByDayType failed: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestGetRulesByDayType_Weekend(t *testing.T) {
 	repo := NewBookingTimeRepository(db)
 
 	// Test weekend rules
-	rules, err := repo.GetRulesByDayType("weekend")
+	rules, err := repo.GetRulesByDayType(1, "weekend") // tenantID = 1
 	if err != nil {
 		t.Fatalf("GetRulesByDayType failed: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestGetRulesByDayType_Invalid(t *testing.T) {
 	repo := NewBookingTimeRepository(db)
 
 	// Test invalid day type
-	rules, err := repo.GetRulesByDayType("invalid")
+	rules, err := repo.GetRulesByDayType(1, "invalid") // tenantID = 1
 	if err != nil {
 		t.Fatalf("GetRulesByDayType failed: %v", err)
 	}
@@ -163,7 +163,7 @@ func TestCreateRule_ValidWeekdayRule(t *testing.T) {
 		IsBlocked: false,
 	}
 
-	err := repo.CreateRule(rule)
+	err := repo.CreateRule(1, rule) // tenantID = 1
 	if err != nil {
 		t.Fatalf("CreateRule failed: %v", err)
 	}
@@ -174,7 +174,7 @@ func TestCreateRule_ValidWeekdayRule(t *testing.T) {
 	}
 
 	// Verify rule was created
-	rules, err := repo.GetRulesByDayType("weekday")
+	rules, err := repo.GetRulesByDayType(1, "weekday") // tenantID = 1
 	if err != nil {
 		t.Fatalf("GetRulesByDayType failed: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestCreateRule_DuplicateDayTypeAndName(t *testing.T) {
 		IsBlocked: false,
 	}
 
-	err := repo.CreateRule(rule)
+	err := repo.CreateRule(1, rule) // tenantID = 1
 	if err == nil {
 		t.Error("Expected error for duplicate (day_type, rule_name), got nil")
 	}
@@ -219,7 +219,7 @@ func TestUpdateRule_ChangeStartTime(t *testing.T) {
 	repo := NewBookingTimeRepository(db)
 
 	// Get first rule
-	rules, _ := repo.GetRulesByDayType("weekday")
+	rules, _ := repo.GetRulesByDayType(1, "weekday") // tenantID = 1
 	if len(rules) == 0 {
 		t.Fatal("No rules found")
 	}
@@ -233,13 +233,13 @@ func TestUpdateRule_ChangeStartTime(t *testing.T) {
 		IsBlocked: originalRule.IsBlocked,
 	}
 
-	err := repo.UpdateRule(originalRule.ID, updatedRule)
+	err := repo.UpdateRule(1, originalRule.ID, updatedRule) // tenantID = 1
 	if err != nil {
 		t.Fatalf("UpdateRule failed: %v", err)
 	}
 
 	// Verify update
-	rules, _ = repo.GetRulesByDayType("weekday")
+	rules, _ = repo.GetRulesByDayType(1, "weekday") // tenantID = 1
 	found := false
 	for _, rule := range rules {
 		if rule.ID == originalRule.ID {
@@ -263,7 +263,7 @@ func TestUpdateRule_ToggleIsBlocked(t *testing.T) {
 	repo := NewBookingTimeRepository(db)
 
 	// Get a blocked rule
-	rules, _ := repo.GetRulesByDayType("weekday")
+	rules, _ := repo.GetRulesByDayType(1, "weekday") // tenantID = 1
 	var blockedRule *models.BookingTimeRule
 	for i, rule := range rules {
 		if rule.IsBlocked {
@@ -283,13 +283,13 @@ func TestUpdateRule_ToggleIsBlocked(t *testing.T) {
 		IsBlocked: false, // Toggle to false
 	}
 
-	err := repo.UpdateRule(blockedRule.ID, updatedRule)
+	err := repo.UpdateRule(1, blockedRule.ID, updatedRule) // tenantID = 1
 	if err != nil {
 		t.Fatalf("UpdateRule failed: %v", err)
 	}
 
 	// Verify update
-	rules, _ = repo.GetRulesByDayType("weekday")
+	rules, _ = repo.GetRulesByDayType(1, "weekday") // tenantID = 1
 	for _, rule := range rules {
 		if rule.ID == blockedRule.ID {
 			if rule.IsBlocked {
@@ -313,7 +313,7 @@ func TestUpdateRule_NonExistentID(t *testing.T) {
 		IsBlocked: false,
 	}
 
-	err := repo.UpdateRule(9999, updatedRule)
+	err := repo.UpdateRule(1, 9999, updatedRule) // tenantID = 1
 	if err != nil {
 		t.Fatalf("UpdateRule with non-existent ID should not error, got: %v", err)
 	}
@@ -331,7 +331,7 @@ func TestDeleteRule_ExistingID(t *testing.T) {
 	repo := NewBookingTimeRepository(db)
 
 	// Get count before delete
-	rulesBefore, _ := repo.GetRulesByDayType("weekday")
+	rulesBefore, _ := repo.GetRulesByDayType(1, "weekday") // tenantID = 1
 	countBefore := len(rulesBefore)
 
 	if countBefore == 0 {
@@ -339,13 +339,13 @@ func TestDeleteRule_ExistingID(t *testing.T) {
 	}
 
 	// Delete first rule
-	err := repo.DeleteRule(rulesBefore[0].ID)
+	err := repo.DeleteRule(1, rulesBefore[0].ID) // tenantID = 1
 	if err != nil {
 		t.Fatalf("DeleteRule failed: %v", err)
 	}
 
 	// Verify deletion
-	rulesAfter, _ := repo.GetRulesByDayType("weekday")
+	rulesAfter, _ := repo.GetRulesByDayType(1, "weekday") // tenantID = 1
 	countAfter := len(rulesAfter)
 
 	if countAfter != countBefore-1 {
@@ -368,13 +368,13 @@ func TestDeleteRule_NonExistentID(t *testing.T) {
 	repo := NewBookingTimeRepository(db)
 
 	// Delete non-existent rule
-	err := repo.DeleteRule(9999)
+	err := repo.DeleteRule(1, 9999) // tenantID = 1
 	if err != nil {
 		t.Fatalf("DeleteRule with non-existent ID should not error, got: %v", err)
 	}
 
 	// Verify count unchanged
-	rules, _ := repo.GetRulesByDayType("weekday")
+	rules, _ := repo.GetRulesByDayType(1, "weekday") // tenantID = 1
 	if len(rules) != 5 {
 		t.Errorf("Expected 5 rules (unchanged), got %d", len(rules))
 	}
@@ -394,7 +394,7 @@ func TestDeleteRule_IDZero(t *testing.T) {
 	}
 
 	// Verify count unchanged
-	rules, _ := repo.GetRulesByDayType("weekday")
+	rules, _ := repo.GetRulesByDayType(1, "weekday") // tenantID = 1
 	if len(rules) != 5 {
 		t.Errorf("Expected 5 rules (unchanged), got %d", len(rules))
 	}

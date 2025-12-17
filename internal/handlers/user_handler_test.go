@@ -1114,7 +1114,7 @@ func TestUserHandler_AdminCreateUser(t *testing.T) {
 
 		// Verify colors were assigned - this is the BUG we're testing
 		userColorRepo := repository.NewUserColorRepository(db)
-		userColorIDs, err := userColorRepo.GetUserColorIDs(createdUser.ID)
+		userColorIDs, err := userColorRepo.GetUserColorIDs(1, createdUser.ID) // tenantID = 1
 		if err != nil {
 			t.Fatalf("Failed to get user colors: %v", err)
 		}

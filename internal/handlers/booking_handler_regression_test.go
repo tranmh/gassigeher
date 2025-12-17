@@ -395,7 +395,7 @@ func TestRegression_BlockedDates(t *testing.T) {
 				}
 
 				// Verify it was created
-				isBlocked, _ := blockedDateRepo.IsBlocked(date)
+				isBlocked, _ := blockedDateRepo.IsBlocked(date, 1) // tenantID = 1
 				if !isBlocked {
 					t.Error("Date should be blocked")
 				}
@@ -413,7 +413,7 @@ func TestRegression_BlockedDates(t *testing.T) {
 				})
 
 				// Find it to get ID
-				blockedDateObj, err := blockedDateRepo.FindByDate(date)
+				blockedDateObj, err := blockedDateRepo.FindByDate(date, 1) // tenantID = 1
 				if err != nil {
 					t.Fatalf("Could not find blocked date: %v", err)
 				}
@@ -425,7 +425,7 @@ func TestRegression_BlockedDates(t *testing.T) {
 				}
 
 				// Verify it was deleted
-				isBlocked, _ := blockedDateRepo.IsBlocked(date)
+				isBlocked, _ := blockedDateRepo.IsBlocked(date, 1) // tenantID = 1
 				if isBlocked {
 					t.Error("Date should not be blocked after deletion")
 				}
@@ -443,7 +443,7 @@ func TestRegression_BlockedDates(t *testing.T) {
 				blockedDateRepo.Create(&models.BlockedDate{Date: date2, Reason: "Reason 2", CreatedBy: 1})
 
 				// Get all blocked dates
-				blockedDates, err := blockedDateRepo.FindAll()
+				blockedDates, err := blockedDateRepo.FindAll(1) // tenantID = 1
 				if err != nil {
 					t.Errorf("Should be able to retrieve blocked dates: %v", err)
 				}

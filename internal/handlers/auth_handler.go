@@ -17,12 +17,13 @@ import (
 
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
-	userRepo      *repository.UserRepository
-	userColorRepo *repository.UserColorRepository
-	settingsRepo  *repository.SettingsRepository
-	authService   *services.AuthService
-	emailService  *services.EmailService
-	config        *config.Config
+	userRepo          *repository.UserRepository
+	userColorRepo     *repository.UserColorRepository
+	settingsRepo      *repository.SettingsRepository
+	authService       *services.AuthService
+	emailService      *services.EmailService
+	bruteForceService *services.BruteForceService
+	config            *config.Config
 }
 
 // NewAuthHandler creates a new auth handler
@@ -34,12 +35,13 @@ func NewAuthHandler(db *sql.DB, cfg *config.Config) *AuthHandler {
 	}
 
 	return &AuthHandler{
-		userRepo:      repository.NewUserRepository(db),
-		userColorRepo: repository.NewUserColorRepository(db),
-		settingsRepo:  repository.NewSettingsRepository(db),
-		authService:   services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours),
-		emailService:  emailService,
-		config:        cfg,
+		userRepo:          repository.NewUserRepository(db),
+		userColorRepo:     repository.NewUserColorRepository(db),
+		settingsRepo:      repository.NewSettingsRepository(db),
+		authService:       services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours),
+		emailService:      emailService,
+		bruteForceService: services.NewBruteForceService(),
+		config:            cfg,
 	}
 }
 
@@ -239,6 +241,18 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// SaaS: Get tenant_id from context
 	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
+	// Brute force protection: Create key from email and IP
+	clientIP := getClientIPForAuth(r)
+	bruteForceKey := req.Email + ":" + clientIP
+
+	// Check if account is locked out
+	if locked, remaining := h.bruteForceService.IsLocked(bruteForceKey); locked {
+		w.Header().Set("Retry-After", fmt.Sprintf("%d", int(remaining.Seconds())))
+		respondError(w, http.StatusTooManyRequests,
+			fmt.Sprintf("Zu viele fehlgeschlagene Anmeldeversuche. Bitte warten Sie %d Sekunden.", int(remaining.Seconds())))
+		return
+	}
+
 	// Find user (within tenant)
 	user, err := h.userRepo.FindByEmail(req.Email, tenantID)
 	if err != nil {
@@ -246,12 +260,22 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if user == nil || user.PasswordHash == nil {
+		// Record failed attempt (user not found)
+		h.bruteForceService.RecordFailure(bruteForceKey)
 		respondError(w, http.StatusUnauthorized, "Ungültige Anmeldedaten")
 		return
 	}
 
 	// Check password
 	if !h.authService.CheckPassword(req.Password, *user.PasswordHash) {
+		// Record failed attempt (wrong password)
+		lockoutDuration := h.bruteForceService.RecordFailure(bruteForceKey)
+		if lockoutDuration > 0 {
+			w.Header().Set("Retry-After", fmt.Sprintf("%d", int(lockoutDuration.Seconds())))
+			respondError(w, http.StatusTooManyRequests,
+				fmt.Sprintf("Zu viele fehlgeschlagene Anmeldeversuche. Konto für %d Sekunden gesperrt.", int(lockoutDuration.Seconds())))
+			return
+		}
 		respondError(w, http.StatusUnauthorized, "Ungültige Anmeldedaten")
 		return
 	}
@@ -275,6 +299,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusUnauthorized, "Ungültige Anmeldedaten")
 		return
 	}
+
+	// Clear brute force failures on successful login
+	h.bruteForceService.ClearFailures(bruteForceKey)
 
 	// Update last activity
 	if err := h.userRepo.UpdateLastActivity(user.ID); err != nil {
@@ -501,4 +528,36 @@ func respondJSON(w http.ResponseWriter, status int, data interface{}) {
 
 func respondError(w http.ResponseWriter, status int, message string) {
 	respondJSON(w, status, map[string]string{"error": message})
+}
+
+// getClientIPForAuth extracts the real client IP address for brute force tracking
+func getClientIPForAuth(r *http.Request) string {
+	// Check X-Forwarded-For header (from reverse proxy)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// Take first IP if comma-separated
+		for i := 0; i < len(xff); i++ {
+			if xff[i] == ',' {
+				return strings.TrimSpace(xff[:i])
+			}
+		}
+		return strings.TrimSpace(xff)
+	}
+
+	// Check X-Real-IP header
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return strings.TrimSpace(xri)
+	}
+
+	// Fall back to RemoteAddr (strip port)
+	addr := r.RemoteAddr
+	if colonIdx := strings.LastIndex(addr, ":"); colonIdx != -1 {
+		// Check if this is IPv6 address (has brackets)
+		if bracketIdx := strings.LastIndex(addr, "]"); bracketIdx != -1 && bracketIdx < colonIdx {
+			return addr[:colonIdx]
+		} else if !strings.Contains(addr, "[") {
+			// IPv4 address
+			return addr[:colonIdx]
+		}
+	}
+	return addr
 }

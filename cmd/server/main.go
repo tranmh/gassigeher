@@ -97,6 +97,8 @@ func main() {
 	router := mux.NewRouter()
 
 	// Apply global middleware
+	// SaaS Phase 5: Global rate limiter (100 requests/second burst 200 per IP)
+	router.Use(middleware.GlobalRateLimit(100, 200))
 	router.Use(middleware.LoggingMiddleware)
 	router.Use(middleware.SecurityHeadersMiddleware)
 	router.Use(middleware.CORSMiddleware(cfg.BaseURL))

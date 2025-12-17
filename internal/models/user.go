@@ -32,6 +32,10 @@ type User struct {
 	AnonymousID              *string    `json:"anonymous_id,omitempty"`
 	TermsAcceptedAt          time.Time  `json:"terms_accepted_at"`
 	LastActivityAt           time.Time  `json:"last_activity_at"`
+	// Brute force protection fields
+	FailedLoginAttempts      int        `json:"failed_login_attempts,omitempty"`
+	LockedUntil              *time.Time `json:"locked_until,omitempty"`
+	LastFailedLogin          *time.Time `json:"last_failed_login,omitempty"`
 	DeactivatedAt            *time.Time `json:"deactivated_at,omitempty"`
 	DeactivationReason       *string    `json:"deactivation_reason,omitempty"`
 	ReactivatedAt            *time.Time `json:"reactivated_at,omitempty"`
