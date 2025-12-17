@@ -882,7 +882,7 @@ func TestUserHandler_AdminCreateUser(t *testing.T) {
 		}
 
 		// Verify user was created with must_change_password = true
-		createdUser, _ := userRepo.FindByEmail("newuser@example.com")
+		createdUser, _ := userRepo.FindByEmail("newuser@example.com", 0)
 		if !createdUser.MustChangePassword {
 			t.Error("Created user should have must_change_password = true")
 		}
@@ -1107,7 +1107,7 @@ func TestUserHandler_AdminCreateUser(t *testing.T) {
 		}
 
 		// Verify user was created
-		createdUser, err := userRepo.FindByEmail("coloruser@example.com")
+		createdUser, err := userRepo.FindByEmail("coloruser@example.com", 0)
 		if err != nil || createdUser == nil {
 			t.Fatal("User should have been created")
 		}

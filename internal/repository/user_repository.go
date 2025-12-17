@@ -19,18 +19,28 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 }
 
 // Create creates a new user
+// SaaS: Now includes tenant_id for multi-tenancy
 func (r *UserRepository) Create(user *models.User) error {
 	query := `
 		INSERT INTO users (
-			first_name, last_name, email, phone, password_hash,
+			tenant_id, first_name, last_name, email, phone, password_hash,
 			is_admin, is_super_admin, is_verified, is_active, must_change_password,
 			verification_token, verification_token_expires,
 			terms_accepted_at, last_activity_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
+
+	// SaaS: Convert TenantID=0 to NULL for single-tenant mode
+	var tenantIDParam interface{}
+	if user.TenantID > 0 {
+		tenantIDParam = user.TenantID
+	} else {
+		tenantIDParam = nil
+	}
 
 	result, err := r.db.Exec(
 		query,
+		tenantIDParam, // SaaS: Include tenant_id (NULL for single-tenant)
 		user.FirstName,
 		user.LastName,
 		user.Email,
@@ -59,24 +69,48 @@ func (r *UserRepository) Create(user *models.User) error {
 	return nil
 }
 
-// FindByEmail finds a user by email
-func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
-	query := `
-		SELECT id, first_name, last_name, email, phone, password_hash,
-		       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
-		       verification_token, verification_token_expires, password_reset_token,
-		       password_reset_expires, profile_photo, anonymous_id,
-		       terms_accepted_at, last_activity_at, deactivated_at,
-		       deactivation_reason, reactivated_at, deleted_at,
-		       created_at, updated_at
-		FROM users
-		WHERE email = ? AND is_deleted = 0
-	`
+// FindByEmail finds a user by email within a tenant
+// SaaS: tenantID=0 searches globally (backward compatibility), otherwise filters by tenant
+func (r *UserRepository) FindByEmail(email string, tenantID int) (*models.User, error) {
+	var query string
+	var args []interface{}
+
+	if tenantID > 0 {
+		// SaaS mode: filter by tenant
+		query = `
+			SELECT id, tenant_id, first_name, last_name, email, phone, password_hash,
+			       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
+			       verification_token, verification_token_expires, password_reset_token,
+			       password_reset_expires, profile_photo, anonymous_id,
+			       terms_accepted_at, last_activity_at, deactivated_at,
+			       deactivation_reason, reactivated_at, deleted_at,
+			       created_at, updated_at
+			FROM users
+			WHERE email = ? AND tenant_id = ? AND is_deleted = 0
+		`
+		args = []interface{}{email, tenantID}
+	} else {
+		// Single-tenant mode: no tenant filter
+		query = `
+			SELECT id, tenant_id, first_name, last_name, email, phone, password_hash,
+			       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
+			       verification_token, verification_token_expires, password_reset_token,
+			       password_reset_expires, profile_photo, anonymous_id,
+			       terms_accepted_at, last_activity_at, deactivated_at,
+			       deactivation_reason, reactivated_at, deleted_at,
+			       created_at, updated_at
+			FROM users
+			WHERE email = ? AND is_deleted = 0
+		`
+		args = []interface{}{email}
+	}
 
 	user := &models.User{}
 	var firstName, lastName sql.NullString
-	err := r.db.QueryRow(query, email).Scan(
+	var tenantIDNull sql.NullInt64
+	err := r.db.QueryRow(query, args...).Scan(
 		&user.ID,
+		&tenantIDNull,
 		&firstName,
 		&lastName,
 		&user.Email,
@@ -109,6 +143,9 @@ func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user: %w", err)
+	}
+	if tenantIDNull.Valid {
+		user.TenantID = int(tenantIDNull.Int64)
 	}
 	if firstName.Valid {
 		user.FirstName = firstName.String
@@ -121,9 +158,10 @@ func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
 }
 
 // FindByID finds a user by ID
+// SaaS: Now includes tenant_id in result
 func (r *UserRepository) FindByID(id int) (*models.User, error) {
 	query := `
-		SELECT id, first_name, last_name, email, phone, password_hash,
+		SELECT id, tenant_id, first_name, last_name, email, phone, password_hash,
 		       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
@@ -136,8 +174,10 @@ func (r *UserRepository) FindByID(id int) (*models.User, error) {
 
 	user := &models.User{}
 	var firstName, lastName sql.NullString
+	var tenantID sql.NullInt64
 	err := r.db.QueryRow(query, id).Scan(
 		&user.ID,
+		&tenantID,
 		&firstName,
 		&lastName,
 		&user.Email,
@@ -170,6 +210,9 @@ func (r *UserRepository) FindByID(id int) (*models.User, error) {
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user: %w", err)
+	}
+	if tenantID.Valid {
+		user.TenantID = int(tenantID.Int64)
 	}
 	if firstName.Valid {
 		user.FirstName = firstName.String
@@ -182,9 +225,10 @@ func (r *UserRepository) FindByID(id int) (*models.User, error) {
 }
 
 // FindByVerificationToken finds a user by verification token
+// SaaS: Now includes tenant_id in result
 func (r *UserRepository) FindByVerificationToken(token string) (*models.User, error) {
 	query := `
-		SELECT id, first_name, last_name, email, phone, password_hash,
+		SELECT id, tenant_id, first_name, last_name, email, phone, password_hash,
 		       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
@@ -197,8 +241,10 @@ func (r *UserRepository) FindByVerificationToken(token string) (*models.User, er
 
 	user := &models.User{}
 	var firstName, lastName sql.NullString
+	var tenantID sql.NullInt64
 	err := r.db.QueryRow(query, token).Scan(
 		&user.ID,
+		&tenantID,
 		&firstName,
 		&lastName,
 		&user.Email,
@@ -231,6 +277,9 @@ func (r *UserRepository) FindByVerificationToken(token string) (*models.User, er
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user: %w", err)
+	}
+	if tenantID.Valid {
+		user.TenantID = int(tenantID.Int64)
 	}
 	if firstName.Valid {
 		user.FirstName = firstName.String
@@ -243,9 +292,10 @@ func (r *UserRepository) FindByVerificationToken(token string) (*models.User, er
 }
 
 // FindByPasswordResetToken finds a user by password reset token
+// SaaS: Now includes tenant_id in result
 func (r *UserRepository) FindByPasswordResetToken(token string) (*models.User, error) {
 	query := `
-		SELECT id, first_name, last_name, email, phone, password_hash,
+		SELECT id, tenant_id, first_name, last_name, email, phone, password_hash,
 		       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
@@ -258,8 +308,10 @@ func (r *UserRepository) FindByPasswordResetToken(token string) (*models.User, e
 
 	user := &models.User{}
 	var firstName, lastName sql.NullString
+	var tenantID sql.NullInt64
 	err := r.db.QueryRow(query, token).Scan(
 		&user.ID,
+		&tenantID,
 		&firstName,
 		&lastName,
 		&user.Email,
@@ -292,6 +344,9 @@ func (r *UserRepository) FindByPasswordResetToken(token string) (*models.User, e
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user: %w", err)
+	}
+	if tenantID.Valid {
+		user.TenantID = int(tenantID.Int64)
 	}
 	if firstName.Valid {
 		user.FirstName = firstName.String
@@ -458,9 +513,10 @@ func (r *UserRepository) Activate(userID int) error {
 }
 
 // FindInactiveUsers finds users who haven't been active for the specified number of days
+// SaaS: Returns users across all tenants (used by global cron job)
 func (r *UserRepository) FindInactiveUsers(days int) ([]*models.User, error) {
 	query := `
-		SELECT id, first_name, last_name, email, phone, password_hash,
+		SELECT id, tenant_id, first_name, last_name, email, phone, password_hash,
 		       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
@@ -486,8 +542,10 @@ func (r *UserRepository) FindInactiveUsers(days int) ([]*models.User, error) {
 	for rows.Next() {
 		user := &models.User{}
 		var firstName, lastName sql.NullString
+		var tenantID sql.NullInt64
 		err := rows.Scan(
 			&user.ID,
+			&tenantID,
 			&firstName,
 			&lastName,
 			&user.Email,
@@ -517,6 +575,9 @@ func (r *UserRepository) FindInactiveUsers(days int) ([]*models.User, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan user: %w", err)
 		}
+		if tenantID.Valid {
+			user.TenantID = int(tenantID.Int64)
+		}
 		if firstName.Valid {
 			user.FirstName = firstName.String
 		}
@@ -530,9 +591,10 @@ func (r *UserRepository) FindInactiveUsers(days int) ([]*models.User, error) {
 }
 
 // FindAll finds all users with optional filters
-func (r *UserRepository) FindAll(activeOnly *bool) ([]*models.User, error) {
+// SaaS: tenantID=0 returns all users (for cron jobs/global admin), otherwise filters by tenant
+func (r *UserRepository) FindAll(activeOnly *bool, tenantID int) ([]*models.User, error) {
 	query := `
-		SELECT id, first_name, last_name, email, phone, password_hash,
+		SELECT id, tenant_id, first_name, last_name, email, phone, password_hash,
 		       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
@@ -544,6 +606,12 @@ func (r *UserRepository) FindAll(activeOnly *bool) ([]*models.User, error) {
 	`
 
 	args := []interface{}{}
+
+	// SaaS: Filter by tenant if specified
+	if tenantID > 0 {
+		query += " AND tenant_id = ?"
+		args = append(args, tenantID)
+	}
 
 	if activeOnly != nil {
 		if *activeOnly {
@@ -565,8 +633,10 @@ func (r *UserRepository) FindAll(activeOnly *bool) ([]*models.User, error) {
 	for rows.Next() {
 		user := &models.User{}
 		var firstName, lastName sql.NullString
+		var tenantIDNull sql.NullInt64
 		err := rows.Scan(
 			&user.ID,
+			&tenantIDNull,
 			&firstName,
 			&lastName,
 			&user.Email,
@@ -595,6 +665,9 @@ func (r *UserRepository) FindAll(activeOnly *bool) ([]*models.User, error) {
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan user: %w", err)
+		}
+		if tenantIDNull.Valid {
+			user.TenantID = int(tenantIDNull.Int64)
 		}
 		if firstName.Valid {
 			user.FirstName = firstName.String

@@ -559,7 +559,7 @@ func TestRegression_DogBrowsing(t *testing.T) {
 		{
 			name: "TC-8.3.2-A: View all dogs",
 			testFunc: func(t *testing.T) {
-				dogs, err := dogRepo.FindAll(&models.DogFilterRequest{})
+				dogs, err := dogRepo.FindAll(&models.DogFilterRequest{}, 0)
 				if err != nil {
 					t.Errorf("Should be able to get all dogs: %v", err)
 				}

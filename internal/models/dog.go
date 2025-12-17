@@ -7,6 +7,7 @@ import (
 // Dog represents a dog in the system
 type Dog struct {
 	ID                   int            `json:"id"`
+	TenantID             int            `json:"tenant_id,omitempty"` // SaaS: Tenant this dog belongs to
 	Name                 string         `json:"name"`
 	Breed                string         `json:"breed"`
 	Size                 string         `json:"size"` // small, medium, large

@@ -32,10 +32,11 @@ func setupTestDB(t *testing.T) *sql.DB {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
 
-	// Create dogs table
+	// Create dogs table (with tenant_id for SaaS support)
 	_, err = db.Exec(`
 		CREATE TABLE dogs (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			tenant_id INTEGER,
 			name TEXT NOT NULL,
 			breed TEXT NOT NULL,
 			size TEXT,

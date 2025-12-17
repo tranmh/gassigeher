@@ -74,8 +74,11 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if user already exists
-	existing, err := h.userRepo.FindByEmail(req.Email)
+	// SaaS: Get tenant_id from context (set by TenantMiddleware)
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	// Check if user already exists (within tenant)
+	existing, err := h.userRepo.FindByEmail(req.Email, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Database error")
 		return
@@ -102,7 +105,9 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	expires := time.Now().Add(24 * time.Hour)
 
 	// Create user
+	// SaaS: Include tenant_id for multi-tenancy
 	user := &models.User{
+		TenantID:                 tenantID,
 		FirstName:                req.FirstName,
 		LastName:                 req.LastName,
 		Email:                    &req.Email,
@@ -231,8 +236,11 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Find user
-	user, err := h.userRepo.FindByEmail(req.Email)
+	// SaaS: Get tenant_id from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	// Find user (within tenant)
+	user, err := h.userRepo.FindByEmail(req.Email, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Database error")
 		return
@@ -307,8 +315,11 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Find user
-	user, err := h.userRepo.FindByEmail(req.Email)
+	// SaaS: Get tenant_id from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	// Find user (within tenant)
+	user, err := h.userRepo.FindByEmail(req.Email, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Database error")
 		return

@@ -161,7 +161,7 @@ func TestDogRepository_FindAll(t *testing.T) {
 	testutil.SeedTestDog(t, db, "Rocky", "German Shepherd", "orange")
 
 	t.Run("all dogs - no filter", func(t *testing.T) {
-		dogs, err := repo.FindAll(nil)
+		dogs, err := repo.FindAll(nil, 0)
 		if err != nil {
 			t.Fatalf("FindAll() failed: %v", err)
 		}
@@ -177,7 +177,7 @@ func TestDogRepository_FindAll(t *testing.T) {
 			Category: &category,
 		}
 
-		dogs, err := repo.FindAll(filter)
+		dogs, err := repo.FindAll(filter, 0)
 		if err != nil {
 			t.Fatalf("FindAll with category filter failed: %v", err)
 		}
@@ -197,7 +197,7 @@ func TestDogRepository_FindAll(t *testing.T) {
 			Available: &available,
 		}
 
-		dogs, err := repo.FindAll(filter)
+		dogs, err := repo.FindAll(filter, 0)
 		if err != nil {
 			t.Fatalf("FindAll with available filter failed: %v", err)
 		}
@@ -220,7 +220,7 @@ func TestDogRepository_FindAll(t *testing.T) {
 			Breed: &breed,
 		}
 
-		dogs, err := repo.FindAll(filter)
+		dogs, err := repo.FindAll(filter, 0)
 		if err != nil {
 			t.Fatalf("FindAll with breed filter failed: %v", err)
 		}
@@ -240,7 +240,7 @@ func TestDogRepository_FindAll(t *testing.T) {
 			Breed: &breed,
 		}
 
-		dogs, err := repo.FindAll(filter)
+		dogs, err := repo.FindAll(filter, 0)
 		if err != nil {
 			t.Fatalf("FindAll with breed filter failed: %v", err)
 		}
@@ -256,7 +256,7 @@ func TestDogRepository_FindAll(t *testing.T) {
 			Size: &size,
 		}
 
-		dogs, err := repo.FindAll(filter)
+		dogs, err := repo.FindAll(filter, 0)
 		if err != nil {
 			t.Fatalf("FindAll with size filter failed: %v", err)
 		}
@@ -275,7 +275,7 @@ func TestDogRepository_FindAll(t *testing.T) {
 			MaxAge: &maxAge,
 		}
 
-		dogs, err := repo.FindAll(filter)
+		dogs, err := repo.FindAll(filter, 0)
 		if err != nil {
 			t.Fatalf("FindAll with age filter failed: %v", err)
 		}
@@ -298,7 +298,7 @@ func TestDogRepository_FindAll(t *testing.T) {
 			MinAge: &minAge,
 		}
 
-		dogs, err := repo.FindAll(filter)
+		dogs, err := repo.FindAll(filter, 0)
 		if err != nil {
 			t.Fatalf("FindAll with min age filter failed: %v", err)
 		}
@@ -316,7 +316,7 @@ func TestDogRepository_FindAll(t *testing.T) {
 			MaxAge: &maxAge,
 		}
 
-		dogs, err := repo.FindAll(filter)
+		dogs, err := repo.FindAll(filter, 0)
 		if err != nil {
 			t.Fatalf("FindAll with max age filter failed: %v", err)
 		}
@@ -334,7 +334,7 @@ func TestDogRepository_FindAll(t *testing.T) {
 			Search: &search,
 		}
 
-		dogs, err := repo.FindAll(filter)
+		dogs, err := repo.FindAll(filter, 0)
 		if err != nil {
 			t.Fatalf("FindAll with search filter failed: %v", err)
 		}
@@ -354,7 +354,7 @@ func TestDogRepository_FindAll(t *testing.T) {
 			Search: &search,
 		}
 
-		dogs, err := repo.FindAll(filter)
+		dogs, err := repo.FindAll(filter, 0)
 		if err != nil {
 			t.Fatalf("FindAll with search filter failed: %v", err)
 		}
@@ -374,7 +374,7 @@ func TestDogRepository_FindAll(t *testing.T) {
 			Search: &search,
 		}
 
-		dogs, err := repo.FindAll(filter)
+		dogs, err := repo.FindAll(filter, 0)
 		if err != nil {
 			t.Fatalf("FindAll with search filter failed: %v", err)
 		}
@@ -392,7 +392,7 @@ func TestDogRepository_FindAll(t *testing.T) {
 			Available: &available,
 		}
 
-		dogs, err := repo.FindAll(filter)
+		dogs, err := repo.FindAll(filter, 0)
 		if err != nil {
 			t.Fatalf("FindAll with multiple filters failed: %v", err)
 		}
@@ -418,7 +418,7 @@ func TestDogRepository_FindAll(t *testing.T) {
 			Breed: &breed,
 		}
 
-		dogs, err := repo.FindAll(filter)
+		dogs, err := repo.FindAll(filter, 0)
 		if err != nil {
 			t.Fatalf("FindAll with breed filter failed: %v", err)
 		}

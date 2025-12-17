@@ -13,6 +13,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
 	"github.com/tranmh/gassigeher/internal/services"
@@ -89,8 +90,11 @@ func (h *DogHandler) ListDogs(w http.ResponseWriter, r *http.Request) {
 		filter.Search = &search
 	}
 
+	// SaaS: Get tenant_id from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Get dogs
-	dogs, err := h.dogRepo.FindAll(filter)
+	dogs, err := h.dogRepo.FindAll(filter, tenantID)
 	if err != nil {
 		log.Printf("ERROR: Failed to fetch dogs: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to fetch dogs")
@@ -513,7 +517,10 @@ func (h *DogHandler) GetBreeds(w http.ResponseWriter, r *http.Request) {
 
 // GetFeaturedDogs handles GET /api/dogs/featured - get featured dogs for homepage (public)
 func (h *DogHandler) GetFeaturedDogs(w http.ResponseWriter, r *http.Request) {
-	dogs, err := h.dogRepo.GetFeatured()
+	// SaaS: Get tenant_id from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	dogs, err := h.dogRepo.GetFeatured(tenantID)
 	if err != nil {
 		log.Printf("Error fetching featured dogs: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to fetch featured dogs")

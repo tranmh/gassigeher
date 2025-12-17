@@ -153,8 +153,8 @@ func (h *UserHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 
 		// Check if email actually changed
 		if user.Email != nil && *user.Email != newEmail {
-			// Check if new email already exists
-			existingUser, err := h.userRepo.FindByEmail(newEmail)
+			// Check if new email already exists (within same tenant)
+			existingUser, err := h.userRepo.FindByEmail(newEmail, user.TenantID)
 			if err != nil {
 				respondError(w, http.StatusInternalServerError, "Database error")
 				return
@@ -365,7 +365,10 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		activeOnly = &active
 	}
 
-	users, err := h.userRepo.FindAll(activeOnly)
+	// SaaS: Get tenant_id from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	users, err := h.userRepo.FindAll(activeOnly, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get users")
 		return
@@ -855,8 +858,8 @@ func (h *UserHandler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		targetUser.LastName = *req.LastName
 	}
 	if req.Email != nil {
-		// Check if email is already taken by another user
-		existingUser, _ := h.userRepo.FindByEmail(*req.Email)
+		// Check if email is already taken by another user (within same tenant)
+		existingUser, _ := h.userRepo.FindByEmail(*req.Email, targetUser.TenantID)
 		if existingUser != nil && existingUser.ID != userID {
 			respondError(w, http.StatusConflict, "E-Mail wird bereits verwendet")
 			return
@@ -917,8 +920,11 @@ func (h *UserHandler) AdminCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check email uniqueness
-	existing, err := h.userRepo.FindByEmail(req.Email)
+	// SaaS: Get tenant_id from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	// Check email uniqueness (within tenant)
+	existing, err := h.userRepo.FindByEmail(req.Email, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Database error")
 		return
@@ -943,7 +949,9 @@ func (h *UserHandler) AdminCreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create user
+	// SaaS: Include tenant_id for multi-tenancy
 	user := &models.User{
+		TenantID:           tenantID,
 		FirstName:          req.FirstName,
 		LastName:           req.LastName,
 		Email:              &req.Email,

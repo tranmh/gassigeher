@@ -172,7 +172,7 @@ func main() {
 	fmt.Println("[OK] Photo fields updated successfully")
 
 	// Test FindAll includes photo fields
-	allDogs, err := dogRepo.FindAll(nil)
+	allDogs, err := dogRepo.FindAll(nil, 0)
 	if err != nil {
 		log.Fatalf("Failed to retrieve all dogs: %v", err)
 	}

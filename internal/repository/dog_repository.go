@@ -21,17 +21,27 @@ func NewDogRepository(db *sql.DB) *DogRepository {
 }
 
 // Create creates a new dog
+// SaaS: Now includes tenant_id for multi-tenancy
 func (r *DogRepository) Create(dog *models.Dog) error {
 	query := `
 		INSERT INTO dogs (
-			name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
+			tenant_id, name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
 			pickup_location, walk_route, walk_duration, special_instructions,
 			default_morning_time, default_evening_time, is_available, external_link
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
+
+	// SaaS: Convert TenantID=0 to NULL for single-tenant mode
+	var tenantIDParam interface{}
+	if dog.TenantID > 0 {
+		tenantIDParam = dog.TenantID
+	} else {
+		tenantIDParam = nil
+	}
 
 	result, err := r.db.Exec(
 		query,
+		tenantIDParam,
 		dog.Name,
 		dog.Breed,
 		dog.Size,
@@ -65,9 +75,10 @@ func (r *DogRepository) Create(dog *models.Dog) error {
 }
 
 // FindByID finds a dog by ID
+// SaaS: Now includes tenant_id in result
 func (r *DogRepository) FindByID(id int) (*models.Dog, error) {
 	query := `
-		SELECT id, name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
+		SELECT id, tenant_id, name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
 		       pickup_location, walk_route, walk_duration, special_instructions,
 		       default_morning_time, default_evening_time, is_available, is_featured,
 		       external_link, unavailable_reason, unavailable_since, created_at, updated_at
@@ -76,8 +87,10 @@ func (r *DogRepository) FindByID(id int) (*models.Dog, error) {
 	`
 
 	dog := &models.Dog{}
+	var tenantID sql.NullInt64
 	err := r.db.QueryRow(query, id).Scan(
 		&dog.ID,
+		&tenantID,
 		&dog.Name,
 		&dog.Breed,
 		&dog.Size,
@@ -108,13 +121,18 @@ func (r *DogRepository) FindByID(id int) (*models.Dog, error) {
 		return nil, fmt.Errorf("failed to find dog: %w", err)
 	}
 
+	if tenantID.Valid {
+		dog.TenantID = int(tenantID.Int64)
+	}
+
 	return dog, nil
 }
 
 // FindAll finds all dogs with optional filtering
-func (r *DogRepository) FindAll(filter *models.DogFilterRequest) ([]*models.Dog, error) {
+// SaaS: tenantID=0 returns all dogs (for global admin), otherwise filters by tenant
+func (r *DogRepository) FindAll(filter *models.DogFilterRequest, tenantID int) ([]*models.Dog, error) {
 	query := `
-		SELECT id, name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
+		SELECT id, tenant_id, name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
 		       pickup_location, walk_route, walk_duration, special_instructions,
 		       default_morning_time, default_evening_time, is_available, is_featured,
 		       external_link, unavailable_reason, unavailable_since, created_at, updated_at
@@ -123,6 +141,12 @@ func (r *DogRepository) FindAll(filter *models.DogFilterRequest) ([]*models.Dog,
 	`
 
 	args := []interface{}{}
+
+	// SaaS: Filter by tenant if specified
+	if tenantID > 0 {
+		query += " AND tenant_id = ?"
+		args = append(args, tenantID)
+	}
 
 	// Apply filters
 	if filter != nil {
@@ -179,8 +203,10 @@ func (r *DogRepository) FindAll(filter *models.DogFilterRequest) ([]*models.Dog,
 	dogs := []*models.Dog{}
 	for rows.Next() {
 		dog := &models.Dog{}
+		var tenantIDVal sql.NullInt64
 		err := rows.Scan(
 			&dog.ID,
+			&tenantIDVal,
 			&dog.Name,
 			&dog.Breed,
 			&dog.Size,
@@ -206,6 +232,9 @@ func (r *DogRepository) FindAll(filter *models.DogFilterRequest) ([]*models.Dog,
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan dog: %w", err)
 		}
+		if tenantIDVal.Valid {
+			dog.TenantID = int(tenantIDVal.Int64)
+		}
 		dogs = append(dogs, dog)
 	}
 
@@ -214,18 +243,25 @@ func (r *DogRepository) FindAll(filter *models.DogFilterRequest) ([]*models.Dog,
 
 // GetFeatured returns up to 3 randomly selected featured dogs that are available
 // If more than 3 dogs are featured, a random selection of 3 is returned
-func (r *DogRepository) GetFeatured() ([]*models.Dog, error) {
+// SaaS: tenantID=0 returns featured dogs across all tenants
+func (r *DogRepository) GetFeatured(tenantID int) ([]*models.Dog, error) {
 	query := `
-		SELECT id, name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
+		SELECT id, tenant_id, name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
 		       pickup_location, walk_route, walk_duration, special_instructions,
 		       default_morning_time, default_evening_time, is_available, is_featured,
 		       external_link, unavailable_reason, unavailable_since, created_at, updated_at
 		FROM dogs
 		WHERE is_featured = 1 AND is_available = 1
-		ORDER BY name ASC
 	`
 
-	rows, err := r.db.Query(query)
+	args := []interface{}{}
+	if tenantID > 0 {
+		query += " AND tenant_id = ?"
+		args = append(args, tenantID)
+	}
+	query += " ORDER BY name ASC"
+
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query featured dogs: %w", err)
 	}
@@ -234,8 +270,10 @@ func (r *DogRepository) GetFeatured() ([]*models.Dog, error) {
 	allFeatured := []*models.Dog{}
 	for rows.Next() {
 		dog := &models.Dog{}
+		var tenantIDVal sql.NullInt64
 		err := rows.Scan(
 			&dog.ID,
+			&tenantIDVal,
 			&dog.Name,
 			&dog.Breed,
 			&dog.Size,
@@ -260,6 +298,9 @@ func (r *DogRepository) GetFeatured() ([]*models.Dog, error) {
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan featured dog: %w", err)
+		}
+		if tenantIDVal.Valid {
+			dog.TenantID = int(tenantIDVal.Int64)
 		}
 		allFeatured = append(allFeatured, dog)
 	}

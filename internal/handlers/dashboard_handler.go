@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
 )
@@ -64,13 +65,16 @@ func (h *DashboardHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// SaaS: Get tenant_id from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Get active/inactive users
-	activeUsers, err := h.userRepo.FindAll(boolPtr(true))
+	activeUsers, err := h.userRepo.FindAll(boolPtr(true), tenantID)
 	if err == nil {
 		stats.ActiveUsers = len(activeUsers)
 	}
 
-	inactiveUsers, err := h.userRepo.FindAll(boolPtr(false))
+	inactiveUsers, err := h.userRepo.FindAll(boolPtr(false), tenantID)
 	if err == nil {
 		stats.InactiveUsers = len(inactiveUsers)
 	}
@@ -78,14 +82,14 @@ func (h *DashboardHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	// Get available/unavailable dogs
 	availableDogs, err := h.dogRepo.FindAll(&models.DogFilterRequest{
 		Available: boolPtr(true),
-	})
+	}, tenantID)
 	if err == nil {
 		stats.AvailableDogs = len(availableDogs)
 	}
 
 	unavailableDogs, err := h.dogRepo.FindAll(&models.DogFilterRequest{
 		Available: boolPtr(false),
-	})
+	}, tenantID)
 	if err == nil {
 		stats.UnavailableDogs = len(unavailableDogs)
 	}

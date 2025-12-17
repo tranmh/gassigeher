@@ -55,8 +55,11 @@ func (h *ReactivationRequestHandler) CreateRequest(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// Find user by email
-	user, err := h.userRepo.FindByEmail(req.Email)
+	// SaaS: Get tenant_id from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	// Find user by email (within tenant)
+	user, err := h.userRepo.FindByEmail(req.Email, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Database error")
 		return

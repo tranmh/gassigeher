@@ -80,7 +80,7 @@ func TestUserRepository_FindByEmail(t *testing.T) {
 		testutil.SeedTestUser(t, db, testEmail, "Find Me", "green")
 
 		// Find by email
-		user, err := repo.FindByEmail(testEmail)
+		user, err := repo.FindByEmail(testEmail, 0)
 		if err != nil {
 			t.Fatalf("FindByEmail() failed: %v", err)
 		}
@@ -95,7 +95,7 @@ func TestUserRepository_FindByEmail(t *testing.T) {
 	})
 
 	t.Run("user not found", func(t *testing.T) {
-		user, err := repo.FindByEmail("nonexistent@example.com")
+		user, err := repo.FindByEmail("nonexistent@example.com", 0)
 		if err != sql.ErrNoRows && err != nil {
 			t.Logf("FindByEmail returned error: %v", err)
 		}
@@ -105,7 +105,7 @@ func TestUserRepository_FindByEmail(t *testing.T) {
 	})
 
 	t.Run("empty email", func(t *testing.T) {
-		user, err := repo.FindByEmail("")
+		user, err := repo.FindByEmail("", 0)
 		if err != sql.ErrNoRows && err != nil {
 			t.Logf("FindByEmail with empty email returned error: %v", err)
 		}
@@ -338,7 +338,7 @@ func TestUserRepository_FindAll(t *testing.T) {
 	repo.Deactivate(inactiveID, "Test")
 
 	t.Run("all users", func(t *testing.T) {
-		users, err := repo.FindAll(nil)
+		users, err := repo.FindAll(nil, 0)
 		if err != nil {
 			t.Fatalf("FindAll() failed: %v", err)
 		}
@@ -350,7 +350,7 @@ func TestUserRepository_FindAll(t *testing.T) {
 
 	t.Run("active only", func(t *testing.T) {
 		activeOnly := true
-		users, err := repo.FindAll(&activeOnly)
+		users, err := repo.FindAll(&activeOnly, 0)
 		if err != nil {
 			t.Fatalf("FindAll(activeOnly=true) failed: %v", err)
 		}
@@ -376,7 +376,7 @@ func TestUserRepository_FindAll(t *testing.T) {
 
 	t.Run("all including inactive", func(t *testing.T) {
 		activeOnly := false
-		users, err := repo.FindAll(&activeOnly)
+		users, err := repo.FindAll(&activeOnly, 0)
 		if err != nil {
 			t.Fatalf("FindAll(activeOnly=false) failed: %v", err)
 		}
@@ -795,7 +795,7 @@ func TestUserRepository_ClearMustChangePassword(t *testing.T) {
 		}
 
 		// Find user to get ID
-		user, err := repo.FindByEmail(email)
+		user, err := repo.FindByEmail(email, 0)
 		if err != nil {
 			t.Fatalf("Failed to find user: %v", err)
 		}
@@ -841,7 +841,7 @@ func TestUserRepository_ClearMustChangePassword(t *testing.T) {
 			t.Fatalf("Failed to seed user: %v", err)
 		}
 
-		user, _ := repo.FindByEmail(email)
+		user, _ := repo.FindByEmail(email, 0)
 
 		// Clear should succeed even if already false
 		err = repo.ClearMustChangePassword(user.ID)

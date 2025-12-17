@@ -857,7 +857,7 @@ func TestAuthHandler_ForgotPassword(t *testing.T) {
 		}
 
 		// Verify user has reset token
-		user, _ := userRepo.FindByEmail(email)
+		user, _ := userRepo.FindByEmail(email, 0)
 		if user.PasswordResetToken == nil {
 			t.Error("Expected password reset token to be set")
 		}
