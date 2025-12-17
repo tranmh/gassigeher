@@ -710,12 +710,14 @@ func (h *UserHandler) ImpersonateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate impersonation JWT
+	// SaaS: Include target user's tenant_id
 	token, err := h.authService.GenerateImpersonationJWT(
 		targetUserID,
 		targetEmail,
 		targetUser.IsAdmin,
 		targetUser.IsSuperAdmin,
 		currentUserID,
+		targetUser.TenantID,
 	)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to generate token")
@@ -775,11 +777,13 @@ func (h *UserHandler) EndImpersonation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate normal JWT for super-admin (no impersonation claims)
+	// SaaS: Include original user's tenant_id
 	token, err := h.authService.GenerateJWT(
 		originalUserID,
 		originalEmail,
 		originalUser.IsAdmin,
 		originalUser.IsSuperAdmin,
+		originalUser.TenantID,
 	)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to generate token")

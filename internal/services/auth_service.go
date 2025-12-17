@@ -76,12 +76,14 @@ func (s *AuthService) GenerateTempPassword() (string, error) {
 
 // GenerateJWT generates a JWT token for a user
 // DONE: Phase 3 - Updated to include is_super_admin claim
-func (s *AuthService) GenerateJWT(userID int, email string, isAdmin bool, isSuperAdmin bool) (string, error) {
+// SaaS: Updated to include tenant_id claim
+func (s *AuthService) GenerateJWT(userID int, email string, isAdmin bool, isSuperAdmin bool, tenantID int) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id":        userID,
 		"email":          email,
 		"is_admin":       isAdmin,
 		"is_super_admin": isSuperAdmin,
+		"tenant_id":      tenantID, // SaaS: Tenant ID for multi-tenancy
 		"exp":            time.Now().Add(time.Hour * time.Duration(s.jwtExpirationHours)).Unix(),
 	}
 
@@ -95,15 +97,17 @@ func (s *AuthService) GenerateJWT(userID int, email string, isAdmin bool, isSupe
 }
 
 // DONE: Phase 3 - JWT now includes is_admin and is_super_admin claims
+// SaaS: JWT now includes tenant_id claim
 
 // GenerateImpersonationJWT generates a JWT token for impersonation
-// Includes original_user_id and impersonating flag for audit trail
-func (s *AuthService) GenerateImpersonationJWT(targetUserID int, targetEmail string, targetIsAdmin bool, targetIsSuperAdmin bool, originalUserID int) (string, error) {
+// Includes original_user_id, impersonating flag, and tenant_id for audit trail
+func (s *AuthService) GenerateImpersonationJWT(targetUserID int, targetEmail string, targetIsAdmin bool, targetIsSuperAdmin bool, originalUserID int, tenantID int) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id":          targetUserID,
 		"email":            targetEmail,
 		"is_admin":         targetIsAdmin,
 		"is_super_admin":   targetIsSuperAdmin,
+		"tenant_id":        tenantID, // SaaS: Tenant ID for multi-tenancy
 		"original_user_id": originalUserID,
 		"impersonating":    true,
 		"exp":              time.Now().Add(time.Hour * time.Duration(s.jwtExpirationHours)).Unix(),

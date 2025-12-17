@@ -72,6 +72,10 @@ type Config struct {
 	// Server
 	Port    string
 	BaseURL string // Base URL for email links (e.g., "https://gassigeher.com")
+
+	// SaaS Multi-Tenancy
+	SaaSMode   bool   // Enable multi-tenant mode
+	BaseDomain string // Base domain for subdomain extraction (e.g., "gassigeher.org")
 }
 
 // Load loads configuration from environment variables
@@ -137,6 +141,10 @@ func Load() *Config {
 		// Server
 		Port:    getEnv("PORT", "8080"),
 		BaseURL: getEnv("BASE_URL", "http://localhost:8080"),
+
+		// SaaS Multi-Tenancy
+		SaaSMode:   getEnvAsBool("SAAS_MODE", false),
+		BaseDomain: getEnv("BASE_DOMAIN", ""), // e.g., "gassigeher.org"
 	}
 }
 

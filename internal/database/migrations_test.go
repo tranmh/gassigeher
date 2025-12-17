@@ -14,8 +14,8 @@ import (
 func TestMigrationRegistry(t *testing.T) {
 	migrations := GetAllMigrations()
 
-	t.Run("All_2_migrations_registered", func(t *testing.T) {
-		assert.Len(t, migrations, 2, "Should have 2 migrations (consolidated schema)")
+	t.Run("All_6_migrations_registered", func(t *testing.T) {
+		assert.Len(t, migrations, 6, "Should have 6 migrations (consolidated schema + SaaS)")
 	})
 
 	t.Run("Migrations_have_unique_IDs", func(t *testing.T) {
@@ -74,7 +74,7 @@ func TestRunMigrations_SQLite(t *testing.T) {
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 2, count, "Should have 2 applied migrations")
+	assert.Equal(t, 6, count, "Should have 6 applied migrations")
 
 	// Verify all tables created
 	tables := []string{
@@ -120,16 +120,16 @@ func TestRunMigrations_Idempotent(t *testing.T) {
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 2, count)
+	assert.Equal(t, 6, count)
 
 	// Run migrations second time (should be idempotent)
 	err = RunMigrationsWithDialect(db, dialect)
 	assert.NoError(t, err, "Second migration run should succeed (idempotent)")
 
-	// Count should still be 2 (no duplicates)
+	// Count should still be 6 (no duplicates)
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 2, count, "Should still have 2 migrations (no duplicates)")
+	assert.Equal(t, 6, count, "Should still have 6 migrations (no duplicates)")
 }
 
 // TestGetMigrationStatus tests migration status reporting
@@ -147,7 +147,7 @@ func TestGetMigrationStatus(t *testing.T) {
 	applied, pending, err := GetMigrationStatus(db, dialect)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, applied)
-	assert.Equal(t, 2, pending)
+	assert.Equal(t, 6, pending)
 
 	// After migrations
 	err = RunMigrationsWithDialect(db, dialect)
@@ -155,7 +155,7 @@ func TestGetMigrationStatus(t *testing.T) {
 
 	applied, pending, err = GetMigrationStatus(db, dialect)
 	assert.NoError(t, err)
-	assert.Equal(t, 2, applied)
+	assert.Equal(t, 6, applied)
 	assert.Equal(t, 0, pending)
 }
 
@@ -213,9 +213,10 @@ func TestMigration_SQLConsistency(t *testing.T) {
 			postgresSQL := m.Up["postgres"]
 			assert.NotEmpty(t, postgresSQL)
 
-			// All SQL should contain either TABLE, INSERT, or ALTER (valid migration types)
-			isValid := contains(sqliteSQL, "TABLE") || contains(sqliteSQL, "INSERT") || contains(sqliteSQL, "ALTER")
-			assert.True(t, isValid, "Migration SQL should contain TABLE, INSERT, or ALTER")
+			// All SQL should contain either TABLE, INSERT, ALTER, POLICY, INDEX, or be a comment-only migration (no-op for SQLite)
+			isValid := contains(sqliteSQL, "TABLE") || contains(sqliteSQL, "INSERT") || contains(sqliteSQL, "ALTER") ||
+				contains(sqliteSQL, "POLICY") || contains(sqliteSQL, "INDEX") || contains(sqliteSQL, "--")
+			assert.True(t, isValid, "Migration SQL should contain TABLE, INSERT, ALTER, POLICY, INDEX, or be a comment")
 		})
 	}
 }
@@ -353,6 +354,10 @@ func TestMigrationOrder(t *testing.T) {
 	expectedOrder := []string{
 		"001_create_tables",
 		"002_insert_default_data",
+		"003_add_tenants",
+		"004_add_tenant_ids",
+		"005_add_rls",
+		"006_update_constraints",
 	}
 
 	assert.Len(t, migrations, len(expectedOrder))
@@ -394,7 +399,7 @@ func TestMigrationRunner_PartialApplication(t *testing.T) {
 	err = markMigrationAsApplied(db, "001_create_tables")
 	require.NoError(t, err)
 
-	// Now run all migrations - should only apply migration 2
+	// Now run all migrations - should only apply remaining migrations
 	err = RunMigrationsWithDialect(db, dialect)
 	assert.NoError(t, err)
 
@@ -402,7 +407,7 @@ func TestMigrationRunner_PartialApplication(t *testing.T) {
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 2, count, "Should have 2 migrations applied")
+	assert.Equal(t, 6, count, "Should have 6 migrations applied")
 }
 
 // TestIsAlreadyExistsError tests error detection for different databases

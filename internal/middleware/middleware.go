@@ -21,6 +21,10 @@ const RequestIDKey contextKey = "requestID"
 const OriginalUserIDKey contextKey = "originalUserID"   // Impersonation: Super-admin's real ID
 const IsImpersonatingKey contextKey = "isImpersonating" // Impersonation: Boolean flag
 
+// SaaS multi-tenancy context keys
+const TenantIDKey contextKey = "tenantID"     // Tenant ID from subdomain or JWT
+const TenantSlugKey contextKey = "tenantSlug" // Tenant slug (subdomain)
+
 // LoggingMiddleware logs HTTP requests with comprehensive information
 // Includes: timestamp, request ID, client IP, method, path, status code,
 // duration, bytes in/out, user agent, and user ID (if authenticated)
@@ -185,6 +189,19 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 				}
 			}
 
+			// SaaS: Extract tenant_id from JWT
+			jwtTenantID := 0
+			if tid, ok := (*claims)["tenant_id"].(float64); ok {
+				jwtTenantID = int(tid)
+			}
+
+			// SaaS: Validate JWT tenant_id matches subdomain tenant (if subdomain tenant is set)
+			subdomainTenantID, _ := r.Context().Value(TenantIDKey).(int)
+			if subdomainTenantID != 0 && jwtTenantID != 0 && subdomainTenantID != jwtTenantID {
+				http.Error(w, `{"error":"Token für anderes Tierheim ungültig"}`, http.StatusUnauthorized)
+				return
+			}
+
 			// Add to context
 			ctx := context.WithValue(r.Context(), UserIDKey, int(userID))
 			ctx = context.WithValue(ctx, EmailKey, email)
@@ -192,6 +209,12 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 			ctx = context.WithValue(ctx, IsSuperAdminKey, isSuperAdmin) // DONE: Phase 3
 			ctx = context.WithValue(ctx, IsImpersonatingKey, isImpersonating)
 			ctx = context.WithValue(ctx, OriginalUserIDKey, originalUserID)
+			// SaaS: Add tenant_id to context (prefer subdomain, fallback to JWT)
+			if subdomainTenantID != 0 {
+				ctx = context.WithValue(ctx, TenantIDKey, subdomainTenantID)
+			} else if jwtTenantID != 0 {
+				ctx = context.WithValue(ctx, TenantIDKey, jwtTenantID)
+			}
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

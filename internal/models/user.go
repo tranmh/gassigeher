@@ -10,6 +10,7 @@ import (
 // User represents a user in the system
 type User struct {
 	ID                       int              `json:"id"`
+	TenantID                 int              `json:"tenant_id,omitempty"` // SaaS: Tenant this user belongs to
 	FirstName                string           `json:"first_name"`
 	LastName                 string           `json:"last_name"`
 	Email                    *string          `json:"email,omitempty"`
