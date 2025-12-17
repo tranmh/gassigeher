@@ -77,7 +77,7 @@ func (h *ReactivationRequestHandler) CreateRequest(w http.ResponseWriter, r *htt
 	}
 
 	// Check if user already has a pending request
-	hasPending, err := h.requestRepo.HasPendingRequest(user.ID)
+	hasPending, err := h.requestRepo.HasPendingRequest(tenantID, user.ID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check pending requests")
 		return
@@ -92,7 +92,7 @@ func (h *ReactivationRequestHandler) CreateRequest(w http.ResponseWriter, r *htt
 		UserID: user.ID,
 	}
 
-	if err := h.requestRepo.Create(reactivationRequest); err != nil {
+	if err := h.requestRepo.Create(tenantID, reactivationRequest); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to create request")
 		return
 	}
@@ -102,7 +102,10 @@ func (h *ReactivationRequestHandler) CreateRequest(w http.ResponseWriter, r *htt
 
 // ListRequests lists reactivation requests (admin sees all pending)
 func (h *ReactivationRequestHandler) ListRequests(w http.ResponseWriter, r *http.Request) {
-	requests, err := h.requestRepo.FindAllPending()
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	requests, err := h.requestRepo.FindAllPending(tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get requests")
 		return
@@ -131,6 +134,8 @@ func (h *ReactivationRequestHandler) ApproveRequest(w http.ResponseWriter, r *ht
 
 	// Get admin user ID
 	reviewerID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Parse request body
 	var req models.ReviewReactivationRequestRequest
@@ -140,7 +145,7 @@ func (h *ReactivationRequestHandler) ApproveRequest(w http.ResponseWriter, r *ht
 	}
 
 	// Get reactivation request
-	reactivationRequest, err := h.requestRepo.FindByID(id)
+	reactivationRequest, err := h.requestRepo.FindByID(tenantID, id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get request")
 		return
@@ -168,7 +173,7 @@ func (h *ReactivationRequestHandler) ApproveRequest(w http.ResponseWriter, r *ht
 	}
 
 	// Approve request
-	if err := h.requestRepo.Approve(id, reviewerID, req.Message); err != nil {
+	if err := h.requestRepo.Approve(tenantID, id, reviewerID, req.Message); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to approve request")
 		return
 	}
@@ -199,6 +204,8 @@ func (h *ReactivationRequestHandler) DenyRequest(w http.ResponseWriter, r *http.
 
 	// Get admin user ID
 	reviewerID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Parse request body
 	var req models.ReviewReactivationRequestRequest
@@ -208,7 +215,7 @@ func (h *ReactivationRequestHandler) DenyRequest(w http.ResponseWriter, r *http.
 	}
 
 	// Get reactivation request
-	reactivationRequest, err := h.requestRepo.FindByID(id)
+	reactivationRequest, err := h.requestRepo.FindByID(tenantID, id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get request")
 		return
@@ -236,7 +243,7 @@ func (h *ReactivationRequestHandler) DenyRequest(w http.ResponseWriter, r *http.
 	}
 
 	// Deny request
-	if err := h.requestRepo.Deny(id, reviewerID, req.Message); err != nil {
+	if err := h.requestRepo.Deny(tenantID, id, reviewerID, req.Message); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to deny request")
 		return
 	}

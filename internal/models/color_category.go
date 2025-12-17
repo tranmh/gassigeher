@@ -8,6 +8,7 @@ import (
 // ColorCategory represents a configurable dog color category
 type ColorCategory struct {
 	ID          int       `json:"id"`
+	TenantID    int       `json:"tenant_id,omitempty"` // SaaS: Tenant this category belongs to
 	Name        string    `json:"name"`
 	HexCode     string    `json:"hex_code"`
 	PatternIcon *string   `json:"pattern_icon,omitempty"`

@@ -30,13 +30,16 @@ func NewBookingTimeHandler(
 // GetAvailableSlots returns available time slots for a date
 // GET /api/booking-times/available?date=YYYY-MM-DD
 func (h *BookingTimeHandler) GetAvailableSlots(w http.ResponseWriter, r *http.Request) {
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	date := r.URL.Query().Get("date")
 	if date == "" {
 		respondError(w, http.StatusBadRequest, "date parameter required")
 		return
 	}
 
-	slots, err := h.bookingTimeService.GetAvailableTimeSlots(date)
+	slots, err := h.bookingTimeService.GetAvailableTimeSlots(tenantID, date)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
@@ -58,7 +61,10 @@ func (h *BookingTimeHandler) GetRules(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rules, err := h.bookingTimeRepo.GetAllRules()
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	rules, err := h.bookingTimeRepo.GetAllRules(tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to load rules")
 		return
@@ -70,13 +76,16 @@ func (h *BookingTimeHandler) GetRules(w http.ResponseWriter, r *http.Request) {
 // GetRulesForDate returns applicable rules for a specific date
 // GET /api/booking-times/rules-for-date?date=YYYY-MM-DD
 func (h *BookingTimeHandler) GetRulesForDate(w http.ResponseWriter, r *http.Request) {
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	date := r.URL.Query().Get("date")
 	if date == "" {
 		respondError(w, http.StatusBadRequest, "date parameter required")
 		return
 	}
 
-	rules, err := h.bookingTimeService.GetRulesForDate(date)
+	rules, err := h.bookingTimeService.GetRulesForDate(tenantID, date)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
@@ -95,6 +104,9 @@ func (h *BookingTimeHandler) UpdateRules(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	var rules []models.BookingTimeRule
 	if err := json.NewDecoder(r.Body).Decode(&rules); err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid request body")
@@ -111,7 +123,7 @@ func (h *BookingTimeHandler) UpdateRules(w http.ResponseWriter, r *http.Request)
 
 	// Update each rule
 	for _, rule := range rules {
-		if err := h.bookingTimeRepo.UpdateRule(rule.ID, &rule); err != nil {
+		if err := h.bookingTimeRepo.UpdateRule(tenantID, rule.ID, &rule); err != nil {
 			respondError(w, http.StatusInternalServerError, "Failed to update rule")
 			return
 		}
@@ -132,6 +144,9 @@ func (h *BookingTimeHandler) CreateRule(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	var rule models.BookingTimeRule
 	if err := json.NewDecoder(r.Body).Decode(&rule); err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid request body")
@@ -143,7 +158,7 @@ func (h *BookingTimeHandler) CreateRule(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := h.bookingTimeRepo.CreateRule(&rule); err != nil {
+	if err := h.bookingTimeRepo.CreateRule(tenantID, &rule); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to create rule")
 		return
 	}
@@ -161,6 +176,9 @@ func (h *BookingTimeHandler) DeleteRule(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Extract ID from path
 	pathParts := strings.Split(r.URL.Path, "/")
 	if len(pathParts) < 4 {
@@ -175,7 +193,7 @@ func (h *BookingTimeHandler) DeleteRule(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := h.bookingTimeRepo.DeleteRule(id); err != nil {
+	if err := h.bookingTimeRepo.DeleteRule(tenantID, id); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to delete rule")
 		return
 	}

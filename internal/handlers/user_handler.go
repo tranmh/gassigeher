@@ -61,6 +61,9 @@ func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	isImpersonating, _ := r.Context().Value(middleware.IsImpersonatingKey).(bool)
 	originalUserID, _ := r.Context().Value(middleware.OriginalUserIDKey).(int)
 
+	// SaaS: Get tenant_id from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	user, err := h.userRepo.FindByID(userID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Database error")
@@ -77,7 +80,7 @@ func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	user.PasswordResetToken = nil
 
 	// Fetch user's colors
-	colorPtrs, err := h.userColorRepo.GetUserColors(userID)
+	colorPtrs, err := h.userColorRepo.GetUserColors(tenantID, userID)
 	if err != nil {
 		log.Printf("Warning: Failed to get user colors: %v", err)
 		colorPtrs = []*models.ColorCategory{}
@@ -382,7 +385,7 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 		// Fetch user's colors
 		if h.userColorRepo != nil {
-			colorPtrs, err := h.userColorRepo.GetUserColors(user.ID)
+			colorPtrs, err := h.userColorRepo.GetUserColors(tenantID, user.ID)
 			if err == nil && colorPtrs != nil {
 				user.Colors = make([]models.ColorCategory, len(colorPtrs))
 				for i, c := range colorPtrs {
@@ -399,6 +402,9 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 // GetUser gets a user by ID (admin only)
 func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
+	// SaaS: Get tenant_id from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Get user ID from URL
 	vars := mux.Vars(r)
 	userID, err := strconv.Atoi(vars["id"])
@@ -424,7 +430,7 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 
 	// Fetch user's colors
 	if h.userColorRepo != nil {
-		colorPtrs, err := h.userColorRepo.GetUserColors(userID)
+		colorPtrs, err := h.userColorRepo.GetUserColors(tenantID, userID)
 		if err == nil && colorPtrs != nil {
 			user.Colors = make([]models.ColorCategory, len(colorPtrs))
 			for i, c := range colorPtrs {
@@ -976,7 +982,7 @@ func (h *UserHandler) AdminCreateUser(w http.ResponseWriter, r *http.Request) {
 	if len(req.ColorIDs) > 0 && h.userColorRepo != nil {
 		// Get current user ID (admin who's creating) for granted_by field
 		currentUserID, _ := r.Context().Value(middleware.UserIDKey).(int)
-		if err := h.userColorRepo.SetUserColors(user.ID, req.ColorIDs, currentUserID); err != nil {
+		if err := h.userColorRepo.SetUserColors(tenantID, user.ID, req.ColorIDs, currentUserID); err != nil {
 			// Log error but don't fail the request - user was already created
 			log.Printf("Warning: Failed to assign colors to user %d: %v\n", user.ID, err)
 		}

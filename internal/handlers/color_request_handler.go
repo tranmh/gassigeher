@@ -42,6 +42,9 @@ func (h *ColorRequestHandler) CreateRequest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Parse request
 	var req models.CreateColorRequestRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -56,7 +59,7 @@ func (h *ColorRequestHandler) CreateRequest(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Check if color exists
-	color, err := h.colorRepo.FindByID(req.ColorID)
+	color, err := h.colorRepo.FindByID(tenantID, req.ColorID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check color")
 		return
@@ -67,7 +70,7 @@ func (h *ColorRequestHandler) CreateRequest(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Check if user already has this color
-	hasColor, err := h.userColorRepo.HasColor(userID, req.ColorID)
+	hasColor, err := h.userColorRepo.HasColor(tenantID, userID, req.ColorID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check user colors")
 		return
@@ -78,7 +81,7 @@ func (h *ColorRequestHandler) CreateRequest(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Check if user has any pending request
-	hasPending, err := h.requestRepo.HasPendingRequest(userID)
+	hasPending, err := h.requestRepo.HasPendingRequest(tenantID, userID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check pending requests")
 		return
@@ -94,7 +97,7 @@ func (h *ColorRequestHandler) CreateRequest(w http.ResponseWriter, r *http.Reque
 		ColorID: req.ColorID,
 	}
 
-	if err := h.requestRepo.Create(colorRequest); err != nil {
+	if err := h.requestRepo.Create(tenantID, colorRequest); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to create color request")
 		return
 	}
@@ -111,6 +114,9 @@ func (h *ColorRequestHandler) ListRequests(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Check if admin
 	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
 
@@ -119,10 +125,10 @@ func (h *ColorRequestHandler) ListRequests(w http.ResponseWriter, r *http.Reques
 
 	if isAdmin {
 		// Admin sees all pending requests
-		requests, err = h.requestRepo.FindAllPending()
+		requests, err = h.requestRepo.FindAllPending(tenantID)
 	} else {
 		// User sees only their own requests
-		requests, err = h.requestRepo.FindByUserID(userID)
+		requests, err = h.requestRepo.FindByUserID(tenantID, userID)
 	}
 
 	if err != nil {
@@ -143,6 +149,8 @@ func (h *ColorRequestHandler) ApproveRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	vars := mux.Vars(r)
 	idStr := vars["id"]
@@ -153,7 +161,7 @@ func (h *ColorRequestHandler) ApproveRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Get the request
-	colorRequest, err := h.requestRepo.FindByID(id)
+	colorRequest, err := h.requestRepo.FindByID(tenantID, id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get request")
 		return
@@ -180,13 +188,13 @@ func (h *ColorRequestHandler) ApproveRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Approve the request
-	if err := h.requestRepo.Approve(id, adminID, message); err != nil {
+	if err := h.requestRepo.Approve(tenantID, id, adminID, message); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to approve request")
 		return
 	}
 
 	// Add color to user
-	if err := h.userColorRepo.AddColorToUser(colorRequest.UserID, colorRequest.ColorID, adminID); err != nil {
+	if err := h.userColorRepo.AddColorToUser(tenantID, colorRequest.UserID, colorRequest.ColorID, adminID); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to add color to user")
 		return
 	}
@@ -204,6 +212,8 @@ func (h *ColorRequestHandler) DenyRequest(w http.ResponseWriter, r *http.Request
 	}
 
 	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	vars := mux.Vars(r)
 	idStr := vars["id"]
@@ -214,7 +224,7 @@ func (h *ColorRequestHandler) DenyRequest(w http.ResponseWriter, r *http.Request
 	}
 
 	// Get the request
-	colorRequest, err := h.requestRepo.FindByID(id)
+	colorRequest, err := h.requestRepo.FindByID(tenantID, id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get request")
 		return
@@ -241,7 +251,7 @@ func (h *ColorRequestHandler) DenyRequest(w http.ResponseWriter, r *http.Request
 	}
 
 	// Deny the request
-	if err := h.requestRepo.Deny(id, adminID, message); err != nil {
+	if err := h.requestRepo.Deny(tenantID, id, adminID, message); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to deny request")
 		return
 	}
@@ -257,6 +267,9 @@ func (h *ColorRequestHandler) GetRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
 
 	vars := mux.Vars(r)
@@ -267,7 +280,7 @@ func (h *ColorRequestHandler) GetRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	colorRequest, err := h.requestRepo.FindByIDWithDetails(id)
+	colorRequest, err := h.requestRepo.FindByIDWithDetails(tenantID, id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get request")
 		return

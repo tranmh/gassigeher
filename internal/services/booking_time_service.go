@@ -27,8 +27,8 @@ func NewBookingTimeService(
 	}
 }
 
-// ValidateBookingTime validates if a time slot is allowed
-func (s *BookingTimeService) ValidateBookingTime(date string, scheduledTime string) error {
+// ValidateBookingTime validates if a time slot is allowed for a tenant
+func (s *BookingTimeService) ValidateBookingTime(tenantID int, date string, scheduledTime string) error {
 	// Parse date
 	dateObj, err := time.Parse("2006-01-02", date)
 	if err != nil {
@@ -42,13 +42,13 @@ func (s *BookingTimeService) ValidateBookingTime(date string, scheduledTime stri
 	}
 
 	// Determine day type
-	dayType, err := s.getDayType(date, dateObj)
+	dayType, err := s.getDayType(tenantID, date, dateObj)
 	if err != nil {
 		return err
 	}
 
 	// Get rules for day type
-	rules, err := s.bookingTimeRepo.GetRulesByDayType(dayType)
+	rules, err := s.bookingTimeRepo.GetRulesByDayType(tenantID, dayType)
 	if err != nil {
 		return fmt.Errorf("failed to load time rules: %w", err)
 	}
@@ -83,8 +83,8 @@ func (s *BookingTimeService) ValidateBookingTime(date string, scheduledTime stri
 	return nil
 }
 
-// GetAvailableTimeSlots returns all available time slots for a date
-func (s *BookingTimeService) GetAvailableTimeSlots(date string) ([]string, error) {
+// GetAvailableTimeSlots returns all available time slots for a date within a tenant
+func (s *BookingTimeService) GetAvailableTimeSlots(tenantID int, date string) ([]string, error) {
 	// Parse date
 	dateObj, err := time.Parse("2006-01-02", date)
 	if err != nil {
@@ -92,20 +92,20 @@ func (s *BookingTimeService) GetAvailableTimeSlots(date string) ([]string, error
 	}
 
 	// Determine day type
-	dayType, err := s.getDayType(date, dateObj)
+	dayType, err := s.getDayType(tenantID, date, dateObj)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get rules
-	rules, err := s.bookingTimeRepo.GetRulesByDayType(dayType)
+	rules, err := s.bookingTimeRepo.GetRulesByDayType(tenantID, dayType)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get granularity
 	granularity := 15 // Default
-	if setting, err := s.settingsRepo.Get("booking_time_granularity"); err == nil && setting != nil {
+	if setting, err := s.settingsRepo.Get(tenantID, "booking_time_granularity"); err == nil && setting != nil {
 		if g, err := strconv.Atoi(setting.Value); err == nil {
 			granularity = g
 		}
@@ -133,10 +133,10 @@ func (s *BookingTimeService) GetAvailableTimeSlots(date string) ([]string, error
 	return slots, nil
 }
 
-// RequiresApproval checks if a booking requires admin approval
-func (s *BookingTimeService) RequiresApproval(scheduledTime string) (bool, error) {
+// RequiresApproval checks if a booking requires admin approval for a tenant
+func (s *BookingTimeService) RequiresApproval(tenantID int, scheduledTime string) (bool, error) {
 	// Check setting
-	setting, err := s.settingsRepo.Get("morning_walk_requires_approval")
+	setting, err := s.settingsRepo.Get(tenantID, "morning_walk_requires_approval")
 	if err != nil || setting == nil || setting.Value != "true" {
 		return false, nil // Setting disabled
 	}
@@ -159,10 +159,10 @@ func (s *BookingTimeService) RequiresApproval(scheduledTime string) (bool, error
 	return false, nil
 }
 
-// getDayType determines if date is weekday, weekend, or holiday
-func (s *BookingTimeService) getDayType(date string, dateObj time.Time) (string, error) {
+// getDayType determines if date is weekday, weekend, or holiday for a tenant
+func (s *BookingTimeService) getDayType(tenantID int, date string, dateObj time.Time) (string, error) {
 	// Check if holiday
-	isHoliday, err := s.holidayService.IsHoliday(date)
+	isHoliday, err := s.holidayService.IsHoliday(tenantID, date)
 	if err != nil {
 		return "", err
 	}
@@ -180,17 +180,17 @@ func (s *BookingTimeService) getDayType(date string, dateObj time.Time) (string,
 	return "weekday", nil
 }
 
-// GetRulesForDate returns applicable rules for a specific date
-func (s *BookingTimeService) GetRulesForDate(date string) ([]models.BookingTimeRule, error) {
+// GetRulesForDate returns applicable rules for a specific date within a tenant
+func (s *BookingTimeService) GetRulesForDate(tenantID int, date string) ([]models.BookingTimeRule, error) {
 	dateObj, err := time.Parse("2006-01-02", date)
 	if err != nil {
 		return nil, err
 	}
 
-	dayType, err := s.getDayType(date, dateObj)
+	dayType, err := s.getDayType(tenantID, date, dateObj)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.bookingTimeRepo.GetRulesByDayType(dayType)
+	return s.bookingTimeRepo.GetRulesByDayType(tenantID, dayType)
 }

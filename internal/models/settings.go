@@ -4,6 +4,7 @@ import "time"
 
 // SystemSetting represents a system configuration setting
 type SystemSetting struct {
+	TenantID  int       `json:"tenant_id,omitempty"` // SaaS: Tenant this setting belongs to (0 = global)
 	Key       string    `json:"key"`
 	Value     string    `json:"value"`
 	UpdatedAt time.Time `json:"updated_at"`

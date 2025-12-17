@@ -47,6 +47,8 @@ func (h *WalkReportHandler) CreateReport(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Parse request
 	var req models.CreateWalkReportRequest
@@ -62,7 +64,7 @@ func (h *WalkReportHandler) CreateReport(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Check if user owns this booking (admins can create for any booking)
-	bookingUserID, err := h.walkReportRepo.GetBookingUserID(req.BookingID)
+	bookingUserID, err := h.walkReportRepo.GetBookingUserID(tenantID, req.BookingID)
 	if err != nil {
 		respondError(w, http.StatusNotFound, "Buchung nicht gefunden")
 		return
@@ -74,7 +76,7 @@ func (h *WalkReportHandler) CreateReport(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Check if booking is completed
-	isCompleted, err := h.walkReportRepo.IsBookingCompleted(req.BookingID)
+	isCompleted, err := h.walkReportRepo.IsBookingCompleted(tenantID, req.BookingID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check booking status")
 		return
@@ -86,7 +88,7 @@ func (h *WalkReportHandler) CreateReport(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Check if report already exists
-	existingReport, err := h.walkReportRepo.FindByBookingID(req.BookingID)
+	existingReport, err := h.walkReportRepo.FindByBookingID(tenantID, req.BookingID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check existing report")
 		return
@@ -105,7 +107,7 @@ func (h *WalkReportHandler) CreateReport(w http.ResponseWriter, r *http.Request)
 		Notes:          req.Notes,
 	}
 
-	if err := h.walkReportRepo.Create(report); err != nil {
+	if err := h.walkReportRepo.Create(tenantID, report); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to create report")
 		return
 	}
@@ -115,6 +117,9 @@ func (h *WalkReportHandler) CreateReport(w http.ResponseWriter, r *http.Request)
 
 // GetReport gets a walk report by ID
 func (h *WalkReportHandler) GetReport(w http.ResponseWriter, r *http.Request) {
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Get report ID from URL
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
@@ -123,7 +128,7 @@ func (h *WalkReportHandler) GetReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	report, err := h.walkReportRepo.FindByID(id)
+	report, err := h.walkReportRepo.FindByID(tenantID, id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get report")
 		return
@@ -139,6 +144,9 @@ func (h *WalkReportHandler) GetReport(w http.ResponseWriter, r *http.Request) {
 
 // GetReportByBooking gets a walk report by booking ID
 func (h *WalkReportHandler) GetReportByBooking(w http.ResponseWriter, r *http.Request) {
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Get booking ID from URL
 	vars := mux.Vars(r)
 	bookingID, err := strconv.Atoi(vars["bookingId"])
@@ -147,7 +155,7 @@ func (h *WalkReportHandler) GetReportByBooking(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	report, err := h.walkReportRepo.FindByBookingID(bookingID)
+	report, err := h.walkReportRepo.FindByBookingID(tenantID, bookingID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get report")
 		return
@@ -163,6 +171,9 @@ func (h *WalkReportHandler) GetReportByBooking(w http.ResponseWriter, r *http.Re
 
 // GetDogWalkReports gets all walk reports for a dog
 func (h *WalkReportHandler) GetDogWalkReports(w http.ResponseWriter, r *http.Request) {
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Get dog ID from URL
 	vars := mux.Vars(r)
 	dogID, err := strconv.Atoi(vars["id"])
@@ -192,14 +203,14 @@ func (h *WalkReportHandler) GetDogWalkReports(w http.ResponseWriter, r *http.Req
 	}
 
 	// Get reports
-	reports, err := h.walkReportRepo.FindByDogID(dogID, limit)
+	reports, err := h.walkReportRepo.FindByDogID(tenantID, dogID, limit)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get reports")
 		return
 	}
 
 	// Get stats
-	stats, err := h.walkReportRepo.GetReportStats(dogID)
+	stats, err := h.walkReportRepo.GetReportStats(tenantID, dogID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get stats")
 		return
@@ -223,6 +234,8 @@ func (h *WalkReportHandler) UpdateReport(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Get report ID from URL
 	vars := mux.Vars(r)
@@ -233,7 +246,7 @@ func (h *WalkReportHandler) UpdateReport(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Get existing report
-	report, err := h.walkReportRepo.FindByID(id)
+	report, err := h.walkReportRepo.FindByID(tenantID, id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get report")
 		return
@@ -245,7 +258,7 @@ func (h *WalkReportHandler) UpdateReport(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Check if user owns this report's booking (admins can update any report)
-	bookingUserID, err := h.walkReportRepo.GetBookingUserID(report.BookingID)
+	bookingUserID, err := h.walkReportRepo.GetBookingUserID(tenantID, report.BookingID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to verify ownership")
 		return
@@ -274,7 +287,7 @@ func (h *WalkReportHandler) UpdateReport(w http.ResponseWriter, r *http.Request)
 	report.EnergyLevel = req.EnergyLevel
 	report.Notes = req.Notes
 
-	if err := h.walkReportRepo.Update(report); err != nil {
+	if err := h.walkReportRepo.Update(tenantID, report); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to update report")
 		return
 	}
@@ -287,6 +300,8 @@ func (h *WalkReportHandler) DeleteReport(w http.ResponseWriter, r *http.Request)
 	// Get user ID and admin status from context
 	userID, _ := r.Context().Value(middleware.UserIDKey).(int)
 	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Get report ID from URL
 	vars := mux.Vars(r)
@@ -297,7 +312,7 @@ func (h *WalkReportHandler) DeleteReport(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Get existing report
-	report, err := h.walkReportRepo.FindByID(id)
+	report, err := h.walkReportRepo.FindByID(tenantID, id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get report")
 		return
@@ -310,7 +325,7 @@ func (h *WalkReportHandler) DeleteReport(w http.ResponseWriter, r *http.Request)
 
 	// Check authorization (user owns booking OR is admin)
 	if !isAdmin {
-		bookingUserID, err := h.walkReportRepo.GetBookingUserID(report.BookingID)
+		bookingUserID, err := h.walkReportRepo.GetBookingUserID(tenantID, report.BookingID)
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "Failed to verify ownership")
 			return
@@ -328,7 +343,7 @@ func (h *WalkReportHandler) DeleteReport(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Delete report (photos cascade deleted in DB)
-	if err := h.walkReportRepo.Delete(id); err != nil {
+	if err := h.walkReportRepo.Delete(tenantID, id); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to delete report")
 		return
 	}
@@ -345,6 +360,8 @@ func (h *WalkReportHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Get report ID from URL
 	vars := mux.Vars(r)
@@ -355,7 +372,7 @@ func (h *WalkReportHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Get existing report
-	report, err := h.walkReportRepo.FindByID(reportID)
+	report, err := h.walkReportRepo.FindByID(tenantID, reportID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get report")
 		return
@@ -367,7 +384,7 @@ func (h *WalkReportHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Check if user owns this report's booking (admins can upload to any report)
-	bookingUserID, err := h.walkReportRepo.GetBookingUserID(report.BookingID)
+	bookingUserID, err := h.walkReportRepo.GetBookingUserID(tenantID, report.BookingID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to verify ownership")
 		return
@@ -379,7 +396,7 @@ func (h *WalkReportHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Check photo limit (max 3)
-	photoCount, err := h.walkReportRepo.CountPhotos(reportID)
+	photoCount, err := h.walkReportRepo.CountPhotos(tenantID, reportID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to count photos")
 		return
@@ -428,7 +445,7 @@ func (h *WalkReportHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Add photo to database
-	photo, err := h.walkReportRepo.AddPhoto(reportID, fullPath, thumbPath, photoCount)
+	photo, err := h.walkReportRepo.AddPhoto(tenantID, reportID, fullPath, thumbPath, photoCount)
 	if err != nil {
 		// Clean up files if DB insert fails
 		h.imageService.DeleteWalkReportPhoto(fullPath, thumbPath)
@@ -447,6 +464,8 @@ func (h *WalkReportHandler) DeletePhoto(w http.ResponseWriter, r *http.Request) 
 		respondError(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Get report and photo IDs from URL
 	vars := mux.Vars(r)
@@ -463,7 +482,7 @@ func (h *WalkReportHandler) DeletePhoto(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Get existing report
-	report, err := h.walkReportRepo.FindByID(reportID)
+	report, err := h.walkReportRepo.FindByID(tenantID, reportID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get report")
 		return
@@ -476,7 +495,7 @@ func (h *WalkReportHandler) DeletePhoto(w http.ResponseWriter, r *http.Request) 
 
 	// Check if user owns this report's booking (admins can delete any photo)
 	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
-	bookingUserID, err := h.walkReportRepo.GetBookingUserID(report.BookingID)
+	bookingUserID, err := h.walkReportRepo.GetBookingUserID(tenantID, report.BookingID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to verify ownership")
 		return
@@ -488,7 +507,7 @@ func (h *WalkReportHandler) DeletePhoto(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Get photo to delete
-	photo, err := h.walkReportRepo.GetPhotoByID(photoID)
+	photo, err := h.walkReportRepo.GetPhotoByID(tenantID, photoID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get photo")
 		return
@@ -506,7 +525,7 @@ func (h *WalkReportHandler) DeletePhoto(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Delete from database
-	if err := h.walkReportRepo.DeletePhoto(photoID); err != nil {
+	if err := h.walkReportRepo.DeletePhoto(tenantID, photoID); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to delete photo")
 		return
 	}

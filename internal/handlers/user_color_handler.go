@@ -41,6 +41,9 @@ func (h *UserColorHandler) GetUserColors(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	vars := mux.Vars(r)
 	userIDStr := vars["id"]
 	userID, err := strconv.Atoi(userIDStr)
@@ -60,7 +63,7 @@ func (h *UserColorHandler) GetUserColors(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	colors, err := h.userColorRepo.GetUserColors(userID)
+	colors, err := h.userColorRepo.GetUserColors(tenantID, userID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get user colors")
 		return
@@ -79,6 +82,8 @@ func (h *UserColorHandler) AddColorToUser(w http.ResponseWriter, r *http.Request
 	}
 
 	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	vars := mux.Vars(r)
 	userIDStr := vars["id"]
@@ -114,7 +119,7 @@ func (h *UserColorHandler) AddColorToUser(w http.ResponseWriter, r *http.Request
 	}
 
 	// Check if color exists
-	color, err := h.colorRepo.FindByID(req.ColorID)
+	color, err := h.colorRepo.FindByID(tenantID, req.ColorID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check color")
 		return
@@ -125,7 +130,7 @@ func (h *UserColorHandler) AddColorToUser(w http.ResponseWriter, r *http.Request
 	}
 
 	// Check if user already has this color
-	hasColor, err := h.userColorRepo.HasColor(userID, req.ColorID)
+	hasColor, err := h.userColorRepo.HasColor(tenantID, userID, req.ColorID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check user colors")
 		return
@@ -136,7 +141,7 @@ func (h *UserColorHandler) AddColorToUser(w http.ResponseWriter, r *http.Request
 	}
 
 	// Add color to user
-	if err := h.userColorRepo.AddColorToUser(userID, req.ColorID, adminID); err != nil {
+	if err := h.userColorRepo.AddColorToUser(tenantID, userID, req.ColorID, adminID); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to add color to user")
 		return
 	}
@@ -152,6 +157,9 @@ func (h *UserColorHandler) RemoveColorFromUser(w http.ResponseWriter, r *http.Re
 		respondError(w, http.StatusForbidden, "Only admin can remove colors from users")
 		return
 	}
+
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	vars := mux.Vars(r)
 	userIDStr := vars["id"]
@@ -180,7 +188,7 @@ func (h *UserColorHandler) RemoveColorFromUser(w http.ResponseWriter, r *http.Re
 	}
 
 	// Check if user has this color
-	hasColor, err := h.userColorRepo.HasColor(userID, colorID)
+	hasColor, err := h.userColorRepo.HasColor(tenantID, userID, colorID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check user colors")
 		return
@@ -191,7 +199,7 @@ func (h *UserColorHandler) RemoveColorFromUser(w http.ResponseWriter, r *http.Re
 	}
 
 	// Remove color from user
-	if err := h.userColorRepo.RemoveColorFromUser(userID, colorID); err != nil {
+	if err := h.userColorRepo.RemoveColorFromUser(tenantID, userID, colorID); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to remove color from user")
 		return
 	}
@@ -209,6 +217,8 @@ func (h *UserColorHandler) SetUserColors(w http.ResponseWriter, r *http.Request)
 	}
 
 	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	vars := mux.Vars(r)
 	userIDStr := vars["id"]
@@ -240,7 +250,7 @@ func (h *UserColorHandler) SetUserColors(w http.ResponseWriter, r *http.Request)
 
 	// Validate all color IDs exist
 	for _, colorID := range req.ColorIDs {
-		color, err := h.colorRepo.FindByID(colorID)
+		color, err := h.colorRepo.FindByID(tenantID, colorID)
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "Failed to check color")
 			return
@@ -252,7 +262,7 @@ func (h *UserColorHandler) SetUserColors(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Set user colors (replace all)
-	if err := h.userColorRepo.SetUserColors(userID, req.ColorIDs, adminID); err != nil {
+	if err := h.userColorRepo.SetUserColors(tenantID, userID, req.ColorIDs, adminID); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to set user colors")
 		return
 	}

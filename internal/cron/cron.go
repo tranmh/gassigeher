@@ -18,6 +18,7 @@ type CronService struct {
 	bookingRepo  *repository.BookingRepository
 	userRepo     *repository.UserRepository
 	settingsRepo *repository.SettingsRepository
+	tenantRepo   *repository.TenantRepository
 	emailService *services.EmailService
 	stopChan     chan bool
 }
@@ -39,6 +40,7 @@ func NewCronService(db *sql.DB, cfg *config.Config) *CronService {
 		bookingRepo:  repository.NewBookingRepository(db),
 		userRepo:     repository.NewUserRepository(db),
 		settingsRepo: repository.NewSettingsRepository(db),
+		tenantRepo:   repository.NewTenantRepository(db),
 		emailService: emailService,
 		stopChan:     make(chan bool),
 	}
@@ -196,11 +198,32 @@ func (s *CronService) runDaily(name string, hour, minute int, fn func()) {
 }
 
 // autoDeactivateInactiveUsers deactivates users who haven't been active for the configured period
+// SaaS: Runs per-tenant to respect tenant-specific settings
 func (s *CronService) autoDeactivateInactiveUsers() {
-	// Get deactivation period from settings
-	setting, err := s.settingsRepo.Get("auto_deactivation_days")
+	// Get all active tenants
+	tenants, err := s.tenantRepo.FindAll("active")
 	if err != nil {
-		log.Printf("Error getting auto_deactivation_days setting: %v", err)
+		log.Printf("Error getting tenants for auto-deactivation: %v", err)
+		return
+	}
+
+	if len(tenants) == 0 {
+		log.Println("No active tenants found for auto-deactivation")
+		return
+	}
+
+	// Process each tenant
+	for _, tenant := range tenants {
+		s.autoDeactivateUsersForTenant(tenant.ID)
+	}
+}
+
+// autoDeactivateUsersForTenant processes auto-deactivation for a specific tenant
+func (s *CronService) autoDeactivateUsersForTenant(tenantID int) {
+	// Get deactivation period from tenant settings
+	setting, err := s.settingsRepo.Get(tenantID, "auto_deactivation_days")
+	if err != nil {
+		log.Printf("Error getting auto_deactivation_days setting for tenant %d: %v", tenantID, err)
 		return
 	}
 
@@ -211,19 +234,18 @@ func (s *CronService) autoDeactivateInactiveUsers() {
 		}
 	}
 
-	// Find inactive users
-	users, err := s.userRepo.FindInactiveUsers(days)
+	// Find inactive users for this tenant
+	users, err := s.userRepo.FindInactiveUsers(tenantID, days)
 	if err != nil {
-		log.Printf("Error finding inactive users: %v", err)
+		log.Printf("Error finding inactive users for tenant %d: %v", tenantID, err)
 		return
 	}
 
 	if len(users) == 0 {
-		log.Println("No inactive users to deactivate")
-		return
+		return // No inactive users for this tenant
 	}
 
-	log.Printf("Found %d inactive user(s) to deactivate", len(users))
+	log.Printf("Found %d inactive user(s) to deactivate for tenant %d", len(users), tenantID)
 
 	// Deactivate each user
 	for _, user := range users {
@@ -232,7 +254,7 @@ func (s *CronService) autoDeactivateInactiveUsers() {
 			continue
 		}
 
-		log.Printf("Auto-deactivated user %d (inactive for %d days)", user.ID, days)
+		log.Printf("Auto-deactivated user %d (tenant %d, inactive for %d days)", user.ID, tenantID, days)
 
 		// Send email notification about deactivation
 		if s.emailService != nil && user.Email != nil {

@@ -7,7 +7,8 @@ import (
 
 type BookingTimeRule struct {
 	ID        int       `json:"id"`
-	DayType   string    `json:"day_type"`   // 'weekday', 'weekend', 'holiday'
+	TenantID  int       `json:"tenant_id,omitempty"` // SaaS: Tenant this rule belongs to
+	DayType   string    `json:"day_type"`            // 'weekday', 'weekend', 'holiday'
 	RuleName  string    `json:"rule_name"`
 	StartTime string    `json:"start_time"` // HH:MM format
 	EndTime   string    `json:"end_time"`   // HH:MM format

@@ -19,14 +19,14 @@ func NewExperienceRequestRepository(db *sql.DB) *ExperienceRequestRepository {
 }
 
 // Create creates a new experience request
-func (r *ExperienceRequestRepository) Create(request *models.ExperienceRequest) error {
+func (r *ExperienceRequestRepository) Create(tenantID int, request *models.ExperienceRequest) error {
 	query := `
-		INSERT INTO experience_requests (user_id, requested_level, status, created_at)
-		VALUES (?, ?, 'pending', ?)
+		INSERT INTO experience_requests (tenant_id, user_id, requested_level, status, created_at)
+		VALUES (?, ?, ?, 'pending', ?)
 	`
 
 	now := time.Now()
-	result, err := r.db.Exec(query, request.UserID, request.RequestedLevel, now)
+	result, err := r.db.Exec(query, tenantID, request.UserID, request.RequestedLevel, now)
 	if err != nil {
 		return fmt.Errorf("failed to create experience request: %w", err)
 	}
@@ -37,23 +37,25 @@ func (r *ExperienceRequestRepository) Create(request *models.ExperienceRequest) 
 	}
 
 	request.ID = int(id)
+	request.TenantID = tenantID
 	request.Status = "pending"
 	request.CreatedAt = now
 
 	return nil
 }
 
-// FindByID finds an experience request by ID
-func (r *ExperienceRequestRepository) FindByID(id int) (*models.ExperienceRequest, error) {
+// FindByID finds an experience request by ID within a tenant
+func (r *ExperienceRequestRepository) FindByID(tenantID int, id int) (*models.ExperienceRequest, error) {
 	query := `
-		SELECT id, user_id, requested_level, status, admin_message, reviewed_by, reviewed_at, created_at
+		SELECT id, tenant_id, user_id, requested_level, status, admin_message, reviewed_by, reviewed_at, created_at
 		FROM experience_requests
-		WHERE id = ?
+		WHERE id = ? AND tenant_id = ?
 	`
 
 	request := &models.ExperienceRequest{}
-	err := r.db.QueryRow(query, id).Scan(
+	err := r.db.QueryRow(query, id, tenantID).Scan(
 		&request.ID,
+		&request.TenantID,
 		&request.UserID,
 		&request.RequestedLevel,
 		&request.Status,
@@ -74,16 +76,16 @@ func (r *ExperienceRequestRepository) FindByID(id int) (*models.ExperienceReques
 	return request, nil
 }
 
-// FindByUserID finds experience requests by user ID
-func (r *ExperienceRequestRepository) FindByUserID(userID int) ([]*models.ExperienceRequest, error) {
+// FindByUserID finds experience requests by user ID within a tenant
+func (r *ExperienceRequestRepository) FindByUserID(tenantID int, userID int) ([]*models.ExperienceRequest, error) {
 	query := `
-		SELECT id, user_id, requested_level, status, admin_message, reviewed_by, reviewed_at, created_at
+		SELECT id, tenant_id, user_id, requested_level, status, admin_message, reviewed_by, reviewed_at, created_at
 		FROM experience_requests
-		WHERE user_id = ?
+		WHERE user_id = ? AND tenant_id = ?
 		ORDER BY created_at DESC
 	`
 
-	rows, err := r.db.Query(query, userID)
+	rows, err := r.db.Query(query, userID, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query experience requests: %w", err)
 	}
@@ -94,6 +96,7 @@ func (r *ExperienceRequestRepository) FindByUserID(userID int) ([]*models.Experi
 		request := &models.ExperienceRequest{}
 		err := rows.Scan(
 			&request.ID,
+			&request.TenantID,
 			&request.UserID,
 			&request.RequestedLevel,
 			&request.Status,
@@ -111,16 +114,16 @@ func (r *ExperienceRequestRepository) FindByUserID(userID int) ([]*models.Experi
 	return requests, nil
 }
 
-// FindAllPending finds all pending experience requests
-func (r *ExperienceRequestRepository) FindAllPending() ([]*models.ExperienceRequest, error) {
+// FindAllPending finds all pending experience requests within a tenant
+func (r *ExperienceRequestRepository) FindAllPending(tenantID int) ([]*models.ExperienceRequest, error) {
 	query := `
-		SELECT id, user_id, requested_level, status, admin_message, reviewed_by, reviewed_at, created_at
+		SELECT id, tenant_id, user_id, requested_level, status, admin_message, reviewed_by, reviewed_at, created_at
 		FROM experience_requests
-		WHERE status = 'pending'
+		WHERE status = 'pending' AND tenant_id = ?
 		ORDER BY created_at ASC
 	`
 
-	rows, err := r.db.Query(query)
+	rows, err := r.db.Query(query, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query pending requests: %w", err)
 	}
@@ -131,6 +134,7 @@ func (r *ExperienceRequestRepository) FindAllPending() ([]*models.ExperienceRequ
 		request := &models.ExperienceRequest{}
 		err := rows.Scan(
 			&request.ID,
+			&request.TenantID,
 			&request.UserID,
 			&request.RequestedLevel,
 			&request.Status,
@@ -148,16 +152,16 @@ func (r *ExperienceRequestRepository) FindAllPending() ([]*models.ExperienceRequ
 	return requests, nil
 }
 
-// Approve approves an experience request
-func (r *ExperienceRequestRepository) Approve(id int, reviewerID int, message *string) error {
+// Approve approves an experience request within a tenant
+func (r *ExperienceRequestRepository) Approve(tenantID int, id int, reviewerID int, message *string) error {
 	query := `
 		UPDATE experience_requests
 		SET status = 'approved', reviewed_by = ?, reviewed_at = ?, admin_message = ?
-		WHERE id = ?
+		WHERE id = ? AND tenant_id = ?
 	`
 
 	now := time.Now()
-	_, err := r.db.Exec(query, reviewerID, now, message, id)
+	_, err := r.db.Exec(query, reviewerID, now, message, id, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to approve request: %w", err)
 	}
@@ -165,16 +169,16 @@ func (r *ExperienceRequestRepository) Approve(id int, reviewerID int, message *s
 	return nil
 }
 
-// Deny denies an experience request
-func (r *ExperienceRequestRepository) Deny(id int, reviewerID int, message *string) error {
+// Deny denies an experience request within a tenant
+func (r *ExperienceRequestRepository) Deny(tenantID int, id int, reviewerID int, message *string) error {
 	query := `
 		UPDATE experience_requests
 		SET status = 'denied', reviewed_by = ?, reviewed_at = ?, admin_message = ?
-		WHERE id = ?
+		WHERE id = ? AND tenant_id = ?
 	`
 
 	now := time.Now()
-	_, err := r.db.Exec(query, reviewerID, now, message, id)
+	_, err := r.db.Exec(query, reviewerID, now, message, id, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to deny request: %w", err)
 	}
@@ -182,16 +186,16 @@ func (r *ExperienceRequestRepository) Deny(id int, reviewerID int, message *stri
 	return nil
 }
 
-// HasPendingRequest checks if user has a pending request for a level
-func (r *ExperienceRequestRepository) HasPendingRequest(userID int, level string) (bool, error) {
+// HasPendingRequest checks if user has a pending request for a level within a tenant
+func (r *ExperienceRequestRepository) HasPendingRequest(tenantID int, userID int, level string) (bool, error) {
 	query := `
 		SELECT COUNT(*)
 		FROM experience_requests
-		WHERE user_id = ? AND requested_level = ? AND status = 'pending'
+		WHERE user_id = ? AND requested_level = ? AND status = 'pending' AND tenant_id = ?
 	`
 
 	var count int
-	err := r.db.QueryRow(query, userID, level).Scan(&count)
+	err := r.db.QueryRow(query, userID, level, tenantID).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check pending request: %w", err)
 	}

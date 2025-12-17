@@ -31,7 +31,10 @@ func NewColorCategoryHandler(db *sql.DB, cfg *config.Config) *ColorCategoryHandl
 
 // ListColors returns all color categories (public endpoint)
 func (h *ColorCategoryHandler) ListColors(w http.ResponseWriter, r *http.Request) {
-	colors, err := h.colorRepo.FindAll()
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	colors, err := h.colorRepo.FindAll(tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get colors")
 		return
@@ -42,6 +45,9 @@ func (h *ColorCategoryHandler) ListColors(w http.ResponseWriter, r *http.Request
 
 // GetColor returns a single color category by ID
 func (h *ColorCategoryHandler) GetColor(w http.ResponseWriter, r *http.Request) {
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	vars := mux.Vars(r)
 	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
@@ -50,7 +56,7 @@ func (h *ColorCategoryHandler) GetColor(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	color, err := h.colorRepo.FindByID(id)
+	color, err := h.colorRepo.FindByID(tenantID, id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get color")
 		return
@@ -73,8 +79,11 @@ func (h *ColorCategoryHandler) CreateColor(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Check max colors limit (15)
-	count, err := h.colorRepo.Count()
+	count, err := h.colorRepo.Count(tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check color count")
 		return
@@ -98,14 +107,14 @@ func (h *ColorCategoryHandler) CreateColor(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Check if name already exists
-	existing, _ := h.colorRepo.FindByName(req.Name)
+	existing, _ := h.colorRepo.FindByName(tenantID, req.Name)
 	if existing != nil {
 		respondError(w, http.StatusConflict, "Color with this name already exists")
 		return
 	}
 
 	// Get next sort order
-	sortOrder, err := h.colorRepo.GetNextSortOrder()
+	sortOrder, err := h.colorRepo.GetNextSortOrder(tenantID)
 	if err != nil {
 		sortOrder = count + 1
 	}
@@ -118,7 +127,7 @@ func (h *ColorCategoryHandler) CreateColor(w http.ResponseWriter, r *http.Reques
 		SortOrder:   sortOrder,
 	}
 
-	if err := h.colorRepo.Create(color); err != nil {
+	if err := h.colorRepo.Create(tenantID, color); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to create color")
 		return
 	}
@@ -135,6 +144,9 @@ func (h *ColorCategoryHandler) UpdateColor(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	vars := mux.Vars(r)
 	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
@@ -144,7 +156,7 @@ func (h *ColorCategoryHandler) UpdateColor(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Get existing color
-	color, err := h.colorRepo.FindByID(id)
+	color, err := h.colorRepo.FindByID(tenantID, id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get color")
 		return
@@ -170,7 +182,7 @@ func (h *ColorCategoryHandler) UpdateColor(w http.ResponseWriter, r *http.Reques
 	// Apply updates
 	if req.Name != nil && *req.Name != "" {
 		// Check if new name conflicts
-		existing, _ := h.colorRepo.FindByName(*req.Name)
+		existing, _ := h.colorRepo.FindByName(tenantID, *req.Name)
 		if existing != nil && existing.ID != id {
 			respondError(w, http.StatusConflict, "Color with this name already exists")
 			return
@@ -187,7 +199,7 @@ func (h *ColorCategoryHandler) UpdateColor(w http.ResponseWriter, r *http.Reques
 		color.SortOrder = *req.SortOrder
 	}
 
-	if err := h.colorRepo.Update(color); err != nil {
+	if err := h.colorRepo.Update(tenantID, color); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to update color")
 		return
 	}
@@ -204,6 +216,9 @@ func (h *ColorCategoryHandler) DeleteColor(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	vars := mux.Vars(r)
 	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
@@ -213,7 +228,7 @@ func (h *ColorCategoryHandler) DeleteColor(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Check if color exists
-	color, err := h.colorRepo.FindByID(id)
+	color, err := h.colorRepo.FindByID(tenantID, id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get color")
 		return
@@ -224,7 +239,7 @@ func (h *ColorCategoryHandler) DeleteColor(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Check min colors limit (3)
-	count, err := h.colorRepo.Count()
+	count, err := h.colorRepo.Count(tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check color count")
 		return
@@ -235,7 +250,7 @@ func (h *ColorCategoryHandler) DeleteColor(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Check if any dogs are assigned to this color
-	dogCount, err := h.colorRepo.CountDogsWithColor(id)
+	dogCount, err := h.colorRepo.CountDogsWithColor(tenantID, id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check dogs")
 		return
@@ -245,7 +260,7 @@ func (h *ColorCategoryHandler) DeleteColor(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := h.colorRepo.Delete(id); err != nil {
+	if err := h.colorRepo.Delete(tenantID, id); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to delete color")
 		return
 	}
@@ -255,6 +270,9 @@ func (h *ColorCategoryHandler) DeleteColor(w http.ResponseWriter, r *http.Reques
 
 // GetColorStats returns stats for a color (dogs count, users count)
 func (h *ColorCategoryHandler) GetColorStats(w http.ResponseWriter, r *http.Request) {
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	vars := mux.Vars(r)
 	idStr := vars["id"]
 	id, err := strconv.Atoi(idStr)
@@ -263,13 +281,13 @@ func (h *ColorCategoryHandler) GetColorStats(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	dogCount, err := h.colorRepo.CountDogsWithColor(id)
+	dogCount, err := h.colorRepo.CountDogsWithColor(tenantID, id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to count dogs")
 		return
 	}
 
-	userCount, err := h.colorRepo.CountUsersWithColor(id)
+	userCount, err := h.colorRepo.CountUsersWithColor(tenantID, id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to count users")
 		return

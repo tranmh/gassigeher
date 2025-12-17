@@ -5,6 +5,7 @@ import "time"
 // ColorRequest represents a request for a user to gain access to a color category
 type ColorRequest struct {
 	ID           int        `json:"id"`
+	TenantID     int        `json:"tenant_id,omitempty"` // SaaS: Tenant this request belongs to
 	UserID       int        `json:"user_id"`
 	ColorID      int        `json:"color_id"`
 	Status       string     `json:"status"`

@@ -19,14 +19,15 @@ func NewWalkReportRepository(db *sql.DB) *WalkReportRepository {
 }
 
 // Create creates a new walk report
-func (r *WalkReportRepository) Create(report *models.WalkReport) error {
+func (r *WalkReportRepository) Create(tenantID int, report *models.WalkReport) error {
 	query := `
-		INSERT INTO walk_reports (booking_id, behavior_rating, energy_level, notes, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO walk_reports (tenant_id, booking_id, behavior_rating, energy_level, notes, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
 
 	now := time.Now()
 	result, err := r.db.Exec(query,
+		tenantID,
 		report.BookingID,
 		report.BehaviorRating,
 		report.EnergyLevel,
@@ -45,23 +46,25 @@ func (r *WalkReportRepository) Create(report *models.WalkReport) error {
 	}
 
 	report.ID = int(id)
+	report.TenantID = tenantID
 	report.CreatedAt = now
 	report.UpdatedAt = now
 
 	return nil
 }
 
-// FindByID finds a walk report by ID
-func (r *WalkReportRepository) FindByID(id int) (*models.WalkReport, error) {
+// FindByID finds a walk report by ID within a tenant
+func (r *WalkReportRepository) FindByID(tenantID int, id int) (*models.WalkReport, error) {
 	query := `
-		SELECT id, booking_id, behavior_rating, energy_level, notes, created_at, updated_at
+		SELECT id, tenant_id, booking_id, behavior_rating, energy_level, notes, created_at, updated_at
 		FROM walk_reports
-		WHERE id = ?
+		WHERE id = ? AND tenant_id = ?
 	`
 
 	report := &models.WalkReport{}
-	err := r.db.QueryRow(query, id).Scan(
+	err := r.db.QueryRow(query, id, tenantID).Scan(
 		&report.ID,
+		&report.TenantID,
 		&report.BookingID,
 		&report.BehaviorRating,
 		&report.EnergyLevel,
@@ -79,7 +82,7 @@ func (r *WalkReportRepository) FindByID(id int) (*models.WalkReport, error) {
 	}
 
 	// Load photos for this report
-	photos, err := r.GetPhotos(report.ID)
+	photos, err := r.GetPhotos(tenantID, report.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load photos: %w", err)
 	}
@@ -88,17 +91,18 @@ func (r *WalkReportRepository) FindByID(id int) (*models.WalkReport, error) {
 	return report, nil
 }
 
-// FindByBookingID finds a walk report by booking ID
-func (r *WalkReportRepository) FindByBookingID(bookingID int) (*models.WalkReport, error) {
+// FindByBookingID finds a walk report by booking ID within a tenant
+func (r *WalkReportRepository) FindByBookingID(tenantID int, bookingID int) (*models.WalkReport, error) {
 	query := `
-		SELECT id, booking_id, behavior_rating, energy_level, notes, created_at, updated_at
+		SELECT id, tenant_id, booking_id, behavior_rating, energy_level, notes, created_at, updated_at
 		FROM walk_reports
-		WHERE booking_id = ?
+		WHERE booking_id = ? AND tenant_id = ?
 	`
 
 	report := &models.WalkReport{}
-	err := r.db.QueryRow(query, bookingID).Scan(
+	err := r.db.QueryRow(query, bookingID, tenantID).Scan(
 		&report.ID,
+		&report.TenantID,
 		&report.BookingID,
 		&report.BehaviorRating,
 		&report.EnergyLevel,
@@ -116,7 +120,7 @@ func (r *WalkReportRepository) FindByBookingID(bookingID int) (*models.WalkRepor
 	}
 
 	// Load photos for this report
-	photos, err := r.GetPhotos(report.ID)
+	photos, err := r.GetPhotos(tenantID, report.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load photos: %w", err)
 	}
@@ -125,22 +129,22 @@ func (r *WalkReportRepository) FindByBookingID(bookingID int) (*models.WalkRepor
 	return report, nil
 }
 
-// FindByDogID finds all walk reports for a dog with user details
-func (r *WalkReportRepository) FindByDogID(dogID int, limit int) ([]*models.WalkReport, error) {
+// FindByDogID finds all walk reports for a dog with user details within a tenant
+func (r *WalkReportRepository) FindByDogID(tenantID int, dogID int, limit int) ([]*models.WalkReport, error) {
 	query := `
-		SELECT wr.id, wr.booking_id, wr.behavior_rating, wr.energy_level, wr.notes,
+		SELECT wr.id, wr.tenant_id, wr.booking_id, wr.behavior_rating, wr.energy_level, wr.notes,
 		       wr.created_at, wr.updated_at,
 		       b.date, b.scheduled_time,
 		       u.id as user_id, u.first_name, u.last_name
 		FROM walk_reports wr
-		JOIN bookings b ON wr.booking_id = b.id
-		JOIN users u ON b.user_id = u.id
-		WHERE b.dog_id = ?
+		JOIN bookings b ON wr.booking_id = b.id AND wr.tenant_id = b.tenant_id
+		JOIN users u ON b.user_id = u.id AND b.tenant_id = u.tenant_id
+		WHERE b.dog_id = ? AND wr.tenant_id = ?
 		ORDER BY wr.created_at DESC
 		LIMIT ?
 	`
 
-	rows, err := r.db.Query(query, dogID, limit)
+	rows, err := r.db.Query(query, dogID, tenantID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query walk reports: %w", err)
 	}
@@ -156,6 +160,7 @@ func (r *WalkReportRepository) FindByDogID(dogID int, limit int) ([]*models.Walk
 
 		err := rows.Scan(
 			&report.ID,
+			&report.TenantID,
 			&report.BookingID,
 			&report.BehaviorRating,
 			&report.EnergyLevel,
@@ -185,7 +190,7 @@ func (r *WalkReportRepository) FindByDogID(dogID int, limit int) ([]*models.Walk
 	// Load photos for each report AFTER closing the rows cursor
 	// (avoids deadlock with SQLite's single connection)
 	for _, report := range reports {
-		photos, err := r.GetPhotos(report.ID)
+		photos, err := r.GetPhotos(tenantID, report.ID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load photos: %w", err)
 		}
@@ -195,22 +200,22 @@ func (r *WalkReportRepository) FindByDogID(dogID int, limit int) ([]*models.Walk
 	return reports, nil
 }
 
-// FindByUserID finds all walk reports created by a user
-func (r *WalkReportRepository) FindByUserID(userID int, limit int) ([]*models.WalkReport, error) {
+// FindByUserID finds all walk reports created by a user within a tenant
+func (r *WalkReportRepository) FindByUserID(tenantID int, userID int, limit int) ([]*models.WalkReport, error) {
 	query := `
-		SELECT wr.id, wr.booking_id, wr.behavior_rating, wr.energy_level, wr.notes,
+		SELECT wr.id, wr.tenant_id, wr.booking_id, wr.behavior_rating, wr.energy_level, wr.notes,
 		       wr.created_at, wr.updated_at,
 		       b.date, b.scheduled_time, b.dog_id,
 		       d.name as dog_name, d.breed
 		FROM walk_reports wr
-		JOIN bookings b ON wr.booking_id = b.id
-		JOIN dogs d ON b.dog_id = d.id
-		WHERE b.user_id = ?
+		JOIN bookings b ON wr.booking_id = b.id AND wr.tenant_id = b.tenant_id
+		JOIN dogs d ON b.dog_id = d.id AND b.tenant_id = d.tenant_id
+		WHERE b.user_id = ? AND wr.tenant_id = ?
 		ORDER BY wr.created_at DESC
 		LIMIT ?
 	`
 
-	rows, err := r.db.Query(query, userID, limit)
+	rows, err := r.db.Query(query, userID, tenantID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query walk reports: %w", err)
 	}
@@ -225,6 +230,7 @@ func (r *WalkReportRepository) FindByUserID(userID int, limit int) ([]*models.Wa
 
 		err := rows.Scan(
 			&report.ID,
+			&report.TenantID,
 			&report.BookingID,
 			&report.BehaviorRating,
 			&report.EnergyLevel,
@@ -247,7 +253,7 @@ func (r *WalkReportRepository) FindByUserID(userID int, limit int) ([]*models.Wa
 	// Load photos for each report AFTER closing the rows cursor
 	// (avoids deadlock with SQLite's single connection)
 	for _, report := range reports {
-		photos, err := r.GetPhotos(report.ID)
+		photos, err := r.GetPhotos(tenantID, report.ID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load photos: %w", err)
 		}
@@ -257,12 +263,12 @@ func (r *WalkReportRepository) FindByUserID(userID int, limit int) ([]*models.Wa
 	return reports, nil
 }
 
-// Update updates a walk report
-func (r *WalkReportRepository) Update(report *models.WalkReport) error {
+// Update updates a walk report within a tenant
+func (r *WalkReportRepository) Update(tenantID int, report *models.WalkReport) error {
 	query := `
 		UPDATE walk_reports
 		SET behavior_rating = ?, energy_level = ?, notes = ?, updated_at = ?
-		WHERE id = ?
+		WHERE id = ? AND tenant_id = ?
 	`
 
 	now := time.Now()
@@ -272,6 +278,7 @@ func (r *WalkReportRepository) Update(report *models.WalkReport) error {
 		report.Notes,
 		now,
 		report.ID,
+		tenantID,
 	)
 
 	if err != nil {
@@ -291,11 +298,11 @@ func (r *WalkReportRepository) Update(report *models.WalkReport) error {
 	return nil
 }
 
-// Delete deletes a walk report (photos are cascade deleted by FK)
-func (r *WalkReportRepository) Delete(id int) error {
-	query := `DELETE FROM walk_reports WHERE id = ?`
+// Delete deletes a walk report (photos are cascade deleted by FK) within a tenant
+func (r *WalkReportRepository) Delete(tenantID int, id int) error {
+	query := `DELETE FROM walk_reports WHERE id = ? AND tenant_id = ?`
 
-	result, err := r.db.Exec(query, id)
+	result, err := r.db.Exec(query, id, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to delete walk report: %w", err)
 	}
@@ -312,15 +319,15 @@ func (r *WalkReportRepository) Delete(id int) error {
 	return nil
 }
 
-// AddPhoto adds a photo to a walk report
-func (r *WalkReportRepository) AddPhoto(reportID int, photoPath, thumbnailPath string, displayOrder int) (*models.WalkReportPhoto, error) {
+// AddPhoto adds a photo to a walk report within a tenant
+func (r *WalkReportRepository) AddPhoto(tenantID int, reportID int, photoPath, thumbnailPath string, displayOrder int) (*models.WalkReportPhoto, error) {
 	query := `
-		INSERT INTO walk_report_photos (walk_report_id, photo_path, photo_thumbnail, display_order, created_at)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO walk_report_photos (tenant_id, walk_report_id, photo_path, photo_thumbnail, display_order, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)
 	`
 
 	now := time.Now()
-	result, err := r.db.Exec(query, reportID, photoPath, thumbnailPath, displayOrder, now)
+	result, err := r.db.Exec(query, tenantID, reportID, photoPath, thumbnailPath, displayOrder, now)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add photo: %w", err)
 	}
@@ -332,6 +339,7 @@ func (r *WalkReportRepository) AddPhoto(reportID int, photoPath, thumbnailPath s
 
 	photo := &models.WalkReportPhoto{
 		ID:             int(id),
+		TenantID:       tenantID,
 		WalkReportID:   reportID,
 		PhotoPath:      photoPath,
 		PhotoThumbnail: thumbnailPath,
@@ -342,16 +350,16 @@ func (r *WalkReportRepository) AddPhoto(reportID int, photoPath, thumbnailPath s
 	return photo, nil
 }
 
-// GetPhotos gets all photos for a walk report
-func (r *WalkReportRepository) GetPhotos(reportID int) ([]models.WalkReportPhoto, error) {
+// GetPhotos gets all photos for a walk report within a tenant
+func (r *WalkReportRepository) GetPhotos(tenantID int, reportID int) ([]models.WalkReportPhoto, error) {
 	query := `
-		SELECT id, walk_report_id, photo_path, photo_thumbnail, display_order, created_at
+		SELECT id, tenant_id, walk_report_id, photo_path, photo_thumbnail, display_order, created_at
 		FROM walk_report_photos
-		WHERE walk_report_id = ?
+		WHERE walk_report_id = ? AND tenant_id = ?
 		ORDER BY display_order ASC
 	`
 
-	rows, err := r.db.Query(query, reportID)
+	rows, err := r.db.Query(query, reportID, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query photos: %w", err)
 	}
@@ -362,6 +370,7 @@ func (r *WalkReportRepository) GetPhotos(reportID int) ([]models.WalkReportPhoto
 		photo := models.WalkReportPhoto{}
 		err := rows.Scan(
 			&photo.ID,
+			&photo.TenantID,
 			&photo.WalkReportID,
 			&photo.PhotoPath,
 			&photo.PhotoThumbnail,
@@ -377,11 +386,11 @@ func (r *WalkReportRepository) GetPhotos(reportID int) ([]models.WalkReportPhoto
 	return photos, nil
 }
 
-// DeletePhoto deletes a photo from a walk report
-func (r *WalkReportRepository) DeletePhoto(photoID int) error {
-	query := `DELETE FROM walk_report_photos WHERE id = ?`
+// DeletePhoto deletes a photo from a walk report within a tenant
+func (r *WalkReportRepository) DeletePhoto(tenantID int, photoID int) error {
+	query := `DELETE FROM walk_report_photos WHERE id = ? AND tenant_id = ?`
 
-	result, err := r.db.Exec(query, photoID)
+	result, err := r.db.Exec(query, photoID, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to delete photo: %w", err)
 	}
@@ -398,17 +407,18 @@ func (r *WalkReportRepository) DeletePhoto(photoID int) error {
 	return nil
 }
 
-// GetPhotoByID gets a photo by its ID
-func (r *WalkReportRepository) GetPhotoByID(photoID int) (*models.WalkReportPhoto, error) {
+// GetPhotoByID gets a photo by its ID within a tenant
+func (r *WalkReportRepository) GetPhotoByID(tenantID int, photoID int) (*models.WalkReportPhoto, error) {
 	query := `
-		SELECT id, walk_report_id, photo_path, photo_thumbnail, display_order, created_at
+		SELECT id, tenant_id, walk_report_id, photo_path, photo_thumbnail, display_order, created_at
 		FROM walk_report_photos
-		WHERE id = ?
+		WHERE id = ? AND tenant_id = ?
 	`
 
 	photo := &models.WalkReportPhoto{}
-	err := r.db.QueryRow(query, photoID).Scan(
+	err := r.db.QueryRow(query, photoID, tenantID).Scan(
 		&photo.ID,
+		&photo.TenantID,
 		&photo.WalkReportID,
 		&photo.PhotoPath,
 		&photo.PhotoThumbnail,
@@ -427,12 +437,12 @@ func (r *WalkReportRepository) GetPhotoByID(photoID int) (*models.WalkReportPhot
 	return photo, nil
 }
 
-// CountPhotos counts the number of photos for a walk report
-func (r *WalkReportRepository) CountPhotos(reportID int) (int, error) {
-	query := `SELECT COUNT(*) FROM walk_report_photos WHERE walk_report_id = ?`
+// CountPhotos counts the number of photos for a walk report within a tenant
+func (r *WalkReportRepository) CountPhotos(tenantID int, reportID int) (int, error) {
+	query := `SELECT COUNT(*) FROM walk_report_photos WHERE walk_report_id = ? AND tenant_id = ?`
 
 	var count int
-	err := r.db.QueryRow(query, reportID).Scan(&count)
+	err := r.db.QueryRow(query, reportID, tenantID).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count photos: %w", err)
 	}
@@ -440,21 +450,21 @@ func (r *WalkReportRepository) CountPhotos(reportID int) (int, error) {
 	return count, nil
 }
 
-// GetReportStats gets aggregated statistics for a dog's walk reports
-func (r *WalkReportRepository) GetReportStats(dogID int) (*models.WalkReportStats, error) {
+// GetReportStats gets aggregated statistics for a dog's walk reports within a tenant
+func (r *WalkReportRepository) GetReportStats(tenantID int, dogID int) (*models.WalkReportStats, error) {
 	query := `
 		SELECT
 			COUNT(*) as total_walks,
 			COALESCE(AVG(wr.behavior_rating), 0) as average_rating,
 			COUNT(DISTINCT CASE WHEN wrp.id IS NOT NULL THEN wr.id END) as reports_with_photos
 		FROM walk_reports wr
-		JOIN bookings b ON wr.booking_id = b.id
-		LEFT JOIN walk_report_photos wrp ON wr.id = wrp.walk_report_id
-		WHERE b.dog_id = ?
+		JOIN bookings b ON wr.booking_id = b.id AND wr.tenant_id = b.tenant_id
+		LEFT JOIN walk_report_photos wrp ON wr.id = wrp.walk_report_id AND wr.tenant_id = wrp.tenant_id
+		WHERE b.dog_id = ? AND wr.tenant_id = ?
 	`
 
 	stats := &models.WalkReportStats{}
-	err := r.db.QueryRow(query, dogID).Scan(
+	err := r.db.QueryRow(query, dogID, tenantID).Scan(
 		&stats.TotalWalks,
 		&stats.AverageRating,
 		&stats.ReportsWithPhotos,
@@ -467,12 +477,12 @@ func (r *WalkReportRepository) GetReportStats(dogID int) (*models.WalkReportStat
 	return stats, nil
 }
 
-// GetBookingUserID gets the user ID for a booking (for authorization checks)
-func (r *WalkReportRepository) GetBookingUserID(bookingID int) (int, error) {
-	query := `SELECT user_id FROM bookings WHERE id = ?`
+// GetBookingUserID gets the user ID for a booking within a tenant (for authorization checks)
+func (r *WalkReportRepository) GetBookingUserID(tenantID int, bookingID int) (int, error) {
+	query := `SELECT user_id FROM bookings WHERE id = ? AND tenant_id = ?`
 
 	var userID int
-	err := r.db.QueryRow(query, bookingID).Scan(&userID)
+	err := r.db.QueryRow(query, bookingID, tenantID).Scan(&userID)
 	if err == sql.ErrNoRows {
 		return 0, fmt.Errorf("booking not found")
 	}
@@ -483,12 +493,12 @@ func (r *WalkReportRepository) GetBookingUserID(bookingID int) (int, error) {
 	return userID, nil
 }
 
-// IsBookingCompleted checks if a booking is completed
-func (r *WalkReportRepository) IsBookingCompleted(bookingID int) (bool, error) {
-	query := `SELECT status FROM bookings WHERE id = ?`
+// IsBookingCompleted checks if a booking is completed within a tenant
+func (r *WalkReportRepository) IsBookingCompleted(tenantID int, bookingID int) (bool, error) {
+	query := `SELECT status FROM bookings WHERE id = ? AND tenant_id = ?`
 
 	var status string
-	err := r.db.QueryRow(query, bookingID).Scan(&status)
+	err := r.db.QueryRow(query, bookingID, tenantID).Scan(&status)
 	if err == sql.ErrNoRows {
 		return false, fmt.Errorf("booking not found")
 	}

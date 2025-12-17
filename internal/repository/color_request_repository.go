@@ -19,14 +19,14 @@ func NewColorRequestRepository(db *sql.DB) *ColorRequestRepository {
 }
 
 // Create creates a new color request
-func (r *ColorRequestRepository) Create(request *models.ColorRequest) error {
+func (r *ColorRequestRepository) Create(tenantID int, request *models.ColorRequest) error {
 	query := `
-		INSERT INTO color_requests (user_id, color_id, status, created_at)
-		VALUES (?, ?, 'pending', ?)
+		INSERT INTO color_requests (tenant_id, user_id, color_id, status, created_at)
+		VALUES (?, ?, ?, 'pending', ?)
 	`
 
 	now := time.Now()
-	result, err := r.db.Exec(query, request.UserID, request.ColorID, now)
+	result, err := r.db.Exec(query, tenantID, request.UserID, request.ColorID, now)
 	if err != nil {
 		return fmt.Errorf("failed to create color request: %w", err)
 	}
@@ -37,23 +37,25 @@ func (r *ColorRequestRepository) Create(request *models.ColorRequest) error {
 	}
 
 	request.ID = int(id)
+	request.TenantID = tenantID
 	request.Status = "pending"
 	request.CreatedAt = now
 
 	return nil
 }
 
-// FindByID finds a color request by ID
-func (r *ColorRequestRepository) FindByID(id int) (*models.ColorRequest, error) {
+// FindByID finds a color request by ID within a tenant
+func (r *ColorRequestRepository) FindByID(tenantID int, id int) (*models.ColorRequest, error) {
 	query := `
-		SELECT id, user_id, color_id, status, admin_message, reviewed_by, reviewed_at, created_at
+		SELECT id, tenant_id, user_id, color_id, status, admin_message, reviewed_by, reviewed_at, created_at
 		FROM color_requests
-		WHERE id = ?
+		WHERE id = ? AND tenant_id = ?
 	`
 
 	request := &models.ColorRequest{}
-	err := r.db.QueryRow(query, id).Scan(
+	err := r.db.QueryRow(query, id, tenantID).Scan(
 		&request.ID,
+		&request.TenantID,
 		&request.UserID,
 		&request.ColorID,
 		&request.Status,
@@ -74,16 +76,16 @@ func (r *ColorRequestRepository) FindByID(id int) (*models.ColorRequest, error) 
 	return request, nil
 }
 
-// FindByIDWithDetails finds a color request by ID with user and color data
-func (r *ColorRequestRepository) FindByIDWithDetails(id int) (*models.ColorRequest, error) {
+// FindByIDWithDetails finds a color request by ID with user and color data within a tenant
+func (r *ColorRequestRepository) FindByIDWithDetails(tenantID int, id int) (*models.ColorRequest, error) {
 	query := `
-		SELECT cr.id, cr.user_id, cr.color_id, cr.status, cr.admin_message, cr.reviewed_by, cr.reviewed_at, cr.created_at,
+		SELECT cr.id, cr.tenant_id, cr.user_id, cr.color_id, cr.status, cr.admin_message, cr.reviewed_by, cr.reviewed_at, cr.created_at,
 		       u.id, u.first_name, u.last_name, u.email,
 		       c.id, c.name, c.hex_code, c.pattern_icon
 		FROM color_requests cr
-		LEFT JOIN users u ON u.id = cr.user_id
-		LEFT JOIN color_categories c ON c.id = cr.color_id
-		WHERE cr.id = ?
+		LEFT JOIN users u ON u.id = cr.user_id AND u.tenant_id = cr.tenant_id
+		LEFT JOIN color_categories c ON c.id = cr.color_id AND c.tenant_id = cr.tenant_id
+		WHERE cr.id = ? AND cr.tenant_id = ?
 	`
 
 	request := &models.ColorRequest{
@@ -96,8 +98,9 @@ func (r *ColorRequestRepository) FindByIDWithDetails(id int) (*models.ColorReque
 	var colorName, colorHex sql.NullString
 	var patternIcon sql.NullString
 
-	err := r.db.QueryRow(query, id).Scan(
+	err := r.db.QueryRow(query, id, tenantID).Scan(
 		&request.ID,
+		&request.TenantID,
 		&request.UserID,
 		&request.ColorID,
 		&request.Status,
@@ -146,18 +149,18 @@ func (r *ColorRequestRepository) FindByIDWithDetails(id int) (*models.ColorReque
 	return request, nil
 }
 
-// FindByUserID finds color requests by user ID
-func (r *ColorRequestRepository) FindByUserID(userID int) ([]*models.ColorRequest, error) {
+// FindByUserID finds color requests by user ID within a tenant
+func (r *ColorRequestRepository) FindByUserID(tenantID int, userID int) ([]*models.ColorRequest, error) {
 	query := `
-		SELECT cr.id, cr.user_id, cr.color_id, cr.status, cr.admin_message, cr.reviewed_by, cr.reviewed_at, cr.created_at,
+		SELECT cr.id, cr.tenant_id, cr.user_id, cr.color_id, cr.status, cr.admin_message, cr.reviewed_by, cr.reviewed_at, cr.created_at,
 		       c.id, c.name, c.hex_code, c.pattern_icon
 		FROM color_requests cr
-		LEFT JOIN color_categories c ON c.id = cr.color_id
-		WHERE cr.user_id = ?
+		LEFT JOIN color_categories c ON c.id = cr.color_id AND c.tenant_id = cr.tenant_id
+		WHERE cr.user_id = ? AND cr.tenant_id = ?
 		ORDER BY cr.created_at DESC
 	`
 
-	rows, err := r.db.Query(query, userID)
+	rows, err := r.db.Query(query, userID, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query color requests: %w", err)
 	}
@@ -175,6 +178,7 @@ func (r *ColorRequestRepository) FindByUserID(userID int) ([]*models.ColorReques
 
 		err := rows.Scan(
 			&request.ID,
+			&request.TenantID,
 			&request.UserID,
 			&request.ColorID,
 			&request.Status,
@@ -208,20 +212,20 @@ func (r *ColorRequestRepository) FindByUserID(userID int) ([]*models.ColorReques
 	return requests, nil
 }
 
-// FindAllPending finds all pending color requests with user and color details
-func (r *ColorRequestRepository) FindAllPending() ([]*models.ColorRequest, error) {
+// FindAllPending finds all pending color requests with user and color details within a tenant
+func (r *ColorRequestRepository) FindAllPending(tenantID int) ([]*models.ColorRequest, error) {
 	query := `
-		SELECT cr.id, cr.user_id, cr.color_id, cr.status, cr.admin_message, cr.reviewed_by, cr.reviewed_at, cr.created_at,
+		SELECT cr.id, cr.tenant_id, cr.user_id, cr.color_id, cr.status, cr.admin_message, cr.reviewed_by, cr.reviewed_at, cr.created_at,
 		       u.id, u.first_name, u.last_name, u.email,
 		       c.id, c.name, c.hex_code, c.pattern_icon
 		FROM color_requests cr
-		LEFT JOIN users u ON u.id = cr.user_id
-		LEFT JOIN color_categories c ON c.id = cr.color_id
-		WHERE cr.status = 'pending'
+		LEFT JOIN users u ON u.id = cr.user_id AND u.tenant_id = cr.tenant_id
+		LEFT JOIN color_categories c ON c.id = cr.color_id AND c.tenant_id = cr.tenant_id
+		WHERE cr.status = 'pending' AND cr.tenant_id = ?
 		ORDER BY cr.created_at ASC
 	`
 
-	rows, err := r.db.Query(query)
+	rows, err := r.db.Query(query, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query pending requests: %w", err)
 	}
@@ -241,6 +245,7 @@ func (r *ColorRequestRepository) FindAllPending() ([]*models.ColorRequest, error
 
 		err := rows.Scan(
 			&request.ID,
+			&request.TenantID,
 			&request.UserID,
 			&request.ColorID,
 			&request.Status,
@@ -287,16 +292,16 @@ func (r *ColorRequestRepository) FindAllPending() ([]*models.ColorRequest, error
 	return requests, nil
 }
 
-// Approve approves a color request
-func (r *ColorRequestRepository) Approve(id int, reviewerID int, message *string) error {
+// Approve approves a color request within a tenant
+func (r *ColorRequestRepository) Approve(tenantID int, id int, reviewerID int, message *string) error {
 	query := `
 		UPDATE color_requests
 		SET status = 'approved', reviewed_by = ?, reviewed_at = ?, admin_message = ?
-		WHERE id = ?
+		WHERE id = ? AND tenant_id = ?
 	`
 
 	now := time.Now()
-	_, err := r.db.Exec(query, reviewerID, now, message, id)
+	_, err := r.db.Exec(query, reviewerID, now, message, id, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to approve request: %w", err)
 	}
@@ -304,16 +309,16 @@ func (r *ColorRequestRepository) Approve(id int, reviewerID int, message *string
 	return nil
 }
 
-// Deny denies a color request
-func (r *ColorRequestRepository) Deny(id int, reviewerID int, message *string) error {
+// Deny denies a color request within a tenant
+func (r *ColorRequestRepository) Deny(tenantID int, id int, reviewerID int, message *string) error {
 	query := `
 		UPDATE color_requests
 		SET status = 'denied', reviewed_by = ?, reviewed_at = ?, admin_message = ?
-		WHERE id = ?
+		WHERE id = ? AND tenant_id = ?
 	`
 
 	now := time.Now()
-	_, err := r.db.Exec(query, reviewerID, now, message, id)
+	_, err := r.db.Exec(query, reviewerID, now, message, id, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to deny request: %w", err)
 	}
@@ -321,16 +326,16 @@ func (r *ColorRequestRepository) Deny(id int, reviewerID int, message *string) e
 	return nil
 }
 
-// HasPendingRequest checks if user has any pending color request
-func (r *ColorRequestRepository) HasPendingRequest(userID int) (bool, error) {
+// HasPendingRequest checks if user has any pending color request within a tenant
+func (r *ColorRequestRepository) HasPendingRequest(tenantID int, userID int) (bool, error) {
 	query := `
 		SELECT COUNT(*)
 		FROM color_requests
-		WHERE user_id = ? AND status = 'pending'
+		WHERE user_id = ? AND status = 'pending' AND tenant_id = ?
 	`
 
 	var count int
-	err := r.db.QueryRow(query, userID).Scan(&count)
+	err := r.db.QueryRow(query, userID, tenantID).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check pending request: %w", err)
 	}
@@ -338,16 +343,16 @@ func (r *ColorRequestRepository) HasPendingRequest(userID int) (bool, error) {
 	return count > 0, nil
 }
 
-// HasPendingRequestForColor checks if user has a pending request for a specific color
-func (r *ColorRequestRepository) HasPendingRequestForColor(userID int, colorID int) (bool, error) {
+// HasPendingRequestForColor checks if user has a pending request for a specific color within a tenant
+func (r *ColorRequestRepository) HasPendingRequestForColor(tenantID int, userID int, colorID int) (bool, error) {
 	query := `
 		SELECT COUNT(*)
 		FROM color_requests
-		WHERE user_id = ? AND color_id = ? AND status = 'pending'
+		WHERE user_id = ? AND color_id = ? AND status = 'pending' AND tenant_id = ?
 	`
 
 	var count int
-	err := r.db.QueryRow(query, userID, colorID).Scan(&count)
+	err := r.db.QueryRow(query, userID, colorID, tenantID).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check pending request for color: %w", err)
 	}

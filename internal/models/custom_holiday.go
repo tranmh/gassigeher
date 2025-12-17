@@ -7,7 +7,8 @@ import (
 
 type CustomHoliday struct {
 	ID        int       `json:"id"`
-	Date      string    `json:"date"` // YYYY-MM-DD
+	TenantID  int       `json:"tenant_id,omitempty"` // SaaS: Tenant this holiday belongs to
+	Date      string    `json:"date"`                // YYYY-MM-DD
 	Name      string    `json:"name"`
 	IsActive  bool      `json:"is_active"`
 	Source    string    `json:"source"` // 'api' or 'admin'

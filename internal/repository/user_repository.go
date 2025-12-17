@@ -513,8 +513,8 @@ func (r *UserRepository) Activate(userID int) error {
 }
 
 // FindInactiveUsers finds users who haven't been active for the specified number of days
-// SaaS: Returns users across all tenants (used by global cron job)
-func (r *UserRepository) FindInactiveUsers(days int) ([]*models.User, error) {
+// SaaS: Filters by tenant_id
+func (r *UserRepository) FindInactiveUsers(tenantID int, days int) ([]*models.User, error) {
 	query := `
 		SELECT id, tenant_id, first_name, last_name, email, phone, password_hash,
 		       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
@@ -528,11 +528,12 @@ func (r *UserRepository) FindInactiveUsers(days int) ([]*models.User, error) {
 		  AND is_deleted = 0
 		  AND is_admin = 0
 		  AND is_super_admin = 0
+		  AND tenant_id = ?
 		  AND last_activity_at < ?
 	`
 
 	cutoffDate := time.Now().AddDate(0, 0, -days)
-	rows, err := r.db.Query(query, cutoffDate)
+	rows, err := r.db.Query(query, tenantID, cutoffDate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query inactive users: %w", err)
 	}

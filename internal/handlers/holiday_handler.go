@@ -31,6 +31,9 @@ func NewHolidayHandler(
 // GetHolidays returns all holidays for a year
 // GET /api/holidays?year=2025
 func (h *HolidayHandler) GetHolidays(w http.ResponseWriter, r *http.Request) {
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	yearStr := r.URL.Query().Get("year")
 	year := time.Now().Year() // Default to current year
 
@@ -41,7 +44,7 @@ func (h *HolidayHandler) GetHolidays(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	holidays, err := h.holidayService.GetHolidaysForYear(year)
+	holidays, err := h.holidayService.GetHolidaysForYear(tenantID, year)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to load holidays")
 		return
@@ -61,6 +64,8 @@ func (h *HolidayHandler) CreateHoliday(w http.ResponseWriter, r *http.Request) {
 	}
 
 	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	var holiday models.CustomHoliday
 	if err := json.NewDecoder(r.Body).Decode(&holiday); err != nil {
@@ -77,7 +82,7 @@ func (h *HolidayHandler) CreateHoliday(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.holidayRepo.CreateHoliday(&holiday); err != nil {
+	if err := h.holidayRepo.CreateHoliday(tenantID, &holiday); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to create holiday")
 		return
 	}
@@ -94,6 +99,9 @@ func (h *HolidayHandler) UpdateHoliday(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusForbidden, "Admin access required")
 		return
 	}
+
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Extract ID from path
 	pathParts := strings.Split(r.URL.Path, "/")
@@ -115,7 +123,7 @@ func (h *HolidayHandler) UpdateHoliday(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.holidayRepo.UpdateHoliday(id, &holiday); err != nil {
+	if err := h.holidayRepo.UpdateHoliday(tenantID, id, &holiday); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to update holiday")
 		return
 	}
@@ -135,6 +143,9 @@ func (h *HolidayHandler) DeleteHoliday(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Extract ID from path
 	pathParts := strings.Split(r.URL.Path, "/")
 	if len(pathParts) < 4 {
@@ -149,7 +160,7 @@ func (h *HolidayHandler) DeleteHoliday(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.holidayRepo.DeleteHoliday(id); err != nil {
+	if err := h.holidayRepo.DeleteHoliday(tenantID, id); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to delete holiday")
 		return
 	}

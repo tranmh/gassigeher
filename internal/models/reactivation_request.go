@@ -5,6 +5,7 @@ import "time"
 // ReactivationRequest represents a request to reactivate a deactivated account
 type ReactivationRequest struct {
 	ID           int        `json:"id"`
+	TenantID     int        `json:"tenant_id,omitempty"` // SaaS: Tenant this request belongs to
 	UserID       int        `json:"user_id"`
 	Status       string     `json:"status"`
 	AdminMessage *string    `json:"admin_message,omitempty"`

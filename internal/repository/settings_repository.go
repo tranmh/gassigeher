@@ -18,16 +18,17 @@ func NewSettingsRepository(db *sql.DB) *SettingsRepository {
 	return &SettingsRepository{db: db}
 }
 
-// Get retrieves a setting by key
-func (r *SettingsRepository) Get(key string) (*models.SystemSetting, error) {
+// Get retrieves a setting by key within a tenant
+func (r *SettingsRepository) Get(tenantID int, key string) (*models.SystemSetting, error) {
 	query := `
-		SELECT key, value, updated_at
+		SELECT tenant_id, key, value, updated_at
 		FROM system_settings
-		WHERE key = ?
+		WHERE key = ? AND tenant_id = ?
 	`
 
 	setting := &models.SystemSetting{}
-	err := r.db.QueryRow(query, key).Scan(
+	err := r.db.QueryRow(query, key, tenantID).Scan(
+		&setting.TenantID,
 		&setting.Key,
 		&setting.Value,
 		&setting.UpdatedAt,
@@ -44,15 +45,16 @@ func (r *SettingsRepository) Get(key string) (*models.SystemSetting, error) {
 	return setting, nil
 }
 
-// GetAll retrieves all settings
-func (r *SettingsRepository) GetAll() ([]*models.SystemSetting, error) {
+// GetAll retrieves all settings for a tenant
+func (r *SettingsRepository) GetAll(tenantID int) ([]*models.SystemSetting, error) {
 	query := `
-		SELECT key, value, updated_at
+		SELECT tenant_id, key, value, updated_at
 		FROM system_settings
+		WHERE tenant_id = ?
 		ORDER BY key ASC
 	`
 
-	rows, err := r.db.Query(query)
+	rows, err := r.db.Query(query, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query settings: %w", err)
 	}
@@ -62,6 +64,7 @@ func (r *SettingsRepository) GetAll() ([]*models.SystemSetting, error) {
 	for rows.Next() {
 		setting := &models.SystemSetting{}
 		err := rows.Scan(
+			&setting.TenantID,
 			&setting.Key,
 			&setting.Value,
 			&setting.UpdatedAt,
@@ -75,15 +78,15 @@ func (r *SettingsRepository) GetAll() ([]*models.SystemSetting, error) {
 	return settings, nil
 }
 
-// Update updates a setting value
-func (r *SettingsRepository) Update(key, value string) error {
+// Update updates a setting value within a tenant
+func (r *SettingsRepository) Update(tenantID int, key, value string) error {
 	query := `
 		UPDATE system_settings
 		SET value = ?, updated_at = ?
-		WHERE key = ?
+		WHERE key = ? AND tenant_id = ?
 	`
 
-	result, err := r.db.Exec(query, value, time.Now(), key)
+	result, err := r.db.Exec(query, value, time.Now(), key, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to update setting: %w", err)
 	}
@@ -98,4 +101,30 @@ func (r *SettingsRepository) Update(key, value string) error {
 	}
 
 	return nil
+}
+
+// Create creates a new setting for a tenant
+func (r *SettingsRepository) Create(tenantID int, key, value string) error {
+	query := `
+		INSERT INTO system_settings (tenant_id, key, value, updated_at)
+		VALUES (?, ?, ?, ?)
+	`
+
+	_, err := r.db.Exec(query, tenantID, key, value, time.Now())
+	if err != nil {
+		return fmt.Errorf("failed to create setting: %w", err)
+	}
+
+	return nil
+}
+
+// Upsert creates or updates a setting for a tenant
+func (r *SettingsRepository) Upsert(tenantID int, key, value string) error {
+	// Try to update first
+	err := r.Update(tenantID, key, value)
+	if err != nil && err.Error() == "setting not found" {
+		// Setting doesn't exist, create it
+		return r.Create(tenantID, key, value)
+	}
+	return err
 }

@@ -18,15 +18,15 @@ func NewUserColorRepository(db *sql.DB) *UserColorRepository {
 	return &UserColorRepository{db: db}
 }
 
-// AddColorToUser adds a color to a user
-func (r *UserColorRepository) AddColorToUser(userID, colorID, grantedBy int) error {
+// AddColorToUser adds a color to a user within a tenant
+func (r *UserColorRepository) AddColorToUser(tenantID int, userID, colorID, grantedBy int) error {
 	query := `
-		INSERT INTO user_colors (user_id, color_id, granted_at, granted_by)
-		VALUES (?, ?, ?, ?)
+		INSERT INTO user_colors (tenant_id, user_id, color_id, granted_at, granted_by)
+		VALUES (?, ?, ?, ?, ?)
 	`
 
 	now := time.Now()
-	_, err := r.db.Exec(query, userID, colorID, now, grantedBy)
+	_, err := r.db.Exec(query, tenantID, userID, colorID, now, grantedBy)
 	if err != nil {
 		return fmt.Errorf("failed to add color to user: %w", err)
 	}
@@ -34,11 +34,11 @@ func (r *UserColorRepository) AddColorToUser(userID, colorID, grantedBy int) err
 	return nil
 }
 
-// RemoveColorFromUser removes a color from a user
-func (r *UserColorRepository) RemoveColorFromUser(userID, colorID int) error {
-	query := `DELETE FROM user_colors WHERE user_id = ? AND color_id = ?`
+// RemoveColorFromUser removes a color from a user within a tenant
+func (r *UserColorRepository) RemoveColorFromUser(tenantID int, userID, colorID int) error {
+	query := `DELETE FROM user_colors WHERE user_id = ? AND color_id = ? AND tenant_id = ?`
 
-	_, err := r.db.Exec(query, userID, colorID)
+	_, err := r.db.Exec(query, userID, colorID, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to remove color from user: %w", err)
 	}
@@ -46,17 +46,17 @@ func (r *UserColorRepository) RemoveColorFromUser(userID, colorID int) error {
 	return nil
 }
 
-// GetUserColors returns all colors assigned to a user
-func (r *UserColorRepository) GetUserColors(userID int) ([]*models.ColorCategory, error) {
+// GetUserColors returns all colors assigned to a user within a tenant
+func (r *UserColorRepository) GetUserColors(tenantID int, userID int) ([]*models.ColorCategory, error) {
 	query := `
-		SELECT c.id, c.name, c.hex_code, c.pattern_icon, c.sort_order, c.created_at, c.updated_at
+		SELECT c.id, c.tenant_id, c.name, c.hex_code, c.pattern_icon, c.sort_order, c.created_at, c.updated_at
 		FROM color_categories c
-		INNER JOIN user_colors uc ON c.id = uc.color_id
-		WHERE uc.user_id = ?
+		INNER JOIN user_colors uc ON c.id = uc.color_id AND c.tenant_id = uc.tenant_id
+		WHERE uc.user_id = ? AND uc.tenant_id = ?
 		ORDER BY c.sort_order ASC, c.name ASC
 	`
 
-	rows, err := r.db.Query(query, userID)
+	rows, err := r.db.Query(query, userID, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query user colors: %w", err)
 	}
@@ -67,6 +67,7 @@ func (r *UserColorRepository) GetUserColors(userID int) ([]*models.ColorCategory
 		color := &models.ColorCategory{}
 		err := rows.Scan(
 			&color.ID,
+			&color.TenantID,
 			&color.Name,
 			&color.HexCode,
 			&color.PatternIcon,
@@ -83,11 +84,11 @@ func (r *UserColorRepository) GetUserColors(userID int) ([]*models.ColorCategory
 	return colors, nil
 }
 
-// GetUserColorIDs returns all color IDs assigned to a user
-func (r *UserColorRepository) GetUserColorIDs(userID int) ([]int, error) {
-	query := `SELECT color_id FROM user_colors WHERE user_id = ?`
+// GetUserColorIDs returns all color IDs assigned to a user within a tenant
+func (r *UserColorRepository) GetUserColorIDs(tenantID int, userID int) ([]int, error) {
+	query := `SELECT color_id FROM user_colors WHERE user_id = ? AND tenant_id = ?`
 
-	rows, err := r.db.Query(query, userID)
+	rows, err := r.db.Query(query, userID, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query user color IDs: %w", err)
 	}
@@ -105,12 +106,12 @@ func (r *UserColorRepository) GetUserColorIDs(userID int) ([]int, error) {
 	return colorIDs, nil
 }
 
-// HasColor checks if a user has a specific color
-func (r *UserColorRepository) HasColor(userID, colorID int) (bool, error) {
-	query := `SELECT COUNT(*) FROM user_colors WHERE user_id = ? AND color_id = ?`
+// HasColor checks if a user has a specific color within a tenant
+func (r *UserColorRepository) HasColor(tenantID int, userID, colorID int) (bool, error) {
+	query := `SELECT COUNT(*) FROM user_colors WHERE user_id = ? AND color_id = ? AND tenant_id = ?`
 
 	var count int
-	err := r.db.QueryRow(query, userID, colorID).Scan(&count)
+	err := r.db.QueryRow(query, userID, colorID, tenantID).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check user color: %w", err)
 	}
@@ -118,8 +119,8 @@ func (r *UserColorRepository) HasColor(userID, colorID int) (bool, error) {
 	return count > 0, nil
 }
 
-// SetUserColors replaces all colors for a user with the given list
-func (r *UserColorRepository) SetUserColors(userID int, colorIDs []int, grantedBy int) error {
+// SetUserColors replaces all colors for a user with the given list within a tenant
+func (r *UserColorRepository) SetUserColors(tenantID int, userID int, colorIDs []int, grantedBy int) error {
 	// Start transaction
 	tx, err := r.db.Begin()
 	if err != nil {
@@ -127,8 +128,8 @@ func (r *UserColorRepository) SetUserColors(userID int, colorIDs []int, grantedB
 	}
 	defer tx.Rollback()
 
-	// Remove all existing colors
-	_, err = tx.Exec("DELETE FROM user_colors WHERE user_id = ?", userID)
+	// Remove all existing colors for this user in this tenant
+	_, err = tx.Exec("DELETE FROM user_colors WHERE user_id = ? AND tenant_id = ?", userID, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to remove existing colors: %w", err)
 	}
@@ -137,8 +138,8 @@ func (r *UserColorRepository) SetUserColors(userID int, colorIDs []int, grantedB
 	now := time.Now()
 	for _, colorID := range colorIDs {
 		_, err = tx.Exec(
-			"INSERT INTO user_colors (user_id, color_id, granted_at, granted_by) VALUES (?, ?, ?, ?)",
-			userID, colorID, now, grantedBy,
+			"INSERT INTO user_colors (tenant_id, user_id, color_id, granted_at, granted_by) VALUES (?, ?, ?, ?, ?)",
+			tenantID, userID, colorID, now, grantedBy,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to add color %d: %w", colorID, err)
@@ -152,18 +153,18 @@ func (r *UserColorRepository) SetUserColors(userID int, colorIDs []int, grantedB
 	return nil
 }
 
-// GetUserColorsWithDetails returns detailed user-color assignments
-func (r *UserColorRepository) GetUserColorsWithDetails(userID int) ([]*models.UserColor, error) {
+// GetUserColorsWithDetails returns detailed user-color assignments within a tenant
+func (r *UserColorRepository) GetUserColorsWithDetails(tenantID int, userID int) ([]*models.UserColor, error) {
 	query := `
-		SELECT uc.id, uc.user_id, uc.color_id, uc.granted_at, uc.granted_by,
-		       c.id, c.name, c.hex_code, c.pattern_icon, c.sort_order, c.created_at, c.updated_at
+		SELECT uc.id, uc.tenant_id, uc.user_id, uc.color_id, uc.granted_at, uc.granted_by,
+		       c.id, c.tenant_id, c.name, c.hex_code, c.pattern_icon, c.sort_order, c.created_at, c.updated_at
 		FROM user_colors uc
-		INNER JOIN color_categories c ON c.id = uc.color_id
-		WHERE uc.user_id = ?
+		INNER JOIN color_categories c ON c.id = uc.color_id AND c.tenant_id = uc.tenant_id
+		WHERE uc.user_id = ? AND uc.tenant_id = ?
 		ORDER BY c.sort_order ASC, c.name ASC
 	`
 
-	rows, err := r.db.Query(query, userID)
+	rows, err := r.db.Query(query, userID, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query user colors with details: %w", err)
 	}
@@ -176,11 +177,13 @@ func (r *UserColorRepository) GetUserColorsWithDetails(userID int) ([]*models.Us
 		}
 		err := rows.Scan(
 			&uc.ID,
+			&uc.TenantID,
 			&uc.UserID,
 			&uc.ColorID,
 			&uc.GrantedAt,
 			&uc.GrantedBy,
 			&uc.Color.ID,
+			&uc.Color.TenantID,
 			&uc.Color.Name,
 			&uc.Color.HexCode,
 			&uc.Color.PatternIcon,

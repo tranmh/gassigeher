@@ -19,14 +19,14 @@ func NewColorCategoryRepository(db *sql.DB) *ColorCategoryRepository {
 }
 
 // Create creates a new color category
-func (r *ColorCategoryRepository) Create(color *models.ColorCategory) error {
+func (r *ColorCategoryRepository) Create(tenantID int, color *models.ColorCategory) error {
 	query := `
-		INSERT INTO color_categories (name, hex_code, pattern_icon, sort_order, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO color_categories (tenant_id, name, hex_code, pattern_icon, sort_order, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
 
 	now := time.Now()
-	result, err := r.db.Exec(query, color.Name, color.HexCode, color.PatternIcon, color.SortOrder, now, now)
+	result, err := r.db.Exec(query, tenantID, color.Name, color.HexCode, color.PatternIcon, color.SortOrder, now, now)
 	if err != nil {
 		return fmt.Errorf("failed to create color category: %w", err)
 	}
@@ -37,23 +37,25 @@ func (r *ColorCategoryRepository) Create(color *models.ColorCategory) error {
 	}
 
 	color.ID = int(id)
+	color.TenantID = tenantID
 	color.CreatedAt = now
 	color.UpdatedAt = now
 
 	return nil
 }
 
-// FindByID finds a color category by ID
-func (r *ColorCategoryRepository) FindByID(id int) (*models.ColorCategory, error) {
+// FindByID finds a color category by ID within a tenant
+func (r *ColorCategoryRepository) FindByID(tenantID int, id int) (*models.ColorCategory, error) {
 	query := `
-		SELECT id, name, hex_code, pattern_icon, sort_order, created_at, updated_at
+		SELECT id, tenant_id, name, hex_code, pattern_icon, sort_order, created_at, updated_at
 		FROM color_categories
-		WHERE id = ?
+		WHERE id = ? AND tenant_id = ?
 	`
 
 	color := &models.ColorCategory{}
-	err := r.db.QueryRow(query, id).Scan(
+	err := r.db.QueryRow(query, id, tenantID).Scan(
 		&color.ID,
+		&color.TenantID,
 		&color.Name,
 		&color.HexCode,
 		&color.PatternIcon,
@@ -73,17 +75,18 @@ func (r *ColorCategoryRepository) FindByID(id int) (*models.ColorCategory, error
 	return color, nil
 }
 
-// FindByName finds a color category by name
-func (r *ColorCategoryRepository) FindByName(name string) (*models.ColorCategory, error) {
+// FindByName finds a color category by name within a tenant
+func (r *ColorCategoryRepository) FindByName(tenantID int, name string) (*models.ColorCategory, error) {
 	query := `
-		SELECT id, name, hex_code, pattern_icon, sort_order, created_at, updated_at
+		SELECT id, tenant_id, name, hex_code, pattern_icon, sort_order, created_at, updated_at
 		FROM color_categories
-		WHERE name = ?
+		WHERE name = ? AND tenant_id = ?
 	`
 
 	color := &models.ColorCategory{}
-	err := r.db.QueryRow(query, name).Scan(
+	err := r.db.QueryRow(query, name, tenantID).Scan(
 		&color.ID,
+		&color.TenantID,
 		&color.Name,
 		&color.HexCode,
 		&color.PatternIcon,
@@ -103,15 +106,16 @@ func (r *ColorCategoryRepository) FindByName(name string) (*models.ColorCategory
 	return color, nil
 }
 
-// FindAll returns all color categories ordered by sort_order
-func (r *ColorCategoryRepository) FindAll() ([]*models.ColorCategory, error) {
+// FindAll returns all color categories for a tenant ordered by sort_order
+func (r *ColorCategoryRepository) FindAll(tenantID int) ([]*models.ColorCategory, error) {
 	query := `
-		SELECT id, name, hex_code, pattern_icon, sort_order, created_at, updated_at
+		SELECT id, tenant_id, name, hex_code, pattern_icon, sort_order, created_at, updated_at
 		FROM color_categories
+		WHERE tenant_id = ?
 		ORDER BY sort_order ASC, name ASC
 	`
 
-	rows, err := r.db.Query(query)
+	rows, err := r.db.Query(query, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query color categories: %w", err)
 	}
@@ -122,6 +126,7 @@ func (r *ColorCategoryRepository) FindAll() ([]*models.ColorCategory, error) {
 		color := &models.ColorCategory{}
 		err := rows.Scan(
 			&color.ID,
+			&color.TenantID,
 			&color.Name,
 			&color.HexCode,
 			&color.PatternIcon,
@@ -138,16 +143,16 @@ func (r *ColorCategoryRepository) FindAll() ([]*models.ColorCategory, error) {
 	return colors, nil
 }
 
-// Update updates a color category
-func (r *ColorCategoryRepository) Update(color *models.ColorCategory) error {
+// Update updates a color category within a tenant
+func (r *ColorCategoryRepository) Update(tenantID int, color *models.ColorCategory) error {
 	query := `
 		UPDATE color_categories
 		SET name = ?, hex_code = ?, pattern_icon = ?, sort_order = ?, updated_at = ?
-		WHERE id = ?
+		WHERE id = ? AND tenant_id = ?
 	`
 
 	now := time.Now()
-	_, err := r.db.Exec(query, color.Name, color.HexCode, color.PatternIcon, color.SortOrder, now, color.ID)
+	_, err := r.db.Exec(query, color.Name, color.HexCode, color.PatternIcon, color.SortOrder, now, color.ID, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to update color category: %w", err)
 	}
@@ -156,10 +161,10 @@ func (r *ColorCategoryRepository) Update(color *models.ColorCategory) error {
 	return nil
 }
 
-// Delete deletes a color category (fails if dogs are assigned)
-func (r *ColorCategoryRepository) Delete(id int) error {
+// Delete deletes a color category (fails if dogs are assigned) within a tenant
+func (r *ColorCategoryRepository) Delete(tenantID int, id int) error {
 	// Check if any dogs are assigned to this color
-	count, err := r.CountDogsWithColor(id)
+	count, err := r.CountDogsWithColor(tenantID, id)
 	if err != nil {
 		return err
 	}
@@ -167,8 +172,8 @@ func (r *ColorCategoryRepository) Delete(id int) error {
 		return fmt.Errorf("cannot delete color category: %d dogs are assigned to this color", count)
 	}
 
-	query := `DELETE FROM color_categories WHERE id = ?`
-	_, err = r.db.Exec(query, id)
+	query := `DELETE FROM color_categories WHERE id = ? AND tenant_id = ?`
+	_, err = r.db.Exec(query, id, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to delete color category: %w", err)
 	}
@@ -176,12 +181,12 @@ func (r *ColorCategoryRepository) Delete(id int) error {
 	return nil
 }
 
-// Count returns the total number of color categories
-func (r *ColorCategoryRepository) Count() (int, error) {
-	query := `SELECT COUNT(*) FROM color_categories`
+// Count returns the total number of color categories for a tenant
+func (r *ColorCategoryRepository) Count(tenantID int) (int, error) {
+	query := `SELECT COUNT(*) FROM color_categories WHERE tenant_id = ?`
 
 	var count int
-	err := r.db.QueryRow(query).Scan(&count)
+	err := r.db.QueryRow(query, tenantID).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count color categories: %w", err)
 	}
@@ -189,12 +194,12 @@ func (r *ColorCategoryRepository) Count() (int, error) {
 	return count, nil
 }
 
-// CountDogsWithColor returns the number of dogs assigned to a color
-func (r *ColorCategoryRepository) CountDogsWithColor(colorID int) (int, error) {
-	query := `SELECT COUNT(*) FROM dogs WHERE color_id = ?`
+// CountDogsWithColor returns the number of dogs assigned to a color within a tenant
+func (r *ColorCategoryRepository) CountDogsWithColor(tenantID int, colorID int) (int, error) {
+	query := `SELECT COUNT(*) FROM dogs WHERE color_id = ? AND tenant_id = ?`
 
 	var count int
-	err := r.db.QueryRow(query, colorID).Scan(&count)
+	err := r.db.QueryRow(query, colorID, tenantID).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count dogs with color: %w", err)
 	}
@@ -202,12 +207,12 @@ func (r *ColorCategoryRepository) CountDogsWithColor(colorID int) (int, error) {
 	return count, nil
 }
 
-// CountUsersWithColor returns the number of users who have a color
-func (r *ColorCategoryRepository) CountUsersWithColor(colorID int) (int, error) {
-	query := `SELECT COUNT(*) FROM user_colors WHERE color_id = ?`
+// CountUsersWithColor returns the number of users who have a color within a tenant
+func (r *ColorCategoryRepository) CountUsersWithColor(tenantID int, colorID int) (int, error) {
+	query := `SELECT COUNT(*) FROM user_colors WHERE color_id = ? AND tenant_id = ?`
 
 	var count int
-	err := r.db.QueryRow(query, colorID).Scan(&count)
+	err := r.db.QueryRow(query, colorID, tenantID).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count users with color: %w", err)
 	}
@@ -215,12 +220,12 @@ func (r *ColorCategoryRepository) CountUsersWithColor(colorID int) (int, error) 
 	return count, nil
 }
 
-// GetNextSortOrder returns the next available sort order
-func (r *ColorCategoryRepository) GetNextSortOrder() (int, error) {
-	query := `SELECT COALESCE(MAX(sort_order), 0) + 1 FROM color_categories`
+// GetNextSortOrder returns the next available sort order for a tenant
+func (r *ColorCategoryRepository) GetNextSortOrder(tenantID int) (int, error) {
+	query := `SELECT COALESCE(MAX(sort_order), 0) + 1 FROM color_categories WHERE tenant_id = ?`
 
 	var nextOrder int
-	err := r.db.QueryRow(query).Scan(&nextOrder)
+	err := r.db.QueryRow(query, tenantID).Scan(&nextOrder)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get next sort order: %w", err)
 	}

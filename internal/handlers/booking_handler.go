@@ -122,7 +122,7 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	// Uses the NEW color system: user must have the dog's color assigned
 	if !user.IsAdmin && !user.IsSuperAdmin {
 		// Get user's assigned colors
-		userColorIDs, err := h.userColorRepo.GetUserColorIDs(userID)
+		userColorIDs, err := h.userColorRepo.GetUserColorIDs(tenantID, userID)
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "Failed to check user permissions")
 			return
@@ -158,7 +158,7 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check booking advance limit
-	advanceSetting, err := h.settingsRepo.Get("booking_advance_days")
+	advanceSetting, err := h.settingsRepo.Get(tenantID, "booking_advance_days")
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get settings")
 		return
@@ -196,13 +196,13 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate booking time (check if time is allowed/blocked)
-	if err := h.bookingTimeService.ValidateBookingTime(req.Date, req.ScheduledTime); err != nil {
+	if err := h.bookingTimeService.ValidateBookingTime(tenantID, req.Date, req.ScheduledTime); err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	// Check if booking requires approval
-	requiresApproval, err := h.bookingTimeService.RequiresApproval(req.ScheduledTime)
+	requiresApproval, err := h.bookingTimeService.RequiresApproval(tenantID, req.ScheduledTime)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check approval requirements")
 		return
@@ -341,6 +341,8 @@ func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) {
 	// Get user ID and admin status
 	userID, _ := r.Context().Value(middleware.UserIDKey).(int)
 	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Parse request
 	var req models.CancelBookingRequest
@@ -374,7 +376,7 @@ func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) {
 
 	// For non-admin users, check cancellation notice period
 	if !isAdmin {
-		noticeSetting, err := h.settingsRepo.Get("cancellation_notice_hours")
+		noticeSetting, err := h.settingsRepo.Get(tenantID, "cancellation_notice_hours")
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "Failed to get settings")
 			return

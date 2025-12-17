@@ -5,6 +5,7 @@ import "time"
 // WalkReport represents a user's report after completing a walk
 type WalkReport struct {
 	ID             int       `json:"id"`
+	TenantID       int       `json:"tenant_id,omitempty"` // SaaS: Tenant this report belongs to
 	BookingID      int       `json:"booking_id"`
 	BehaviorRating int       `json:"behavior_rating"` // 1-5 scale
 	EnergyLevel    string    `json:"energy_level"`    // low, medium, high
@@ -24,6 +25,7 @@ type WalkReport struct {
 // WalkReportPhoto represents a photo attached to a walk report
 type WalkReportPhoto struct {
 	ID             int       `json:"id"`
+	TenantID       int       `json:"tenant_id,omitempty"` // SaaS: Tenant this photo belongs to
 	WalkReportID   int       `json:"walk_report_id"`
 	PhotoPath      string    `json:"photo_path"`
 	PhotoThumbnail string    `json:"photo_thumbnail"`

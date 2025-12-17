@@ -11,6 +11,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
 	"github.com/tranmh/gassigeher/internal/services"
@@ -36,7 +37,10 @@ func NewSettingsHandler(db *sql.DB, cfg *config.Config) *SettingsHandler {
 
 // GetAllSettings gets all system settings (admin only)
 func (h *SettingsHandler) GetAllSettings(w http.ResponseWriter, r *http.Request) {
-	settings, err := h.settingsRepo.GetAll()
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	settings, err := h.settingsRepo.GetAll(tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get settings")
 		return
@@ -47,6 +51,9 @@ func (h *SettingsHandler) GetAllSettings(w http.ResponseWriter, r *http.Request)
 
 // UpdateSetting updates a system setting (admin only)
 func (h *SettingsHandler) UpdateSetting(w http.ResponseWriter, r *http.Request) {
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Get key from URL
 	vars := mux.Vars(r)
 	key := vars["key"]
@@ -111,7 +118,7 @@ func (h *SettingsHandler) UpdateSetting(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Update setting
-	if err := h.settingsRepo.Update(key, req.Value); err != nil {
+	if err := h.settingsRepo.Update(tenantID, key, req.Value); err != nil {
 		if err.Error() == "setting not found" {
 			respondError(w, http.StatusNotFound, err.Error())
 			return
@@ -128,7 +135,10 @@ const defaultLogoURL = "https://www.tierheim-goeppingen.de/wp-content/uploads/20
 
 // GetLogo returns the current logo URL (public endpoint, no auth required)
 func (h *SettingsHandler) GetLogo(w http.ResponseWriter, r *http.Request) {
-	setting, err := h.settingsRepo.Get("site_logo")
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	setting, err := h.settingsRepo.Get(tenantID, "site_logo")
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get logo setting")
 		return
@@ -144,6 +154,9 @@ func (h *SettingsHandler) GetLogo(w http.ResponseWriter, r *http.Request) {
 
 // UploadLogo handles uploading a custom site logo (admin only)
 func (h *SettingsHandler) UploadLogo(w http.ResponseWriter, r *http.Request) {
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Parse multipart form with max size limit
 	maxSize := int64(h.cfg.MaxUploadSizeMB) << 20
 	if err := r.ParseMultipartForm(maxSize); err != nil {
@@ -183,7 +196,7 @@ func (h *SettingsHandler) UploadLogo(w http.ResponseWriter, r *http.Request) {
 
 	// Update setting with local path (prefixed with /uploads/)
 	localURL := "/uploads/" + logoPath
-	if err := h.settingsRepo.Update("site_logo", localURL); err != nil {
+	if err := h.settingsRepo.Update(tenantID, "site_logo", localURL); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to update logo setting")
 		return
 	}
@@ -196,13 +209,16 @@ func (h *SettingsHandler) UploadLogo(w http.ResponseWriter, r *http.Request) {
 
 // GetWhatsAppSettings returns the WhatsApp group settings (public endpoint, no auth required)
 func (h *SettingsHandler) GetWhatsAppSettings(w http.ResponseWriter, r *http.Request) {
-	enabledSetting, err := h.settingsRepo.Get("whatsapp_group_enabled")
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	enabledSetting, err := h.settingsRepo.Get(tenantID, "whatsapp_group_enabled")
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get WhatsApp enabled setting")
 		return
 	}
 
-	linkSetting, err := h.settingsRepo.Get("whatsapp_group_link")
+	linkSetting, err := h.settingsRepo.Get(tenantID, "whatsapp_group_link")
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get WhatsApp link setting")
 		return
@@ -226,11 +242,14 @@ func (h *SettingsHandler) GetWhatsAppSettings(w http.ResponseWriter, r *http.Req
 
 // ResetLogo resets the site logo to the default (admin only)
 func (h *SettingsHandler) ResetLogo(w http.ResponseWriter, r *http.Request) {
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Delete custom logo file (if exists)
 	h.imageService.DeleteLogo()
 
 	// Reset setting to default URL
-	if err := h.settingsRepo.Update("site_logo", defaultLogoURL); err != nil {
+	if err := h.settingsRepo.Update(tenantID, "site_logo", defaultLogoURL); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to reset logo setting")
 		return
 	}

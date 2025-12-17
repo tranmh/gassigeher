@@ -51,6 +51,9 @@ func (h *ExperienceRequestHandler) CreateRequest(w http.ResponseWriter, r *http.
 		return
 	}
 
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Parse request
 	var req models.CreateExperienceRequestRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -78,7 +81,7 @@ func (h *ExperienceRequestHandler) CreateRequest(w http.ResponseWriter, r *http.
 	// Check if user already has this level or higher
 	// Determine current level from user's assigned colors
 	// Color IDs: 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau
-	colors, err := h.userColorRepo.GetUserColors(userID)
+	colors, err := h.userColorRepo.GetUserColors(tenantID, userID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get user colors")
 		return
@@ -112,7 +115,7 @@ func (h *ExperienceRequestHandler) CreateRequest(w http.ResponseWriter, r *http.
 	}
 
 	// Check if user already has a pending request for this level
-	hasPending, err := h.requestRepo.HasPendingRequest(userID, requestedLevel)
+	hasPending, err := h.requestRepo.HasPendingRequest(tenantID, userID, requestedLevel)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check pending requests")
 		return
@@ -128,7 +131,7 @@ func (h *ExperienceRequestHandler) CreateRequest(w http.ResponseWriter, r *http.
 		RequestedLevel: requestedLevel,
 	}
 
-	if err := h.requestRepo.Create(experienceRequest); err != nil {
+	if err := h.requestRepo.Create(tenantID, experienceRequest); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to create request")
 		return
 	}
@@ -141,16 +144,18 @@ func (h *ExperienceRequestHandler) ListRequests(w http.ResponseWriter, r *http.R
 	// Get user ID and admin status from context
 	userID, _ := r.Context().Value(middleware.UserIDKey).(int)
 	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	var requests []*models.ExperienceRequest
 	var err error
 
 	if isAdmin {
 		// Admin sees all pending requests
-		requests, err = h.requestRepo.FindAllPending()
+		requests, err = h.requestRepo.FindAllPending(tenantID)
 	} else {
 		// User sees their own requests
-		requests, err = h.requestRepo.FindByUserID(userID)
+		requests, err = h.requestRepo.FindByUserID(tenantID, userID)
 	}
 
 	if err != nil {
@@ -183,6 +188,8 @@ func (h *ExperienceRequestHandler) ApproveRequest(w http.ResponseWriter, r *http
 
 	// Get admin user ID
 	reviewerID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Parse request body
 	var req models.ReviewExperienceRequestRequest
@@ -192,7 +199,7 @@ func (h *ExperienceRequestHandler) ApproveRequest(w http.ResponseWriter, r *http
 	}
 
 	// Get experience request
-	experienceRequest, err := h.requestRepo.FindByID(id)
+	experienceRequest, err := h.requestRepo.FindByID(tenantID, id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get request")
 		return
@@ -220,7 +227,7 @@ func (h *ExperienceRequestHandler) ApproveRequest(w http.ResponseWriter, r *http
 	}
 
 	// Approve request
-	if err := h.requestRepo.Approve(id, reviewerID, req.Message); err != nil {
+	if err := h.requestRepo.Approve(tenantID, id, reviewerID, req.Message); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to approve request")
 		return
 	}
@@ -233,7 +240,7 @@ func (h *ExperienceRequestHandler) ApproveRequest(w http.ResponseWriter, r *http
 		"blue":   {1, 2, 3, 4, 5}, // all main colors
 	}
 	if colors, ok := colorsByLevel[experienceRequest.RequestedLevel]; ok {
-		if err := h.userColorRepo.SetUserColors(user.ID, colors, reviewerID); err != nil {
+		if err := h.userColorRepo.SetUserColors(tenantID, user.ID, colors, reviewerID); err != nil {
 			// Log but don't fail the approval
 			println("Warning: Failed to assign colors to user:", err.Error())
 		}
@@ -259,6 +266,8 @@ func (h *ExperienceRequestHandler) DenyRequest(w http.ResponseWriter, r *http.Re
 
 	// Get admin user ID
 	reviewerID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Parse request body
 	var req models.ReviewExperienceRequestRequest
@@ -268,7 +277,7 @@ func (h *ExperienceRequestHandler) DenyRequest(w http.ResponseWriter, r *http.Re
 	}
 
 	// Get experience request
-	experienceRequest, err := h.requestRepo.FindByID(id)
+	experienceRequest, err := h.requestRepo.FindByID(tenantID, id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get request")
 		return
@@ -296,7 +305,7 @@ func (h *ExperienceRequestHandler) DenyRequest(w http.ResponseWriter, r *http.Re
 	}
 
 	// Deny request
-	if err := h.requestRepo.Deny(id, reviewerID, req.Message); err != nil {
+	if err := h.requestRepo.Deny(tenantID, id, reviewerID, req.Message); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to deny request")
 		return
 	}

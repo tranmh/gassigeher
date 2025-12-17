@@ -5,6 +5,7 @@ import "time"
 // UserColor represents the many-to-many relationship between users and color categories
 type UserColor struct {
 	ID        int       `json:"id"`
+	TenantID  int       `json:"tenant_id,omitempty"` // SaaS: Tenant this relationship belongs to
 	UserID    int       `json:"user_id"`
 	ColorID   int       `json:"color_id"`
 	GrantedAt time.Time `json:"granted_at"`

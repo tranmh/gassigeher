@@ -57,8 +57,11 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SaaS: Get tenant_id from context (set by TenantMiddleware)
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Validate registration password against stored value
-	storedPassword, err := h.settingsRepo.Get("registration_password")
+	storedPassword, err := h.settingsRepo.Get(tenantID, "registration_password")
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Database error")
 		return
@@ -73,9 +76,6 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-
-	// SaaS: Get tenant_id from context (set by TenantMiddleware)
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Check if user already exists (within tenant)
 	existing, err := h.userRepo.FindByEmail(req.Email, tenantID)
@@ -130,7 +130,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	// Assign default color (green = ID 1) to new user
 	// Green users start with only the green color
 	if h.userColorRepo != nil {
-		if err := h.userColorRepo.SetUserColors(user.ID, []int{1}, user.ID); err != nil {
+		if err := h.userColorRepo.SetUserColors(tenantID, user.ID, []int{1}, user.ID); err != nil {
 			// Log but don't fail registration
 			fmt.Printf("Warning: Failed to assign default color to user %d: %v\n", user.ID, err)
 		}

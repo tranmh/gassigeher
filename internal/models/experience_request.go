@@ -5,6 +5,7 @@ import "time"
 // ExperienceRequest represents a request for experience level promotion
 type ExperienceRequest struct {
 	ID             int        `json:"id"`
+	TenantID       int        `json:"tenant_id,omitempty"` // SaaS: Tenant this request belongs to
 	UserID         int        `json:"user_id"`
 	RequestedLevel string     `json:"requested_level"`
 	Status         string     `json:"status"`
