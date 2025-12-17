@@ -210,8 +210,8 @@ func TestColorCategoryHandler_DeleteColor(t *testing.T) {
 		colorID := testutil.SeedTestColorCategory(t, db, "has-dogs", "#444444", 300)
 
 		// Create a dog with this color
-		_, err := db.Exec(`INSERT INTO dogs (name, breed, size, age, category, color_id, is_available, created_at)
-			VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'))`, "TestDog", "Mix", "medium", 3, "green", colorID)
+		_, err := db.Exec(`INSERT INTO dogs (name, breed, size, age, color_id, is_available, created_at)
+			VALUES (?, ?, ?, ?, ?, 1, datetime('now'))`, "TestDog", "Mix", "medium", 3, colorID)
 		if err != nil {
 			t.Fatalf("Failed to create test dog: %v", err)
 		}

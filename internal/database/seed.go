@@ -61,11 +61,11 @@ func SeedDatabase(db *sql.DB, superAdminEmail string) error {
 	now := time.Now()
 	_, err = db.Exec(`
 		INSERT INTO users (
-			id, name, first_name, last_name, email, password_hash, experience_level,
+			id, first_name, last_name, email, password_hash,
 			is_admin, is_super_admin, is_verified, is_active,
 			terms_accepted_at, last_activity_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, 1, "Super Admin", "Super", "Admin", superAdminEmail, string(hashedPassword), "orange",
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, 1, "Super", "Admin", superAdminEmail, string(hashedPassword),
 		true, true, true, true, now, now, now, now)
 
 	if err != nil {
@@ -86,8 +86,8 @@ func SeedDatabase(db *sql.DB, superAdminEmail string) error {
 		return fmt.Errorf("failed to generate dogs: %w", err)
 	}
 
-	// 6. Assign colors to users (all users get green/gruen color)
-	err = assignUserColors(db)
+	// 6. Assign colors to users based on test user levels
+	err = assignUserColors(db, testUsers)
 	if err != nil {
 		return fmt.Errorf("failed to assign user colors: %w", err)
 	}
@@ -159,7 +159,8 @@ func generateSecurePassword(length int) string {
 	return string(password)
 }
 
-// generateTestUsers creates 3 test users with different experience levels
+// generateTestUsers creates 3 test users with different color levels
+// Level field is used for assigning colors after creation
 // DONE
 func generateTestUsers(db *sql.DB) ([]TestUser, error) {
 	users := []TestUser{
@@ -176,13 +177,12 @@ func generateTestUsers(db *sql.DB) ([]TestUser, error) {
 			return nil, fmt.Errorf("failed to hash test user password: %w", err)
 		}
 
-		fullName := users[i].FirstName + " " + users[i].LastName
 		_, err = db.Exec(`
-			INSERT INTO users (name, first_name, last_name, email, password_hash, experience_level,
+			INSERT INTO users (first_name, last_name, email, password_hash,
 				is_admin, is_super_admin, is_verified, is_active,
 				terms_accepted_at, last_activity_at, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, fullName, users[i].FirstName, users[i].LastName, users[i].Email, string(hashedPassword), users[i].Level,
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, users[i].FirstName, users[i].LastName, users[i].Email, string(hashedPassword),
 			false, false, true, true, now, now, now, now)
 
 		if err != nil {
@@ -199,8 +199,7 @@ func generateTestUsers(db *sql.DB) ([]TestUser, error) {
 func generateDogs(db *sql.DB) error {
 	dogs := []struct {
 		Name                string
-		Category            string // Legacy field (kept for CHECK constraint)
-		ColorID             int    // New color system
+		ColorID             int // Color category ID
 		Breed               string
 		Size                string
 		Age                 int
@@ -214,7 +213,6 @@ func generateDogs(db *sql.DB) error {
 	}{
 		{
 			Name:                "Bella",
-			Category:            "green",
 			ColorID:             1, // gruen
 			Breed:               "Labrador Retriever",
 			Size:                "large",
@@ -229,7 +227,6 @@ func generateDogs(db *sql.DB) error {
 		},
 		{
 			Name:                "Max",
-			Category:            "green",
 			ColorID:             2, // gelb
 			Breed:               "Golden Retriever",
 			Size:                "large",
@@ -244,7 +241,6 @@ func generateDogs(db *sql.DB) error {
 		},
 		{
 			Name:                "Luna",
-			Category:            "green",
 			ColorID:             3, // orange
 			Breed:               "Deutscher Schäferhund",
 			Size:                "large",
@@ -259,7 +255,6 @@ func generateDogs(db *sql.DB) error {
 		},
 		{
 			Name:                "Charlie",
-			Category:            "green",
 			ColorID:             4, // hellblau
 			Breed:               "Border Collie",
 			Size:                "medium",
@@ -274,7 +269,6 @@ func generateDogs(db *sql.DB) error {
 		},
 		{
 			Name:                "Rocky",
-			Category:            "green",
 			ColorID:             5, // dunkelblau
 			Breed:               "Belgischer Malinois",
 			Size:                "large",
@@ -292,12 +286,12 @@ func generateDogs(db *sql.DB) error {
 	now := time.Now()
 	for _, dog := range dogs {
 		_, err := db.Exec(`
-			INSERT INTO dogs (name, category, color_id, breed, size, age,
+			INSERT INTO dogs (name, color_id, breed, size, age,
 				special_needs, pickup_location, walk_route, walk_duration,
 				special_instructions, default_morning_time, default_evening_time,
 				is_available, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, dog.Name, dog.Category, dog.ColorID, dog.Breed, dog.Size, dog.Age,
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, dog.Name, dog.ColorID, dog.Breed, dog.Size, dog.Age,
 			dog.SpecialNeeds, dog.PickupLocation, dog.WalkRoute, dog.WalkDuration,
 			dog.SpecialInstructions, dog.DefaultMorningTime, dog.DefaultEveningTime,
 			true, now, now)
@@ -319,21 +313,27 @@ func intPtr(i int) *int {
 	return &i
 }
 
-// assignUserColors assigns colors to users based on their experience_level
+// assignUserColors assigns colors to users based on their level
 // Color IDs: 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau, 6=helllila, 7=dunkellila
 // - green users: only gruen (1)
 // - orange users: gruen (1), gelb (2), orange (3)
 // - blue users: all colors (1-5)
-func assignUserColors(db *sql.DB) error {
-	// Define which colors each experience level gets
+func assignUserColors(db *sql.DB, testUsers []TestUser) error {
+	// Define which colors each level gets
 	colorsByLevel := map[string][]int{
-		"green":  {1},                // only gruen
-		"orange": {1, 2, 3},          // gruen, gelb, orange
-		"blue":   {1, 2, 3, 4, 5},    // all main colors
+		"green":  {1},             // only gruen
+		"orange": {1, 2, 3},       // gruen, gelb, orange
+		"blue":   {1, 2, 3, 4, 5}, // all main colors
 	}
 
-	// Get all users with their experience levels
-	rows, err := db.Query("SELECT id, experience_level FROM users")
+	// Build a map of email to level from test users
+	levelByEmail := make(map[string]string)
+	for _, u := range testUsers {
+		levelByEmail[u.Email] = u.Level
+	}
+
+	// Get all users with their emails
+	rows, err := db.Query("SELECT id, email FROM users")
 	if err != nil {
 		return fmt.Errorf("failed to query users: %w", err)
 	}
@@ -341,13 +341,13 @@ func assignUserColors(db *sql.DB) error {
 
 	type userInfo struct {
 		id    int
-		level string
+		email string
 	}
 	var users []userInfo
 
 	for rows.Next() {
 		var u userInfo
-		if err := rows.Scan(&u.id, &u.level); err != nil {
+		if err := rows.Scan(&u.id, &u.email); err != nil {
 			return fmt.Errorf("failed to scan user: %w", err)
 		}
 		users = append(users, u)
@@ -355,9 +355,18 @@ func assignUserColors(db *sql.DB) error {
 
 	totalAssignments := 0
 	for _, user := range users {
-		colors, ok := colorsByLevel[user.level]
+		// Determine level: Super Admin (ID=1) gets orange, test users get their level
+		var level string
+		if user.id == 1 {
+			level = "orange" // Super Admin gets orange-level colors
+		} else if l, ok := levelByEmail[user.email]; ok {
+			level = l
+		} else {
+			level = "green" // Default to green
+		}
+
+		colors, ok := colorsByLevel[level]
 		if !ok {
-			// Default to green if unknown level
 			colors = colorsByLevel["green"]
 		}
 
@@ -373,7 +382,7 @@ func assignUserColors(db *sql.DB) error {
 		}
 	}
 
-	log.Printf("✓ Assigned %d colors to %d users based on experience levels", totalAssignments, len(users))
+	log.Printf("✓ Assigned %d colors to %d users based on levels", totalAssignments, len(users))
 	return nil
 }
 

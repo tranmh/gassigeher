@@ -20,19 +20,17 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 
 // Create creates a new user
 func (r *UserRepository) Create(user *models.User) error {
-	// Include name column for backward compatibility (NOT NULL constraint)
 	query := `
 		INSERT INTO users (
-			name, first_name, last_name, email, phone, password_hash,
+			first_name, last_name, email, phone, password_hash,
 			is_admin, is_super_admin, is_verified, is_active, must_change_password,
 			verification_token, verification_token_expires,
 			terms_accepted_at, last_activity_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	result, err := r.db.Exec(
 		query,
-		user.FullName(),      // Legacy name column for backward compatibility
 		user.FirstName,
 		user.LastName,
 		user.Email,

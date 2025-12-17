@@ -12,102 +12,77 @@ import (
 	"github.com/tranmh/gassigeher/internal/testutil"
 )
 
-// setupTestDB creates a test database
+// setupTestDB creates a test database using the standard migration system
+// and seeds with default test data
 func setupTestDB(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite", ":memory:")
+	db := testutil.SetupTestDB(t)
+
+	// Insert test users with explicit IDs
+	now := time.Now()
+	_, err := db.Exec(`
+		INSERT INTO users (id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
+		VALUES (1, 'Test', 'User', 'test@example.com', 'hash', 1, 1, ?, ?, ?)
+	`, now, now, now)
 	if err != nil {
-		t.Fatalf("Failed to open test database: %v", err)
+		t.Fatalf("Failed to create test user 1: %v", err)
 	}
 
-	// Create tables
-	schema := `
-	CREATE TABLE users (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT NOT NULL,
-		first_name TEXT,
-		last_name TEXT,
-		email TEXT UNIQUE,
-		phone TEXT,
-		password_hash TEXT,
-		experience_level TEXT DEFAULT 'green',
-		is_admin INTEGER DEFAULT 0,
-		is_super_admin INTEGER DEFAULT 0,
-		is_verified INTEGER DEFAULT 0,
-		is_active INTEGER DEFAULT 1,
-		is_deleted INTEGER DEFAULT 0,
-		verification_token TEXT,
-		verification_token_expires TIMESTAMP,
-		password_reset_token TEXT,
-		password_reset_expires TIMESTAMP,
-		profile_photo TEXT,
-		anonymous_id TEXT,
-		terms_accepted_at TIMESTAMP,
-		last_activity_at TIMESTAMP,
-		deactivated_at TIMESTAMP,
-		deactivation_reason TEXT,
-		reactivated_at TIMESTAMP,
-		deleted_at TIMESTAMP,
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	);
+	_, err = db.Exec(`
+		INSERT INTO users (id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
+		VALUES (2, 'Test', 'User 2', 'test2@example.com', 'hash', 1, 1, ?, ?, ?)
+	`, now, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create test user 2: %v", err)
+	}
 
-	CREATE TABLE dogs (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT NOT NULL,
-		breed TEXT,
-		size TEXT,
-		age INTEGER,
-		category TEXT DEFAULT 'green',
-		photo TEXT,
-		photo_thumbnail TEXT,
-		special_needs TEXT,
-		pickup_location TEXT,
-		walk_route TEXT,
-		walk_duration INTEGER,
-		special_instructions TEXT,
-		default_morning_time TEXT,
-		default_evening_time TEXT,
-		is_available INTEGER DEFAULT 1,
-		is_featured INTEGER DEFAULT 0,
-		external_link TEXT,
-		unavailable_reason TEXT,
-		unavailable_since TIMESTAMP,
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	);
+	// Insert more test users for complete test coverage
+	_, err = db.Exec(`
+		INSERT INTO users (id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
+		VALUES (3, 'Test', 'User 3', 'test3@example.com', 'hash', 1, 1, ?, ?, ?)
+	`, now, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create test user 3: %v", err)
+	}
 
-	CREATE TABLE bookings (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		user_id INTEGER NOT NULL,
-		dog_id INTEGER NOT NULL,
-		date TEXT NOT NULL,
-		scheduled_time TEXT NOT NULL,
-		status TEXT DEFAULT 'scheduled' CHECK(status IN ('scheduled', 'completed', 'cancelled')),
-		completed_at TIMESTAMP,
-		reminder_sent_at TIMESTAMP,
-		user_notes TEXT,
-		admin_cancellation_reason TEXT,
-		requires_approval INTEGER DEFAULT 0,
-		approval_status TEXT DEFAULT 'approved',
-		approved_by INTEGER,
-		approved_at TIMESTAMP,
-		rejection_reason TEXT,
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		UNIQUE(dog_id, date, scheduled_time)
-	);
+	_, err = db.Exec(`
+		INSERT INTO users (id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
+		VALUES (4, 'Test', 'User 4', 'test4@example.com', 'hash', 1, 1, ?, ?, ?)
+	`, now, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create test user 4: %v", err)
+	}
 
-	-- Insert test users
-	INSERT INTO users (id, name, email) VALUES (1, 'Test User', 'test@example.com');
-	INSERT INTO users (id, name, email) VALUES (2, 'Test User 2', 'test2@example.com');
+	// Insert test dogs with explicit IDs
+	_, err = db.Exec(`
+		INSERT INTO dogs (id, name, breed, color_id, is_available, created_at)
+		VALUES (1, 'Buddy', 'Labrador', 1, 1, ?)
+	`, now)
+	if err != nil {
+		t.Fatalf("Failed to create test dog 1: %v", err)
+	}
 
-	-- Insert test dogs
-	INSERT INTO dogs (id, name, breed) VALUES (1, 'Buddy', 'Labrador');
-	INSERT INTO dogs (id, name, breed) VALUES (2, 'Max', 'German Shepherd');
-	`
+	_, err = db.Exec(`
+		INSERT INTO dogs (id, name, breed, color_id, is_available, created_at)
+		VALUES (2, 'Max', 'German Shepherd', 1, 1, ?)
+	`, now)
+	if err != nil {
+		t.Fatalf("Failed to create test dog 2: %v", err)
+	}
 
-	if _, err := db.Exec(schema); err != nil {
-		t.Fatalf("Failed to create schema: %v", err)
+	_, err = db.Exec(`
+		INSERT INTO dogs (id, name, breed, color_id, is_available, created_at)
+		VALUES (3, 'Rocky', 'Bulldog', 1, 1, ?)
+	`, now)
+	if err != nil {
+		t.Fatalf("Failed to create test dog 3: %v", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO dogs (id, name, breed, color_id, is_available, created_at)
+		VALUES (4, 'Luna', 'Poodle', 1, 1, ?)
+	`, now)
+	if err != nil {
+		t.Fatalf("Failed to create test dog 4: %v", err)
 	}
 
 	return db
@@ -1446,7 +1421,7 @@ func TestRejectBooking_ReasonRequired(t *testing.T) {
 		}
 
 		bookingID, _ := result.LastInsertId()
-		adminID := 5
+		adminID := 1 // Use existing user ID from setupTestDB
 		reason := "Dog is sick"
 
 		// Reject booking

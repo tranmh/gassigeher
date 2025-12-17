@@ -3,10 +3,19 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/tranmh/gassigeher/internal/models"
 )
+
+// normalizeDate ensures date is in YYYY-MM-DD format (strips any time suffix)
+func normalizeDate(date string) string {
+	if idx := strings.Index(date, "T"); idx != -1 {
+		return date[:idx]
+	}
+	return date
+}
 
 // BookingRepository handles booking database operations
 type BookingRepository struct {
@@ -99,6 +108,7 @@ func (r *BookingRepository) FindByID(id int) (*models.Booking, error) {
 		return nil, fmt.Errorf("failed to find booking: %w", err)
 	}
 
+	booking.Date = normalizeDate(booking.Date)
 	return booking, nil
 }
 
@@ -177,6 +187,7 @@ func (r *BookingRepository) FindAll(filter *models.BookingFilterRequest) ([]*mod
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan booking: %w", err)
 		}
+		booking.Date = normalizeDate(booking.Date)
 		bookings = append(bookings, booking)
 	}
 
@@ -308,6 +319,7 @@ func (r *BookingRepository) GetUpcoming(userID int, limit int) ([]*models.Bookin
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan booking: %w", err)
 		}
+		booking.Date = normalizeDate(booking.Date)
 		bookings = append(bookings, booking)
 	}
 
@@ -376,6 +388,8 @@ func (r *BookingRepository) GetForReminders() ([]*models.Booking, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan booking: %w", err)
 		}
+
+		booking.Date = normalizeDate(booking.Date)
 
 		// Populate user details
 		if userFirstName.Valid {
@@ -484,6 +498,8 @@ func (r *BookingRepository) FindByIDWithDetails(id int) (*models.Booking, error)
 		return nil, fmt.Errorf("failed to find booking with details: %w", err)
 	}
 
+	booking.Date = normalizeDate(booking.Date)
+
 	// Populate user details
 	if userFirstName.Valid {
 		booking.User.FirstName = userFirstName.String
@@ -564,6 +580,8 @@ func (r *BookingRepository) GetPendingApprovalBookings() ([]*models.Booking, err
 		if err != nil {
 			return nil, err
 		}
+
+		booking.Date = normalizeDate(booking.Date)
 
 		// Convert nullable fields
 		booking.RequiresApproval = requiresApproval == 1

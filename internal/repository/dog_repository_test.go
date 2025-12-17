@@ -136,8 +136,9 @@ func TestDogRepository_FindByID(t *testing.T) {
 			t.Errorf("Expected name 'Bella', got %s", dog.Name)
 		}
 
-		if dog.Category != "green" {
-			t.Errorf("Expected category 'green', got %s", dog.Category)
+		// ColorID 1 = gruen (green)
+		if dog.ColorID == nil || *dog.ColorID != 1 {
+			t.Errorf("Expected color_id 1, got %v", dog.ColorID)
 		}
 	})
 
@@ -401,8 +402,9 @@ func TestDogRepository_FindAll(t *testing.T) {
 		}
 
 		if len(dogs) > 0 {
-			if dogs[0].Category != "blue" {
-				t.Errorf("Expected category 'blue', got %s", dogs[0].Category)
+			// ColorID 5 = dunkelblau (blue)
+			if dogs[0].ColorID == nil || *dogs[0].ColorID != 5 {
+				t.Errorf("Expected color_id 5, got %v", dogs[0].ColorID)
 			}
 			if !dogs[0].IsAvailable {
 				t.Error("Expected dog to be available")
@@ -441,7 +443,8 @@ func TestDogRepository_Update(t *testing.T) {
 		// Update fields
 		dog.Name = "Bella Updated"
 		dog.Age = 6
-		dog.Category = "blue"
+		newColorID := 5 // dunkelblau (blue)
+		dog.ColorID = &newColorID
 
 		err := repo.Update(dog)
 		if err != nil {
@@ -456,8 +459,8 @@ func TestDogRepository_Update(t *testing.T) {
 		if updated.Age != 6 {
 			t.Errorf("Expected age 6, got %d", updated.Age)
 		}
-		if updated.Category != "blue" {
-			t.Errorf("Expected category 'blue', got %s", updated.Category)
+		if updated.ColorID == nil || *updated.ColorID != 5 {
+			t.Errorf("Expected color_id 5, got %v", updated.ColorID)
 		}
 	})
 

@@ -1400,14 +1400,13 @@ func TestBookingHandler_ColorBasedPermission(t *testing.T) {
 		// Assign this color to the user
 		testutil.SeedTestUserColor(t, db, userID, colorID)
 
-		// Create a dog with category="blue" (old system) but color_id=colorID (new system)
-		// In old system: green user cannot access blue dog
-		// In new system: user has blue color, so CAN access blue dog
+		// Create a dog with color_id=colorID
+		// User has this color, so CAN access the dog
 		now := time.Now()
 		result, _ := db.Exec(`
-			INSERT INTO dogs (name, breed, size, age, category, color_id, is_available, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, "ColorDog", "TestBreed", "medium", 3, "blue", colorID, true, now, now)
+			INSERT INTO dogs (name, breed, size, age, color_id, is_available, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`, "ColorDog", "TestBreed", "medium", 3, colorID, true, now, now)
 		dogID, _ := result.LastInsertId()
 
 		// Try to book - should SUCCEED because user has the dog's color
@@ -1442,14 +1441,13 @@ func TestBookingHandler_ColorBasedPermission(t *testing.T) {
 
 		// Do NOT assign this color to the user
 
-		// Create a dog with category="green" (low in old system) but color_id=colorID
-		// In old system: blue user CAN access green dog
-		// In new system: user does NOT have red color, so CANNOT access
+		// Create a dog with color_id=colorID that user does NOT have
+		// User does NOT have this color, so CANNOT access
 		now := time.Now()
 		result, _ := db.Exec(`
-			INSERT INTO dogs (name, breed, size, age, category, color_id, is_available, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, "RedDog", "TestBreed", "small", 2, "green", colorID, true, now, now)
+			INSERT INTO dogs (name, breed, size, age, color_id, is_available, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`, "RedDog", "TestBreed", "small", 2, colorID, true, now, now)
 		dogID, _ := result.LastInsertId()
 
 		// Try to book - should FAIL because user doesn't have the dog's color

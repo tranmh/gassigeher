@@ -14,8 +14,8 @@ import (
 func TestMigrationRegistry(t *testing.T) {
 	migrations := GetAllMigrations()
 
-	t.Run("All_27_migrations_registered", func(t *testing.T) {
-		assert.Len(t, migrations, 27, "Should have 27 migrations")
+	t.Run("All_2_migrations_registered", func(t *testing.T) {
+		assert.Len(t, migrations, 2, "Should have 2 migrations (consolidated schema)")
 	})
 
 	t.Run("Migrations_have_unique_IDs", func(t *testing.T) {
@@ -74,7 +74,7 @@ func TestRunMigrations_SQLite(t *testing.T) {
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 27, count, "Should have 27 applied migrations")
+	assert.Equal(t, 2, count, "Should have 2 applied migrations")
 
 	// Verify all tables created
 	tables := []string{
@@ -120,16 +120,16 @@ func TestRunMigrations_Idempotent(t *testing.T) {
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 27, count)
+	assert.Equal(t, 2, count)
 
 	// Run migrations second time (should be idempotent)
 	err = RunMigrationsWithDialect(db, dialect)
 	assert.NoError(t, err, "Second migration run should succeed (idempotent)")
 
-	// Count should still be 27 (no duplicates)
+	// Count should still be 2 (no duplicates)
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 27, count, "Should still have 27 migrations (no duplicates)")
+	assert.Equal(t, 2, count, "Should still have 2 migrations (no duplicates)")
 }
 
 // TestGetMigrationStatus tests migration status reporting
@@ -147,7 +147,7 @@ func TestGetMigrationStatus(t *testing.T) {
 	applied, pending, err := GetMigrationStatus(db, dialect)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, applied)
-	assert.Equal(t, 27, pending)
+	assert.Equal(t, 2, pending)
 
 	// After migrations
 	err = RunMigrationsWithDialect(db, dialect)
@@ -155,7 +155,7 @@ func TestGetMigrationStatus(t *testing.T) {
 
 	applied, pending, err = GetMigrationStatus(db, dialect)
 	assert.NoError(t, err)
-	assert.Equal(t, 27, applied)
+	assert.Equal(t, 2, applied)
 	assert.Equal(t, 0, pending)
 }
 
@@ -224,50 +224,50 @@ func TestMigration_SQLConsistency(t *testing.T) {
 func TestMigration_TypeConsistency(t *testing.T) {
 	migrations := GetAllMigrations()
 
-	// Check first migration (users table) for proper type mappings
-	usersMigration := migrations[0]
-	assert.Equal(t, "001_create_users_table", usersMigration.ID)
+	// Check first migration (consolidated schema) for proper type mappings
+	tableMigration := migrations[0]
+	assert.Equal(t, "001_create_tables", tableMigration.ID)
 
 	t.Run("SQLite_uses_INTEGER_PRIMARY_KEY_AUTOINCREMENT", func(t *testing.T) {
-		assert.Contains(t, usersMigration.Up["sqlite"], "INTEGER PRIMARY KEY AUTOINCREMENT")
+		assert.Contains(t, tableMigration.Up["sqlite"], "INTEGER PRIMARY KEY AUTOINCREMENT")
 	})
 
 	t.Run("MySQL_uses_INT_AUTO_INCREMENT", func(t *testing.T) {
-		assert.Contains(t, usersMigration.Up["mysql"], "INT AUTO_INCREMENT PRIMARY KEY")
+		assert.Contains(t, tableMigration.Up["mysql"], "INT AUTO_INCREMENT PRIMARY KEY")
 	})
 
 	t.Run("PostgreSQL_uses_SERIAL", func(t *testing.T) {
-		assert.Contains(t, usersMigration.Up["postgres"], "SERIAL PRIMARY KEY")
+		assert.Contains(t, tableMigration.Up["postgres"], "SERIAL PRIMARY KEY")
 	})
 
 	t.Run("SQLite_uses_INTEGER_for_booleans", func(t *testing.T) {
 		// is_verified INTEGER DEFAULT 0
-		assert.Contains(t, usersMigration.Up["sqlite"], "is_verified INTEGER")
+		assert.Contains(t, tableMigration.Up["sqlite"], "is_verified INTEGER")
 	})
 
 	t.Run("MySQL_uses_TINYINT_for_booleans", func(t *testing.T) {
-		assert.Contains(t, usersMigration.Up["mysql"], "is_verified TINYINT(1)")
+		assert.Contains(t, tableMigration.Up["mysql"], "is_verified TINYINT(1)")
 	})
 
 	t.Run("PostgreSQL_uses_BOOLEAN", func(t *testing.T) {
-		assert.Contains(t, usersMigration.Up["postgres"], "is_verified BOOLEAN")
+		assert.Contains(t, tableMigration.Up["postgres"], "is_verified BOOLEAN")
 	})
 }
 
-// TestMigration_InsertOrIgnore tests that migration 008 uses correct syntax
+// TestMigration_InsertOrIgnore tests that migration 002 uses correct syntax
 func TestMigration_InsertOrIgnore(t *testing.T) {
 	migrations := GetAllMigrations()
 
-	// Find migration 008 (insert default settings)
+	// Find migration 002 (insert default data)
 	var settingsMigration *Migration
 	for _, m := range migrations {
-		if m.ID == "008_insert_default_settings" {
+		if m.ID == "002_insert_default_data" {
 			settingsMigration = m
 			break
 		}
 	}
 
-	require.NotNil(t, settingsMigration, "Migration 008 should exist")
+	require.NotNil(t, settingsMigration, "Migration 002 should exist")
 
 	t.Run("SQLite_uses_INSERT_OR_IGNORE", func(t *testing.T) {
 		assert.Contains(t, settingsMigration.Up["sqlite"], "INSERT OR IGNORE")
@@ -283,7 +283,7 @@ func TestMigration_InsertOrIgnore(t *testing.T) {
 	})
 
 	t.Run("All_insert_same_values", func(t *testing.T) {
-		// All should insert the same 3 settings
+		// All should insert core settings
 		for dialect, sql := range settingsMigration.Up {
 			assert.Contains(t, sql, "booking_advance_days", "Missing setting in %s", dialect)
 			assert.Contains(t, sql, "cancellation_notice_hours", "Missing setting in %s", dialect)
@@ -351,33 +351,8 @@ func TestMigrationOrder(t *testing.T) {
 	migrations := GetAllMigrations()
 
 	expectedOrder := []string{
-		"001_create_users_table",
-		"002_create_dogs_table",
-		"003_create_bookings_table",
-		"004_create_blocked_dates_table",
-		"005_create_experience_requests_table",
-		"006_create_system_settings_table",
-		"007_create_reactivation_requests_table",
-		"008_insert_default_settings",
-		"009_add_photo_thumbnail_column",
-		"010_add_admin_flags",
-		"012_booking_times",
-		"013_remove_walk_type",
-		"014_add_featured_dogs",
-		"015_add_external_link",
-		"016_add_reminder_sent",
-		"017_insert_site_logo_setting",
-		"018_insert_registration_password",
-		"019_add_dog_id_to_blocked_dates",
-		"020_split_name_to_first_last",
-		"021_insert_whatsapp_settings",
-		"022_create_walk_reports_table",
-		"023_add_must_change_password",
-		"024_create_color_categories_table",
-		"025_create_user_colors_table",
-		"026_add_color_id_to_dogs",
-		"027_create_color_requests_table",
-		"028_add_default_color_setting",
+		"001_create_tables",
+		"002_insert_default_data",
 	}
 
 	assert.Len(t, migrations, len(expectedOrder))
@@ -399,19 +374,27 @@ func TestMigrationRunner_PartialApplication(t *testing.T) {
 	err = dialect.ApplySettings(db)
 	require.NoError(t, err)
 
-	// Create schema_migrations table and mark some migrations as applied
+	// Create schema_migrations table
 	err = createSchemaMigrationsTable(db, dialect)
 	require.NoError(t, err)
 
-	// Simulate that first 3 migrations were already applied
-	for i := 1; i <= 3; i++ {
-		migrationID := fmt.Sprintf("00%d_", i) // This won't match actual IDs perfectly
-		err = markMigrationAsApplied(db, migrationID)
-		require.NoError(t, err)
-	}
+	// Actually apply the first migration (create tables)
+	migrations := GetAllMigrations()
+	require.GreaterOrEqual(t, len(migrations), 1, "Should have at least 1 migration")
 
-	// Now run all migrations
-	// Should only apply migrations 4-9 (plus 1-3 that match actual IDs)
+	firstMigration := migrations[0]
+	require.Equal(t, "001_create_tables", firstMigration.ID)
+
+	// Execute the first migration
+	sql := firstMigration.Up["sqlite"]
+	_, err = db.Exec(sql)
+	require.NoError(t, err, "First migration should execute successfully")
+
+	// Mark first migration as applied
+	err = markMigrationAsApplied(db, "001_create_tables")
+	require.NoError(t, err)
+
+	// Now run all migrations - should only apply migration 2
 	err = RunMigrationsWithDialect(db, dialect)
 	assert.NoError(t, err)
 
@@ -419,7 +402,7 @@ func TestMigrationRunner_PartialApplication(t *testing.T) {
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.GreaterOrEqual(t, count, 9, "Should have at least 9 migrations applied")
+	assert.Equal(t, 2, count, "Should have 2 migrations applied")
 }
 
 // TestIsAlreadyExistsError tests error detection for different databases

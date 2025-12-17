@@ -24,10 +24,10 @@ func NewDogRepository(db *sql.DB) *DogRepository {
 func (r *DogRepository) Create(dog *models.Dog) error {
 	query := `
 		INSERT INTO dogs (
-			name, breed, size, age, category, color_id, photo, photo_thumbnail, special_needs,
+			name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
 			pickup_location, walk_route, walk_duration, special_instructions,
 			default_morning_time, default_evening_time, is_available, external_link
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	result, err := r.db.Exec(
@@ -36,7 +36,6 @@ func (r *DogRepository) Create(dog *models.Dog) error {
 		dog.Breed,
 		dog.Size,
 		dog.Age,
-		dog.Category,
 		dog.ColorID,
 		dog.Photo,
 		dog.PhotoThumbnail,
@@ -68,7 +67,7 @@ func (r *DogRepository) Create(dog *models.Dog) error {
 // FindByID finds a dog by ID
 func (r *DogRepository) FindByID(id int) (*models.Dog, error) {
 	query := `
-		SELECT id, name, breed, size, age, category, color_id, photo, photo_thumbnail, special_needs,
+		SELECT id, name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
 		       pickup_location, walk_route, walk_duration, special_instructions,
 		       default_morning_time, default_evening_time, is_available, is_featured,
 		       external_link, unavailable_reason, unavailable_since, created_at, updated_at
@@ -83,7 +82,6 @@ func (r *DogRepository) FindByID(id int) (*models.Dog, error) {
 		&dog.Breed,
 		&dog.Size,
 		&dog.Age,
-		&dog.Category,
 		&dog.ColorID,
 		&dog.Photo,
 		&dog.PhotoThumbnail,
@@ -116,7 +114,7 @@ func (r *DogRepository) FindByID(id int) (*models.Dog, error) {
 // FindAll finds all dogs with optional filtering
 func (r *DogRepository) FindAll(filter *models.DogFilterRequest) ([]*models.Dog, error) {
 	query := `
-		SELECT id, name, breed, size, age, category, color_id, photo, photo_thumbnail, special_needs,
+		SELECT id, name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
 		       pickup_location, walk_route, walk_duration, special_instructions,
 		       default_morning_time, default_evening_time, is_available, is_featured,
 		       external_link, unavailable_reason, unavailable_since, created_at, updated_at
@@ -148,9 +146,14 @@ func (r *DogRepository) FindAll(filter *models.DogFilterRequest) ([]*models.Dog,
 			args = append(args, *filter.MaxAge)
 		}
 
+		// Category filter maps to color_id via color name lookup
 		if filter.Category != nil && *filter.Category != "" {
-			query += " AND category = ?"
-			args = append(args, *filter.Category)
+			// Map category name to color_id
+			colorMap := map[string]int{"green": 1, "orange": 3, "blue": 5}
+			if colorID, ok := colorMap[*filter.Category]; ok {
+				query += " AND color_id = ?"
+				args = append(args, colorID)
+			}
 		}
 
 		if filter.Available != nil {
@@ -182,7 +185,6 @@ func (r *DogRepository) FindAll(filter *models.DogFilterRequest) ([]*models.Dog,
 			&dog.Breed,
 			&dog.Size,
 			&dog.Age,
-			&dog.Category,
 			&dog.ColorID,
 			&dog.Photo,
 			&dog.PhotoThumbnail,
@@ -214,7 +216,7 @@ func (r *DogRepository) FindAll(filter *models.DogFilterRequest) ([]*models.Dog,
 // If more than 3 dogs are featured, a random selection of 3 is returned
 func (r *DogRepository) GetFeatured() ([]*models.Dog, error) {
 	query := `
-		SELECT id, name, breed, size, age, category, color_id, photo, photo_thumbnail, special_needs,
+		SELECT id, name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
 		       pickup_location, walk_route, walk_duration, special_instructions,
 		       default_morning_time, default_evening_time, is_available, is_featured,
 		       external_link, unavailable_reason, unavailable_since, created_at, updated_at
@@ -238,7 +240,6 @@ func (r *DogRepository) GetFeatured() ([]*models.Dog, error) {
 			&dog.Breed,
 			&dog.Size,
 			&dog.Age,
-			&dog.Category,
 			&dog.ColorID,
 			&dog.Photo,
 			&dog.PhotoThumbnail,
@@ -309,7 +310,6 @@ func (r *DogRepository) Update(dog *models.Dog) error {
 			breed = ?,
 			size = ?,
 			age = ?,
-			category = ?,
 			color_id = ?,
 			photo = ?,
 			photo_thumbnail = ?,
@@ -334,7 +334,6 @@ func (r *DogRepository) Update(dog *models.Dog) error {
 		dog.Breed,
 		dog.Size,
 		dog.Age,
-		dog.Category,
 		dog.ColorID,
 		dog.Photo,
 		dog.PhotoThumbnail,

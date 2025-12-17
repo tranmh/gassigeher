@@ -402,8 +402,8 @@ func TestUserRepository_FindInactiveUsers(t *testing.T) {
 
 		email := "old@example.com"
 		_, err := db.Exec(`
-			INSERT INTO users (email, name, password_hash, experience_level, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
-			VALUES (?, 'Old User', 'hash', 'green', 1, 1, ?, ?, ?)
+			INSERT INTO users (email, first_name, last_name, password_hash, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
+			VALUES (?, 'Old', 'User', 'hash', 1, 1, ?, ?, ?)
 		`, email, now, oldActivity, now)
 		if err != nil {
 			t.Fatalf("Failed to seed old user: %v", err)
@@ -440,9 +440,9 @@ func TestUserRepository_FindByVerificationToken(t *testing.T) {
 
 		// Create user with verification token
 		_, err := db.Exec(`
-			INSERT INTO users (email, name, password_hash, experience_level, is_verified, is_active,
+			INSERT INTO users (email, first_name, last_name, password_hash, is_verified, is_active,
 			                   verification_token, verification_token_expires, terms_accepted_at, last_activity_at, created_at)
-			VALUES (?, 'Verify Me', 'hash', 'green', 0, 1, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+			VALUES (?, 'Verify', 'Me', 'hash', 0, 1, ?, ?, datetime('now'), datetime('now'), datetime('now'))
 		`, email, verificationToken, tokenExpires)
 		if err != nil {
 			t.Fatalf("Failed to seed user: %v", err)
@@ -500,9 +500,9 @@ func TestUserRepository_FindByVerificationToken(t *testing.T) {
 
 		// Create deleted user with verification token
 		_, err := db.Exec(`
-			INSERT INTO users (email, name, password_hash, experience_level, is_verified, is_active, is_deleted,
+			INSERT INTO users (email, first_name, last_name, password_hash, is_verified, is_active, is_deleted,
 			                   verification_token, verification_token_expires, terms_accepted_at, last_activity_at, created_at)
-			VALUES (?, 'Deleted User', 'hash', 'green', 0, 0, 1, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+			VALUES (?, 'Deleted', 'User', 'hash', 0, 0, 1, ?, ?, datetime('now'), datetime('now'), datetime('now'))
 		`, email, verificationToken, tokenExpires)
 		if err != nil {
 			t.Fatalf("Failed to seed deleted user: %v", err)
@@ -532,9 +532,9 @@ func TestUserRepository_FindByPasswordResetToken(t *testing.T) {
 
 		// Create user with password reset token
 		_, err := db.Exec(`
-			INSERT INTO users (email, name, password_hash, experience_level, is_verified, is_active,
+			INSERT INTO users (email, first_name, last_name, password_hash, is_verified, is_active,
 			                   password_reset_token, password_reset_expires, terms_accepted_at, last_activity_at, created_at)
-			VALUES (?, 'Reset Me', 'hash', 'blue', 1, 1, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+			VALUES (?, 'Reset', 'Me', 'hash', 1, 1, ?, ?, datetime('now'), datetime('now'), datetime('now'))
 		`, email, resetToken, tokenExpires)
 		if err != nil {
 			t.Fatalf("Failed to seed user: %v", err)
@@ -588,9 +588,9 @@ func TestUserRepository_FindByPasswordResetToken(t *testing.T) {
 
 		// Create deleted user with reset token
 		_, err := db.Exec(`
-			INSERT INTO users (email, name, password_hash, experience_level, is_verified, is_active, is_deleted,
+			INSERT INTO users (email, first_name, last_name, password_hash, is_verified, is_active, is_deleted,
 			                   password_reset_token, password_reset_expires, terms_accepted_at, last_activity_at, created_at)
-			VALUES (?, 'Deleted User', 'hash', 'green', 1, 0, 1, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+			VALUES (?, 'Deleted', 'User', 'hash', 1, 0, 1, ?, ?, datetime('now'), datetime('now'), datetime('now'))
 		`, email, resetToken, tokenExpires)
 		if err != nil {
 			t.Fatalf("Failed to seed deleted user: %v", err)
@@ -787,8 +787,8 @@ func TestUserRepository_ClearMustChangePassword(t *testing.T) {
 		// Create user with must_change_password = true
 		email := "mustchange@example.com"
 		_, err := db.Exec(`
-			INSERT INTO users (email, name, first_name, last_name, password_hash, experience_level, is_active, is_verified, must_change_password, terms_accepted_at, last_activity_at, created_at)
-			VALUES (?, 'Must Change', 'Must', 'Change', 'hash', 'green', 1, 1, 1, datetime('now'), datetime('now'), datetime('now'))
+			INSERT INTO users (email, first_name, last_name, password_hash, is_active, is_verified, must_change_password, terms_accepted_at, last_activity_at, created_at)
+			VALUES (?, 'Must', 'Change', 'hash', 1, 1, 1, datetime('now'), datetime('now'), datetime('now'))
 		`, email)
 		if err != nil {
 			t.Fatalf("Failed to seed user: %v", err)
@@ -834,8 +834,8 @@ func TestUserRepository_ClearMustChangePassword(t *testing.T) {
 		// Create user with must_change_password = false
 		email := "nochange@example.com"
 		_, err := db.Exec(`
-			INSERT INTO users (email, name, first_name, last_name, password_hash, experience_level, is_active, is_verified, must_change_password, terms_accepted_at, last_activity_at, created_at)
-			VALUES (?, 'No Change', 'No', 'Change', 'hash', 'blue', 1, 1, 0, datetime('now'), datetime('now'), datetime('now'))
+			INSERT INTO users (email, first_name, last_name, password_hash, is_active, is_verified, must_change_password, terms_accepted_at, last_activity_at, created_at)
+			VALUES (?, 'No', 'Change', 'hash', 1, 1, 0, datetime('now'), datetime('now'), datetime('now'))
 		`, email)
 		if err != nil {
 			t.Fatalf("Failed to seed user: %v", err)

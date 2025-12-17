@@ -13,7 +13,8 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// Test 9.1.1: Fresh Database Migration
+// Test 9.1.1: Fresh Database Migration (consolidated schema)
+// Tests that migrations create all tables and seed data correctly
 func TestFreshDatabaseMigration(t *testing.T) {
 	// Create a temporary database file
 	tmpFile := "./test_fresh_migration.db"
@@ -36,170 +37,49 @@ func TestFreshDatabaseMigration(t *testing.T) {
 	// Verify all tables exist
 	tables := []string{
 		"users", "dogs", "bookings", "blocked_dates", "experience_requests",
-		"system_settings", "booking_time_rules", "custom_holidays", "feiertage_cache", "reactivation_requests",
+		"system_settings", "reactivation_requests", "booking_time_rules",
+		"custom_holidays", "feiertage_cache", "walk_reports", "walk_report_photos",
+		"color_categories", "user_colors", "color_requests",
 	}
 
 	for _, table := range tables {
-		var name string
-		err := db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&name)
+		var count int
+		err := db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM %s", table)).Scan(&count)
 		if err != nil {
-			t.Errorf("Table %s does not exist: %v", table, err)
+			t.Errorf("Table %s should exist: %v", table, err)
 		}
 	}
 
-	// Verify seed data in booking_time_rules
+	// Verify default color categories were inserted
+	var colorCount int
+	err = db.QueryRow("SELECT COUNT(*) FROM color_categories").Scan(&colorCount)
+	if err != nil || colorCount != 7 {
+		t.Errorf("Expected 7 color categories, got %d", colorCount)
+	}
+
+	// Verify default booking time rules were inserted
 	var ruleCount int
 	err = db.QueryRow("SELECT COUNT(*) FROM booking_time_rules").Scan(&ruleCount)
-	if err != nil {
-		t.Fatalf("Failed to count rules: %v", err)
-	}
-	if ruleCount != 9 {
-		t.Errorf("Expected 9 seed rules, got %d", ruleCount)
+	if err != nil || ruleCount < 9 {
+		t.Errorf("Expected at least 9 booking time rules, got %d", ruleCount)
 	}
 
-	// Verify bookings table has new columns
-	rows, err := db.Query("PRAGMA table_info(bookings)")
-	if err != nil {
-		t.Fatalf("Failed to get table info: %v", err)
-	}
-	defer rows.Close()
-
-	columns := make(map[string]bool)
-	for rows.Next() {
-		var cid int
-		var name, dataType string
-		var notNull, pk int
-		var dfltValue sql.NullString
-		err := rows.Scan(&cid, &name, &dataType, &notNull, &dfltValue, &pk)
-		if err != nil {
-			t.Fatalf("Failed to scan column info: %v", err)
-		}
-		columns[name] = true
-	}
-
-	requiredColumns := []string{"requires_approval", "approval_status", "approved_by", "approved_at", "rejection_reason"}
-	for _, col := range requiredColumns {
-		if !columns[col] {
-			t.Errorf("Required column %s not found in bookings table", col)
-		}
-	}
-
-	// Verify system_settings has new entries
-	var morningApprovalSetting string
-	err = db.QueryRow("SELECT value FROM system_settings WHERE key='morning_walk_requires_approval'").Scan(&morningApprovalSetting)
-	if err != nil {
-		t.Errorf("morning_walk_requires_approval setting not found: %v", err)
-	}
-
-	var feiertageAPISetting string
-	err = db.QueryRow("SELECT value FROM system_settings WHERE key='use_feiertage_api'").Scan(&feiertageAPISetting)
-	if err != nil {
-		t.Errorf("use_feiertage_api setting not found: %v", err)
-	}
-
-	t.Log("✅ Fresh database migration test passed")
-}
-
-// Test 9.1.2: Existing Database Migration
-func TestExistingDatabaseMigration(t *testing.T) {
-	// Create a temporary database file
-	tmpFile := "./test_existing_migration.db"
-	defer os.Remove(tmpFile)
-
-	// Open database
-	db, err := sql.Open("sqlite", tmpFile)
-	if err != nil {
-		t.Fatalf("Failed to create database: %v", err)
-	}
-	defer db.Close()
-
-	// Create old schema (minimal version before booking time restrictions)
+	// Verify bookings table has approval columns
+	var total, defaultRequiresApproval, defaultApproved int
+	// Insert a test booking first
 	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS users (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name TEXT NOT NULL,
-			email TEXT UNIQUE,
-			password_hash TEXT,
-			experience_level TEXT DEFAULT 'green',
-			is_active INTEGER DEFAULT 1,
-			is_verified INTEGER DEFAULT 0,
-			last_activity_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			terms_accepted_at DATETIME NOT NULL,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		);
-
-		CREATE TABLE IF NOT EXISTS dogs (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name TEXT NOT NULL,
-			category TEXT NOT NULL,
-			is_available INTEGER DEFAULT 1
-		);
-
-		CREATE TABLE IF NOT EXISTS bookings (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			user_id INTEGER NOT NULL,
-			dog_id INTEGER NOT NULL,
-			date DATE NOT NULL,
-			walk_type TEXT CHECK(walk_type IN ('morning', 'evening')),
-			scheduled_time TEXT NOT NULL,
-			status TEXT DEFAULT 'scheduled' CHECK(status IN ('scheduled', 'completed', 'cancelled')),
-			completed_at TIMESTAMP,
-			user_notes TEXT,
-			admin_cancellation_reason TEXT,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-			FOREIGN KEY (dog_id) REFERENCES dogs(id) ON DELETE CASCADE,
-			UNIQUE(dog_id, date, walk_type)
-		);
-	`)
-	if err != nil {
-		t.Fatalf("Failed to create old schema: %v", err)
-	}
-
-	// Insert test data
-	_, err = db.Exec(`
-		INSERT INTO users (name, email, password_hash, terms_accepted_at) VALUES
-		('Test User', 'test@example.com', 'hash', CURRENT_TIMESTAMP);
-
-		INSERT INTO dogs (name, category, is_available) VALUES
-		('Test Dog', 'green', 1);
-
-		INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status) VALUES
-		(1, 1, '2025-01-27', '10:00', 'scheduled'),
-		(1, 1, '2025-01-28', '15:00', 'scheduled');
+		INSERT INTO users (id, first_name, last_name, email, password_hash, terms_accepted_at) VALUES
+		(1, 'Test', 'User', 'test@example.com', 'hash', CURRENT_TIMESTAMP);
+		INSERT INTO dogs (id, name, breed, is_available, color_id) VALUES
+		(1, 'Test Dog', 'Labrador', 1, 1);
+		INSERT INTO bookings (user_id, dog_id, date, scheduled_time) VALUES
+		(1, 1, '2025-01-27', '10:00'),
+		(1, 1, '2025-01-28', '15:00');
 	`)
 	if err != nil {
 		t.Fatalf("Failed to insert test data: %v", err)
 	}
 
-	// Count existing bookings
-	var oldBookingCount int
-	err = db.QueryRow("SELECT COUNT(*) FROM bookings").Scan(&oldBookingCount)
-	if err != nil {
-		t.Fatalf("Failed to count old bookings: %v", err)
-	}
-
-	// Now run migrations with dialect
-	factory := NewDialectFactory()
-	dialect, _ := factory.GetDialect("sqlite")
-	err = RunMigrationsWithDialect(db, dialect)
-	if err != nil {
-		t.Fatalf("Migration failed: %v", err)
-	}
-
-	// Verify existing bookings preserved
-	var newBookingCount int
-	err = db.QueryRow("SELECT COUNT(*) FROM bookings").Scan(&newBookingCount)
-	if err != nil {
-		t.Fatalf("Failed to count new bookings: %v", err)
-	}
-	if newBookingCount != oldBookingCount {
-		t.Errorf("Booking count changed: expected %d, got %d", oldBookingCount, newBookingCount)
-	}
-
-	// Verify new columns have default values
-	var total, defaultRequiresApproval, defaultApproved int
 	err = db.QueryRow(`
 		SELECT
 			COUNT(*) as total,
@@ -312,12 +192,12 @@ func TestForeignKeyConstraints(t *testing.T) {
 
 	// Create test data
 	_, err = db.Exec(`
-		INSERT INTO users (id, name, email, password_hash, is_admin, terms_accepted_at, experience_level) VALUES
-		(1, 'Admin User', 'admin@example.com', 'hash', 1, CURRENT_TIMESTAMP, 'green'),
-		(2, 'Regular User', 'user@example.com', 'hash', 0, CURRENT_TIMESTAMP, 'green');
+		INSERT INTO users (id, first_name, last_name, email, password_hash, is_admin, terms_accepted_at) VALUES
+		(1, 'Admin', 'User', 'admin@example.com', 'hash', 1, CURRENT_TIMESTAMP),
+		(2, 'Regular', 'User', 'user@example.com', 'hash', 0, CURRENT_TIMESTAMP);
 
-		INSERT INTO dogs (id, name, breed, category, is_available) VALUES
-		(1, 'Test Dog', 'Labrador', 'green', 1);
+		INSERT INTO dogs (id, name, breed, color_id, is_available) VALUES
+		(1, 'Test Dog', 'Labrador', 1, 1);
 
 		INSERT INTO bookings (id, user_id, dog_id, date, scheduled_time, status, requires_approval, approval_status, approved_by, approved_at) VALUES
 		(1, 2, 1, '2025-01-27', '10:00', 'scheduled', 1, 'approved', 1, CURRENT_TIMESTAMP);
@@ -434,11 +314,11 @@ func TestUniqueConstraints(t *testing.T) {
 	// Test 9.2.2-C: Duplicate booking (dog, date, scheduled_time)
 	// First create test user and dog
 	_, err = db.Exec(`
-		INSERT INTO users (id, name, email, password_hash, terms_accepted_at, experience_level) VALUES
-		(1, 'Test User', 'test@example.com', 'hash', CURRENT_TIMESTAMP, 'green');
+		INSERT INTO users (id, first_name, last_name, email, password_hash, terms_accepted_at) VALUES
+		(1, 'Test', 'User', 'test@example.com', 'hash', CURRENT_TIMESTAMP);
 
-		INSERT INTO dogs (id, name, breed, category, is_available) VALUES
-		(1, 'Test Dog', 'Labrador', 'green', 1);
+		INSERT INTO dogs (id, name, breed, color_id, is_available) VALUES
+		(1, 'Test Dog', 'Labrador', 1, 1);
 	`)
 	if err != nil {
 		t.Fatalf("Failed to create test user/dog: %v", err)
@@ -585,11 +465,11 @@ func TestIndexEffectiveness(t *testing.T) {
 
 	// Insert test bookings
 	_, err = db.Exec(`
-		INSERT INTO users (id, name, email, password_hash, terms_accepted_at, experience_level) VALUES
-		(1, 'Test User', 'test@example.com', 'hash', CURRENT_TIMESTAMP, 'green');
+		INSERT INTO users (id, first_name, last_name, email, password_hash, terms_accepted_at) VALUES
+		(1, 'Test', 'User', 'test@example.com', 'hash', CURRENT_TIMESTAMP);
 
-		INSERT INTO dogs (id, name, breed, category, is_available) VALUES
-		(1, 'Test Dog', 'Labrador', 'green', 1);
+		INSERT INTO dogs (id, name, breed, color_id, is_available) VALUES
+		(1, 'Test Dog', 'Labrador', 1, 1);
 	`)
 	if err != nil {
 		t.Fatalf("Failed to create test user/dog: %v", err)

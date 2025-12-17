@@ -147,7 +147,7 @@ func cleanPostgreSQLTestDB(t *testing.T, db *sql.DB) {
 
 // DONE: SeedTestUser creates a test user and returns the ID
 // Name is split: first word = first_name, rest = last_name
-// Also assigns colors based on experience level for the new color system
+// Also assigns colors based on level parameter for the color system
 func SeedTestUser(t *testing.T, db *sql.DB, email, name, level string) int {
 	now := time.Now()
 
@@ -162,12 +162,10 @@ func SeedTestUser(t *testing.T, db *sql.DB, email, name, level string) int {
 		}
 	}
 
-	// Note: We still include the legacy 'name' column for backward compatibility
-	// with the database schema until a migration drops it
 	result, err := db.Exec(`
-		INSERT INTO users (email, name, first_name, last_name, phone, password_hash, experience_level, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?)
-	`, email, name, firstName, lastName, "+49 123 456789", "test_hash", level, now, now, now)
+		INSERT INTO users (email, first_name, last_name, phone, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
+		VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?, ?)
+	`, email, firstName, lastName, "+49 123 456789", "test_hash", now, now, now)
 
 	if err != nil {
 		t.Fatalf("Failed to seed test user: %v", err)
@@ -175,7 +173,7 @@ func SeedTestUser(t *testing.T, db *sql.DB, email, name, level string) int {
 
 	userID, _ := result.LastInsertId()
 
-	// Assign colors based on experience level for the new color system
+	// Assign colors based on level parameter for the color system
 	// Color IDs: 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau
 	colorsByLevel := map[string][]int{
 		"green":  {1},             // only gruen
@@ -215,9 +213,9 @@ func SeedTestUserWithoutColors(t *testing.T, db *sql.DB, email, name, level stri
 	}
 
 	result, err := db.Exec(`
-		INSERT INTO users (email, name, first_name, last_name, phone, password_hash, experience_level, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?)
-	`, email, name, firstName, lastName, "+49 123 456789", "test_hash", level, now, now, now)
+		INSERT INTO users (email, first_name, last_name, phone, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
+		VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?, ?)
+	`, email, firstName, lastName, "+49 123 456789", "test_hash", now, now, now)
 
 	if err != nil {
 		t.Fatalf("Failed to seed test user without colors: %v", err)
@@ -263,11 +261,11 @@ func splitName(name string) []string {
 }
 
 // DONE: SeedTestDog creates a test dog and returns the ID
-// Also sets color_id based on category for the new color system
+// Sets color_id based on category parameter for the color system
 func SeedTestDog(t *testing.T, db *sql.DB, name, breed, category string) int {
 	now := time.Now()
 
-	// Map category to color_id for the new color system
+	// Map category to color_id for the color system
 	// Color IDs: 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau
 	colorByCategory := map[string]int{
 		"green":  1, // gruen
@@ -280,9 +278,9 @@ func SeedTestDog(t *testing.T, db *sql.DB, name, breed, category string) int {
 	}
 
 	result, err := db.Exec(`
-		INSERT INTO dogs (name, breed, size, age, category, color_id, is_available, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, 1, ?)
-	`, name, breed, "medium", 5, category, colorID, now)
+		INSERT INTO dogs (name, breed, size, age, color_id, is_available, created_at)
+		VALUES (?, ?, ?, ?, ?, 1, ?)
+	`, name, breed, "medium", 5, colorID, now)
 
 	if err != nil {
 		t.Fatalf("Failed to seed test dog: %v", err)

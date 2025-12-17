@@ -28,17 +28,17 @@ func TestConcurrentBookingCreation(t *testing.T) {
 	// Create test users and dogs
 	for i := 1; i <= 50; i++ {
 		_, err := db.Exec(`
-			INSERT INTO users (id, name, email, password_hash, experience_level, terms_accepted_at)
+			INSERT INTO users (id, first_name, last_name, email, password_hash, terms_accepted_at)
 			VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-		`, i, fmt.Sprintf("User %d", i), fmt.Sprintf("user%d@test.com", i), "hash", "green")
+		`, i, "User", fmt.Sprintf("%d", i), fmt.Sprintf("user%d@test.com", i), "hash")
 		if err != nil {
 			t.Fatalf("Failed to create test user: %v", err)
 		}
 	}
 
 	_, err := db.Exec(`
-		INSERT INTO dogs (id, name, category, age, breed, is_available)
-		VALUES (1, 'Test Dog', 'green', 3, 'Mixed', 1)
+		INSERT INTO dogs (id, name, color_id, age, breed, is_available)
+		VALUES (1, 'Test Dog', 1, 3, 'Mixed', 1)
 	`)
 	if err != nil {
 		t.Fatalf("Failed to create test dog: %v", err)
@@ -118,17 +118,17 @@ func TestConcurrentBookingCreation_DifferentTimeSlots(t *testing.T) {
 	// Create test users and dogs
 	for i := 1; i <= 20; i++ {
 		_, err := db.Exec(`
-			INSERT INTO users (id, name, email, password_hash, experience_level, terms_accepted_at)
+			INSERT INTO users (id, first_name, last_name, email, password_hash, terms_accepted_at)
 			VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-		`, i, fmt.Sprintf("User %d", i), fmt.Sprintf("user%d@test.com", i), "hash", "green")
+		`, i, "User", fmt.Sprintf("%d", i), fmt.Sprintf("user%d@test.com", i), "hash")
 		if err != nil {
 			t.Fatalf("Failed to create test user: %v", err)
 		}
 	}
 
 	_, err := db.Exec(`
-		INSERT INTO dogs (id, name, category, age, breed, is_available)
-		VALUES (1, 'Test Dog', 'green', 3, 'Mixed', 1)
+		INSERT INTO dogs (id, name, color_id, age, breed, is_available)
+		VALUES (1, 'Test Dog', 1, 3, 'Mixed', 1)
 	`)
 	if err != nil {
 		t.Fatalf("Failed to create test dog: %v", err)
@@ -207,9 +207,9 @@ func TestConcurrentApprovalUpdates(t *testing.T) {
 
 	// Create test user, dog, and admin
 	_, err := db.Exec(`
-		INSERT INTO users (id, name, email, password_hash, experience_level, is_admin, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
-		VALUES (1, 'User', 'user@test.com', 'hash', 'green', 0, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-		       (2, 'Admin', 'admin@test.com', 'hash', 'green', 1, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		INSERT INTO users (id, first_name, last_name, email, password_hash, is_admin, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
+		VALUES (1, 'Test', 'User', 'user@test.com', 'hash', 0, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+		       (2, 'Test', 'Admin', 'admin@test.com', 'hash', 1, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 	`)
 	if err != nil {
 		t.Fatalf("Failed to create test users: %v", err)
@@ -218,8 +218,8 @@ func TestConcurrentApprovalUpdates(t *testing.T) {
 	// Create 10 dogs for testing
 	for i := 1; i <= 10; i++ {
 		_, _ = db.Exec(`
-			INSERT INTO dogs (id, name, category, age, breed, is_available)
-			VALUES (?, ?, 'green', 3, 'Mixed', 1)
+			INSERT INTO dogs (id, name, color_id, age, breed, is_available)
+			VALUES (?, ?, 1, 3, 'Mixed', 1)
 		`, i, fmt.Sprintf("Test Dog %d", i))
 	}
 
@@ -310,14 +310,14 @@ func BenchmarkConcurrentBookingCreation(b *testing.B) {
 	// Create test data
 	for i := 1; i <= 100; i++ {
 		_, _ = db.Exec(`
-			INSERT INTO users (id, name, email, password_hash, experience_level, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
+			INSERT INTO users (id, first_name, last_name, email, password_hash, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
 			VALUES (?, ?, ?, ?, ?, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-		`, i, fmt.Sprintf("User %d", i), fmt.Sprintf("user%d@test.com", i), "hash", "green")
+		`, i, "User", fmt.Sprintf("%d", i), fmt.Sprintf("user%d@test.com", i), "hash")
 	}
 
 	_, _ = db.Exec(`
-		INSERT INTO dogs (id, name, category, age, breed, is_available)
-		VALUES (1, 'Test Dog', 'green', 3, 'Mixed', 1)
+		INSERT INTO dogs (id, name, color_id, age, breed, is_available)
+		VALUES (1, 'Test Dog', 1, 3, 'Mixed', 1)
 	`)
 
 	bookingRepo := NewBookingRepository(db)
@@ -357,12 +357,12 @@ func TestBookingCreation_RaceConditions(t *testing.T) {
 
 	// Create test data
 	_, _ = db.Exec(`
-		INSERT INTO users (id, name, email, password_hash, experience_level, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
-		VALUES (1, 'User', 'user@test.com', 'hash', 'green', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		INSERT INTO users (id, first_name, last_name, email, password_hash, is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
+		VALUES (1, 'Test', 'User', 'user@test.com', 'hash', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 	`)
 	_, _ = db.Exec(`
-		INSERT INTO dogs (id, name, category, age, breed, is_available)
-		VALUES (1, 'Test Dog', 'green', 3, 'Mixed', 1)
+		INSERT INTO dogs (id, name, color_id, age, breed, is_available)
+		VALUES (1, 'Test Dog', 1, 3, 'Mixed', 1)
 	`)
 
 	// Run 100 concurrent booking operations
