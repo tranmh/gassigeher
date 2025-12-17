@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"image"
 	"image/jpeg"
@@ -17,7 +18,10 @@ import (
 
 // ImageService handles image processing operations
 type ImageService struct {
-	uploadDir string
+	uploadDir  string
+	s3Service  *S3Service // Optional S3 service for cloud storage
+	tenantSlug string     // Tenant slug for S3 path organization
+	useS3      bool       // Flag to use S3 storage
 }
 
 // Image processing constants
@@ -30,15 +34,32 @@ const (
 	LogoMaxHeight   = 200  // Max height for site logo (banner format)
 )
 
-// NewImageService creates a new image service
+// NewImageService creates a new image service with local filesystem storage
 func NewImageService(uploadDir string) *ImageService {
 	return &ImageService{
 		uploadDir: uploadDir,
+		useS3:     false,
 	}
+}
+
+// NewImageServiceWithS3 creates a new image service with S3 storage support
+func NewImageServiceWithS3(uploadDir string, s3Service *S3Service, tenantSlug string) *ImageService {
+	return &ImageService{
+		uploadDir:  uploadDir,
+		s3Service:  s3Service,
+		tenantSlug: tenantSlug,
+		useS3:      s3Service != nil,
+	}
+}
+
+// SetTenantSlug updates the tenant slug (used for S3 path organization)
+func (s *ImageService) SetTenantSlug(slug string) {
+	s.tenantSlug = slug
 }
 
 // ProcessDogPhoto processes an uploaded dog photo and creates both full-size and thumbnail versions
 // Returns the relative paths (e.g., "dogs/dog_5_full.jpg", "dogs/dog_5_thumb.jpg")
+// When using S3, returns full URLs instead of relative paths
 func (s *ImageService) ProcessDogPhoto(file multipart.File, dogID int) (fullPath, thumbPath string, err error) {
 	// Reset file pointer to beginning
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
@@ -51,26 +72,58 @@ func (s *ImageService) ProcessDogPhoto(file multipart.File, dogID int) (fullPath
 		return "", "", fmt.Errorf("failed to decode image: %w", err)
 	}
 
-	// Create dogs directory if it doesn't exist
+	// Process full-size image
+	fullImg := s.resizeImage(img, MaxImageWidth, MaxImageHeight)
+	fullFilename := fmt.Sprintf("dog_%d_full.jpg", dogID)
+
+	// Process thumbnail
+	thumbImg := s.resizeImage(img, ThumbnailSize, ThumbnailSize)
+	thumbFilename := fmt.Sprintf("dog_%d_thumb.jpg", dogID)
+
+	// Use S3 if configured
+	if s.useS3 && s.s3Service != nil {
+		// Encode images to JPEG in memory
+		fullBuf, err := s.encodeJPEGToBuffer(fullImg, JPEGQuality)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to encode full-size image: %w", err)
+		}
+
+		thumbBuf, err := s.encodeJPEGToBuffer(thumbImg, JPEGQuality)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to encode thumbnail: %w", err)
+		}
+
+		// Upload to S3
+		ctx := context.Background()
+		fullURL, err := s.s3Service.Upload(ctx, s.tenantSlug,
+			fmt.Sprintf("dogs/%s", fullFilename), fullBuf.Bytes(), "image/jpeg")
+		if err != nil {
+			return "", "", fmt.Errorf("failed to upload full-size image to S3: %w", err)
+		}
+
+		thumbURL, err := s.s3Service.Upload(ctx, s.tenantSlug,
+			fmt.Sprintf("dogs/%s", thumbFilename), thumbBuf.Bytes(), "image/jpeg")
+		if err != nil {
+			// Try to clean up the full-size image
+			s.s3Service.DeleteByPath(ctx, s.tenantSlug, fmt.Sprintf("dogs/%s", fullFilename))
+			return "", "", fmt.Errorf("failed to upload thumbnail to S3: %w", err)
+		}
+
+		return fullURL, thumbURL, nil
+	}
+
+	// Local filesystem storage (default)
 	dogsDir := filepath.Join(s.uploadDir, "dogs")
 	if err := os.MkdirAll(dogsDir, 0755); err != nil {
 		return "", "", fmt.Errorf("failed to create dogs directory: %w", err)
 	}
 
-	// Process full-size image
-	fullImg := s.resizeImage(img, MaxImageWidth, MaxImageHeight)
-	fullFilename := fmt.Sprintf("dog_%d_full.jpg", dogID)
 	fullFilePath := filepath.Join(dogsDir, fullFilename)
-
 	if err := s.saveJPEG(fullImg, fullFilePath, JPEGQuality); err != nil {
 		return "", "", fmt.Errorf("failed to save full-size image: %w", err)
 	}
 
-	// Process thumbnail
-	thumbImg := s.resizeImage(img, ThumbnailSize, ThumbnailSize)
-	thumbFilename := fmt.Sprintf("dog_%d_thumb.jpg", dogID)
 	thumbFilePath := filepath.Join(dogsDir, thumbFilename)
-
 	if err := s.saveJPEG(thumbImg, thumbFilePath, JPEGQuality); err != nil {
 		// Clean up full image if thumbnail fails
 		os.Remove(fullFilePath)
@@ -82,6 +135,16 @@ func (s *ImageService) ProcessDogPhoto(file multipart.File, dogID int) (fullPath
 	thumbRelPath := filepath.Join("dogs", thumbFilename)
 
 	return fullRelPath, thumbRelPath, nil
+}
+
+// encodeJPEGToBuffer encodes an image to JPEG format in memory
+func (s *ImageService) encodeJPEGToBuffer(img image.Image, quality int) (*bytes.Buffer, error) {
+	buf := new(bytes.Buffer)
+	opts := &jpeg.Options{Quality: quality}
+	if err := jpeg.Encode(buf, img, opts); err != nil {
+		return nil, fmt.Errorf("failed to encode JPEG: %w", err)
+	}
+	return buf, nil
 }
 
 // resizeImage resizes an image to fit within maxWidth x maxHeight while maintaining aspect ratio
@@ -141,16 +204,29 @@ func (s *ImageService) savePNG(img image.Image, path string) error {
 // DeleteDogPhotos deletes both full-size and thumbnail photos for a dog
 // Does not return error if files don't exist (idempotent)
 func (s *ImageService) DeleteDogPhotos(dogID int) error {
+	fullFilename := fmt.Sprintf("dog_%d_full.jpg", dogID)
+	thumbFilename := fmt.Sprintf("dog_%d_thumb.jpg", dogID)
+
+	// Use S3 if configured
+	if s.useS3 && s.s3Service != nil {
+		ctx := context.Background()
+		// Delete from S3 (errors are ignored for idempotency)
+		s.s3Service.DeleteByPath(ctx, s.tenantSlug, fmt.Sprintf("dogs/%s", fullFilename))
+		s.s3Service.DeleteByPath(ctx, s.tenantSlug, fmt.Sprintf("dogs/%s", thumbFilename))
+		return nil
+	}
+
+	// Local filesystem deletion
 	dogsDir := filepath.Join(s.uploadDir, "dogs")
 
 	// Delete full-size image
-	fullPath := filepath.Join(dogsDir, fmt.Sprintf("dog_%d_full.jpg", dogID))
+	fullPath := filepath.Join(dogsDir, fullFilename)
 	if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to delete full-size image: %w", err)
 	}
 
 	// Delete thumbnail
-	thumbPath := filepath.Join(dogsDir, fmt.Sprintf("dog_%d_thumb.jpg", dogID))
+	thumbPath := filepath.Join(dogsDir, thumbFilename)
 	if err := os.Remove(thumbPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to delete thumbnail: %w", err)
 	}

@@ -76,6 +76,16 @@ type Config struct {
 	// SaaS Multi-Tenancy
 	SaaSMode   bool   // Enable multi-tenant mode
 	BaseDomain string // Base domain for subdomain extraction (e.g., "gassigeher.org")
+
+	// S3 Storage (Hetzner Object Storage)
+	UseS3        bool   // Enable S3 storage (false = local filesystem)
+	S3Endpoint   string // e.g., "fsn1.your-objectstorage.com"
+	S3AccessKey  string
+	S3SecretKey  string
+	S3BucketName string
+	S3Region     string
+	S3PublicURL  string // e.g., "https://gassigeher-uploads.fsn1.your-objectstorage.com"
+	S3UseSSL     bool
 }
 
 // Load loads configuration from environment variables
@@ -145,6 +155,16 @@ func Load() *Config {
 		// SaaS Multi-Tenancy
 		SaaSMode:   getEnvAsBool("SAAS_MODE", false),
 		BaseDomain: getEnv("BASE_DOMAIN", ""), // e.g., "gassigeher.org"
+
+		// S3 Storage (Hetzner Object Storage)
+		UseS3:        getEnvAsBool("USE_S3", false),
+		S3Endpoint:   getEnv("S3_ENDPOINT", ""),
+		S3AccessKey:  getEnv("S3_ACCESS_KEY", ""),
+		S3SecretKey:  getEnv("S3_SECRET_KEY", ""),
+		S3BucketName: getEnv("S3_BUCKET_NAME", ""),
+		S3Region:     getEnv("S3_REGION", ""),
+		S3PublicURL:  getEnv("S3_PUBLIC_URL", ""),
+		S3UseSSL:     getEnvAsBool("S3_USE_SSL", true),
 	}
 }
 
