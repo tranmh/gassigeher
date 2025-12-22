@@ -423,6 +423,49 @@ func TestAuthService_GenerateTempPassword(t *testing.T) {
 			t.Error("Password should match generated hash")
 		}
 	})
+
+	t.Run("no modulo bias in character distribution", func(t *testing.T) {
+		// Generate many passwords and check character frequency distribution
+		// With modulo bias, certain characters would appear ~1.6% more often
+		// Charset has 56 characters, 256 % 56 = 32, so first 32 chars get bias
+		const numSamples = 50000 // Generate enough samples for statistical significance
+		charCount := make(map[byte]int)
+
+		for i := 0; i < numSamples; i++ {
+			password, err := service.GenerateTempPassword()
+			if err != nil {
+				t.Fatalf("GenerateTempPassword() error = %v", err)
+			}
+			// Skip positions 0, 1, 2 which have forced character requirements
+			for j := 3; j < len(password); j++ {
+				charCount[password[j]]++
+			}
+		}
+
+		// Calculate expected count per character
+		// 56 chars in charset, 9 positions (excluding first 3), numSamples passwords
+		totalChars := numSamples * 9
+		expectedPerChar := float64(totalChars) / 56.0
+
+		// Check for significant deviation (more than 10% from expected)
+		// With modulo bias, some characters would have ~15% deviation
+		maxDeviation := 0.0
+		for _, count := range charCount {
+			deviation := (float64(count) - expectedPerChar) / expectedPerChar
+			if deviation < 0 {
+				deviation = -deviation
+			}
+			if deviation > maxDeviation {
+				maxDeviation = deviation
+			}
+		}
+
+		// With proper uniform generation, max deviation should be < 5%
+		// With modulo bias, it would be > 10%
+		if maxDeviation > 0.08 {
+			t.Errorf("Character distribution shows potential modulo bias: max deviation %.2f%% (should be < 8%%)", maxDeviation*100)
+		}
+	})
 }
 
 // TestAuthService_GenerateImpersonationJWT tests impersonation JWT generation

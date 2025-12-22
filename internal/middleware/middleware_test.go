@@ -297,6 +297,114 @@ func TestLoggingMiddleware(t *testing.T) {
 	})
 }
 
+// TestCORSMiddleware_NoOriginHeader tests CORS does NOT set headers when no Origin is present
+// BUG FIX: CORS bypass vulnerability - should not set headers for same-origin requests
+func TestCORSMiddleware_NoOriginHeader(t *testing.T) {
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := CORSMiddleware("http://localhost:8080")(testHandler)
+
+	t.Run("no CORS headers when Origin header is missing", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/test", nil)
+		// Intentionally NOT setting Origin header - same-origin request
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		// Should NOT set Access-Control-Allow-Origin for same-origin requests
+		corsHeader := rec.Header().Get("Access-Control-Allow-Origin")
+		if corsHeader != "" {
+			t.Errorf("Expected no Access-Control-Allow-Origin header for same-origin request, got %s", corsHeader)
+		}
+	})
+
+	t.Run("rejects unknown origin", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/test", nil)
+		req.Header.Set("Origin", "http://evil-site.com")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		// Should NOT set Access-Control-Allow-Origin for unknown origins
+		corsHeader := rec.Header().Get("Access-Control-Allow-Origin")
+		if corsHeader != "" {
+			t.Errorf("Expected no Access-Control-Allow-Origin for unknown origin, got %s", corsHeader)
+		}
+	})
+}
+
+// TestAuthMiddleware_TenantValidation tests tenant ID validation in JWT
+// BUG FIX: Tenant isolation bypass - JWT with tenant_id=0 should be rejected when subdomain is set
+func TestAuthMiddleware_TenantValidation(t *testing.T) {
+	jwtSecret := "test-secret"
+	authService := services.NewAuthService(jwtSecret, 24)
+	middleware := AuthMiddleware(jwtSecret)
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	t.Run("rejects JWT with zero tenant_id when subdomain tenant is set", func(t *testing.T) {
+		// Generate JWT with tenant_id=0 (no tenant)
+		token, _ := authService.GenerateJWT(1, "test@example.com", false, false, false, 0)
+
+		req := httptest.NewRequest("GET", "/api/test", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		// Set subdomain tenant in context (simulating TenantMiddleware ran first)
+		ctx := context.WithValue(req.Context(), TenantIDKey, 1)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		middleware(testHandler).ServeHTTP(rec, req)
+
+		// Should reject - JWT tenant_id=0 doesn't match subdomain tenant_id=1
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("Expected 401 for JWT with tenant_id=0 on tenant subdomain, got %d", rec.Code)
+		}
+	})
+
+	t.Run("allows matching tenant IDs", func(t *testing.T) {
+		// Generate JWT with tenant_id=1
+		token, _ := authService.GenerateJWT(1, "test@example.com", false, false, false, 1)
+
+		req := httptest.NewRequest("GET", "/api/test", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		// Set matching subdomain tenant in context
+		ctx := context.WithValue(req.Context(), TenantIDKey, 1)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		middleware(testHandler).ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected 200 for matching tenant IDs, got %d", rec.Code)
+		}
+	})
+
+	t.Run("rejects mismatched tenant IDs", func(t *testing.T) {
+		// Generate JWT with tenant_id=2
+		token, _ := authService.GenerateJWT(1, "test@example.com", false, false, false, 2)
+
+		req := httptest.NewRequest("GET", "/api/test", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		// Set different subdomain tenant in context
+		ctx := context.WithValue(req.Context(), TenantIDKey, 1)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		middleware(testHandler).ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("Expected 401 for mismatched tenant IDs, got %d", rec.Code)
+		}
+	})
+}
+
 // TestRateLimitLogin_IPSpoofingPrevention tests that rate limiting cannot be bypassed
 // by spoofing the X-Forwarded-For header when proxy trust is disabled
 func TestRateLimitLogin_IPSpoofingPrevention(t *testing.T) {
@@ -381,4 +489,49 @@ func TestRateLimitLogin_TrustedProxy(t *testing.T) {
 			t.Errorf("6th request should be rate limited, got status %d", rec.Code)
 		}
 	})
+}
+
+// TestRateLimitLogin_NoConcurrentBlocking tests that rate limiter doesn't serialize requests
+// from different IPs (i.e., doesn't hold mutex during handler execution)
+func TestRateLimitLogin_NoConcurrentBlocking(t *testing.T) {
+	ResetRateLimiter()
+
+	// Handler that simulates slow processing
+	slowHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := RateLimitLogin(slowHandler)
+
+	// Send 3 concurrent requests from different IPs
+	numRequests := 3
+	done := make(chan time.Duration, numRequests)
+
+	start := time.Now()
+	for i := 0; i < numRequests; i++ {
+		go func(ip int) {
+			reqStart := time.Now()
+			req := httptest.NewRequest("POST", "/api/auth/login", nil)
+			req.RemoteAddr = "192.168.1." + string(rune('0'+ip)) + ":12345"
+
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			done <- time.Since(reqStart)
+		}(i)
+	}
+
+	// Wait for all requests to complete
+	for i := 0; i < numRequests; i++ {
+		<-done
+	}
+	totalTime := time.Since(start)
+
+	// If requests are serialized, total time would be ~300ms
+	// If concurrent, total time should be ~100ms (plus some overhead)
+	// We use 200ms as threshold to be safe
+	if totalTime > 200*time.Millisecond {
+		t.Errorf("Requests appear to be serialized (took %v). "+
+			"Rate limiter should not hold mutex during handler execution.", totalTime)
+	}
 }

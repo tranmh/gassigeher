@@ -108,10 +108,8 @@ func CORSMiddleware(baseURL string) func(http.Handler) http.Handler {
 				}
 			}
 
-			// If no origin header or not in allowed list, allow same-origin requests
-			if origin == "" {
-				w.Header().Set("Access-Control-Allow-Origin", baseURL)
-			}
+			// If no origin header, this is a same-origin request - no CORS headers needed
+			// Only set CORS headers for cross-origin requests from allowed origins
 
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
@@ -204,9 +202,16 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 
 			// SaaS: Validate JWT tenant_id matches subdomain tenant (if subdomain tenant is set)
 			subdomainTenantID, _ := r.Context().Value(TenantIDKey).(int)
-			if subdomainTenantID != 0 && jwtTenantID != 0 && subdomainTenantID != jwtTenantID {
-				http.Error(w, `{"error":"Token für anderes Tierheim ungültig"}`, http.StatusUnauthorized)
-				return
+			if subdomainTenantID != 0 {
+				// Subdomain tenant is set - JWT must have matching tenant_id
+				if jwtTenantID == 0 {
+					http.Error(w, `{"error":"Token ohne Tierheim-ID ungültig"}`, http.StatusUnauthorized)
+					return
+				}
+				if subdomainTenantID != jwtTenantID {
+					http.Error(w, `{"error":"Token für anderes Tierheim ungültig"}`, http.StatusUnauthorized)
+					return
+				}
 			}
 
 			// Add to context

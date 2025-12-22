@@ -716,7 +716,10 @@ func (r *BookingRepository) ApproveBooking(bookingID int, adminID int) error {
 		return err
 	}
 
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
 	if rows == 0 {
 		return fmt.Errorf("booking not found or not pending")
 	}
@@ -742,7 +745,10 @@ func (r *BookingRepository) RejectBooking(bookingID int, adminID int, reason str
 		return err
 	}
 
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
 	if rows == 0 {
 		return fmt.Errorf("booking not found or not pending")
 	}

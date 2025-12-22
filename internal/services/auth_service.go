@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -50,26 +51,45 @@ func (s *AuthService) GenerateToken() (string, error) {
 
 // GenerateTempPassword generates a secure temporary password
 // Returns a 12-character password with uppercase, lowercase, and numbers
+// Uses crypto/rand.Int to eliminate modulo bias for uniform distribution
 func (s *AuthService) GenerateTempPassword() (string, error) {
 	// Character set excluding ambiguous characters (0, O, l, 1, I)
 	const charset = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+	const uppercase = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+	const lowercase = "abcdefghjkmnpqrstuvwxyz"
+	const digits = "23456789"
 	const length = 12
 
-	bytes := make([]byte, length)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", fmt.Errorf("failed to generate temp password: %w", err)
-	}
-
 	result := make([]byte, length)
-	for i := range bytes {
-		result[i] = charset[int(bytes[i])%len(charset)]
+
+	// Generate random characters using crypto/rand.Int (no modulo bias)
+	for i := 0; i < length; i++ {
+		idx, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			return "", fmt.Errorf("failed to generate temp password: %w", err)
+		}
+		result[i] = charset[idx.Int64()]
 	}
 
 	// Ensure password meets requirements by placing required characters
 	// Position 0: uppercase, Position 1: lowercase, Position 2: number
-	result[0] = "ABCDEFGHJKLMNPQRSTUVWXYZ"[int(bytes[0])%24]
-	result[1] = "abcdefghjkmnpqrstuvwxyz"[int(bytes[1])%23]
-	result[2] = "23456789"[int(bytes[2])%8]
+	upperIdx, err := rand.Int(rand.Reader, big.NewInt(int64(len(uppercase))))
+	if err != nil {
+		return "", fmt.Errorf("failed to generate temp password: %w", err)
+	}
+	result[0] = uppercase[upperIdx.Int64()]
+
+	lowerIdx, err := rand.Int(rand.Reader, big.NewInt(int64(len(lowercase))))
+	if err != nil {
+		return "", fmt.Errorf("failed to generate temp password: %w", err)
+	}
+	result[1] = lowercase[lowerIdx.Int64()]
+
+	digitIdx, err := rand.Int(rand.Reader, big.NewInt(int64(len(digits))))
+	if err != nil {
+		return "", fmt.Errorf("failed to generate temp password: %w", err)
+	}
+	result[2] = digits[digitIdx.Int64()]
 
 	return string(result), nil
 }

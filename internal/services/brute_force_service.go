@@ -12,6 +12,7 @@ type BruteForceService struct {
 	maxAttempts int           // Number of failures before lockout
 	lockoutBase time.Duration // Base lockout duration
 	maxLockout  time.Duration // Maximum lockout duration
+	stopChan    chan struct{} // Channel to signal cleanup goroutine to stop
 }
 
 // FailureRecord tracks login failures for a specific key (email:ip)
@@ -28,12 +29,18 @@ func NewBruteForceService() *BruteForceService {
 		maxAttempts: 3,
 		lockoutBase: 30 * time.Second,
 		maxLockout:  30 * time.Minute,
+		stopChan:    make(chan struct{}),
 	}
 
 	// Start cleanup goroutine
 	go bfs.cleanupStaleEntries()
 
 	return bfs
+}
+
+// Stop stops the cleanup goroutine and releases resources
+func (s *BruteForceService) Stop() {
+	close(s.stopChan)
 }
 
 // RecordFailure records a failed login attempt and returns lockout duration (0 if not locked)
@@ -114,14 +121,19 @@ func (s *BruteForceService) cleanupStaleEntries() {
 	ticker := time.NewTicker(30 * time.Minute)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		s.mu.Lock()
-		cutoff := time.Now().Add(-2 * time.Hour)
-		for key, record := range s.failures {
-			if record.LastFailed.Before(cutoff) && time.Now().After(record.LockedUntil) {
-				delete(s.failures, key)
+	for {
+		select {
+		case <-s.stopChan:
+			return
+		case <-ticker.C:
+			s.mu.Lock()
+			cutoff := time.Now().Add(-2 * time.Hour)
+			for key, record := range s.failures {
+				if record.LastFailed.Before(cutoff) && time.Now().After(record.LockedUntil) {
+					delete(s.failures, key)
+				}
 			}
+			s.mu.Unlock()
 		}
-		s.mu.Unlock()
 	}
 }

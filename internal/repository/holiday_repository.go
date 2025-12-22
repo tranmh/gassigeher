@@ -120,16 +120,32 @@ func (r *HolidayRepository) GetCachedHolidays(year int, state string) (string, e
 }
 
 // SetCachedHolidays stores API response in cache (global cache, not tenant-specific)
+// Uses standard SQL pattern (UPDATE then INSERT if no rows affected) for multi-database compatibility
 func (r *HolidayRepository) SetCachedHolidays(year int, state string, data string, cacheDays int) error {
 	expiresAt := time.Now().AddDate(0, 0, cacheDays)
+	now := time.Now()
 
-	query := `
-		INSERT OR REPLACE INTO feiertage_cache (year, state, data, fetched_at, expires_at)
-		VALUES (?, ?, ?, ?, ?)
-	`
+	// Try UPDATE first (standard SQL pattern for upsert)
+	updateQuery := `UPDATE feiertage_cache SET data = ?, fetched_at = ?, expires_at = ? WHERE year = ? AND state = ?`
+	result, err := r.db.Exec(updateQuery, data, now, expiresAt, year, state)
+	if err != nil {
+		return fmt.Errorf("failed to update cache: %w", err)
+	}
 
-	_, err := r.db.Exec(query, year, state, data, time.Now(), expiresAt)
-	return err
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+
+	if rows == 0 {
+		// Row doesn't exist, INSERT it
+		insertQuery := `INSERT INTO feiertage_cache (year, state, data, fetched_at, expires_at) VALUES (?, ?, ?, ?, ?)`
+		_, err = r.db.Exec(insertQuery, year, state, data, now, expiresAt)
+		if err != nil {
+			return fmt.Errorf("failed to insert cache: %w", err)
+		}
+	}
+	return nil
 }
 
 // scanHolidays helper to scan holiday rows

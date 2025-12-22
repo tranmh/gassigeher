@@ -14,6 +14,7 @@ type GlobalRateLimiter struct {
 	mu       sync.RWMutex
 	rps      rate.Limit // requests per second
 	burst    int
+	stopChan chan struct{} // Channel to signal cleanup goroutine to stop
 }
 
 type rateLimiterEntry struct {
@@ -27,12 +28,18 @@ func NewGlobalRateLimiter(rps float64, burst int) *GlobalRateLimiter {
 		limiters: make(map[string]*rateLimiterEntry),
 		rps:      rate.Limit(rps),
 		burst:    burst,
+		stopChan: make(chan struct{}),
 	}
 
 	// Start cleanup goroutine to remove stale entries
 	go grl.cleanupStaleEntries()
 
 	return grl
+}
+
+// Close stops the cleanup goroutine and releases resources
+func (g *GlobalRateLimiter) Close() {
+	close(g.stopChan)
 }
 
 // GetLimiter returns the rate limiter for a given IP
@@ -59,15 +66,20 @@ func (g *GlobalRateLimiter) cleanupStaleEntries() {
 	ticker := time.NewTicker(10 * time.Minute)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		g.mu.Lock()
-		cutoff := time.Now().Add(-1 * time.Hour)
-		for ip, entry := range g.limiters {
-			if entry.lastSeen.Before(cutoff) {
-				delete(g.limiters, ip)
+	for {
+		select {
+		case <-g.stopChan:
+			return
+		case <-ticker.C:
+			g.mu.Lock()
+			cutoff := time.Now().Add(-1 * time.Hour)
+			for ip, entry := range g.limiters {
+				if entry.lastSeen.Before(cutoff) {
+					delete(g.limiters, ip)
+				}
 			}
+			g.mu.Unlock()
 		}
-		g.mu.Unlock()
 	}
 }
 

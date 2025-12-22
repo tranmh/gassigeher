@@ -77,7 +77,6 @@ func getClientIP(r *http.Request, trustedProxies map[string]bool) string {
 func RateLimitLogin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		loginLimiter.mu.Lock()
-		defer loginLimiter.mu.Unlock()
 
 		// Get client IP safely (prevents IP spoofing)
 		ip := getClientIP(r, loginLimiter.trustedProxies)
@@ -97,13 +96,16 @@ func RateLimitLogin(next http.Handler) http.Handler {
 
 		// Check if limit exceeded
 		if len(loginLimiter.requests[ip]) >= loginLimiter.limit {
+			loginLimiter.mu.Unlock()
 			http.Error(w, `{"error":"Zu viele Anmeldeversuche. Bitte versuchen Sie es in einer Minute erneut."}`, http.StatusTooManyRequests)
 			return
 		}
 
 		// Add current request
 		loginLimiter.requests[ip] = append(loginLimiter.requests[ip], now)
+		loginLimiter.mu.Unlock()
 
+		// Call next handler without holding the lock
 		next.ServeHTTP(w, r)
 	})
 }
