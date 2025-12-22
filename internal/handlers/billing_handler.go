@@ -391,6 +391,13 @@ func (h *BillingHandler) handleCheckoutCompleted(event *stripe.Event) {
 		return
 	}
 
+	// Verify tenant exists before updating (security: prevent orphan subscriptions)
+	existingSubscription, err := h.subscriptionRepo.GetSubscriptionByTenant(data.TenantID)
+	if err != nil || existingSubscription == nil {
+		log.Printf("ERROR: Tenant %d not found or has no subscription - ignoring checkout event", data.TenantID)
+		return
+	}
+
 	// Update subscription with Stripe IDs
 	err = h.subscriptionRepo.SetStripeIDs(data.TenantID, data.CustomerID, data.SubscriptionID)
 	if err != nil {

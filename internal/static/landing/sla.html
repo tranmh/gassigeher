@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Level Agreement (SLA) - Gassigeher</title>
+    <link rel="stylesheet" href="/landing/assets/css/landing.css">
+    <link rel="icon" href="/assets/images/favicon.ico">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <a href="/landing/" class="logo">
+                <span>Gassigeher</span>
+            </a>
+            <nav class="nav">
+                <a href="/landing/">Startseite</a>
+                <a href="/landing/pricing.html">Preise</a>
+                <a href="/landing/faq.html">FAQ</a>
+                <a href="/landing/register.html" class="btn btn-primary">Jetzt starten</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="legal-page">
+        <h1>Service Level Agreement (SLA)</h1>
+        <p class="last-updated">Gültig ab: Januar 2025 | Version 1.0</p>
+
+        <h2>1. Verfügbarkeit</h2>
+
+        <h3>1.1 Verfügbarkeitsziel</h3>
+        <p>
+            Gassigeher strebt eine Systemverfügbarkeit von <strong>99,5%</strong> pro Kalendermonat an.
+        </p>
+
+        <h3>1.2 Berechnung</h3>
+        <p>
+            Die Verfügbarkeit wird wie folgt berechnet:
+        </p>
+        <p class="formula">
+            Verfügbarkeit = (Gesamtminuten - Ausfallminuten) / Gesamtminuten × 100
+        </p>
+
+        <h3>1.3 Ausnahmen</h3>
+        <p>
+            Folgende Zeiten zählen nicht als Ausfallzeit:
+        </p>
+        <ul>
+            <li>Geplante Wartungsfenster (siehe Abschnitt 3)</li>
+            <li>Höhere Gewalt (Naturkatastrophen, Krieg, etc.)</li>
+            <li>Probleme außerhalb unserer Kontrolle (DNS, Internet-Backbone, Cloud-Provider)</li>
+            <li>Kundenverursachte Ausfälle (falsche Konfiguration, übermäßige Nutzung)</li>
+            <li>Ausfälle von Drittanbieter-Integrationen (Stripe, E-Mail-Provider)</li>
+        </ul>
+
+        <h2>2. Support-Reaktionszeiten</h2>
+
+        <table class="sla-table">
+            <thead>
+                <tr>
+                    <th>Plan</th>
+                    <th>Erstreaktion</th>
+                    <th>Kritisch</th>
+                    <th>Standard</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Free</td>
+                    <td>48 Stunden</td>
+                    <td>24 Stunden</td>
+                    <td>48 Stunden</td>
+                </tr>
+                <tr>
+                    <td>Pro</td>
+                    <td>4 Stunden</td>
+                    <td>4 Stunden</td>
+                    <td>24 Stunden</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>2.1 Prioritätsstufen</h3>
+        <ul>
+            <li><strong>Kritisch:</strong> System nicht nutzbar, kein Workaround möglich, Datenverlust droht</li>
+            <li><strong>Standard:</strong> Eingeschränkte Funktionalität, Workaround verfügbar</li>
+        </ul>
+
+        <h3>2.2 Support-Kanäle</h3>
+        <p>
+            <strong>E-Mail:</strong> support@gassigeher.org<br>
+            <strong>Geschäftszeiten:</strong> Montag bis Freitag, 9:00 - 17:00 Uhr MEZ
+        </p>
+        <p>
+            Die angegebenen Reaktionszeiten gelten während der Geschäftszeiten. Anfragen außerhalb der Geschäftszeiten werden am nächsten Werktag bearbeitet.
+        </p>
+
+        <h2>3. Wartungsfenster</h2>
+
+        <h3>3.1 Geplante Wartung</h3>
+        <ul>
+            <li><strong>Zeitfenster:</strong> Sonntag, 02:00 - 06:00 Uhr MEZ</li>
+            <li><strong>Ankündigung:</strong> Mindestens 48 Stunden im Voraus per E-Mail an alle Administratoren</li>
+            <li><strong>Häufigkeit:</strong> Maximal einmal pro Woche</li>
+        </ul>
+
+        <h3>3.2 Notfallwartung</h3>
+        <p>
+            Bei kritischen Sicherheitsproblemen oder systemgefährdenden Fehlern kann eine Notfallwartung ohne vorherige Ankündigung durchgeführt werden. Betroffene Kunden werden schnellstmöglich informiert.
+        </p>
+
+        <h2>4. Datensicherung</h2>
+
+        <h3>4.1 Backup-Frequenz</h3>
+        <ul>
+            <li>Tägliche automatische Backups aller Daten</li>
+            <li>Aufbewahrungsdauer: 30 Tage</li>
+            <li>Backups werden verschlüsselt und an einem separaten Standort gespeichert</li>
+        </ul>
+
+        <h3>4.2 Datenwiederherstellung</h3>
+        <table class="sla-table">
+            <thead>
+                <tr>
+                    <th>Plan</th>
+                    <th>Wiederherstellung</th>
+                    <th>Kosten</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Free</td>
+                    <td>Auf Anfrage</td>
+                    <td>50,00 EUR</td>
+                </tr>
+                <tr>
+                    <td>Pro</td>
+                    <td>Auf Anfrage</td>
+                    <td>Kostenlos</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>4.3 Datenexport</h3>
+        <p>
+            Kunden können ihre Daten jederzeit über die API oder das Admin-Dashboard exportieren. Unterstützte Formate: JSON, CSV.
+        </p>
+
+        <h2>5. Haftungsausschluss</h2>
+
+        <h3>5.1 Haftungsbegrenzung</h3>
+        <p>
+            Die maximale Haftung von Gassigeher ist auf die Summe der vom Kunden in den letzten 12 Monaten gezahlten Gebühren begrenzt.
+        </p>
+
+        <h3>5.2 Ausschlüsse</h3>
+        <p>
+            Keine Haftung besteht für:
+        </p>
+        <ul>
+            <li>Indirekte Schäden oder entgangenen Gewinn</li>
+            <li>Datenverlust durch Kundenverschulden oder höhere Gewalt</li>
+            <li>Ausfälle durch Drittanbieter (Stripe, E-Mail-Provider, Cloud-Infrastruktur)</li>
+            <li>Schäden durch nicht autorisierte Zugriffe aufgrund unsicherer Kundenpasswörter</li>
+        </ul>
+
+        <h2>6. Eskalationsprozess</h2>
+
+        <h3>Stufe 1: Support-Team</h3>
+        <p>
+            Kontaktieren Sie unser Support-Team unter support@gassigeher.org
+        </p>
+
+        <h3>Stufe 2: Technische Leitung</h3>
+        <p>
+            Wenn innerhalb der SLA-Reaktionszeit keine Antwort erfolgt, eskalieren Sie an: technik@gassigeher.org
+        </p>
+
+        <h3>Stufe 3: Geschäftsführung</h3>
+        <p>
+            Für geschäftskritische Eskalationen: geschaeftsfuehrung@gassigeher.org
+        </p>
+
+        <h2>7. SLA-Gutschriften (Pro-Plan)</h2>
+        <p>
+            Bei Unterschreitung der garantierten Verfügbarkeit von 99,5% erhalten Pro-Kunden folgende Gutschriften:
+        </p>
+        <table class="sla-table">
+            <thead>
+                <tr>
+                    <th>Verfügbarkeit</th>
+                    <th>Gutschrift</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>99,0% - 99,5%</td>
+                    <td>10% des Monatsbeitrags</td>
+                </tr>
+                <tr>
+                    <td>95,0% - 99,0%</td>
+                    <td>25% des Monatsbeitrags</td>
+                </tr>
+                <tr>
+                    <td>Unter 95,0%</td>
+                    <td>50% des Monatsbeitrags</td>
+                </tr>
+            </tbody>
+        </table>
+        <p>
+            Gutschriften müssen innerhalb von 30 Tagen nach dem betroffenen Monat schriftlich beantragt werden.
+        </p>
+
+        <h2>8. SLA-Änderungen</h2>
+        <p>
+            Änderungen an diesem SLA werden mindestens 30 Tage im Voraus per E-Mail angekündigt. Wesentliche Verschlechterungen berechtigen Pro-Kunden zur außerordentlichen Kündigung zum Zeitpunkt des Inkrafttretens der Änderung.
+        </p>
+
+        <h2>9. Kontakt</h2>
+        <p>
+            Bei Fragen zu diesem SLA kontaktieren Sie uns unter:<br>
+            E-Mail: support@gassigeher.org
+        </p>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-links">
+                <a href="/landing/imprint.html">Impressum</a>
+                <a href="/landing/privacy.html">Datenschutz</a>
+                <a href="/landing/widerrufsbelehrung.html">Widerrufsrecht</a>
+                <a href="/landing/agb.html">AGB</a>
+                <a href="/landing/sla.html">SLA</a>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Gassigeher. Alle Rechte vorbehalten.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

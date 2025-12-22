@@ -93,6 +93,9 @@ type Config struct {
 	StripeWebhookSecret  string // whsec_xxx
 	StripePriceMonthly   string // price_xxx for monthly subscription
 	StripePriceYearly    string // price_xxx for yearly subscription
+
+	// Contact Form
+	ContactEmail string // Email address for contact form submissions
 }
 
 // Load loads configuration from environment variables
@@ -179,6 +182,9 @@ func Load() *Config {
 		StripeWebhookSecret:  getEnv("STRIPE_WEBHOOK_SECRET", ""),
 		StripePriceMonthly:   getEnv("STRIPE_PRICE_MONTHLY", ""),
 		StripePriceYearly:    getEnv("STRIPE_PRICE_YEARLY", ""),
+
+		// Contact Form
+		ContactEmail: getEnv("CONTACT_EMAIL", "kontakt@gassigeher.org"),
 	}
 }
 

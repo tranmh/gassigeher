@@ -7,6 +7,224 @@
     <meta name="description" content="Registrieren Sie Ihr Tierheim bei Gassigeher. Kostenlos und in wenigen Minuten einsatzbereit.">
     <link rel="stylesheet" href="/landing/assets/css/landing.css">
     <link rel="icon" href="/assets/images/favicon.ico">
+    <style>
+        /* Plan Selection Styles */
+        .plan-selection {
+            margin-bottom: 2rem;
+        }
+        .plan-selection h2 {
+            margin-bottom: 1rem;
+        }
+        .plan-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .plan-card {
+            border: 2px solid var(--color-border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            background: white;
+        }
+        .plan-card:hover {
+            border-color: var(--color-primary);
+        }
+        .plan-card.selected {
+            border-color: var(--color-primary);
+            background: linear-gradient(to bottom, rgba(130, 185, 101, 0.05), white);
+        }
+        .plan-card.selected::after {
+            content: "✓";
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--color-primary);
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .plan-card input[type="radio"] {
+            display: none;
+        }
+        .plan-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+        .plan-card-name {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--color-secondary);
+        }
+        .plan-card-badge {
+            background: var(--color-primary);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .plan-card-price {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--color-primary);
+            margin-bottom: 0.5rem;
+        }
+        .plan-card-price span {
+            font-size: 1rem;
+            color: var(--color-text-light);
+            font-weight: 400;
+        }
+        .plan-card-features {
+            list-style: none;
+            padding: 0;
+            margin: 1rem 0 0 0;
+            font-size: 0.9rem;
+        }
+        .plan-card-features li {
+            padding: 6px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .plan-card-features li::before {
+            content: "✓";
+            color: var(--color-primary);
+            font-weight: bold;
+        }
+        .billing-toggle-container {
+            display: none;
+            margin-top: 1rem;
+            padding: 1rem;
+            background: var(--color-accent);
+            border-radius: 8px;
+        }
+        .billing-toggle-container.show {
+            display: block;
+        }
+        .billing-toggle-container label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        .billing-toggle {
+            display: flex;
+            gap: 0;
+            background: var(--color-border);
+            border-radius: 8px;
+            padding: 4px;
+            max-width: 320px;
+        }
+        .billing-toggle button {
+            flex: 1;
+            padding: 10px 16px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            color: var(--color-text-light);
+        }
+        .billing-toggle button.active {
+            background: var(--color-primary);
+            color: white;
+        }
+        .billing-toggle button:hover:not(.active) {
+            background: rgba(130, 185, 101, 0.1);
+        }
+        .billing-savings {
+            display: inline-block;
+            background: var(--color-primary);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            margin-left: 4px;
+        }
+        .pro-price-display {
+            margin-top: 0.75rem;
+            font-size: 0.9rem;
+            color: var(--color-text-light);
+        }
+        .pro-price-display strong {
+            color: var(--color-primary);
+        }
+        .plan-note {
+            font-size: 0.85rem;
+            color: var(--color-text-light);
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: #f0f9ff;
+            border-radius: 6px;
+            border-left: 3px solid #0ea5e9;
+        }
+        .plan-note.pro-note {
+            background: #fef3c7;
+            border-left-color: #f59e0b;
+        }
+        /* Success Message Styles */
+        .success-message {
+            text-align: center;
+            padding: 2rem;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .success-icon {
+            width: 60px;
+            height: 60px;
+            background: var(--color-primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            margin: 0 auto 1.5rem;
+        }
+        .success-message h2 {
+            color: var(--color-secondary);
+            margin-bottom: 1rem;
+        }
+        .success-message p {
+            color: var(--color-text-light);
+            margin-bottom: 0.5rem;
+        }
+        .success-message .btn {
+            margin-top: 1.5rem;
+        }
+        .pro-checkout-info {
+            background: var(--color-accent);
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            text-align: left;
+        }
+        .pro-checkout-info p {
+            margin: 0.5rem 0;
+            color: var(--color-text);
+        }
+        .checkout-skip {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
+        .checkout-skip a {
+            color: var(--color-text-light);
+        }
+    </style>
 </head>
 <body>
     <header class="header">
@@ -16,7 +234,7 @@
             </a>
             <nav class="nav">
                 <a href="/landing/">Startseite</a>
-                <a href="/landing/#features">Funktionen</a>
+                <a href="/landing/pricing.html">Preise</a>
                 <a href="/landing/faq.html">FAQ</a>
             </nav>
         </div>
@@ -24,11 +242,66 @@
 
     <main class="register-page">
         <h1>Tierheim registrieren</h1>
-        <p>Starten Sie in wenigen Minuten mit Gassigeher. Kostenlos und unverbindlich.</p>
+        <p>Wählen Sie Ihren Plan und starten Sie in wenigen Minuten.</p>
 
         <form id="register-form">
+            <!-- Plan Selection -->
+            <section class="plan-selection">
+                <h2>1. Plan wählen</h2>
+                <div class="plan-cards">
+                    <!-- Free Plan -->
+                    <label class="plan-card selected" data-plan="free">
+                        <input type="radio" name="plan" value="free" checked>
+                        <div class="plan-card-header">
+                            <span class="plan-card-name">Free</span>
+                        </div>
+                        <div class="plan-card-price">0 <span>EUR/Monat</span></div>
+                        <ul class="plan-card-features">
+                            <li>Bis zu 10 Hunde</li>
+                            <li>Alle Grundfunktionen</li>
+                            <li>Unbegrenzte Benutzer</li>
+                            <li>E-Mail-Support</li>
+                        </ul>
+                    </label>
+
+                    <!-- Pro Plan -->
+                    <label class="plan-card" data-plan="pro">
+                        <input type="radio" name="plan" value="pro">
+                        <div class="plan-card-header">
+                            <span class="plan-card-name">Pro</span>
+                            <span class="plan-card-badge">Empfohlen</span>
+                        </div>
+                        <div class="plan-card-price" id="pro-price-display">29 <span>EUR/Monat</span></div>
+                        <ul class="plan-card-features">
+                            <li><strong>Unbegrenzte Hunde</strong></li>
+                            <li>Alle Funktionen</li>
+                            <li>Prioritäts-Support</li>
+                            <li>SLA mit 99,5% Uptime</li>
+                        </ul>
+                    </label>
+                </div>
+
+                <!-- Billing Cycle Toggle (only for Pro) -->
+                <div class="billing-toggle-container" id="billing-toggle-container">
+                    <label>Abrechnungszeitraum:</label>
+                    <div class="billing-toggle">
+                        <button type="button" class="active" data-cycle="monthly">Monatlich</button>
+                        <button type="button" data-cycle="yearly">Jährlich <span class="billing-savings">-17%</span></button>
+                    </div>
+                    <div class="pro-price-display" id="pro-price-note">
+                        <strong>29 EUR/Monat</strong> - Monatlich kündbar
+                    </div>
+                </div>
+
+                <input type="hidden" id="selected_plan" name="selected_plan" value="free">
+                <input type="hidden" id="billing_cycle" name="billing_cycle" value="monthly">
+
+                <p class="plan-note" id="plan-note">
+                    Sie können jederzeit auf Pro upgraden, wenn Sie mehr als 10 Hunde verwalten möchten.
+                </p>
+            </section>
             <section>
-                <h2>Tierheim-Informationen</h2>
+                <h2>2. Tierheim-Informationen</h2>
 
                 <div class="form-group">
                     <label for="organization_name">Name des Tierheims *</label>
@@ -108,7 +381,7 @@
             </section>
 
             <section>
-                <h2>Administrator-Konto</h2>
+                <h2>3. Administrator-Konto</h2>
                 <p>Erstellen Sie das erste Admin-Konto für Ihr Tierheim.</p>
 
                 <div class="form-row">
@@ -141,25 +414,49 @@
                 <label>
                     <input type="checkbox" name="terms" required>
                     Ich akzeptiere die <a href="/landing/privacy.html" target="_blank">Datenschutzerklärung</a>
-                    und <a href="/terms.html" target="_blank">Nutzungsbedingungen</a> *
+                    und <a href="/landing/agb.html" target="_blank">AGB</a> *
                 </label>
             </div>
 
-            <button type="submit" class="btn btn-primary">Tierheim registrieren</button>
+            <button type="submit" class="btn btn-primary" id="submit-btn">Tierheim registrieren</button>
         </form>
 
-        <div id="success-message" style="display: none;">
+        <!-- Success Message for Free Plan -->
+        <div id="success-message-free" class="success-message" style="display: none;">
+            <div class="success-icon">✓</div>
             <h2>Registrierung erfolgreich!</h2>
             <p>Ihr Tierheim wurde erfolgreich bei Gassigeher registriert.</p>
             <p>Sie können sich jetzt anmelden und mit der Einrichtung beginnen:</p>
-            <a id="login-link" class="btn btn-primary btn-large" href="">Zum Login</a>
+            <a id="login-link-free" class="btn btn-primary btn-large" href="">Zum Login</a>
+        </div>
+
+        <!-- Success Message for Pro Plan -->
+        <div id="success-message-pro" class="success-message" style="display: none;">
+            <div class="success-icon">✓</div>
+            <h2>Fast geschafft!</h2>
+            <p>Ihr Tierheim wurde erstellt. Um den Pro-Plan zu aktivieren, schließen Sie jetzt die Zahlung ab.</p>
+            <div class="pro-checkout-info">
+                <p><strong>Gewählter Plan:</strong> Pro (<span id="checkout-billing-cycle">monatlich</span>)</p>
+                <p><strong>Preis:</strong> <span id="checkout-price">29 EUR/Monat</span></p>
+            </div>
+            <button id="checkout-btn" class="btn btn-primary btn-large">Jetzt zur Zahlung</button>
+            <p class="checkout-skip">
+                <a href="#" id="skip-payment-link">Später upgraden (Free-Plan nutzen)</a>
+            </p>
         </div>
     </main>
 
     <footer class="footer">
         <div class="container">
+            <div class="footer-links">
+                <a href="/landing/imprint.html">Impressum</a>
+                <a href="/landing/privacy.html">Datenschutz</a>
+                <a href="/landing/widerrufsbelehrung.html">Widerrufsrecht</a>
+                <a href="/landing/agb.html">AGB</a>
+                <a href="/landing/sla.html">SLA</a>
+            </div>
             <div class="footer-bottom">
-                <p>&copy; 2025 Gassigeher. <a href="/landing/imprint.html">Impressum</a> | <a href="/landing/privacy.html">Datenschutz</a></p>
+                <p>&copy; 2025 Gassigeher. Alle Rechte vorbehalten.</p>
             </div>
         </div>
     </footer>

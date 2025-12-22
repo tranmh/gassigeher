@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Über uns - Gassigeher</title>
+    <meta name="description" content="Erfahren Sie mehr über Gassigeher - die Buchungsplattform für Tierheime, entwickelt in Zusammenarbeit mit dem Tierheim Göppingen.">
+    <link rel="stylesheet" href="/landing/assets/css/landing.css">
+    <link rel="icon" href="/assets/images/favicon.ico">
+    <style>
+        .about-hero {
+            background: linear-gradient(180deg, var(--color-accent) 0%, var(--color-white) 100%);
+            padding: 4rem 0;
+            text-align: center;
+        }
+        .about-hero h1 {
+            margin-bottom: 1rem;
+        }
+        .about-hero p {
+            color: var(--color-text-light);
+            font-size: 1.2rem;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        .about-section {
+            padding: 4rem 0;
+        }
+        .about-section:nth-child(even) {
+            background: var(--color-accent);
+        }
+        .about-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .about-content h2 {
+            margin-bottom: 1.5rem;
+            color: var(--color-secondary);
+        }
+        .about-content p {
+            color: var(--color-text);
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+        }
+        .mission-box {
+            background: white;
+            border-left: 4px solid var(--color-primary);
+            padding: 2rem;
+            margin: 2rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .mission-box p {
+            font-size: 1.2rem;
+            font-style: italic;
+            margin: 0;
+            color: var(--color-secondary);
+        }
+        .values-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        .value-item {
+            text-align: center;
+            padding: 1.5rem;
+        }
+        .value-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        .value-item h3 {
+            margin-bottom: 0.5rem;
+            color: var(--color-secondary);
+        }
+        .value-item p {
+            color: var(--color-text-light);
+            margin: 0;
+        }
+        .open-source-section {
+            background: var(--color-secondary);
+            color: white;
+            padding: 4rem 0;
+            text-align: center;
+        }
+        .open-source-section h2 {
+            color: white;
+            margin-bottom: 1rem;
+        }
+        .open-source-section p {
+            color: rgba(255,255,255,0.8);
+            max-width: 600px;
+            margin: 0 auto 2rem;
+        }
+        .github-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: white;
+            color: var(--color-secondary);
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        .github-link:hover {
+            transform: translateY(-2px);
+            text-decoration: none;
+        }
+        .team-placeholder {
+            background: var(--color-border);
+            padding: 3rem;
+            border-radius: 8px;
+            text-align: center;
+            color: var(--color-text-light);
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <a href="/landing/" class="logo">
+                <span>Gassigeher</span>
+            </a>
+            <nav class="nav">
+                <a href="/landing/">Startseite</a>
+                <a href="/landing/pricing.html">Preise</a>
+                <a href="/landing/faq.html">FAQ</a>
+                <a href="/landing/register.html" class="btn btn-primary">Jetzt starten</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="about-hero">
+            <div class="container">
+                <h1>Über Gassigeher</h1>
+                <p>Die Buchungsplattform, die Tierheimen hilft, ihre ehrenamtlichen Gassigeher effizienter zu koordinieren.</p>
+            </div>
+        </section>
+
+        <section class="about-section">
+            <div class="container">
+                <div class="about-content">
+                    <h2>Unsere Mission</h2>
+                    <div class="mission-box">
+                        <p>"Wir glauben, dass Tierheime ihre Zeit für die Tiere nutzen sollten - nicht für Verwaltung und Koordination."</p>
+                    </div>
+                    <p>
+                        Gassigeher wurde entwickelt, um Tierheimen eine einfache, zuverlässige Lösung für die Koordination von ehrenamtlichen Gassigängern zu bieten. Unsere Software übernimmt die zeitaufwändige Verwaltungsarbeit, damit sich Tierheim-Mitarbeiter auf das Wesentliche konzentrieren können: die Betreuung der Tiere.
+                    </p>
+                    <p>
+                        Mit Funktionen wie Online-Buchung, automatischen E-Mail-Benachrichtigungen und einem Erfahrungsstufen-System sorgen wir dafür, dass die richtigen Hunde von den richtigen Helfern geführt werden - sicher und koordiniert.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="about-section">
+            <div class="container">
+                <div class="about-content">
+                    <h2>Unsere Geschichte</h2>
+                    <p>
+                        Gassigeher entstand in enger Zusammenarbeit mit dem <strong>Tierheim Göppingen</strong>. Aus den täglichen Herausforderungen eines echten Tierheims entwickelten wir eine Software, die genau die Probleme löst, mit denen Tierheime konfrontiert sind:
+                    </p>
+                    <ul style="line-height: 2; color: var(--color-text);">
+                        <li>Unübersichtliche Terminplanung per Telefon und E-Mail</li>
+                        <li>Fehlende Übersicht, welche Hunde bereits Gassi waren</li>
+                        <li>Schwierigkeit, Erfahrungslevel der Helfer zu berücksichtigen</li>
+                        <li>Zeitaufwändige manuelle Benachrichtigungen</li>
+                    </ul>
+                    <p>
+                        Heute nutzen Tierheime in ganz Deutschland Gassigeher, um ihre ehrenamtlichen Helfer zu koordinieren und mehr Zeit für die eigentliche Tierbetreuung zu haben.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="about-section">
+            <div class="container">
+                <div class="about-content">
+                    <h2>Unsere Werte</h2>
+                    <div class="values-grid">
+                        <div class="value-item">
+                            <div class="value-icon">🔍</div>
+                            <h3>Transparenz</h3>
+                            <p>Klare Preise, offener Quellcode, keine versteckten Kosten oder überraschende Einschränkungen.</p>
+                        </div>
+                        <div class="value-item">
+                            <div class="value-icon">💚</div>
+                            <h3>Tierwohl</h3>
+                            <p>Jede Entscheidung orientiert sich daran, wie wir Tierheimen am besten helfen können.</p>
+                        </div>
+                        <div class="value-item">
+                            <div class="value-icon">🛡️</div>
+                            <h3>Datenschutz</h3>
+                            <p>DSGVO-konform, Daten in Deutschland, verschlüsselte Verbindungen - Ihre Daten sind sicher.</p>
+                        </div>
+                        <div class="value-item">
+                            <div class="value-icon">🤝</div>
+                            <h3>Gemeinschaft</h3>
+                            <p>Open Source bedeutet: Jeder kann beitragen, verbessern und die Software kostenlos nutzen.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="open-source-section">
+            <div class="container">
+                <h2>Open Source</h2>
+                <p>
+                    Gassigeher ist vollständig Open Source. Tierheime, die ihre eigene Infrastruktur betreiben möchten, können den kompletten Quellcode kostenlos nutzen und selbst hosten - ohne Einschränkungen und ohne Lizenzgebühren.
+                </p>
+                <a href="https://github.com/tranmh/gassigeher" target="_blank" rel="noopener" class="github-link">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    Auf GitHub ansehen
+                </a>
+            </div>
+        </section>
+
+        <section class="about-section">
+            <div class="container">
+                <div class="about-content">
+                    <h2>Kontakt</h2>
+                    <p>
+                        Haben Sie Fragen oder möchten Sie mehr über Gassigeher erfahren? Wir freuen uns auf Ihre Nachricht!
+                    </p>
+                    <p>
+                        <strong>E-Mail:</strong> <a href="mailto:kontakt@gassigeher.org">kontakt@gassigeher.org</a><br>
+                        <strong>Support:</strong> <a href="mailto:support@gassigeher.org">support@gassigeher.org</a>
+                    </p>
+                    <p style="margin-top: 2rem;">
+                        <a href="/landing/contact.html" class="btn btn-primary">Kontaktformular</a>
+                    </p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-links">
+                <a href="/landing/imprint.html">Impressum</a>
+                <a href="/landing/privacy.html">Datenschutz</a>
+                <a href="/landing/widerrufsbelehrung.html">Widerrufsrecht</a>
+                <a href="/landing/agb.html">AGB</a>
+                <a href="/landing/sla.html">SLA</a>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Gassigeher. Alle Rechte vorbehalten.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

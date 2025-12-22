@@ -3,9 +3,124 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize components
     initSlugChecker();
+    initPlanSelection();
+    initBillingCycleToggle();
     initRegistrationForm();
     initFAQ();
+
+    // Check URL params for pre-selected plan
+    const urlParams = new URLSearchParams(window.location.search);
+    const planParam = urlParams.get('plan');
+    if (planParam === 'pro') {
+        selectPlan('pro');
+    }
 });
+
+// Plan selection state
+let selectedPlan = 'free';
+let billingCycle = 'monthly';
+let registrationResult = null;
+
+// Plan selection handler
+function initPlanSelection() {
+    const planCards = document.querySelectorAll('.plan-card');
+
+    planCards.forEach(card => {
+        card.addEventListener('click', function() {
+            const plan = this.dataset.plan;
+            selectPlan(plan);
+        });
+    });
+}
+
+function selectPlan(plan) {
+    selectedPlan = plan;
+
+    // Update hidden input
+    const selectedPlanInput = document.getElementById('selected_plan');
+    if (selectedPlanInput) selectedPlanInput.value = plan;
+
+    // Update card styling
+    document.querySelectorAll('.plan-card').forEach(card => {
+        card.classList.remove('selected');
+        if (card.dataset.plan === plan) {
+            card.classList.add('selected');
+            card.querySelector('input[type="radio"]').checked = true;
+        }
+    });
+
+    // Show/hide billing toggle for Pro
+    const billingContainer = document.getElementById('billing-toggle-container');
+    if (billingContainer) {
+        if (plan === 'pro') {
+            billingContainer.classList.add('show');
+        } else {
+            billingContainer.classList.remove('show');
+        }
+    }
+
+    // Update plan note
+    const planNote = document.getElementById('plan-note');
+    if (planNote) {
+        if (plan === 'pro') {
+            planNote.textContent = 'Nach der Registrierung werden Sie zur Zahlung weitergeleitet.';
+            planNote.classList.add('pro-note');
+        } else {
+            planNote.textContent = 'Sie können jederzeit auf Pro upgraden, wenn Sie mehr als 10 Hunde verwalten möchten.';
+            planNote.classList.remove('pro-note');
+        }
+    }
+
+    // Update submit button text
+    const submitBtn = document.getElementById('submit-btn');
+    if (submitBtn) {
+        if (plan === 'pro') {
+            submitBtn.textContent = 'Registrieren & zur Zahlung';
+        } else {
+            submitBtn.textContent = 'Tierheim registrieren';
+        }
+    }
+}
+
+// Billing cycle toggle handler
+function initBillingCycleToggle() {
+    const billingButtons = document.querySelectorAll('.billing-toggle button');
+
+    billingButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const cycle = this.dataset.cycle;
+            setBillingCycle(cycle);
+        });
+    });
+}
+
+function setBillingCycle(cycle) {
+    billingCycle = cycle;
+
+    // Update hidden input
+    const billingCycleInput = document.getElementById('billing_cycle');
+    if (billingCycleInput) billingCycleInput.value = cycle;
+
+    // Update button styling
+    document.querySelectorAll('.billing-toggle button').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.cycle === cycle) {
+            btn.classList.add('active');
+        }
+    });
+
+    // Update price display
+    const proPriceDisplay = document.getElementById('pro-price-display');
+    const proPriceNote = document.getElementById('pro-price-note');
+
+    if (cycle === 'yearly') {
+        if (proPriceDisplay) proPriceDisplay.innerHTML = '290 <span>EUR/Jahr</span>';
+        if (proPriceNote) proPriceNote.innerHTML = '<strong>24,17 EUR/Monat</strong> - 2 Monate gratis';
+    } else {
+        if (proPriceDisplay) proPriceDisplay.innerHTML = '29 <span>EUR/Monat</span>';
+        if (proPriceNote) proPriceNote.innerHTML = '<strong>29 EUR/Monat</strong> - Monatlich kündbar';
+    }
+}
 
 // Slug availability checker
 function initSlugChecker() {
@@ -54,7 +169,8 @@ function initSlugChecker() {
 // Registration form handler
 function initRegistrationForm() {
     const form = document.getElementById('register-form');
-    const successMessage = document.getElementById('success-message');
+    const successMessageFree = document.getElementById('success-message-free');
+    const successMessagePro = document.getElementById('success-message-pro');
 
     if (!form) return;
 
@@ -87,7 +203,9 @@ function initRegistrationForm() {
             admin_first_name: formData.get('admin_first_name'),
             admin_last_name: formData.get('admin_last_name'),
             admin_email: formData.get('admin_email'),
-            admin_password: formData.get('admin_password')
+            admin_password: formData.get('admin_password'),
+            plan: selectedPlan,
+            billing_cycle: billingCycle
         };
 
         try {
@@ -105,14 +223,63 @@ function initRegistrationForm() {
                 throw new Error(result.error || 'Registrierung fehlgeschlagen');
             }
 
-            // Success! Show success message
-            form.style.display = 'none';
-            successMessage.style.display = 'block';
+            // Store registration result for checkout (use sessionStorage, cleared on tab close)
+            // Note: Password storage is temporary and cleared immediately after checkout
+            sessionStorage.setItem('gassigeher_checkout_data', JSON.stringify({
+                login_url: result.login_url,
+                slug: result.slug,
+                adminEmail: data.admin_email,
+                adminPassword: data.admin_password
+            }));
+            registrationResult = result;
 
-            const loginLink = document.getElementById('login-link');
-            if (loginLink && result.login_url) {
-                loginLink.href = result.login_url;
-                loginLink.textContent = `Anmelden bei ${result.slug}.gassigeher.org`;
+            // Hide form
+            form.style.display = 'none';
+
+            // Show appropriate success message based on plan
+            if (selectedPlan === 'pro') {
+                // Show Pro success message with checkout button
+                if (successMessagePro) {
+                    successMessagePro.style.display = 'block';
+
+                    // Update checkout info
+                    const checkoutBillingCycle = document.getElementById('checkout-billing-cycle');
+                    const checkoutPrice = document.getElementById('checkout-price');
+
+                    if (checkoutBillingCycle) {
+                        checkoutBillingCycle.textContent = billingCycle === 'yearly' ? 'jährlich' : 'monatlich';
+                    }
+                    if (checkoutPrice) {
+                        checkoutPrice.textContent = billingCycle === 'yearly' ? '290 EUR/Jahr' : '29 EUR/Monat';
+                    }
+
+                    // Setup checkout button
+                    const checkoutBtn = document.getElementById('checkout-btn');
+                    if (checkoutBtn) {
+                        checkoutBtn.addEventListener('click', () => initiateProCheckout(result));
+                    }
+
+                    // Setup skip payment link
+                    const skipLink = document.getElementById('skip-payment-link');
+                    if (skipLink) {
+                        skipLink.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            // Redirect to login page
+                            window.location.href = result.login_url;
+                        });
+                    }
+                }
+            } else {
+                // Show Free success message
+                if (successMessageFree) {
+                    successMessageFree.style.display = 'block';
+
+                    const loginLink = document.getElementById('login-link-free');
+                    if (loginLink && result.login_url) {
+                        loginLink.href = result.login_url;
+                        loginLink.textContent = `Anmelden bei ${result.slug}.gassigeher.org`;
+                    }
+                }
             }
 
         } catch (error) {
@@ -124,6 +291,98 @@ function initRegistrationForm() {
             submitBtn.textContent = originalText;
         }
     });
+}
+
+// Initiate Pro checkout after registration
+async function initiateProCheckout(registrationResult) {
+    const checkoutBtn = document.getElementById('checkout-btn');
+    if (checkoutBtn) {
+        checkoutBtn.disabled = true;
+        checkoutBtn.textContent = 'Wird geladen...';
+    }
+
+    // Get checkout data from sessionStorage
+    const checkoutDataStr = sessionStorage.getItem('gassigeher_checkout_data');
+    if (!checkoutDataStr) {
+        showFormError(document.getElementById('success-message-pro'),
+            'Sitzung abgelaufen. Bitte registrieren Sie sich erneut.');
+        return;
+    }
+
+    let checkoutData;
+    try {
+        checkoutData = JSON.parse(checkoutDataStr);
+    } catch (e) {
+        sessionStorage.removeItem('gassigeher_checkout_data');
+        showFormError(document.getElementById('success-message-pro'),
+            'Sitzung abgelaufen. Bitte registrieren Sie sich erneut.');
+        return;
+    }
+
+    try {
+        // First, we need to authenticate to get a token
+        // The tenant was just created, so we need to login to the tenant subdomain
+        const baseUrl = checkoutData.login_url.replace(/\/login\/?$/, '');
+        const loginResponse = await fetch(`${baseUrl}/api/auth/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                email: checkoutData.adminEmail,
+                password: checkoutData.adminPassword
+            })
+        });
+
+        // Clear sensitive data immediately after use
+        sessionStorage.removeItem('gassigeher_checkout_data');
+
+        if (!loginResponse.ok) {
+            throw new Error('Login fehlgeschlagen');
+        }
+
+        const loginData = await loginResponse.json();
+        const token = loginData.token;
+
+        // Now create checkout session with the token
+        const billingResponse = await fetch(`${baseUrl}/api/billing/checkout`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                plan_slug: 'pro',
+                billing_cycle: billingCycle
+            })
+        });
+
+        if (!billingResponse.ok) {
+            const errorData = await billingResponse.json();
+            throw new Error(errorData.error || 'Checkout fehlgeschlagen');
+        }
+
+        const billingData = await billingResponse.json();
+
+        // Redirect to Stripe checkout
+        if (billingData.checkout_url) {
+            window.location.href = billingData.checkout_url;
+        } else {
+            throw new Error('Keine Checkout-URL erhalten');
+        }
+
+    } catch (error) {
+        console.error('Checkout error:', error);
+        // Clear sensitive data on error too
+        sessionStorage.removeItem('gassigeher_checkout_data');
+        showFormError(document.getElementById('success-message-pro'),
+            'Checkout konnte nicht gestartet werden. Sie können später im Dashboard upgraden.');
+
+        if (checkoutBtn) {
+            checkoutBtn.disabled = false;
+            checkoutBtn.textContent = 'Erneut versuchen';
+        }
+    }
 }
 
 // Show form error

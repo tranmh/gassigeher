@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kontakt - Gassigeher</title>
+    <meta name="description" content="Kontaktieren Sie das Gassigeher-Team. Wir helfen Ihnen gerne bei Fragen zu unserer Buchungsplattform für Tierheime.">
+    <link rel="stylesheet" href="/landing/assets/css/landing.css">
+    <link rel="icon" href="/assets/images/favicon.ico">
+    <style>
+        .contact-hero {
+            background: linear-gradient(180deg, var(--color-accent) 0%, var(--color-white) 100%);
+            padding: 4rem 0;
+            text-align: center;
+        }
+        .contact-hero h1 {
+            margin-bottom: 1rem;
+        }
+        .contact-hero p {
+            color: var(--color-text-light);
+            font-size: 1.2rem;
+        }
+        .contact-section {
+            padding: 4rem 0;
+        }
+        .contact-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        @media (max-width: 768px) {
+            .contact-grid {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+        }
+        .contact-form {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: var(--box-shadow);
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--color-secondary);
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--color-primary);
+        }
+        .form-group textarea {
+            min-height: 150px;
+            resize: vertical;
+        }
+        .form-group .required {
+            color: var(--color-error);
+        }
+        .form-submit {
+            width: 100%;
+            padding: 14px 24px;
+            background: var(--color-primary);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .form-submit:hover {
+            background: var(--color-primary-dark);
+        }
+        .form-submit:disabled {
+            background: var(--color-border);
+            cursor: not-allowed;
+        }
+        .contact-info h2 {
+            margin-bottom: 1.5rem;
+            color: var(--color-secondary);
+        }
+        .contact-info-item {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: var(--color-accent);
+            border-radius: 8px;
+        }
+        .contact-info-icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+        .contact-info-text h3 {
+            margin-bottom: 0.25rem;
+            font-size: 1rem;
+            color: var(--color-secondary);
+        }
+        .contact-info-text p {
+            margin: 0;
+            color: var(--color-text-light);
+        }
+        .contact-info-text a {
+            color: var(--color-primary);
+        }
+        .response-time {
+            background: white;
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+        .response-time h3 {
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+        .response-time p {
+            margin: 0;
+            color: var(--color-text-light);
+            font-size: 0.95rem;
+        }
+        .alert {
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1.5rem;
+            display: none;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .alert.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <a href="/landing/" class="logo">
+                <span>Gassigeher</span>
+            </a>
+            <nav class="nav">
+                <a href="/landing/">Startseite</a>
+                <a href="/landing/pricing.html">Preise</a>
+                <a href="/landing/faq.html">FAQ</a>
+                <a href="/landing/register.html" class="btn btn-primary">Jetzt starten</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="contact-hero">
+            <div class="container">
+                <h1>Kontakt</h1>
+                <p>Haben Sie Fragen? Wir helfen Ihnen gerne!</p>
+            </div>
+        </section>
+
+        <section class="contact-section">
+            <div class="container">
+                <div class="contact-grid">
+                    <div class="contact-form-container">
+                        <form class="contact-form" id="contactForm">
+                            <div class="alert alert-success" id="successAlert">
+                                Vielen Dank für Ihre Nachricht! Wir werden uns schnellstmöglich bei Ihnen melden.
+                            </div>
+                            <div class="alert alert-error" id="errorAlert">
+                                Es ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut oder kontaktieren Sie uns direkt per E-Mail.
+                            </div>
+
+                            <div class="form-group">
+                                <label for="name">Name <span class="required">*</span></label>
+                                <input type="text" id="name" name="name" required placeholder="Ihr Name">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="email">E-Mail <span class="required">*</span></label>
+                                <input type="email" id="email" name="email" required placeholder="ihre@email.de">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="subject">Betreff <span class="required">*</span></label>
+                                <select id="subject" name="subject" required>
+                                    <option value="">Bitte wählen...</option>
+                                    <option value="general">Allgemeine Anfrage</option>
+                                    <option value="support">Technischer Support</option>
+                                    <option value="sales">Vertrieb / Pro-Plan</option>
+                                    <option value="partnership">Partnerschaft</option>
+                                    <option value="press">Presse</option>
+                                    <option value="other">Sonstiges</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="organization">Organisation (optional)</label>
+                                <input type="text" id="organization" name="organization" placeholder="Name Ihres Tierheims">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="message">Nachricht <span class="required">*</span></label>
+                                <textarea id="message" name="message" required placeholder="Wie können wir Ihnen helfen?"></textarea>
+                            </div>
+
+                            <button type="submit" class="form-submit" id="submitBtn">
+                                Nachricht senden
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="contact-info">
+                        <h2>Weitere Kontaktmöglichkeiten</h2>
+
+                        <div class="contact-info-item">
+                            <div class="contact-info-icon">📧</div>
+                            <div class="contact-info-text">
+                                <h3>E-Mail</h3>
+                                <p><a href="mailto:kontakt@gassigeher.org">kontakt@gassigeher.org</a></p>
+                            </div>
+                        </div>
+
+                        <div class="contact-info-item">
+                            <div class="contact-info-icon">🛠️</div>
+                            <div class="contact-info-text">
+                                <h3>Technischer Support</h3>
+                                <p><a href="mailto:support@gassigeher.org">support@gassigeher.org</a></p>
+                            </div>
+                        </div>
+
+                        <div class="contact-info-item">
+                            <div class="contact-info-icon">💼</div>
+                            <div class="contact-info-text">
+                                <h3>Vertrieb & Pro-Plan</h3>
+                                <p><a href="mailto:vertrieb@gassigeher.org">vertrieb@gassigeher.org</a></p>
+                            </div>
+                        </div>
+
+                        <div class="contact-info-item">
+                            <div class="contact-info-icon">📰</div>
+                            <div class="contact-info-text">
+                                <h3>Presse</h3>
+                                <p><a href="mailto:presse@gassigeher.org">presse@gassigeher.org</a></p>
+                            </div>
+                        </div>
+
+                        <div class="response-time">
+                            <h3>Antwortzeiten</h3>
+                            <p>
+                                Wir bemühen uns, alle Anfragen innerhalb von 24-48 Stunden zu beantworten.
+                                Pro-Kunden erhalten Prioritäts-Support mit einer Reaktionszeit von 4 Stunden (werktags).
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-links">
+                <a href="/landing/imprint.html">Impressum</a>
+                <a href="/landing/privacy.html">Datenschutz</a>
+                <a href="/landing/widerrufsbelehrung.html">Widerrufsrecht</a>
+                <a href="/landing/agb.html">AGB</a>
+                <a href="/landing/sla.html">SLA</a>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Gassigeher. Alle Rechte vorbehalten.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        document.getElementById('contactForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            const successAlert = document.getElementById('successAlert');
+            const errorAlert = document.getElementById('errorAlert');
+
+            // Hide alerts
+            successAlert.classList.remove('show');
+            errorAlert.classList.remove('show');
+
+            // Disable button
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Wird gesendet...';
+
+            const formData = {
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                subject: document.getElementById('subject').value,
+                organization: document.getElementById('organization').value,
+                message: document.getElementById('message').value
+            };
+
+            try {
+                const response = await fetch('/api/contact', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    successAlert.classList.add('show');
+                    this.reset();
+                } else {
+                    errorAlert.textContent = data.error || 'Es ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut.';
+                    throw new Error(data.error || 'Server error');
+                }
+            } catch (error) {
+                errorAlert.classList.add('show');
+                console.error('Contact form error:', error);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Nachricht senden';
+            }
+        });
+    </script>
+</body>
+</html>

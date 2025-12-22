@@ -121,6 +121,7 @@ func main() {
 	themeHandler := handlers.NewThemeHandler(db)
 	tenantHandler := handlers.NewTenantHandler(db, cfg)
 	centralAdminHandler := handlers.NewCentralAdminHandler(db, cfg)
+	contactHandler := handlers.NewContactHandler(cfg)
 
 	// SaaS: Initialize Stripe service and billing handler
 	var stripeService *services.StripeService
@@ -201,6 +202,9 @@ func main() {
 	// Tenant registration (public - for self-service signup)
 	router.HandleFunc("/api/tenants/register", tenantHandler.Register).Methods("POST")
 	router.HandleFunc("/api/tenants/check-slug", tenantHandler.CheckSlug).Methods("GET")
+
+	// Contact form (public - for landing page inquiries)
+	router.HandleFunc("/api/contact", contactHandler.Submit).Methods("POST")
 
 	// SaaS Stripe webhook (public - verified by signature)
 	router.HandleFunc("/api/billing/webhook", billingHandler.HandleWebhook).Methods("POST")
