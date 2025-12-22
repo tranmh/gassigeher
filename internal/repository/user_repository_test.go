@@ -439,11 +439,12 @@ func TestUserRepository_FindByVerificationToken(t *testing.T) {
 		tokenExpires := time.Now().Add(24 * time.Hour)
 
 		// Create user with verification token
+		now := testutil.Now()
 		_, err := db.Exec(`
 			INSERT INTO users (email, first_name, last_name, password_hash, is_verified, is_active,
 			                   verification_token, verification_token_expires, terms_accepted_at, last_activity_at, created_at)
-			VALUES (?, 'Verify', 'Me', 'hash', 0, 1, ?, ?, datetime('now'), datetime('now'), datetime('now'))
-		`, email, verificationToken, tokenExpires)
+			VALUES (?, 'Verify', 'Me', 'hash', 0, 1, ?, ?, ?, ?, ?)
+		`, email, verificationToken, tokenExpires, now, now, now)
 		if err != nil {
 			t.Fatalf("Failed to seed user: %v", err)
 		}
@@ -499,11 +500,12 @@ func TestUserRepository_FindByVerificationToken(t *testing.T) {
 		tokenExpires := time.Now().Add(24 * time.Hour)
 
 		// Create deleted user with verification token
+		now := testutil.Now()
 		_, err := db.Exec(`
 			INSERT INTO users (email, first_name, last_name, password_hash, is_verified, is_active, is_deleted,
 			                   verification_token, verification_token_expires, terms_accepted_at, last_activity_at, created_at)
-			VALUES (?, 'Deleted', 'User', 'hash', 0, 0, 1, ?, ?, datetime('now'), datetime('now'), datetime('now'))
-		`, email, verificationToken, tokenExpires)
+			VALUES (?, 'Deleted', 'User', 'hash', 0, 0, 1, ?, ?, ?, ?, ?)
+		`, email, verificationToken, tokenExpires, now, now, now)
 		if err != nil {
 			t.Fatalf("Failed to seed deleted user: %v", err)
 		}
@@ -531,11 +533,12 @@ func TestUserRepository_FindByPasswordResetToken(t *testing.T) {
 		tokenExpires := time.Now().Add(1 * time.Hour)
 
 		// Create user with password reset token
+		now := testutil.Now()
 		_, err := db.Exec(`
 			INSERT INTO users (email, first_name, last_name, password_hash, is_verified, is_active,
 			                   password_reset_token, password_reset_expires, terms_accepted_at, last_activity_at, created_at)
-			VALUES (?, 'Reset', 'Me', 'hash', 1, 1, ?, ?, datetime('now'), datetime('now'), datetime('now'))
-		`, email, resetToken, tokenExpires)
+			VALUES (?, 'Reset', 'Me', 'hash', 1, 1, ?, ?, ?, ?, ?)
+		`, email, resetToken, tokenExpires, now, now, now)
 		if err != nil {
 			t.Fatalf("Failed to seed user: %v", err)
 		}
@@ -587,11 +590,12 @@ func TestUserRepository_FindByPasswordResetToken(t *testing.T) {
 		tokenExpires := time.Now().Add(1 * time.Hour)
 
 		// Create deleted user with reset token
+		now := testutil.Now()
 		_, err := db.Exec(`
 			INSERT INTO users (email, first_name, last_name, password_hash, is_verified, is_active, is_deleted,
 			                   password_reset_token, password_reset_expires, terms_accepted_at, last_activity_at, created_at)
-			VALUES (?, 'Deleted', 'User', 'hash', 1, 0, 1, ?, ?, datetime('now'), datetime('now'), datetime('now'))
-		`, email, resetToken, tokenExpires)
+			VALUES (?, 'Deleted', 'User', 'hash', 1, 0, 1, ?, ?, ?, ?, ?)
+		`, email, resetToken, tokenExpires, now, now, now)
 		if err != nil {
 			t.Fatalf("Failed to seed deleted user: %v", err)
 		}
@@ -786,10 +790,11 @@ func TestUserRepository_ClearMustChangePassword(t *testing.T) {
 	t.Run("clears must_change_password flag successfully", func(t *testing.T) {
 		// Create user with must_change_password = true
 		email := "mustchange@example.com"
+		now := testutil.Now()
 		_, err := db.Exec(`
 			INSERT INTO users (email, first_name, last_name, password_hash, is_active, is_verified, must_change_password, terms_accepted_at, last_activity_at, created_at)
-			VALUES (?, 'Must', 'Change', 'hash', 1, 1, 1, datetime('now'), datetime('now'), datetime('now'))
-		`, email)
+			VALUES (?, 'Must', 'Change', 'hash', 1, 1, 1, ?, ?, ?)
+		`, email, now, now, now)
 		if err != nil {
 			t.Fatalf("Failed to seed user: %v", err)
 		}
@@ -833,10 +838,11 @@ func TestUserRepository_ClearMustChangePassword(t *testing.T) {
 	t.Run("clearing flag on user where it is already false", func(t *testing.T) {
 		// Create user with must_change_password = false
 		email := "nochange@example.com"
+		now := testutil.Now()
 		_, err := db.Exec(`
 			INSERT INTO users (email, first_name, last_name, password_hash, is_active, is_verified, must_change_password, terms_accepted_at, last_activity_at, created_at)
-			VALUES (?, 'No', 'Change', 'hash', 1, 1, 0, datetime('now'), datetime('now'), datetime('now'))
-		`, email)
+			VALUES (?, 'No', 'Change', 'hash', 1, 1, 0, ?, ?, ?)
+		`, email, now, now, now)
 		if err != nil {
 			t.Fatalf("Failed to seed user: %v", err)
 		}
@@ -960,13 +966,14 @@ func TestUserRepository_FindByEmail_CentralAdmin(t *testing.T) {
 	t.Run("central admin flag is returned", func(t *testing.T) {
 		// Create a Central Admin user directly in database
 		email := "central@admin.local"
+		now := testutil.Now()
 		_, err := db.Exec(`
 			INSERT INTO users (
 				first_name, last_name, email, password_hash,
 				is_admin, is_super_admin, is_central_admin,
 				is_verified, is_active, terms_accepted_at, last_activity_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-		`, "Central", "Admin", email, "hashedpw", 1, 1, 1, 1, 1)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, "Central", "Admin", email, "hashedpw", 1, 1, 1, 1, 1, now, now)
 		if err != nil {
 			t.Fatalf("Failed to create central admin: %v", err)
 		}
@@ -988,13 +995,14 @@ func TestUserRepository_FindByEmail_CentralAdmin(t *testing.T) {
 
 	t.Run("regular user has central admin false", func(t *testing.T) {
 		email := "regular@user.local"
+		now := testutil.Now()
 		_, err := db.Exec(`
 			INSERT INTO users (
 				first_name, last_name, email, password_hash,
 				is_admin, is_super_admin, is_central_admin,
 				is_verified, is_active, terms_accepted_at, last_activity_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-		`, "Regular", "User", email, "hashedpw", 0, 0, 0, 1, 1)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, "Regular", "User", email, "hashedpw", 0, 0, 0, 1, 1, now, now)
 		if err != nil {
 			t.Fatalf("Failed to create regular user: %v", err)
 		}

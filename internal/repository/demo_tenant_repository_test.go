@@ -163,10 +163,11 @@ func TestDemoTenantRepository_GetCredentials(t *testing.T) {
 		}
 
 		// Create super admin user for tenant 1
+		nowStr := testutil.Now()
 		_, err = db.Exec(`
 			INSERT INTO users (tenant_id, email, first_name, last_name, password_hash, is_super_admin, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
-			VALUES (1, 'admin@demo.test', 'Demo', 'Admin', 'hash', 1, 1, 1, datetime('now'), datetime('now'), datetime('now'))
-		`)
+			VALUES (1, 'admin@demo.test', 'Demo', 'Admin', 'hash', 1, 1, 1, ?, ?, ?)
+		`, nowStr, nowStr, nowStr)
 		if err != nil {
 			t.Fatalf("Failed to create super admin: %v", err)
 		}

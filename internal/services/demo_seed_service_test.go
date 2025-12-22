@@ -368,9 +368,10 @@ func TestDemoSeedService_SeedDemoColors_Idempotent(t *testing.T) {
 	service := NewDemoSeedService(db)
 
 	// First create demo tenant (without going through EnsureDemoTenant to control the flow)
+	now := testutil.Now()
 	_, err := db.Exec(`INSERT INTO tenants (slug, name, status, contact_email, federal_state, is_demo, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
-		"test-demo", "Test Demo", "active", "test@demo.org", "BW", 1)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"test-demo", "Test Demo", "active", "test@demo.org", "BW", 1, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create test tenant: %v", err)
 	}

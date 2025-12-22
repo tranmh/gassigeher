@@ -194,8 +194,9 @@ func TestColorCategoryRepository_Delete(t *testing.T) {
 		colorID := testutil.SeedTestColorCategory(t, db, "has-dogs", "#333333", 50)
 
 		// Create a dog with this color
+		now := testutil.Now()
 		_, err := db.Exec(`INSERT INTO dogs (name, breed, size, age, color_id, is_available, created_at)
-			VALUES (?, ?, ?, ?, ?, 1, datetime('now'))`, "TestDog", "Mix", "medium", 3, colorID)
+			VALUES (?, ?, ?, ?, ?, 1, ?)`, "TestDog", "Mix", "medium", 3, colorID, now)
 		if err != nil {
 			t.Fatalf("Failed to create test dog: %v", err)
 		}
@@ -248,10 +249,11 @@ func TestColorCategoryRepository_CountDogsWithColor(t *testing.T) {
 		colorID := testutil.SeedTestColorCategory(t, db, "with-dogs", "#555555", 70)
 
 		// Create dogs with this color (include tenant_id = 1)
+		now := testutil.Now()
 		_, _ = db.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at)
-			VALUES (1, ?, ?, ?, ?, ?, 1, datetime('now'))`, "Dog1", "Mix", "medium", 3, colorID)
+			VALUES (1, ?, ?, ?, ?, ?, 1, ?)`, "Dog1", "Mix", "medium", 3, colorID, now)
 		_, _ = db.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at)
-			VALUES (1, ?, ?, ?, ?, ?, 1, datetime('now'))`, "Dog2", "Lab", "large", 5, colorID)
+			VALUES (1, ?, ?, ?, ?, ?, 1, ?)`, "Dog2", "Lab", "large", 5, colorID, now)
 
 		count, err := repo.CountDogsWithColor(1, colorID) // tenantID = 1
 		if err != nil {

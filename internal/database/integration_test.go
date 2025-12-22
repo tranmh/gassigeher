@@ -65,9 +65,15 @@ func TestInitializeWithConfig_MySQL(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Clean database first
-	tables := []string{"bookings", "blocked_dates", "experience_requests",
-		"reactivation_requests", "dogs", "users", "system_settings", "schema_migrations"}
+	// Clean database first - drop ALL tables in correct order
+	tables := []string{
+		"walk_report_photos", "walk_reports", "color_requests", "user_colors",
+		"bookings", "blocked_dates", "experience_requests", "reactivation_requests",
+		"dogs", "demo_tenant_state", "tenant_subscriptions", "tenant_settings",
+		"pricing_plans", "users", "color_categories", "booking_time_rules",
+		"custom_holidays", "feiertage_cache", "system_settings", "tenants",
+		"schema_migrations",
+	}
 	db.Exec("SET FOREIGN_KEY_CHECKS = 0")
 	for _, table := range tables {
 		db.Exec("DROP TABLE IF EXISTS " + table)

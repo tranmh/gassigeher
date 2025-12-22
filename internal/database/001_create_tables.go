@@ -371,10 +371,9 @@ CREATE TABLE IF NOT EXISTS blocked_dates (
   reason TEXT NOT NULL,
   created_by INT NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  dog_id_unique INT AS (COALESCE(dog_id, 0)) STORED,
   FOREIGN KEY (created_by) REFERENCES users(id),
   FOREIGN KEY (dog_id) REFERENCES dogs(id) ON DELETE CASCADE,
-  UNIQUE KEY idx_blocked_dates_dog_date (dog_id_unique, date),
+  UNIQUE KEY idx_blocked_dates_dog_date ((COALESCE(dog_id, 0)), date),
   INDEX idx_blocked_dates_date (date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -117,8 +117,9 @@ func TestReactivationRequestHandler_ListRequests(t *testing.T) {
 	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
 
 	// Create reactivation requests
-	db.Exec("INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (1, ?, 'pending', datetime('now'))", user1ID)
-	db.Exec("INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (1, ?, 'pending', datetime('now'))", user2ID)
+	now := testutil.Now()
+	db.Exec("INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (1, ?, 'pending', ?)", user1ID, now)
+	db.Exec("INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (1, ?, 'pending', ?)", user2ID, now)
 
 	t.Run("admin sees all requests", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/reactivation-requests", nil)
@@ -167,8 +168,9 @@ func TestReactivationRequestHandler_ApproveRequest(t *testing.T) {
 
 	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
 
-	var requestID int
-	db.QueryRow("INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (1, ?, 'pending', datetime('now')) RETURNING id", userID).Scan(&requestID)
+	// Use InsertAndGetID for cross-database compatibility (RETURNING id not supported in MySQL)
+	now := testutil.Now()
+	requestID := testutil.InsertAndGetID(t, db, "INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (1, ?, 'pending', ?)", userID, now)
 
 	t.Run("successful approval reactivates user", func(t *testing.T) {
 		reqBody := map[string]interface{}{
@@ -242,8 +244,9 @@ func TestReactivationRequestHandler_DenyRequest(t *testing.T) {
 
 	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
 
-	var requestID int
-	db.QueryRow("INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (1, ?, 'pending', datetime('now')) RETURNING id", userID).Scan(&requestID)
+	// Use InsertAndGetID for cross-database compatibility (RETURNING id not supported in MySQL)
+	now := testutil.Now()
+	requestID := testutil.InsertAndGetID(t, db, "INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (1, ?, 'pending', ?)", userID, now)
 
 	t.Run("successful denial keeps user inactive", func(t *testing.T) {
 		reqBody := map[string]interface{}{

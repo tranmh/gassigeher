@@ -259,10 +259,11 @@ func TestUniqueConstraints(t *testing.T) {
 	}
 
 	// Create a test tenant for foreign key constraints
+	now := time.Now().Format("2006-01-02 15:04:05")
 	_, err = db.Exec(`
 		INSERT INTO tenants (id, slug, name, status, contact_email, federal_state, created_at, updated_at)
-		VALUES (1, 'test-tenant', 'Test Tenant', 'active', 'test@example.com', 'BW', datetime('now'), datetime('now'))
-	`)
+		VALUES (1, 'test-tenant', 'Test Tenant', 'active', 'test@example.com', 'BW', ?, ?)
+	`, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create test tenant: %v", err)
 	}
@@ -374,10 +375,11 @@ func TestIndexEffectiveness(t *testing.T) {
 	}
 
 	// Create a test tenant for foreign key constraints
+	now := time.Now().Format("2006-01-02 15:04:05")
 	_, err = db.Exec(`
 		INSERT INTO tenants (id, slug, name, status, contact_email, federal_state, created_at, updated_at)
-		VALUES (1, 'test-tenant', 'Test Tenant', 'active', 'test@example.com', 'BW', datetime('now'), datetime('now'))
-	`)
+		VALUES (1, 'test-tenant', 'Test Tenant', 'active', 'test@example.com', 'BW', ?, ?)
+	`, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create test tenant: %v", err)
 	}

@@ -1111,13 +1111,14 @@ func TestAuthHandler_Login_CentralAdminRedirect(t *testing.T) {
 	// Create Central Admin user directly
 	authService := services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours)
 	hashedPw, _ := authService.HashPassword("CentralAdmin123!")
+	now := testutil.Now()
 	_, err := db.Exec(`
 		INSERT INTO users (
 			first_name, last_name, email, password_hash,
 			is_admin, is_super_admin, is_central_admin,
 			is_verified, is_active, terms_accepted_at, last_activity_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-	`, "Central", "Admin", "central@admin.local", hashedPw, 1, 1, 1, 1, 1)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, "Central", "Admin", "central@admin.local", hashedPw, 1, 1, 1, 1, 1, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create Central Admin: %v", err)
 	}
@@ -1166,13 +1167,14 @@ func TestAuthHandler_Login_CentralAdminRedirect(t *testing.T) {
 	t.Run("tenant user login returns redirect to dashboard", func(t *testing.T) {
 		// Create tenant user
 		hashedPw2, _ := authService.HashPassword("TenantUser123!")
+		now2 := testutil.Now()
 		_, err := db.Exec(`
 			INSERT INTO users (
 				tenant_id, first_name, last_name, email, password_hash,
 				is_admin, is_super_admin, is_central_admin,
 				is_verified, is_active, terms_accepted_at, last_activity_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-		`, 1, "Tenant", "User", "tenant@user.local", hashedPw2, 0, 0, 0, 1, 1)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, 1, "Tenant", "User", "tenant@user.local", hashedPw2, 0, 0, 0, 1, 1, now2, now2)
 		if err != nil {
 			t.Fatalf("Failed to create tenant user: %v", err)
 		}

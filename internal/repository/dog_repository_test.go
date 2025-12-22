@@ -876,10 +876,11 @@ func TestDogRepository_CountByTenant(t *testing.T) {
 		repo4 := NewDogRepository(db4)
 
 		// Create tenant 2
+		now := testutil.Now()
 		_, err := db4.Exec(`
 			INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
-			VALUES (2, 'tenant-2', 'Tenant 2', 'active', 'tenant2@example.com', datetime('now'), datetime('now'))
-		`)
+			VALUES (2, 'tenant-2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)
+		`, now, now)
 		if err != nil {
 			t.Fatalf("Failed to create tenant 2: %v", err)
 		}
@@ -890,7 +891,7 @@ func TestDogRepository_CountByTenant(t *testing.T) {
 		testutil.SeedTestDog(t, db4, "Rocky", "Shepherd", "orange")
 
 		// Create 2 dogs for tenant 2 (directly via SQL since SeedTestDog uses tenant_id=1)
-		now := time.Now()
+		// Reuse the 'now' string variable from above for SQL timestamp
 		_, err = db4.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at) VALUES (2, ?, ?, ?, ?, ?, 1, ?)`,
 			"Luna", "Poodle", "small", 3, 1, now)
 		if err != nil {

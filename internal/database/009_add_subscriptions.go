@@ -102,8 +102,19 @@ CREATE TABLE IF NOT EXISTS tenant_subscriptions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Add max_dogs column to tenants table for quick access (denormalized)
-ALTER TABLE tenants ADD COLUMN IF NOT EXISTS max_dogs INT DEFAULT 10;
-ALTER TABLE tenants ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(20) DEFAULT 'free';
+-- For MySQL, we use information_schema to check if column exists before adding
+-- The SET statements are used to conditionally add columns
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'tenants' AND column_name = 'max_dogs');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE tenants ADD COLUMN max_dogs INT DEFAULT 10', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'tenants' AND column_name = 'subscription_status');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE tenants ADD COLUMN subscription_status VARCHAR(20) DEFAULT ''free''', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Create default free subscriptions for existing tenants
 INSERT IGNORE INTO tenant_subscriptions (tenant_id, plan_id, status)

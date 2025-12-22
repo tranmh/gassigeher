@@ -131,8 +131,9 @@ func TestMultiTenant_ListBookings_FilterByTenant(t *testing.T) {
 	dogID := testutil.SeedTestDog(t, db, "Buddy", "Labrador", "green")
 
 	// Create tenant 2 in the database
+	now := testutil.Now()
 	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
-		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', datetime('now'), datetime('now'))`)
+		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create tenant 2: %v", err)
 	}
@@ -214,8 +215,9 @@ func TestMultiTenant_GetBooking_CrossTenantBlocked(t *testing.T) {
 	dogID := testutil.SeedTestDog(t, db, "Buddy", "Labrador", "green")
 
 	// Create tenant 2
+	now := testutil.Now()
 	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
-		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', datetime('now'), datetime('now'))`)
+		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create tenant 2: %v", err)
 	}
@@ -269,8 +271,9 @@ func TestMultiTenant_CancelBooking_CrossTenantBlocked(t *testing.T) {
 	dogID := testutil.SeedTestDog(t, db, "Buddy", "Labrador", "green")
 
 	// Create tenant 2
+	now := testutil.Now()
 	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
-		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', datetime('now'), datetime('now'))`)
+		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create tenant 2: %v", err)
 	}
@@ -334,8 +337,9 @@ func TestMultiTenant_ApproveBooking_CrossTenantBlocked(t *testing.T) {
 	dogID := testutil.SeedTestDog(t, db, "Buddy", "Labrador", "green")
 
 	// Create tenant 2
+	now := testutil.Now()
 	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
-		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', datetime('now'), datetime('now'))`)
+		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create tenant 2: %v", err)
 	}
@@ -394,8 +398,9 @@ func TestMultiTenant_MoveBooking_CrossTenantBlocked(t *testing.T) {
 	dogID := testutil.SeedTestDog(t, db, "Buddy", "Labrador", "green")
 
 	// Create tenant 2
+	now := testutil.Now()
 	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
-		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', datetime('now'), datetime('now'))`)
+		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create tenant 2: %v", err)
 	}

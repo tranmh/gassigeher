@@ -332,7 +332,7 @@ func TestCreateSchemaMigrationsTable(t *testing.T) {
 			assert.Equal(t, 0, count, "Table should be empty initially")
 
 			// Verify we can insert a migration record
-			err = markMigrationAsApplied(db, "test_migration_001")
+			err = markMigrationAsApplied(db, tc.dialect, "test_migration_001")
 			assert.NoError(t, err)
 
 			err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
@@ -401,7 +401,7 @@ func TestMigrationRunner_PartialApplication(t *testing.T) {
 	require.NoError(t, err, "First migration should execute successfully")
 
 	// Mark first migration as applied
-	err = markMigrationAsApplied(db, "001_create_tables")
+	err = markMigrationAsApplied(db, dialect, "001_create_tables")
 	require.NoError(t, err)
 
 	// Now run all migrations - should only apply remaining migrations

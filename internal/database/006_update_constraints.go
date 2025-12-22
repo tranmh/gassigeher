@@ -45,9 +45,14 @@ ALTER TABLE color_categories ADD UNIQUE INDEX idx_color_categories_tenant_name (
 
 -- System settings: Drop old PK and create composite PK with tenant_id
 -- MySQL requires special handling for primary keys
+-- Temporarily disable FK checks for this operation
+SET FOREIGN_KEY_CHECKS = 0;
+-- First update any NULL tenant_id values to 1 (default tenant)
+UPDATE system_settings SET tenant_id = 1 WHERE tenant_id IS NULL;
 ALTER TABLE system_settings DROP PRIMARY KEY;
-ALTER TABLE system_settings MODIFY COLUMN tenant_id INT NOT NULL DEFAULT 0;
+ALTER TABLE system_settings MODIFY COLUMN tenant_id INT NOT NULL DEFAULT 1;
 ALTER TABLE system_settings ADD PRIMARY KEY (tenant_id, ` + "`key`" + `);
+SET FOREIGN_KEY_CHECKS = 1;
 
 -- Booking time rules: day_type + rule_name should be unique per tenant
 ALTER TABLE booking_time_rules DROP INDEX unique_day_rule;
@@ -71,43 +76,37 @@ ALTER TABLE walk_reports ADD UNIQUE INDEX idx_walk_reports_tenant_booking (tenan
 `,
 			"postgres": `
 -- Users: email should be unique per tenant (not globally)
-DROP INDEX IF EXISTS users_email_key;
+-- Drop constraint first (this also removes the implicit index)
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_email_key;
-CREATE UNIQUE INDEX idx_users_tenant_email ON users(tenant_id, email) WHERE email IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_tenant_email ON users(tenant_id, email) WHERE email IS NOT NULL;
 
 -- Color categories: name should be unique per tenant
-DROP INDEX IF EXISTS color_categories_name_key;
 ALTER TABLE color_categories DROP CONSTRAINT IF EXISTS color_categories_name_key;
-CREATE UNIQUE INDEX idx_color_categories_tenant_name ON color_categories(tenant_id, name);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_color_categories_tenant_name ON color_categories(tenant_id, name);
 
 -- System settings: key should be unique per tenant
 ALTER TABLE system_settings DROP CONSTRAINT IF EXISTS system_settings_pkey;
 ALTER TABLE system_settings ADD PRIMARY KEY (tenant_id, key);
 
 -- Booking time rules: day_type + rule_name should be unique per tenant
-DROP INDEX IF EXISTS booking_time_rules_day_type_rule_name_key;
 ALTER TABLE booking_time_rules DROP CONSTRAINT IF EXISTS booking_time_rules_day_type_rule_name_key;
-CREATE UNIQUE INDEX idx_booking_time_rules_tenant_unique ON booking_time_rules(tenant_id, day_type, rule_name);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_booking_time_rules_tenant_unique ON booking_time_rules(tenant_id, day_type, rule_name);
 
 -- Custom holidays: date should be unique per tenant
-DROP INDEX IF EXISTS custom_holidays_date_key;
 ALTER TABLE custom_holidays DROP CONSTRAINT IF EXISTS custom_holidays_date_key;
-CREATE UNIQUE INDEX idx_custom_holidays_tenant_date ON custom_holidays(tenant_id, date);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_custom_holidays_tenant_date ON custom_holidays(tenant_id, date);
 
 -- User colors: user_id + color_id should be unique per tenant
-DROP INDEX IF EXISTS user_colors_user_id_color_id_key;
 ALTER TABLE user_colors DROP CONSTRAINT IF EXISTS user_colors_user_id_color_id_key;
-CREATE UNIQUE INDEX idx_user_colors_tenant_unique ON user_colors(tenant_id, user_id, color_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_colors_tenant_unique ON user_colors(tenant_id, user_id, color_id);
 
 -- Bookings: dog_id + date + scheduled_time should be unique per tenant
-DROP INDEX IF EXISTS bookings_dog_id_date_scheduled_time_key;
 ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_dog_id_date_scheduled_time_key;
-CREATE UNIQUE INDEX idx_bookings_tenant_unique ON bookings(tenant_id, dog_id, date, scheduled_time);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_tenant_unique ON bookings(tenant_id, dog_id, date, scheduled_time);
 
 -- Walk reports: booking_id should be unique per tenant
-DROP INDEX IF EXISTS walk_reports_booking_id_key;
 ALTER TABLE walk_reports DROP CONSTRAINT IF EXISTS walk_reports_booking_id_key;
-CREATE UNIQUE INDEX idx_walk_reports_tenant_booking ON walk_reports(tenant_id, booking_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_walk_reports_tenant_booking ON walk_reports(tenant_id, booking_id);
 `,
 		},
 	})

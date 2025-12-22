@@ -75,7 +75,7 @@ func RunMigrationsWithDialect(db *sql.DB, dialect Dialect) error {
 			if isAlreadyExistsError(err, dialect) {
 				log.Printf("Migration %s: Object already exists, marking as applied", migration.ID)
 				// Mark as applied even though exec failed (idempotency)
-				if err := markMigrationAsApplied(db, migration.ID); err != nil {
+				if err := markMigrationAsApplied(db, dialect, migration.ID); err != nil {
 					return fmt.Errorf("failed to mark migration as applied: %w", err)
 				}
 				pendingCount++
@@ -85,7 +85,7 @@ func RunMigrationsWithDialect(db *sql.DB, dialect Dialect) error {
 		}
 
 		// Mark migration as applied
-		if err := markMigrationAsApplied(db, migration.ID); err != nil {
+		if err := markMigrationAsApplied(db, dialect, migration.ID); err != nil {
 			return fmt.Errorf("failed to mark migration %s as applied: %w", migration.ID, err)
 		}
 
@@ -120,9 +120,9 @@ func createSchemaMigrationsTable(db *sql.DB, dialect Dialect) error {
 	}
 
 	// Create index on version column for faster lookups
-	indexSQL := "CREATE INDEX IF NOT EXISTS idx_schema_migrations_version ON schema_migrations(version)"
-	if _, err := db.Exec(indexSQL); err != nil {
-		// Non-fatal - some databases might not support IF NOT EXISTS for indexes
+	// MySQL doesn't support IF NOT EXISTS for indexes, so we use dialect-specific approach
+	if err := createIndexIfNotExists(db, dialect, "idx_schema_migrations_version", "schema_migrations", "version"); err != nil {
+		// Non-fatal - index might already exist
 		log.Printf("Warning: Failed to create index on schema_migrations: %v", err)
 	}
 
@@ -151,9 +151,16 @@ func getAppliedMigrations(db *sql.DB) (map[string]bool, error) {
 }
 
 // markMigrationAsApplied records a migration as applied in schema_migrations
-func markMigrationAsApplied(db *sql.DB, migrationID string) error {
-	_, err := db.Exec("INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",
-		migrationID, time.Now())
+// Note: Uses dialect-specific placeholder syntax
+func markMigrationAsApplied(db *sql.DB, dialect Dialect, migrationID string) error {
+	var query string
+	switch dialect.Name() {
+	case "postgres":
+		query = "INSERT INTO schema_migrations (version, applied_at) VALUES ($1, $2)"
+	default:
+		query = "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)"
+	}
+	_, err := db.Exec(query, migrationID, time.Now())
 	if err != nil {
 		return fmt.Errorf("failed to insert migration record: %w", err)
 	}
@@ -243,4 +250,39 @@ func GetMigrationStatus(db *sql.DB, dialect Dialect) (applied int, pending int, 
 	pending = len(allMigrations) - applied
 
 	return applied, pending, nil
+}
+
+// createIndexIfNotExists creates an index if it doesn't already exist
+// Uses dialect-specific approach since MySQL doesn't support IF NOT EXISTS for indexes
+func createIndexIfNotExists(db *sql.DB, dialect Dialect, indexName, tableName, columnName string) error {
+	switch dialect.Name() {
+	case "mysql":
+		// MySQL: Check if index exists first using information_schema
+		var count int
+		err := db.QueryRow(`
+			SELECT COUNT(*) FROM information_schema.statistics
+			WHERE table_schema = DATABASE()
+			AND table_name = ?
+			AND index_name = ?`, tableName, indexName).Scan(&count)
+		if err != nil {
+			return fmt.Errorf("failed to check index existence: %w", err)
+		}
+		if count > 0 {
+			// Index already exists
+			return nil
+		}
+		// Create the index
+		_, err = db.Exec(fmt.Sprintf("CREATE INDEX %s ON %s(%s)", indexName, tableName, columnName))
+		return err
+
+	case "sqlite", "postgres":
+		// SQLite and PostgreSQL support IF NOT EXISTS
+		_, err := db.Exec(fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s ON %s(%s)", indexName, tableName, columnName))
+		return err
+
+	default:
+		// Fallback: try CREATE INDEX IF NOT EXISTS
+		_, err := db.Exec(fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s ON %s(%s)", indexName, tableName, columnName))
+		return err
+	}
 }

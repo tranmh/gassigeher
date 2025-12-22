@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"os"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,6 +13,16 @@ import (
 	_ "github.com/lib/pq"
 	_ "modernc.org/sqlite"
 	"github.com/tranmh/gassigeher/internal/database"
+)
+
+// Shared database connection for MySQL/PostgreSQL tests
+// This avoids recreating the schema for each test
+var (
+	sharedDB       *sql.DB
+	sharedDialect  database.Dialect
+	sharedDBType   string
+	sharedDBMu     sync.Mutex
+	sharedDBInited bool
 )
 
 // Define context keys locally to avoid import cycle with middleware
@@ -22,11 +34,16 @@ const (
 	testUserIDKey   contextKey = "userID"
 )
 
-// SetupTestDB creates a test database (default: in-memory SQLite)
-// For backward compatibility, this defaults to SQLite
-// Use SetupTestDBWithType() to test with MySQL or PostgreSQL
+// SetupTestDB creates a test database with auto-detection
+// It checks for DB_TEST_MYSQL and DB_TEST_POSTGRES environment variables
+// and uses the corresponding database if available. Falls back to SQLite.
+// This enables running the same tests against all databases by setting env vars.
+//
+// For MySQL/PostgreSQL, this uses a shared connection with table truncation
+// instead of dropping and recreating tables for each test (10x+ faster).
 func SetupTestDB(t *testing.T) *sql.DB {
-	return SetupTestDBWithType(t, "sqlite")
+	// Use the fast version that reuses connections for MySQL/PostgreSQL
+	return SetupTestDBFast(t)
 }
 
 // SetupTestDBWithType creates a test database of the specified type
@@ -61,6 +78,15 @@ func SetupTestDBWithType(t *testing.T, dbType string) *sql.DB {
 		if dsn == "" {
 			t.Skip("MySQL test database not configured (set DB_TEST_MYSQL env var)")
 			return nil
+		}
+
+		// Ensure multiStatements=true is enabled for running migrations with multiple statements
+		if !strings.Contains(dsn, "multiStatements=true") {
+			if strings.Contains(dsn, "?") {
+				dsn = dsn + "&multiStatements=true"
+			} else {
+				dsn = dsn + "?multiStatements=true"
+			}
 		}
 
 		db, err = sql.Open("mysql", dsn)
@@ -121,11 +147,14 @@ func SetupTestDBWithType(t *testing.T, dbType string) *sql.DB {
 		t.Fatalf("Failed to run migrations on %s: %v", dbType, err)
 	}
 
+	// Use Go time for cross-database compatibility (not datetime('now') which is SQLite-specific)
+	now := time.Now().Format("2006-01-02 15:04:05")
+
 	// Create a test tenant with id=1 for all tests
 	_, err = db.Exec(`
 		INSERT INTO tenants (id, slug, name, status, contact_email, federal_state, created_at, updated_at)
-		VALUES (1, 'test-tenant', 'Test Tenant', 'active', 'test@example.com', 'BW', datetime('now'), datetime('now'))
-	`)
+		VALUES (1, 'test-tenant', 'Test Tenant', 'active', 'test@example.com', 'BW', ?, ?)
+	`, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create test tenant: %v", err)
 	}
@@ -134,8 +163,8 @@ func SetupTestDBWithType(t *testing.T, dbType string) *sql.DB {
 	// Migration 009 seeds subscriptions for existing tenants, but tenant 1 is created after migrations
 	_, err = db.Exec(`
 		INSERT INTO tenant_subscriptions (tenant_id, plan_id, status, created_at, updated_at)
-		VALUES (1, 1, 'active', datetime('now'), datetime('now'))
-	`)
+		VALUES (1, 1, 'active', ?, ?)
+	`, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create test subscription: %v", err)
 	}
@@ -154,15 +183,43 @@ func SetupTestDBWithType(t *testing.T, dbType string) *sql.DB {
 	return db
 }
 
+// allTables lists all tables in the correct order for deletion (children first, then parents)
+// This ensures foreign key constraints are respected
+var allTables = []string{
+	// Child tables first (have foreign key references)
+	"walk_report_photos",
+	"walk_reports",
+	"color_requests",
+	"user_colors",
+	"bookings",
+	"blocked_dates",
+	"experience_requests",
+	"reactivation_requests",
+	"dogs",
+	// SaaS tables
+	"demo_tenant_state",
+	"tenant_subscriptions",
+	"tenant_settings",
+	// Parent tables
+	"pricing_plans",
+	"users",
+	"color_categories",
+	"booking_time_rules",
+	"custom_holidays",
+	"feiertage_cache",
+	"system_settings",
+	"tenants",
+	// Migration tracking table
+	"schema_migrations",
+}
+
 // cleanMySQLTestDB drops all tables in the test database
 func cleanMySQLTestDB(t *testing.T, db *sql.DB) {
 	// Disable foreign key checks temporarily
 	_, _ = db.Exec("SET FOREIGN_KEY_CHECKS = 0")
 
-	// Drop tables if they exist
-	tables := []string{"bookings", "blocked_dates", "experience_requests",
-		"reactivation_requests", "dogs", "users", "system_settings", "schema_migrations"}
-	for _, table := range tables {
+	// Drop all tables
+	for _, table := range allTables {
 		_, _ = db.Exec("DROP TABLE IF EXISTS " + table)
 	}
 
@@ -172,12 +229,202 @@ func cleanMySQLTestDB(t *testing.T, db *sql.DB) {
 
 // cleanPostgreSQLTestDB drops all tables in the test database
 func cleanPostgreSQLTestDB(t *testing.T, db *sql.DB) {
-	// Drop tables if they exist (CASCADE to handle foreign keys)
-	tables := []string{"bookings", "blocked_dates", "experience_requests",
-		"reactivation_requests", "dogs", "users", "system_settings", "schema_migrations"}
-	for _, table := range tables {
+	// Drop all tables with CASCADE to handle foreign keys
+	for _, table := range allTables {
 		_, _ = db.Exec("DROP TABLE IF EXISTS " + table + " CASCADE")
 	}
+}
+
+// dataTables lists tables that contain test data (excludes schema_migrations and pricing_plans)
+// These are truncated between tests for fast reset
+var dataTables = []string{
+	"walk_report_photos",
+	"walk_reports",
+	"color_requests",
+	"user_colors",
+	"bookings",
+	"blocked_dates",
+	"experience_requests",
+	"reactivation_requests",
+	"dogs",
+	"demo_tenant_state",
+	"tenant_subscriptions",
+	"tenant_settings",
+	"users",
+	"color_categories",
+	"booking_time_rules",
+	"custom_holidays",
+	"feiertage_cache",
+	"system_settings",
+	"tenants",
+}
+
+// SetupTestDBFast returns a test database using a shared connection for MySQL/PostgreSQL
+// This is MUCH faster than SetupTestDB because it:
+// 1. Reuses the database connection across tests
+// 2. Truncates tables instead of dropping and recreating them
+// 3. Only runs migrations once per test run
+// For SQLite, it still creates a fresh in-memory database (already fast)
+func SetupTestDBFast(t *testing.T) *sql.DB {
+	// Determine database type
+	dbType := "sqlite"
+	if os.Getenv("DB_TEST_MYSQL") != "" {
+		dbType = "mysql"
+	} else if os.Getenv("DB_TEST_POSTGRES") != "" {
+		dbType = "postgres"
+	}
+
+	// SQLite: always use fresh in-memory database (it's fast enough)
+	if dbType == "sqlite" {
+		return SetupTestDBWithType(t, "sqlite")
+	}
+
+	// MySQL/PostgreSQL: use shared connection with truncation
+	sharedDBMu.Lock()
+	defer sharedDBMu.Unlock()
+
+	// Initialize shared connection if needed
+	if !sharedDBInited || sharedDBType != dbType {
+		if sharedDB != nil {
+			sharedDB.Close()
+		}
+		initSharedDB(t, dbType)
+	}
+
+	// Truncate all data tables and reset to clean state
+	truncateAndResetData(t, sharedDB, sharedDialect)
+
+	// Don't close the shared connection in cleanup - it's reused
+	return sharedDB
+}
+
+// initSharedDB initializes the shared database connection
+func initSharedDB(t *testing.T, dbType string) {
+	var err error
+
+	switch dbType {
+	case "mysql":
+		dsn := os.Getenv("DB_TEST_MYSQL")
+		if !strings.Contains(dsn, "multiStatements=true") {
+			if strings.Contains(dsn, "?") {
+				dsn = dsn + "&multiStatements=true"
+			} else {
+				dsn = dsn + "?multiStatements=true"
+			}
+		}
+		sharedDB, err = sql.Open("mysql", dsn)
+		if err != nil {
+			t.Fatalf("Failed to open MySQL: %v", err)
+		}
+		sharedDialect = database.NewMySQLDialect()
+
+	case "postgres":
+		dsn := os.Getenv("DB_TEST_POSTGRES")
+		sharedDB, err = sql.Open("postgres", dsn)
+		if err != nil {
+			t.Fatalf("Failed to open PostgreSQL: %v", err)
+		}
+		sharedDialect = database.NewPostgreSQLDialect()
+	}
+
+	if err := sharedDB.Ping(); err != nil {
+		t.Skipf("Database not available: %v", err)
+	}
+
+	if err := sharedDialect.ApplySettings(sharedDB); err != nil {
+		t.Fatalf("Failed to apply settings: %v", err)
+	}
+
+	// Drop all tables first to ensure clean state
+	if dbType == "mysql" {
+		cleanMySQLTestDB(t, sharedDB)
+	} else {
+		cleanPostgreSQLTestDB(t, sharedDB)
+	}
+
+	// Run migrations once
+	if err := database.RunMigrationsWithDialect(sharedDB, sharedDialect); err != nil {
+		t.Fatalf("Failed to run migrations: %v", err)
+	}
+
+	sharedDBType = dbType
+	sharedDBInited = true
+}
+
+// truncateAndResetData truncates all data tables and inserts base test data
+func truncateAndResetData(t *testing.T, db *sql.DB, dialect database.Dialect) {
+	now := time.Now().Format("2006-01-02 15:04:05")
+
+	// Disable FK checks for truncation
+	switch dialect.Name() {
+	case "mysql":
+		db.Exec("SET FOREIGN_KEY_CHECKS = 0")
+	case "postgres":
+		db.Exec("SET session_replication_role = 'replica'")
+	}
+
+	// Truncate data tables (but not schema_migrations or pricing_plans)
+	for _, table := range dataTables {
+		switch dialect.Name() {
+		case "mysql":
+			db.Exec("TRUNCATE TABLE " + table)
+		case "postgres":
+			db.Exec("TRUNCATE TABLE " + table + " CASCADE")
+		}
+	}
+
+	// Re-enable FK checks
+	switch dialect.Name() {
+	case "mysql":
+		db.Exec("SET FOREIGN_KEY_CHECKS = 1")
+	case "postgres":
+		db.Exec("SET session_replication_role = 'origin'")
+	}
+
+	// Insert base test data
+	// 1. Test tenant
+	_, err := db.Exec(`
+		INSERT INTO tenants (id, slug, name, status, contact_email, federal_state, created_at, updated_at)
+		VALUES (1, 'test-tenant', 'Test Tenant', 'active', 'test@example.com', 'BW', ?, ?)
+	`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create test tenant: %v", err)
+	}
+
+	// 2. Test subscription
+	_, err = db.Exec(`
+		INSERT INTO tenant_subscriptions (tenant_id, plan_id, status, created_at, updated_at)
+		VALUES (1, 1, 'active', ?, ?)
+	`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create test subscription: %v", err)
+	}
+
+	// 3. Default color categories (from migration 002)
+	_, _ = db.Exec(`INSERT INTO color_categories (tenant_id, name, hex_code, pattern_icon, sort_order, created_at, updated_at) VALUES
+		(1, 'gruen', '#82b965', 'circle', 1, ?, ?),
+		(1, 'gelb', '#f9c74f', 'triangle', 2, ?, ?),
+		(1, 'orange', '#f3722c', 'square', 3, ?, ?),
+		(1, 'hellblau', '#90e0ef', 'diamond', 4, ?, ?),
+		(1, 'dunkelblau', '#4361ee', 'star', 5, ?, ?)
+	`, now, now, now, now, now, now, now, now, now, now)
+
+	// 4. Default system settings
+	_, _ = db.Exec(`INSERT INTO system_settings (tenant_id, ` + "`key`" + `, value, updated_at) VALUES
+		(1, 'booking_advance_days', '14', ?),
+		(1, 'cancellation_notice_hours', '12', ?),
+		(1, 'auto_deactivation_days', '365', ?)
+	`, now, now, now)
+
+	// 5. Default booking time rules (simplified set)
+	_, _ = db.Exec(`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked, created_at, updated_at) VALUES
+		(1, 'weekday', 'morning', '08:00', '12:00', 0, ?, ?),
+		(1, 'weekday', 'afternoon', '14:00', '18:00', 0, ?, ?),
+		(1, 'weekend', 'morning', '09:00', '12:00', 0, ?, ?),
+		(1, 'weekend', 'afternoon', '14:00', '17:00', 0, ?, ?),
+		(1, 'holiday', 'morning', '10:00', '12:00', 0, ?, ?),
+		(1, 'holiday', 'afternoon', '14:00', '16:00', 0, ?, ?)
+	`, now, now, now, now, now, now, now, now, now, now, now, now)
 }
 
 // DONE: SeedTestUser creates a test user and returns the ID
@@ -475,6 +722,32 @@ func SeedUserColor(t *testing.T, db *sql.DB, userID, colorID int) {
 // GetFutureDate returns a date string N days in the future
 func GetFutureDate(daysFromNow int) string {
 	return time.Now().AddDate(0, 0, daysFromNow).Format("2006-01-02")
+}
+
+// Now returns the current timestamp formatted for SQL queries
+// Use this instead of SQLite-specific datetime('now')
+func Now() string {
+	return time.Now().Format("2006-01-02 15:04:05")
+}
+
+// NowTime returns the current time as a time.Time for SQL queries
+func NowTime() time.Time {
+	return time.Now()
+}
+
+// InsertAndGetID executes an INSERT statement and returns the last inserted ID
+// This is a cross-database compatible way to handle INSERT ... RETURNING id
+// which is not supported in MySQL
+func InsertAndGetID(t *testing.T, db *sql.DB, query string, args ...interface{}) int {
+	result, err := db.Exec(query, args...)
+	if err != nil {
+		t.Fatalf("Failed to execute INSERT: %v", err)
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		t.Fatalf("Failed to get last insert ID: %v", err)
+	}
+	return int(id)
 }
 
 // DONE: CountRows returns the count of rows in a table

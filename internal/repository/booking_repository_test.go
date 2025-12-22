@@ -814,8 +814,19 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 	repo := NewBookingRepository(db)
 	now := time.Now()
 
+	// Helper to check if adding duration to current time would cross midnight
+	crossesMidnight := func(d time.Duration) bool {
+		future := now.Add(d)
+		return future.Day() != now.Day()
+	}
+
 	t.Run("returns bookings in reminder window", func(t *testing.T) {
-		// Create booking scheduled 1.5 hours from now
+		// Skip if 90 minutes from now crosses midnight (test would be invalid)
+		if crossesMidnight(90 * time.Minute) {
+			t.Skip("Skipping test: 90 minutes from now crosses midnight")
+		}
+
+		// Create booking scheduled 1.5 hours from now (on same day)
 		reminderTime := now.Add(90 * time.Minute)
 		reminderDate := reminderTime.Format("2006-01-02")
 		reminderScheduledTime := reminderTime.Format("15:04")
@@ -827,7 +838,10 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 			ScheduledTime: reminderScheduledTime,
 			Status:        "scheduled",
 		}
-		repo.Create(booking)
+		err := repo.Create(booking)
+		if err != nil {
+			t.Fatalf("Failed to create booking: %v", err)
+		}
 
 		// Get reminders
 		reminders, err := repo.GetForReminders()
@@ -835,7 +849,7 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 			t.Fatalf("GetForReminders() failed: %v", err)
 		}
 
-		// Should find the booking (if time is within 1-2 hour window)
+		// Should find the booking (time is within 1-2 hour window)
 		found := false
 		for _, r := range reminders {
 			if r.ID == booking.ID {
@@ -844,7 +858,7 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 			}
 		}
 
-		if !found && reminderTime.Sub(now) >= 1*time.Hour && reminderTime.Sub(now) < 2*time.Hour {
+		if !found {
 			t.Error("Expected to find booking in reminder window")
 		}
 
@@ -852,6 +866,11 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 	})
 
 	t.Run("does not return bookings too far in future", func(t *testing.T) {
+		// Skip if 5 hours from now crosses midnight
+		if crossesMidnight(5 * time.Hour) {
+			t.Skip("Skipping test: 5 hours from now crosses midnight")
+		}
+
 		// Create booking 5 hours from now
 		futureTime := now.Add(5 * time.Hour)
 		futureDate := futureTime.Format("2006-01-02")
@@ -881,6 +900,11 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 	})
 
 	t.Run("does not return completed bookings", func(t *testing.T) {
+		// Skip if 90 minutes from now crosses midnight
+		if crossesMidnight(90 * time.Minute) {
+			t.Skip("Skipping test: 90 minutes from now crosses midnight")
+		}
+
 		// Create completed booking in reminder window
 		reminderTime := now.Add(90 * time.Minute)
 		reminderDate := reminderTime.Format("2006-01-02")
@@ -915,6 +939,11 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 	})
 
 	t.Run("does not return cancelled bookings", func(t *testing.T) {
+		// Skip if 90 minutes from now crosses midnight
+		if crossesMidnight(90 * time.Minute) {
+			t.Skip("Skipping test: 90 minutes from now crosses midnight")
+		}
+
 		// Create cancelled booking in reminder window
 		reminderTime := now.Add(90 * time.Minute)
 		reminderDate := reminderTime.Format("2006-01-02")
@@ -1091,11 +1120,12 @@ func TestGetPendingApprovalBookings_QueryFiltering(t *testing.T) {
 		}
 
 		// Create 3 approved bookings
+		now := testutil.Now()
 		for i := 6; i <= 8; i++ {
 			_, err := db.Exec(`
 				INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, approval_status, approved_by, approved_at)
-				VALUES (?, ?, ?, '10:00', 'scheduled', 'approved', 1, datetime('now'))
-			`, i, i, "2025-01-31")
+				VALUES (?, ?, ?, '10:00', 'scheduled', 'approved', 1, ?)
+			`, i, i, "2025-01-31", now)
 			if err != nil {
 				t.Fatalf("Failed to create approved booking: %v", err)
 			}
@@ -1247,10 +1277,11 @@ func TestApproveBooking_StateTransition(t *testing.T) {
 
 	t.Run("approving already approved booking", func(t *testing.T) {
 		// Create already approved booking
+		now := testutil.Now()
 		result, err := db.Exec(`
 			INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, approval_status, approved_by, approved_at)
-			VALUES (2, 2, '2025-01-30', '10:00', 'scheduled', 'approved', 1, datetime('now'))
-		`)
+			VALUES (2, 2, '2025-01-30', '10:00', 'scheduled', 'approved', 1, ?)
+		`, now)
 		if err != nil {
 			t.Fatalf("Failed to create approved booking: %v", err)
 		}
@@ -1382,10 +1413,11 @@ func TestRejectBooking_ReasonRequired(t *testing.T) {
 
 	t.Run("cannot reject approved booking", func(t *testing.T) {
 		// Create approved booking
+		now := testutil.Now()
 		result, err := db.Exec(`
 			INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, approval_status, approved_by, approved_at)
-			VALUES (3, 3, '2025-01-30', '10:00', 'scheduled', 'approved', 1, datetime('now'))
-		`)
+			VALUES (3, 3, '2025-01-30', '10:00', 'scheduled', 'approved', 1, ?)
+		`, now)
 		if err != nil {
 			t.Fatalf("Failed to create approved booking: %v", err)
 		}

@@ -41,8 +41,9 @@ func setupRegressionTest(t *testing.T) (*sql.DB, func()) {
 	}
 
 	// Create test tenant first
+	now := time.Now().Format("2006-01-02 15:04:05")
 	_, err = db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, federal_state, created_at, updated_at)
-		VALUES (1, 'test-tenant', 'Test Tenant', 'active', 'test@example.com', 'BW', datetime('now'), datetime('now'))`)
+		VALUES (1, 'test-tenant', 'Test Tenant', 'active', 'test@example.com', 'BW', ?, ?)`, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create test tenant: %v", err)
 	}
@@ -52,9 +53,7 @@ func setupRegressionTest(t *testing.T) (*sql.DB, func()) {
 	db.Exec(`UPDATE booking_time_rules SET tenant_id = 1 WHERE tenant_id IS NULL`)
 	db.Exec(`UPDATE system_settings SET tenant_id = 1 WHERE tenant_id IS NULL`)
 
-	// Seed test users and dogs with timestamps
-	now := time.Now()
-
+	// Seed test users and dogs with timestamps (reuse 'now' string variable from above)
 	result, err := db.Exec(`INSERT INTO users (id, tenant_id, first_name, last_name, email, password_hash, is_active, is_verified, created_at, last_activity_at, terms_accepted_at)
 		VALUES
 		(1, 1, 'Green', 'User', 'green@test.com', 'hash', 1, 1, ?, ?, ?),

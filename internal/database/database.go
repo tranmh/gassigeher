@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -76,6 +77,14 @@ func InitializeWithConfig(config *DBConfig) (*sql.DB, Dialect, error) {
 		dsn := config.ConnectionString
 		if dsn == "" {
 			dsn = buildMySQLDSN(config)
+		}
+		// Ensure multiStatements=true for running migrations with multiple SQL statements
+		if !strings.Contains(dsn, "multiStatements=true") {
+			if strings.Contains(dsn, "?") {
+				dsn = dsn + "&multiStatements=true"
+			} else {
+				dsn = dsn + "?multiStatements=true"
+			}
 		}
 		db, err = sql.Open(dialect.GetDriverName(), dsn)
 

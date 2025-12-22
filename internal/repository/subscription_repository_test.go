@@ -130,10 +130,11 @@ func TestSubscriptionRepository_CreateSubscription(t *testing.T) {
 	repo := NewSubscriptionRepository(db)
 
 	// Create a second tenant for testing
+	now := testutil.Now()
 	_, err := db.Exec(`
 		INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
-		VALUES (2, 'tenant-2', 'Tenant 2', 'active', 'tenant2@example.com', datetime('now'), datetime('now'))
-	`)
+		VALUES (2, 'tenant-2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)
+	`, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create test tenant: %v", err)
 	}
