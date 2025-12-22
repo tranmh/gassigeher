@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tierheime - Central Admin</title>
+    <link rel="stylesheet" href="/landing/assets/css/landing.css">
+    <link rel="stylesheet" href="/central/assets/css/central.css">
+</head>
+<body>
+    <header class="central-header">
+        <div class="container">
+            <a href="/central/" class="logo">Gassigeher Platform</a>
+            <nav>
+                <ul>
+                    <li><a href="/central/">Dashboard</a></li>
+                    <li><a href="/central/tenants.html" class="active">Tierheime</a></li>
+                    <li><a href="/central/users.html">Benutzer</a></li>
+                    <li><a href="#" onclick="logout()">Abmelden</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="central-main">
+        <div class="container">
+            <div class="page-header">
+                <h1>Tierheime verwalten</h1>
+            </div>
+
+            <div id="alert-container"></div>
+
+            <!-- Filters -->
+            <div class="card filters-card">
+                <div class="filters-row">
+                    <div class="filter-group">
+                        <input type="text" id="search-input" placeholder="Suche nach Name, Subdomain oder E-Mail..." class="form-input">
+                    </div>
+                    <div class="filter-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="active-only-checkbox">
+                            Nur aktive anzeigen
+                        </label>
+                    </div>
+                    <button onclick="loadTenants()" class="btn btn-primary">Suchen</button>
+                </div>
+            </div>
+
+            <!-- Tenants Table -->
+            <div class="card">
+                <div id="tenants-container">
+                    <p class="loading">Laden...</p>
+                </div>
+            </div>
+
+            <!-- Tenant Detail Modal -->
+            <div id="tenant-modal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 id="modal-tenant-name">Tierheim Details</h2>
+                        <button class="modal-close" onclick="closeModal()">&times;</button>
+                    </div>
+                    <div class="modal-body" id="modal-body">
+                        <p class="loading">Laden...</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="closeModal()">Schliessen</button>
+                        <button class="btn btn-success" id="btn-activate" onclick="activateTenant()" style="display: none;">Aktivieren</button>
+                        <button class="btn btn-warning" id="btn-deactivate" onclick="deactivateTenant()" style="display: none;">Deaktivieren</button>
+                        <button class="btn btn-primary" onclick="exportTenant()">Daten exportieren</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/central/assets/js/central.js"></script>
+    <script>
+        let currentTenantId = null;
+        let currentTenantStatus = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!isAuthenticated()) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // Check for tenant ID in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const tenantId = urlParams.get('id');
+            if (tenantId) {
+                await openTenantModal(parseInt(tenantId));
+            }
+
+            await loadTenants();
+
+            // Enable search on Enter
+            document.getElementById('search-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') loadTenants();
+            });
+        });
+
+        async function loadTenants() {
+            const search = document.getElementById('search-input').value;
+            const activeOnly = document.getElementById('active-only-checkbox').checked;
+            const container = document.getElementById('tenants-container');
+
+            container.innerHTML = '<p class="loading">Laden...</p>';
+
+            try {
+                const tenants = await centralAPI.getTenants(search, activeOnly);
+
+                if (tenants.length === 0) {
+                    container.innerHTML = '<p class="empty-state">Keine Tierheime gefunden</p>';
+                    return;
+                }
+
+                container.innerHTML = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Subdomain</th>
+                                <th>Kontakt</th>
+                                <th>Status</th>
+                                <th>Benutzer</th>
+                                <th>Hunde</th>
+                                <th>Erstellt</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tenants.map(t => `
+                                <tr>
+                                    <td>${t.id}</td>
+                                    <td><strong>${escapeHtml(t.name)}</strong></td>
+                                    <td>
+                                        <code>${escapeHtml(t.slug)}</code>
+                                        <a href="https://${escapeHtml(t.slug)}.gassigeher.org" target="_blank" class="external-link" title="Besuchen">↗</a>
+                                    </td>
+                                    <td>${escapeHtml(t.contact_email)}</td>
+                                    <td><span class="badge badge-${getStatusBadge(t.status)}">${t.status}</span></td>
+                                    <td>${t.user_count}</td>
+                                    <td>${t.dog_count}</td>
+                                    <td>${formatDate(t.created_at)}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-secondary" onclick="openTenantModal(${t.id})">Details</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    <div class="table-footer">
+                        <p>${tenants.length} Tierheim(e) gefunden</p>
+                    </div>
+                `;
+            } catch (err) {
+                container.innerHTML = '<p class="error">Fehler beim Laden der Tierheime</p>';
+                showAlert('Fehler: ' + err.message, 'error');
+            }
+        }
+
+        function getStatusBadge(status) {
+            switch (status) {
+                case 'active': return 'success';
+                case 'suspended': return 'warning';
+                case 'deleted': return 'danger';
+                default: return 'secondary';
+            }
+        }
+
+        async function openTenantModal(tenantId) {
+            currentTenantId = tenantId;
+            document.getElementById('tenant-modal').style.display = 'flex';
+            document.getElementById('modal-body').innerHTML = '<p class="loading">Laden...</p>';
+
+            try {
+                const data = await centralAPI.getTenant(tenantId);
+                const tenant = data.tenant;
+                currentTenantStatus = tenant.status;
+
+                document.getElementById('modal-tenant-name').textContent = tenant.name;
+
+                // Update action buttons
+                document.getElementById('btn-activate').style.display = tenant.status !== 'active' ? 'inline-block' : 'none';
+                document.getElementById('btn-deactivate').style.display = tenant.status === 'active' ? 'inline-block' : 'none';
+
+                document.getElementById('modal-body').innerHTML = `
+                    <div class="detail-grid">
+                        <div class="detail-section">
+                            <h4>Allgemein</h4>
+                            <dl>
+                                <dt>ID</dt><dd>${tenant.id}</dd>
+                                <dt>Subdomain</dt><dd><code>${escapeHtml(tenant.slug)}</code></dd>
+                                <dt>Status</dt><dd><span class="badge badge-${getStatusBadge(tenant.status)}">${tenant.status}</span></dd>
+                                <dt>Erstellt</dt><dd>${formatDateTime(tenant.created_at)}</dd>
+                                <dt>Aktualisiert</dt><dd>${formatDateTime(tenant.updated_at)}</dd>
+                            </dl>
+                        </div>
+
+                        <div class="detail-section">
+                            <h4>Kontakt</h4>
+                            <dl>
+                                <dt>E-Mail</dt><dd>${escapeHtml(tenant.contact_email)}</dd>
+                                <dt>Telefon</dt><dd>${escapeHtml(tenant.contact_phone || '-')}</dd>
+                                <dt>Adresse</dt><dd>${escapeHtml(tenant.address || '-')}</dd>
+                                <dt>Stadt</dt><dd>${escapeHtml(tenant.city || '-')} ${escapeHtml(tenant.postal_code || '')}</dd>
+                                <dt>Bundesland</dt><dd>${escapeHtml(tenant.federal_state || '-')}</dd>
+                            </dl>
+                        </div>
+
+                        <div class="detail-section">
+                            <h4>Statistiken</h4>
+                            <dl>
+                                <dt>Benutzer</dt><dd>${data.user_count}</dd>
+                                <dt>Hunde</dt><dd>${data.dog_count}</dd>
+                                <dt>Buchungen</dt><dd>${data.booking_count}</dd>
+                            </dl>
+                        </div>
+
+                        ${tenant.suspended_at ? `
+                        <div class="detail-section detail-warning">
+                            <h4>Suspendierung</h4>
+                            <dl>
+                                <dt>Suspendiert am</dt><dd>${formatDateTime(tenant.suspended_at)}</dd>
+                                <dt>Grund</dt><dd>${escapeHtml(tenant.suspended_reason || '-')}</dd>
+                            </dl>
+                        </div>
+                        ` : ''}
+                    </div>
+
+                    <div class="detail-section">
+                        <h4>Benutzer dieses Tierheims</h4>
+                        <div id="tenant-users">
+                            <p class="loading">Laden...</p>
+                        </div>
+                    </div>
+                `;
+
+                // Load tenant users
+                loadTenantUsers(tenantId);
+
+            } catch (err) {
+                document.getElementById('modal-body').innerHTML = '<p class="error">Fehler beim Laden der Details</p>';
+            }
+        }
+
+        async function loadTenantUsers(tenantId) {
+            const container = document.getElementById('tenant-users');
+            try {
+                const users = await centralAPI.getTenantUsers(tenantId);
+
+                if (users.length === 0) {
+                    container.innerHTML = '<p class="empty-state">Keine Benutzer</p>';
+                    return;
+                }
+
+                container.innerHTML = `
+                    <table class="data-table data-table-sm">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>E-Mail</th>
+                                <th>Rolle</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${users.slice(0, 10).map(u => `
+                                <tr>
+                                    <td>${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)}</td>
+                                    <td>${escapeHtml(u.email || '-')}</td>
+                                    <td>
+                                        ${u.is_super_admin ? '<span class="badge badge-danger">Super-Admin</span>' :
+                                          u.is_admin ? '<span class="badge badge-warning">Admin</span>' :
+                                          '<span class="badge badge-secondary">Benutzer</span>'}
+                                    </td>
+                                    <td><span class="badge badge-${u.is_active ? 'success' : 'warning'}">${u.is_active ? 'Aktiv' : 'Inaktiv'}</span></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    ${users.length > 10 ? `<p class="table-note">Zeige 10 von ${users.length} Benutzern</p>` : ''}
+                `;
+            } catch (err) {
+                container.innerHTML = '<p class="error">Fehler beim Laden der Benutzer</p>';
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('tenant-modal').style.display = 'none';
+            currentTenantId = null;
+            currentTenantStatus = null;
+            // Remove ID from URL
+            window.history.replaceState({}, document.title, '/central/tenants.html');
+        }
+
+        async function activateTenant() {
+            if (!currentTenantId) return;
+            if (!confirm('Tierheim wirklich aktivieren?')) return;
+
+            try {
+                await centralAPI.activateTenant(currentTenantId);
+                showAlert('Tierheim aktiviert', 'success');
+                closeModal();
+                loadTenants();
+            } catch (err) {
+                showAlert('Fehler: ' + err.message, 'error');
+            }
+        }
+
+        async function deactivateTenant() {
+            if (!currentTenantId) return;
+            if (!confirm('Tierheim wirklich deaktivieren? Benutzer werden sich nicht mehr anmelden konnen.')) return;
+
+            try {
+                await centralAPI.deactivateTenant(currentTenantId);
+                showAlert('Tierheim deaktiviert', 'success');
+                closeModal();
+                loadTenants();
+            } catch (err) {
+                showAlert('Fehler: ' + err.message, 'error');
+            }
+        }
+
+        async function exportTenant() {
+            if (!currentTenantId) return;
+
+            try {
+                const data = await centralAPI.exportTenant(currentTenantId);
+                // Download as JSON
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `tenant-${currentTenantId}-export.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showAlert('Export heruntergeladen', 'success');
+            } catch (err) {
+                showAlert('Fehler beim Export: ' + err.message, 'error');
+            }
+        }
+
+        // Close modal on click outside
+        document.getElementById('tenant-modal').addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>

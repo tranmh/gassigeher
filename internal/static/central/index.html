@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Central Admin - Gassigeher Platform</title>
+    <link rel="stylesheet" href="/landing/assets/css/landing.css">
+    <link rel="stylesheet" href="/central/assets/css/central.css">
+</head>
+<body>
+    <header class="central-header">
+        <div class="container">
+            <a href="/central/" class="logo">Gassigeher Platform</a>
+            <nav>
+                <ul>
+                    <li><a href="/central/" class="active">Dashboard</a></li>
+                    <li><a href="/central/tenants.html">Tierheime</a></li>
+                    <li><a href="/central/users.html">Benutzer</a></li>
+                    <li><a href="#" onclick="logout()">Abmelden</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="central-main">
+        <div class="container">
+            <h1>Platform Dashboard</h1>
+
+            <div id="alert-container"></div>
+
+            <!-- Statistics Grid -->
+            <div class="stats-grid">
+                <div class="stat-card stat-primary">
+                    <h2 id="stat-total-tenants">-</h2>
+                    <p>Tierheime gesamt</p>
+                </div>
+                <div class="stat-card stat-success">
+                    <h2 id="stat-active-tenants">-</h2>
+                    <p>Aktive Tierheime</p>
+                </div>
+                <div class="stat-card stat-info">
+                    <h2 id="stat-total-users">-</h2>
+                    <p>Benutzer gesamt</p>
+                </div>
+                <div class="stat-card stat-warning">
+                    <h2 id="stat-total-dogs">-</h2>
+                    <p>Hunde gesamt</p>
+                </div>
+                <div class="stat-card">
+                    <h2 id="stat-total-bookings">-</h2>
+                    <p>Buchungen gesamt</p>
+                </div>
+                <div class="stat-card">
+                    <h2 id="stat-bookings-month">-</h2>
+                    <p>Buchungen diesen Monat</p>
+                </div>
+                <div class="stat-card stat-accent">
+                    <h2 id="stat-new-tenants">-</h2>
+                    <p>Neue Tierheime (7 Tage)</p>
+                </div>
+            </div>
+
+            <!-- Recent Tenants -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Neueste Tierheime</h3>
+                    <a href="/central/tenants.html" class="btn btn-secondary btn-sm">Alle anzeigen</a>
+                </div>
+                <div id="recent-tenants">
+                    <p class="loading">Laden...</p>
+                </div>
+            </div>
+
+            <!-- Central Admins -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Central Administratoren</h3>
+                </div>
+                <div id="central-admins">
+                    <p class="loading">Laden...</p>
+                </div>
+            </div>
+
+            <!-- Quick Links -->
+            <div class="card">
+                <h3>Schnellzugriff</h3>
+                <div class="quick-links">
+                    <a href="/central/tenants.html" class="btn">Tierheime verwalten</a>
+                    <a href="/central/users.html" class="btn">Benutzer suchen</a>
+                    <a href="/landing/" class="btn btn-secondary" target="_blank">Landing Page</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/central/assets/js/central.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!isAuthenticated()) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            await loadStats();
+            await loadRecentTenants();
+            await loadCentralAdmins();
+        });
+
+        async function loadStats() {
+            try {
+                const stats = await centralAPI.getStats();
+                document.getElementById('stat-total-tenants').textContent = stats.total_tenants;
+                document.getElementById('stat-active-tenants').textContent = stats.active_tenants;
+                document.getElementById('stat-total-users').textContent = stats.total_users;
+                document.getElementById('stat-total-dogs').textContent = stats.total_dogs;
+                document.getElementById('stat-total-bookings').textContent = stats.total_bookings;
+                document.getElementById('stat-bookings-month').textContent = stats.bookings_this_month;
+                document.getElementById('stat-new-tenants').textContent = stats.new_tenants_this_week;
+            } catch (err) {
+                showAlert('Fehler beim Laden der Statistiken', 'error');
+            }
+        }
+
+        async function loadRecentTenants() {
+            try {
+                const tenants = await centralAPI.getTenants();
+                const container = document.getElementById('recent-tenants');
+
+                if (tenants.length === 0) {
+                    container.innerHTML = '<p class="empty-state">Keine Tierheime vorhanden</p>';
+                    return;
+                }
+
+                const recent = tenants.slice(0, 5);
+                container.innerHTML = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Subdomain</th>
+                                <th>Status</th>
+                                <th>Benutzer</th>
+                                <th>Hunde</th>
+                                <th>Erstellt</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${recent.map(t => `
+                                <tr>
+                                    <td><a href="/central/tenants.html?id=${t.id}">${escapeHtml(t.name)}</a></td>
+                                    <td><code>${escapeHtml(t.slug)}</code></td>
+                                    <td><span class="badge badge-${t.status === 'active' ? 'success' : 'warning'}">${t.status}</span></td>
+                                    <td>${t.user_count}</td>
+                                    <td>${t.dog_count}</td>
+                                    <td>${formatDate(t.created_at)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (err) {
+                document.getElementById('recent-tenants').innerHTML = '<p class="error">Fehler beim Laden</p>';
+            }
+        }
+
+        async function loadCentralAdmins() {
+            try {
+                const admins = await centralAPI.getAdmins();
+                const container = document.getElementById('central-admins');
+
+                if (admins.length === 0) {
+                    container.innerHTML = '<p class="empty-state">Keine Central Admins</p>';
+                    return;
+                }
+
+                container.innerHTML = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>E-Mail</th>
+                                <th>Status</th>
+                                <th>Letzte Aktivitat</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${admins.map(a => `
+                                <tr>
+                                    <td>${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</td>
+                                    <td>${escapeHtml(a.email || '-')}</td>
+                                    <td><span class="badge badge-${a.is_active ? 'success' : 'warning'}">${a.is_active ? 'Aktiv' : 'Inaktiv'}</span></td>
+                                    <td>${formatDate(a.last_activity_at)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (err) {
+                document.getElementById('central-admins').innerHTML = '<p class="error">Fehler beim Laden</p>';
+            }
+        }
+    </script>
+</body>
+</html>

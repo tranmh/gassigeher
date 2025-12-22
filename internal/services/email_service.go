@@ -1072,3 +1072,97 @@ func (s *EmailService) SendExperienceLevelDenied(to, name, level string, message
 
 	return s.SendEmail(to, subject, body.String())
 }
+
+// SendTenantWelcomeEmail sends a welcome email when a new tenant is created (SaaS)
+func (s *EmailService) SendTenantWelcomeEmail(to, tenantName, adminName, tenantSlug, loginURL string) error {
+	subject := fmt.Sprintf("Willkommen bei Gassigeher - %s ist bereit!", tenantName)
+
+	tmpl := `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #26272b; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #82b965; color: white; padding: 20px; text-align: center; border-radius: 6px 6px 0 0; }
+        .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 6px 6px; }
+        .welcome-box { background-color: white; padding: 20px; margin: 20px 0; border-radius: 6px; border-left: 4px solid #82b965; }
+        .cta-button { display: inline-block; background-color: #82b965; color: white; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 20px 0; }
+        .cta-button:hover { background-color: #6fa050; }
+        .steps-list { background-color: white; padding: 20px; margin: 20px 0; border-radius: 6px; }
+        .steps-list h3 { margin-top: 0; color: #82b965; }
+        .steps-list ol { margin: 0; padding-left: 20px; }
+        .steps-list li { margin: 10px 0; }
+        .subdomain { font-family: monospace; background-color: #e9ecef; padding: 2px 8px; border-radius: 4px; }
+        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Willkommen bei Gassigeher!</h1>
+        </div>
+        <div class="content">
+            <p>Hallo {{.AdminName}},</p>
+
+            <div class="welcome-box">
+                <h3 style="margin-top: 0; color: #82b965;">{{.TenantName}} ist bereit!</h3>
+                <p>Ihr Tierheim wurde erfolgreich eingerichtet und ist ab sofort unter folgender Adresse erreichbar:</p>
+                <p style="text-align: center; font-size: 1.2rem;">
+                    <strong><a href="{{.LoginURL}}" class="subdomain">{{.TenantSlug}}.gassigeher.org</a></strong>
+                </p>
+            </div>
+
+            <div style="text-align: center;">
+                <a href="{{.LoginURL}}" class="cta-button">Jetzt anmelden</a>
+            </div>
+
+            <div class="steps-list">
+                <h3>Nachste Schritte</h3>
+                <ol>
+                    <li><strong>Anmelden:</strong> Loggen Sie sich mit Ihren Zugangsdaten ein</li>
+                    <li><strong>Hunde hinzufugen:</strong> Erfassen Sie Ihre Hunde im System</li>
+                    <li><strong>Team einladen:</strong> Fugen Sie weitere Administratoren hinzu</li>
+                    <li><strong>Freiwillige einladen:</strong> Teilen Sie den Registrierungslink</li>
+                    <li><strong>Design anpassen:</strong> Passen Sie Farben und Logo an</li>
+                </ol>
+            </div>
+
+            <p style="font-size: 0.9rem; color: #666;">
+                Bei Fragen oder Problemen konnen Sie uns jederzeit unter <a href="mailto:support@gassigeher.org">support@gassigeher.org</a> erreichen.
+            </p>
+        </div>
+        <div class="footer">
+            <p>Gassigeher - Die Gassi-Verwaltung fur Tierheime</p>
+            <p>Diese E-Mail wurde automatisch generiert.</p>
+        </div>
+    </div>
+</body>
+</html>
+`
+
+	data := struct {
+		TenantName string
+		AdminName  string
+		TenantSlug string
+		LoginURL   string
+	}{
+		TenantName: tenantName,
+		AdminName:  adminName,
+		TenantSlug: tenantSlug,
+		LoginURL:   loginURL,
+	}
+
+	t, err := template.New("tenant_welcome").Parse(tmpl)
+	if err != nil {
+		return fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	var body bytes.Buffer
+	if err := t.Execute(&body, data); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return s.SendEmail(to, subject, body.String())
+}

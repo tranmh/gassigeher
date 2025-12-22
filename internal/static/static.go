@@ -11,6 +11,9 @@ var frontendFiles embed.FS
 //go:embed landing
 var landingFiles embed.FS
 
+//go:embed central
+var centralFiles embed.FS
+
 // FrontendFS returns the frontend filesystem (without the "frontend" prefix)
 func FrontendFS() (fs.FS, error) {
 	return fs.Sub(frontendFiles, "frontend")
@@ -29,4 +32,14 @@ func LandingFS() (fs.FS, error) {
 // LandingFile returns a specific file from the embedded landing pages
 func LandingFile(path string) ([]byte, error) {
 	return landingFiles.ReadFile("landing/" + path)
+}
+
+// CentralFS returns the central admin filesystem (without the "central" prefix)
+func CentralFS() (fs.FS, error) {
+	return fs.Sub(centralFiles, "central")
+}
+
+// CentralFile returns a specific file from the embedded central admin pages
+func CentralFile(path string) ([]byte, error) {
+	return centralFiles.ReadFile("central/" + path)
 }

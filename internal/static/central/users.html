@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Benutzer - Central Admin</title>
+    <link rel="stylesheet" href="/landing/assets/css/landing.css">
+    <link rel="stylesheet" href="/central/assets/css/central.css">
+</head>
+<body>
+    <header class="central-header">
+        <div class="container">
+            <a href="/central/" class="logo">Gassigeher Platform</a>
+            <nav>
+                <ul>
+                    <li><a href="/central/">Dashboard</a></li>
+                    <li><a href="/central/tenants.html">Tierheime</a></li>
+                    <li><a href="/central/users.html" class="active">Benutzer</a></li>
+                    <li><a href="#" onclick="logout()">Abmelden</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="central-main">
+        <div class="container">
+            <div class="page-header">
+                <h1>Benutzer suchen</h1>
+                <p class="page-subtitle">Suche nach Benutzern uber alle Tierheime hinweg</p>
+            </div>
+
+            <div id="alert-container"></div>
+
+            <!-- Search -->
+            <div class="card filters-card">
+                <div class="filters-row">
+                    <div class="filter-group filter-group-large">
+                        <input type="text" id="search-input" placeholder="Name oder E-Mail-Adresse eingeben..." class="form-input">
+                    </div>
+                    <button onclick="searchUsers()" class="btn btn-primary">Suchen</button>
+                </div>
+                <p class="filter-hint">Mindestens 2 Zeichen eingeben. Sucht in Vorname, Nachname und E-Mail.</p>
+            </div>
+
+            <!-- Results -->
+            <div class="card">
+                <div id="results-container">
+                    <p class="empty-state">Geben Sie einen Suchbegriff ein, um Benutzer zu finden.</p>
+                </div>
+            </div>
+
+            <!-- Central Admins Management -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Central Administratoren verwalten</h3>
+                </div>
+                <div id="admins-container">
+                    <p class="loading">Laden...</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/central/assets/js/central.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!isAuthenticated()) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            await loadAdmins();
+
+            // Enable search on Enter
+            document.getElementById('search-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') searchUsers();
+            });
+        });
+
+        async function searchUsers() {
+            const query = document.getElementById('search-input').value.trim();
+            const container = document.getElementById('results-container');
+
+            if (query.length < 2) {
+                showAlert('Bitte mindestens 2 Zeichen eingeben', 'warning');
+                return;
+            }
+
+            container.innerHTML = '<p class="loading">Suche...</p>';
+
+            try {
+                const users = await centralAPI.searchUsers(query);
+
+                if (users.length === 0) {
+                    container.innerHTML = '<p class="empty-state">Keine Benutzer gefunden</p>';
+                    return;
+                }
+
+                container.innerHTML = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>E-Mail</th>
+                                <th>Tierheim</th>
+                                <th>Rolle</th>
+                                <th>Status</th>
+                                <th>Erstellt</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${users.map(u => `
+                                <tr>
+                                    <td>${u.id}</td>
+                                    <td><strong>${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)}</strong></td>
+                                    <td>${escapeHtml(u.email || '-')}</td>
+                                    <td>
+                                        ${u.tenant_name ?
+                                            `<a href="/central/tenants.html?id=${u.tenant_id}">${escapeHtml(u.tenant_name)}</a>` :
+                                            '<span class="text-muted">Kein Tierheim</span>'
+                                        }
+                                    </td>
+                                    <td>
+                                        ${u.is_super_admin ? '<span class="badge badge-danger">Super-Admin</span>' :
+                                          u.is_admin ? '<span class="badge badge-warning">Admin</span>' :
+                                          '<span class="badge badge-secondary">Benutzer</span>'}
+                                    </td>
+                                    <td><span class="badge badge-${u.is_active ? 'success' : 'warning'}">${u.is_active ? 'Aktiv' : 'Inaktiv'}</span></td>
+                                    <td>${formatDate(u.created_at)}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-secondary" onclick="promoteToAdmin(${u.id}, '${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)}')">Zum Central Admin</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    <div class="table-footer">
+                        <p>${users.length} Benutzer gefunden${users.length === 100 ? ' (Maximum erreicht)' : ''}</p>
+                    </div>
+                `;
+            } catch (err) {
+                container.innerHTML = '<p class="error">Fehler bei der Suche</p>';
+                showAlert('Fehler: ' + err.message, 'error');
+            }
+        }
+
+        async function loadAdmins() {
+            const container = document.getElementById('admins-container');
+
+            try {
+                const admins = await centralAPI.getAdmins();
+
+                if (admins.length === 0) {
+                    container.innerHTML = '<p class="empty-state">Keine Central Admins vorhanden</p>';
+                    return;
+                }
+
+                container.innerHTML = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>E-Mail</th>
+                                <th>Status</th>
+                                <th>Erstellt</th>
+                                <th>Letzte Aktivitat</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${admins.map(a => `
+                                <tr>
+                                    <td>${a.id}</td>
+                                    <td><strong>${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</strong></td>
+                                    <td>${escapeHtml(a.email || '-')}</td>
+                                    <td><span class="badge badge-${a.is_active ? 'success' : 'warning'}">${a.is_active ? 'Aktiv' : 'Inaktiv'}</span></td>
+                                    <td>${formatDate(a.created_at)}</td>
+                                    <td>${formatDate(a.last_activity_at)}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-warning" onclick="demoteAdmin(${a.id}, '${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}')">Entfernen</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (err) {
+                container.innerHTML = '<p class="error">Fehler beim Laden</p>';
+            }
+        }
+
+        async function promoteToAdmin(userId, userName) {
+            if (!confirm(`${userName} zum Central Administrator befordern?`)) return;
+
+            try {
+                await centralAPI.promoteToAdmin(userId);
+                showAlert(`${userName} ist jetzt Central Administrator`, 'success');
+                loadAdmins();
+            } catch (err) {
+                showAlert('Fehler: ' + err.message, 'error');
+            }
+        }
+
+        async function demoteAdmin(userId, userName) {
+            if (!confirm(`Central Admin Rechte von ${userName} entfernen?`)) return;
+
+            try {
+                await centralAPI.demoteAdmin(userId);
+                showAlert(`Central Admin Rechte von ${userName} entfernt`, 'success');
+                loadAdmins();
+            } catch (err) {
+                showAlert('Fehler: ' + err.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

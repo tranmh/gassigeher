@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -27,6 +29,7 @@ type DogHandler struct {
 	subscriptionRepo *repository.SubscriptionRepository // SaaS: For checking dog limits
 	imageService     *services.ImageService
 	emailService     *services.EmailService
+	s3Service        *services.S3Service // SaaS: For S3 storage
 	config           *config.Config
 }
 
@@ -38,6 +41,26 @@ func NewDogHandler(db *sql.DB, cfg *config.Config) *DogHandler {
 		fmt.Printf("Warning: Failed to initialize email service in DogHandler: %v\n", err)
 	}
 
+	// Initialize S3 service if enabled
+	var s3Service *services.S3Service
+	if cfg.UseS3 {
+		s3Config := &services.S3Config{
+			Endpoint:   cfg.S3Endpoint,
+			AccessKey:  cfg.S3AccessKey,
+			SecretKey:  cfg.S3SecretKey,
+			BucketName: cfg.S3BucketName,
+			Region:     cfg.S3Region,
+			PublicURL:  cfg.S3PublicURL,
+			UseSSL:     cfg.S3UseSSL,
+		}
+		s3Service, err = services.NewS3Service(s3Config)
+		if err != nil {
+			fmt.Printf("Warning: Failed to initialize S3 service in DogHandler: %v\n", err)
+		} else {
+			fmt.Printf("S3 storage enabled for DogHandler\n")
+		}
+	}
+
 	return &DogHandler{
 		dogRepo:          repository.NewDogRepository(db),
 		userRepo:         repository.NewUserRepository(db),
@@ -45,6 +68,7 @@ func NewDogHandler(db *sql.DB, cfg *config.Config) *DogHandler {
 		subscriptionRepo: repository.NewSubscriptionRepository(db), // SaaS: For dog limit checks
 		imageService:     services.NewImageService(cfg.UploadDir),
 		emailService:     emailService,
+		s3Service:        s3Service,
 		config:           cfg,
 	}
 }
@@ -475,11 +499,51 @@ func (h *DogHandler) UploadDogPhoto(w http.ResponseWriter, r *http.Request) {
 		os.Remove(oldPath) // Ignore errors if file doesn't exist
 	}
 
-	// Process the uploaded photo (resize, compress, create thumbnail)
-	fullPath, thumbPath, err := h.imageService.ProcessDogPhoto(file, id)
-	if err != nil {
-		respondError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to process image: %v", err))
-		return
+	var fullPath, thumbPath string
+
+	// SaaS: Use S3 storage if enabled
+	if h.s3Service != nil && h.config.UseS3 {
+		// Get tenant slug from context
+		tenantSlug, _ := r.Context().Value(middleware.TenantSlugKey).(string)
+		if tenantSlug == "" {
+			tenantSlug = "default"
+		}
+
+		// Read file data
+		fileData, err := io.ReadAll(file)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "Failed to read file")
+			return
+		}
+
+		// Determine content type
+		contentType := "image/jpeg"
+		if ext == ".png" {
+			contentType = "image/png"
+		}
+
+		// Upload full-size photo to S3
+		fullObjectPath := fmt.Sprintf("dogs/dog_%d_full%s", id, ext)
+		fullURL, err := h.s3Service.Upload(context.Background(), tenantSlug, fullObjectPath, fileData, contentType)
+		if err != nil {
+			log.Printf("Failed to upload dog photo to S3: %v", err)
+			respondError(w, http.StatusInternalServerError, "Failed to upload photo")
+			return
+		}
+
+		// For S3, we store the full URL in the database
+		fullPath = fullURL
+		thumbPath = fullURL // For now, use same URL for thumbnail (S3 doesn't auto-resize)
+
+		log.Printf("Uploaded dog %d photo to S3: %s", id, fullURL)
+	} else {
+		// Local filesystem storage
+		// Process the uploaded photo (resize, compress, create thumbnail)
+		fullPath, thumbPath, err = h.imageService.ProcessDogPhoto(file, id)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to process image: %v", err))
+			return
+		}
 	}
 
 	// Update dog with new photo paths
@@ -487,8 +551,10 @@ func (h *DogHandler) UploadDogPhoto(w http.ResponseWriter, r *http.Request) {
 	dog.PhotoThumbnail = &thumbPath
 
 	if err := h.dogRepo.Update(dog); err != nil {
-		// If database update fails, clean up the newly created files
-		h.imageService.DeleteDogPhotos(id)
+		// If database update fails, clean up the newly created files (only for local storage)
+		if h.s3Service == nil || !h.config.UseS3 {
+			h.imageService.DeleteDogPhotos(id)
+		}
 		respondError(w, http.StatusInternalServerError, "Failed to update dog")
 		return
 	}

@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -27,6 +29,7 @@ type UserHandler struct {
 	userColorRepo *repository.UserColorRepository
 	authService   *services.AuthService
 	emailService  *services.EmailService
+	s3Service     *services.S3Service // SaaS: For S3 storage
 	config        *config.Config
 }
 
@@ -37,11 +40,32 @@ func NewUserHandler(db *sql.DB, cfg *config.Config) *UserHandler {
 		println("Warning: Failed to initialize email service:", err.Error())
 	}
 
+	// Initialize S3 service if enabled
+	var s3Service *services.S3Service
+	if cfg.UseS3 {
+		s3Config := &services.S3Config{
+			Endpoint:   cfg.S3Endpoint,
+			AccessKey:  cfg.S3AccessKey,
+			SecretKey:  cfg.S3SecretKey,
+			BucketName: cfg.S3BucketName,
+			Region:     cfg.S3Region,
+			PublicURL:  cfg.S3PublicURL,
+			UseSSL:     cfg.S3UseSSL,
+		}
+		s3Service, err = services.NewS3Service(s3Config)
+		if err != nil {
+			fmt.Printf("Warning: Failed to initialize S3 service in UserHandler: %v\n", err)
+		} else {
+			fmt.Printf("S3 storage enabled for UserHandler\n")
+		}
+	}
+
 	return &UserHandler{
 		userRepo:      repository.NewUserRepository(db),
 		userColorRepo: repository.NewUserColorRepository(db),
 		authService:   services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours),
 		emailService:  emailService,
+		s3Service:     s3Service,
 		config:        cfg,
 	}
 }
@@ -247,31 +271,7 @@ func (h *UserHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 	// Reset file reader position after MIME check
 	file.Seek(0, 0)
 
-	// Create upload directory if it doesn't exist
-	userDir := filepath.Join(h.config.UploadDir, "users")
-	if err := os.MkdirAll(userDir, 0755); err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to create upload directory")
-		return
-	}
-
-	// Generate filename
-	filename := filepath.Join("users", filepath.Base(header.Filename))
-	destPath := filepath.Join(h.config.UploadDir, filename)
-
-	// Save file
-	dest, err := os.Create(destPath)
-	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to save file")
-		return
-	}
-	defer dest.Close()
-
-	if _, err := io.Copy(dest, file); err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to save file")
-		return
-	}
-
-	// Update user profile
+	// Get user first (needed for cleanup)
 	user, err := h.userRepo.FindByID(userID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Database error")
@@ -282,13 +282,74 @@ func (h *UserHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Delete old photo if exists
-	if user.ProfilePhoto != nil && *user.ProfilePhoto != "" {
-		oldPath := filepath.Join(h.config.UploadDir, *user.ProfilePhoto)
-		os.Remove(oldPath) // Ignore errors
+	var photoPath string
+
+	// SaaS: Use S3 storage if enabled
+	if h.s3Service != nil && h.config.UseS3 {
+		// Get tenant slug from context
+		tenantSlug, _ := r.Context().Value(middleware.TenantSlugKey).(string)
+		if tenantSlug == "" {
+			tenantSlug = "default"
+		}
+
+		// Read file data
+		fileData, err := io.ReadAll(file)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "Failed to read file")
+			return
+		}
+
+		// Determine content type
+		contentType := "image/jpeg"
+		if ext == ".png" {
+			contentType = "image/png"
+		}
+
+		// Upload to S3
+		objectPath := fmt.Sprintf("users/user_%d_profile%s", userID, ext)
+		photoURL, err := h.s3Service.Upload(context.Background(), tenantSlug, objectPath, fileData, contentType)
+		if err != nil {
+			log.Printf("Failed to upload user photo to S3: %v", err)
+			respondError(w, http.StatusInternalServerError, "Failed to upload photo")
+			return
+		}
+
+		photoPath = photoURL
+		log.Printf("Uploaded user %d photo to S3: %s", userID, photoURL)
+	} else {
+		// Local filesystem storage
+		// Create upload directory if it doesn't exist
+		userDir := filepath.Join(h.config.UploadDir, "users")
+		if err := os.MkdirAll(userDir, 0755); err != nil {
+			respondError(w, http.StatusInternalServerError, "Failed to create upload directory")
+			return
+		}
+
+		// Generate filename
+		photoPath = filepath.Join("users", filepath.Base(header.Filename))
+		destPath := filepath.Join(h.config.UploadDir, photoPath)
+
+		// Save file
+		dest, err := os.Create(destPath)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "Failed to save file")
+			return
+		}
+		defer dest.Close()
+
+		if _, err := io.Copy(dest, file); err != nil {
+			respondError(w, http.StatusInternalServerError, "Failed to save file")
+			return
+		}
+
+		// Delete old photo if exists (only for local storage)
+		if user.ProfilePhoto != nil && *user.ProfilePhoto != "" {
+			oldPath := filepath.Join(h.config.UploadDir, *user.ProfilePhoto)
+			os.Remove(oldPath) // Ignore errors
+		}
 	}
 
-	user.ProfilePhoto = &filename
+	user.ProfilePhoto = &photoPath
 	if err := h.userRepo.Update(user); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to update profile")
 		return
@@ -296,7 +357,7 @@ func (h *UserHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, map[string]string{
 		"message": "Photo uploaded successfully",
-		"photo":   filename,
+		"photo":   photoPath,
 	})
 }
 

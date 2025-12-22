@@ -103,6 +103,14 @@ func main() {
 	router.Use(middleware.SecurityHeadersMiddleware)
 	router.Use(middleware.CORSMiddleware(cfg.BaseURL))
 
+	// SaaS: Tenant resolution middleware (resolves subdomain to tenant_id)
+	// Must be after CORS but before auth middleware
+	tenantRepo := repository.NewTenantRepository(db)
+	if cfg.BaseDomain != "" {
+		router.Use(middleware.TenantMiddleware(tenantRepo, cfg.BaseDomain))
+		log.Printf("SaaS mode: Tenant middleware enabled for domain *.%s", cfg.BaseDomain)
+	}
+
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(db, cfg)
 	userHandler := handlers.NewUserHandler(db, cfg)
@@ -393,6 +401,14 @@ func main() {
 	}
 	// Serve landing pages at /landing/
 	router.PathPrefix("/landing/").Handler(http.StripPrefix("/landing/", http.FileServer(http.FS(landingFS))))
+
+	// Get embedded central admin filesystem (for SaaS platform administration)
+	centralFS, err := static.CentralFS()
+	if err != nil {
+		log.Fatalf("Failed to get embedded central admin pages: %v", err)
+	}
+	// Serve central admin pages at /central/
+	router.PathPrefix("/central/").Handler(http.StripPrefix("/central/", http.FileServer(http.FS(centralFS))))
 
 	// Get embedded frontend filesystem
 	frontendFS, err := static.FrontendFS()
