@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"strings"
 )
 
 // EmailService handles sending emails via any email provider
@@ -66,8 +67,19 @@ func NewEmailServiceLegacy(clientID, clientSecret, refreshToken, fromEmail strin
 }
 
 // SendEmail sends an email using the configured provider
+// Skips sending for demo tenant emails (ending with @demo.gassigeher.org)
 func (s *EmailService) SendEmail(to, subject, body string) error {
+	// Skip emails for demo tenant users
+	if isDemoEmail(to) {
+		log.Printf("Skipping email to demo tenant user: %s (subject: %s)", to, subject)
+		return nil
+	}
 	return s.provider.SendEmail(to, subject, body)
+}
+
+// isDemoEmail checks if an email address belongs to a demo tenant user
+func isDemoEmail(email string) bool {
+	return strings.HasSuffix(email, "@demo.gassigeher.org")
 }
 
 // SendVerificationEmail sends an email verification link

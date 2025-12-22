@@ -23,8 +23,8 @@ func (r *TenantRepository) Create(tenant *models.Tenant) error {
 	query := `
 		INSERT INTO tenants (
 			slug, name, status, contact_email, contact_phone,
-			address, city, postal_code, federal_state
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			address, city, postal_code, federal_state, is_demo
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	result, err := r.db.Exec(
@@ -38,6 +38,7 @@ func (r *TenantRepository) Create(tenant *models.Tenant) error {
 		tenant.City,
 		tenant.PostalCode,
 		tenant.FederalState,
+		tenant.IsDemo,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create tenant: %w", err)
@@ -59,8 +60,8 @@ func (r *TenantRepository) CreateTx(tx *sql.Tx, tenant *models.Tenant) (int, err
 	query := `
 		INSERT INTO tenants (
 			slug, name, status, contact_email, contact_phone,
-			address, city, postal_code, federal_state
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			address, city, postal_code, federal_state, is_demo
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	result, err := tx.Exec(
@@ -74,6 +75,7 @@ func (r *TenantRepository) CreateTx(tx *sql.Tx, tenant *models.Tenant) (int, err
 		tenant.City,
 		tenant.PostalCode,
 		tenant.FederalState,
+		tenant.IsDemo,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create tenant: %w", err)
@@ -91,7 +93,7 @@ func (r *TenantRepository) CreateTx(tx *sql.Tx, tenant *models.Tenant) (int, err
 func (r *TenantRepository) FindByID(id int) (*models.Tenant, error) {
 	query := `
 		SELECT id, slug, name, status, contact_email, contact_phone,
-		       address, city, postal_code, federal_state,
+		       address, city, postal_code, federal_state, is_demo,
 		       created_at, updated_at, suspended_at, suspended_reason, deleted_at
 		FROM tenants
 		WHERE id = ?
@@ -109,6 +111,7 @@ func (r *TenantRepository) FindByID(id int) (*models.Tenant, error) {
 		&tenant.City,
 		&tenant.PostalCode,
 		&tenant.FederalState,
+		&tenant.IsDemo,
 		&tenant.CreatedAt,
 		&tenant.UpdatedAt,
 		&tenant.SuspendedAt,
@@ -129,7 +132,7 @@ func (r *TenantRepository) FindByID(id int) (*models.Tenant, error) {
 func (r *TenantRepository) FindBySlug(slug string) (*models.Tenant, error) {
 	query := `
 		SELECT id, slug, name, status, contact_email, contact_phone,
-		       address, city, postal_code, federal_state,
+		       address, city, postal_code, federal_state, is_demo,
 		       created_at, updated_at, suspended_at, suspended_reason, deleted_at
 		FROM tenants
 		WHERE slug = ?
@@ -147,6 +150,7 @@ func (r *TenantRepository) FindBySlug(slug string) (*models.Tenant, error) {
 		&tenant.City,
 		&tenant.PostalCode,
 		&tenant.FederalState,
+		&tenant.IsDemo,
 		&tenant.CreatedAt,
 		&tenant.UpdatedAt,
 		&tenant.SuspendedAt,
@@ -171,7 +175,7 @@ func (r *TenantRepository) FindAll(status string) ([]*models.Tenant, error) {
 	if status != "" && status != "all" {
 		query = `
 			SELECT id, slug, name, status, contact_email, contact_phone,
-			       address, city, postal_code, federal_state,
+			       address, city, postal_code, federal_state, is_demo,
 			       created_at, updated_at, suspended_at, suspended_reason, deleted_at
 			FROM tenants
 			WHERE status = ?
@@ -181,7 +185,7 @@ func (r *TenantRepository) FindAll(status string) ([]*models.Tenant, error) {
 	} else {
 		query = `
 			SELECT id, slug, name, status, contact_email, contact_phone,
-			       address, city, postal_code, federal_state,
+			       address, city, postal_code, federal_state, is_demo,
 			       created_at, updated_at, suspended_at, suspended_reason, deleted_at
 			FROM tenants
 			ORDER BY name ASC
@@ -208,6 +212,7 @@ func (r *TenantRepository) FindAll(status string) ([]*models.Tenant, error) {
 			&tenant.City,
 			&tenant.PostalCode,
 			&tenant.FederalState,
+			&tenant.IsDemo,
 			&tenant.CreatedAt,
 			&tenant.UpdatedAt,
 			&tenant.SuspendedAt,
@@ -555,4 +560,62 @@ func (r *TenantRepository) UpdateFavicon(tenantID int, faviconURL string) error 
 		return fmt.Errorf("failed to update favicon: %w", err)
 	}
 	return nil
+}
+
+// --- Demo Tenant Methods ---
+
+// IsDemoTenant checks if a tenant is a demo tenant
+func (r *TenantRepository) IsDemoTenant(tenantID int) (bool, error) {
+	query := `SELECT is_demo FROM tenants WHERE id = ?`
+	var isDemo bool
+	err := r.db.QueryRow(query, tenantID).Scan(&isDemo)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("failed to check demo tenant: %w", err)
+	}
+	return isDemo, nil
+}
+
+// GetDemoTenant returns the demo tenant if it exists
+func (r *TenantRepository) GetDemoTenant() (*models.Tenant, error) {
+	// Use is_demo = 1 which works across SQLite, MySQL, and PostgreSQL
+	// (PostgreSQL treats 1 as truthy for boolean columns)
+	query := `
+		SELECT id, slug, name, status, contact_email, contact_phone,
+		       address, city, postal_code, federal_state, is_demo,
+		       created_at, updated_at, suspended_at, suspended_reason, deleted_at
+		FROM tenants
+		WHERE is_demo = 1
+		LIMIT 1
+	`
+
+	tenant := &models.Tenant{}
+	err := r.db.QueryRow(query).Scan(
+		&tenant.ID,
+		&tenant.Slug,
+		&tenant.Name,
+		&tenant.Status,
+		&tenant.ContactEmail,
+		&tenant.ContactPhone,
+		&tenant.Address,
+		&tenant.City,
+		&tenant.PostalCode,
+		&tenant.FederalState,
+		&tenant.IsDemo,
+		&tenant.CreatedAt,
+		&tenant.UpdatedAt,
+		&tenant.SuspendedAt,
+		&tenant.SuspendedReason,
+		&tenant.DeletedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get demo tenant: %w", err)
+	}
+
+	return tenant, nil
 }

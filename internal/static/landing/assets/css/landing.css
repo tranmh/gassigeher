@@ -595,6 +595,103 @@ a:hover {
     margin-bottom: 1rem;
 }
 
+/* Demo Teaser in Hero */
+.demo-teaser {
+    margin-top: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    font-size: 0.95rem;
+}
+
+.demo-teaser-text {
+    color: var(--color-text-light);
+}
+
+.demo-link {
+    color: var(--color-primary);
+    font-weight: 600;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.demo-link:hover {
+    color: var(--color-primary-dark);
+    text-decoration: underline;
+}
+
+/* How It Works Demo CTA */
+.how-it-works-demo {
+    text-align: center;
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--color-border);
+}
+
+.how-it-works-demo p {
+    margin-bottom: 1rem;
+    color: var(--color-text-light);
+}
+
+/* Demo Banner on Pricing Page */
+.pricing-demo-banner {
+    background: linear-gradient(135deg, #f0f4e8 0%, #e8f0dc 100%);
+    padding: 2rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+}
+
+.pricing-demo-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.pricing-demo-banner-icon {
+    font-size: 3rem;
+    flex-shrink: 0;
+}
+
+.pricing-demo-banner-text {
+    flex: 1;
+}
+
+.pricing-demo-banner-text h3 {
+    margin-bottom: 0.5rem;
+    color: var(--color-secondary);
+}
+
+.pricing-demo-banner-text p {
+    color: var(--color-text-light);
+    margin: 0;
+}
+
+.pricing-demo-banner .btn {
+    flex-shrink: 0;
+}
+
+/* Nav Demo Link Highlight */
+.nav-demo {
+    background: var(--color-accent);
+    padding: 0.5rem 1rem !important;
+    border-radius: 6px;
+    color: var(--color-primary) !important;
+    font-weight: 600;
+}
+
+.nav-demo:hover {
+    background: #e8f0dc;
+}
+
+/* Footer Demo Link */
+.footer-links a.footer-demo {
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .nav {
@@ -631,5 +728,20 @@ a:hover {
         border-radius: 0 0 var(--border-radius) var(--border-radius);
         width: 100%;
         text-align: center;
+    }
+
+    .demo-teaser {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .pricing-demo-banner-content {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+    }
+
+    .pricing-demo-banner .btn {
+        width: 100%;
     }
 }

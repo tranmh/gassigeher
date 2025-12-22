@@ -19,6 +19,7 @@ type Tenant struct {
 	City            *string    `json:"city,omitempty"`
 	PostalCode      *string    `json:"postal_code,omitempty"`
 	FederalState    string     `json:"federal_state"`     // For holiday API (default: "BW")
+	IsDemo          bool       `json:"is_demo"`           // Demo tenant flag
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
 	SuspendedAt     *time.Time `json:"suspended_at,omitempty"`
@@ -298,10 +299,10 @@ func ValidateSlug(slug string) error {
 		return errors.New("slug cannot contain consecutive hyphens")
 	}
 
-	// Reserved slugs
+	// Reserved slugs (note: "demo" is intentionally NOT reserved - it's used for demo tenant)
 	reservedSlugs := []string{
 		"www", "admin", "api", "app", "mail", "email", "ftp", "ssh",
-		"test", "demo", "staging", "dev", "prod", "central", "support",
+		"test", "staging", "dev", "prod", "central", "support",
 		"help", "docs", "blog", "status", "cdn", "assets", "static",
 	}
 	for _, reserved := range reservedSlugs {

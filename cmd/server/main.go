@@ -93,6 +93,13 @@ func main() {
 		// Don't exit - allow server to start
 	}
 
+	// Demo tenant: Ensure demo tenant exists with sample data
+	demoSeedService := services.NewDemoSeedService(db)
+	if err := demoSeedService.EnsureDemoTenant(); err != nil {
+		log.Printf("Warning: Failed to ensure demo tenant: %v", err)
+		// Don't exit - demo is optional
+	}
+
 	// Initialize router
 	router := mux.NewRouter()
 
@@ -130,6 +137,7 @@ func main() {
 	tenantHandler := handlers.NewTenantHandler(db, cfg)
 	centralAdminHandler := handlers.NewCentralAdminHandler(db, cfg)
 	contactHandler := handlers.NewContactHandler(cfg)
+	demoHandler := handlers.NewDemoHandler(db)
 
 	// SaaS: Initialize Stripe service and billing handler
 	var stripeService *services.StripeService
@@ -216,6 +224,10 @@ func main() {
 
 	// SaaS Stripe webhook (public - verified by signature)
 	router.HandleFunc("/api/billing/webhook", billingHandler.HandleWebhook).Methods("POST")
+
+	// Demo tenant endpoints (public - for demo landing page)
+	router.HandleFunc("/api/demo/credentials", demoHandler.GetCredentials).Methods("GET")
+	router.HandleFunc("/api/demo/status", demoHandler.GetStatus).Methods("GET")
 
 	// Protected routes (authenticated users)
 	protected := router.PathPrefix("/api").Subrouter()

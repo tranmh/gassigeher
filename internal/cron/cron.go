@@ -12,15 +12,28 @@ import (
 	"github.com/tranmh/gassigeher/internal/services"
 )
 
+// getBerlinLocation returns the Europe/Berlin timezone location
+// Falls back to UTC if the timezone cannot be loaded
+func getBerlinLocation() *time.Location {
+	loc, err := time.LoadLocation("Europe/Berlin")
+	if err != nil {
+		log.Printf("Warning: Could not load Europe/Berlin timezone, falling back to UTC: %v", err)
+		return time.UTC
+	}
+	return loc
+}
+
 // CronService handles scheduled tasks
 type CronService struct {
-	db           *sql.DB
-	bookingRepo  *repository.BookingRepository
-	userRepo     *repository.UserRepository
-	settingsRepo *repository.SettingsRepository
-	tenantRepo   *repository.TenantRepository
-	emailService *services.EmailService
-	stopChan     chan bool
+	db              *sql.DB
+	bookingRepo     *repository.BookingRepository
+	userRepo        *repository.UserRepository
+	settingsRepo    *repository.SettingsRepository
+	tenantRepo      *repository.TenantRepository
+	demoStateRepo   *repository.DemoTenantRepository
+	emailService    *services.EmailService
+	demoSeedService *services.DemoSeedService
+	stopChan        chan bool
 }
 
 // NewCronService creates a new cron service
@@ -36,13 +49,15 @@ func NewCronService(db *sql.DB, cfg *config.Config) *CronService {
 	}
 
 	return &CronService{
-		db:           db,
-		bookingRepo:  repository.NewBookingRepository(db),
-		userRepo:     repository.NewUserRepository(db),
-		settingsRepo: repository.NewSettingsRepository(db),
-		tenantRepo:   repository.NewTenantRepository(db),
-		emailService: emailService,
-		stopChan:     make(chan bool),
+		db:              db,
+		bookingRepo:     repository.NewBookingRepository(db),
+		userRepo:        repository.NewUserRepository(db),
+		settingsRepo:    repository.NewSettingsRepository(db),
+		tenantRepo:      repository.NewTenantRepository(db),
+		demoStateRepo:   repository.NewDemoTenantRepository(db),
+		emailService:    emailService,
+		demoSeedService: services.NewDemoSeedService(db),
+		stopChan:        make(chan bool),
 	}
 }
 
@@ -58,6 +73,9 @@ func (s *CronService) Start() {
 
 	// Run booking reminder job every 15 minutes
 	go s.runPeriodically("Send booking reminders", 15*time.Minute, s.sendBookingReminders)
+
+	// Run demo reset job daily at midnight (Europe/Berlin time)
+	go s.runDaily("Demo tenant reset", 0, 0, s.resetDemoTenant)
 }
 
 // Stop stops all cron jobs
@@ -169,14 +187,17 @@ func (s *CronService) sendBookingReminders() {
 }
 
 // runDaily runs a function daily at a specific time (also runs once immediately on startup)
+// Uses Europe/Berlin timezone for scheduling to ensure consistency across servers
 func (s *CronService) runDaily(name string, hour, minute int, fn func()) {
 	// Run immediately on startup
 	log.Printf("Running daily job on startup: %s", name)
 	fn()
 
+	berlinLoc := getBerlinLocation()
+
 	for {
-		now := time.Now()
-		next := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
+		now := time.Now().In(berlinLoc)
+		next := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, berlinLoc)
 
 		// If we've passed today's scheduled time, schedule for tomorrow
 		if now.After(next) {
@@ -262,4 +283,43 @@ func (s *CronService) autoDeactivateUsersForTenant(tenantID int) {
 			go s.emailService.SendAccountDeactivated(*user.Email, user.FirstName, reason)
 		}
 	}
+}
+
+// resetDemoTenant resets the demo tenant to its initial state
+// Called daily at midnight (Europe/Berlin time)
+func (s *CronService) resetDemoTenant() {
+	// Check if demo tenant exists
+	demoTenant, err := s.tenantRepo.GetDemoTenant()
+	if err != nil {
+		log.Printf("Error checking for demo tenant: %v", err)
+		return
+	}
+
+	if demoTenant == nil {
+		log.Println("Demo reset: No demo tenant found, skipping")
+		return
+	}
+
+	// Check if reset is needed (based on next_reset_at)
+	state, err := s.demoStateRepo.GetState(demoTenant.ID)
+	if err != nil {
+		log.Printf("Error getting demo state: %v", err)
+		return
+	}
+
+	if state == nil {
+		log.Println("Demo reset: No demo state found, will create on reset")
+	} else if state.NextResetAt != nil && time.Now().Before(*state.NextResetAt) {
+		log.Printf("Demo reset: Next reset scheduled for %s, skipping", state.NextResetAt.Format("2006-01-02 15:04"))
+		return
+	}
+
+	// Perform reset
+	log.Printf("Demo reset: Starting reset for tenant %d (%s)", demoTenant.ID, demoTenant.Slug)
+	if err := s.demoSeedService.ResetDemoTenant(); err != nil {
+		log.Printf("Error resetting demo tenant: %v", err)
+		return
+	}
+
+	log.Println("Demo reset: Completed successfully")
 }

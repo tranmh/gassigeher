@@ -25,6 +25,7 @@ const IsImpersonatingKey contextKey = "isImpersonating" // Impersonation: Boolea
 // SaaS multi-tenancy context keys
 const TenantIDKey contextKey = "tenantID"     // Tenant ID from subdomain or JWT
 const TenantSlugKey contextKey = "tenantSlug" // Tenant slug (subdomain)
+const IsDemoKey contextKey = "isDemo"         // Demo tenant flag
 
 // LoggingMiddleware logs HTTP requests with comprehensive information
 // Includes: timestamp, request ID, client IP, method, path, status code,

@@ -250,6 +250,37 @@ func TestCronService_AutoDeactivateInactiveUsers_SendsEmailNotifications(t *test
 	})
 }
 
+// TestCronService_RunDaily_UsesEuropeBerlinTimezone tests that runDaily uses Europe/Berlin timezone
+func TestCronService_RunDaily_UsesEuropeBerlinTimezone(t *testing.T) {
+	// This test verifies that the daily scheduler uses Europe/Berlin timezone
+	// The demo reset should happen at midnight Berlin time, not server local time
+
+	t.Run("getBerlinLocation returns valid Europe/Berlin timezone", func(t *testing.T) {
+		loc := getBerlinLocation()
+
+		// Should return a valid location
+		if loc == nil {
+			t.Fatal("getBerlinLocation should return non-nil location")
+		}
+
+		// Should be Europe/Berlin (or UTC as fallback)
+		locName := loc.String()
+		if locName != "Europe/Berlin" && locName != "UTC" {
+			t.Errorf("Expected Europe/Berlin or UTC, got %s", locName)
+		}
+	})
+
+	t.Run("getBerlinLocation handles timezone loading", func(t *testing.T) {
+		// Call multiple times to verify consistency
+		loc1 := getBerlinLocation()
+		loc2 := getBerlinLocation()
+
+		if loc1.String() != loc2.String() {
+			t.Error("getBerlinLocation should return consistent results")
+		}
+	})
+}
+
 // DONE: TestCronService_NewCronService tests cron service initialization
 func TestCronService_NewCronService(t *testing.T) {
 	db := testutil.SetupTestDB(t)

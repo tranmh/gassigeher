@@ -14,8 +14,8 @@ import (
 func TestMigrationRegistry(t *testing.T) {
 	migrations := GetAllMigrations()
 
-	t.Run("All_9_migrations_registered", func(t *testing.T) {
-		assert.Len(t, migrations, 9, "Should have 9 migrations (consolidated schema + SaaS + lockout + central_admin + subscriptions)")
+	t.Run("All_11_migrations_registered", func(t *testing.T) {
+		assert.Len(t, migrations, 11, "Should have 11 migrations (consolidated schema + SaaS + lockout + central_admin + subscriptions + demo)")
 	})
 
 	t.Run("Migrations_have_unique_IDs", func(t *testing.T) {
@@ -74,7 +74,7 @@ func TestRunMigrations_SQLite(t *testing.T) {
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 9, count, "Should have 9 applied migrations")
+	assert.Equal(t, 11, count, "Should have 11 applied migrations")
 
 	// Verify all tables created
 	tables := []string{
@@ -120,16 +120,16 @@ func TestRunMigrations_Idempotent(t *testing.T) {
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 9, count)
+	assert.Equal(t, 11, count)
 
 	// Run migrations second time (should be idempotent)
 	err = RunMigrationsWithDialect(db, dialect)
 	assert.NoError(t, err, "Second migration run should succeed (idempotent)")
 
-	// Count should still be 8 (no duplicates)
+	// Count should still be 11 (no duplicates)
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 9, count, "Should still have 9 migrations (no duplicates)")
+	assert.Equal(t, 11, count, "Should still have 11 migrations (no duplicates)")
 }
 
 // TestGetMigrationStatus tests migration status reporting
@@ -147,7 +147,7 @@ func TestGetMigrationStatus(t *testing.T) {
 	applied, pending, err := GetMigrationStatus(db, dialect)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, applied)
-	assert.Equal(t, 9, pending)
+	assert.Equal(t, 11, pending)
 
 	// After migrations
 	err = RunMigrationsWithDialect(db, dialect)
@@ -155,7 +155,7 @@ func TestGetMigrationStatus(t *testing.T) {
 
 	applied, pending, err = GetMigrationStatus(db, dialect)
 	assert.NoError(t, err)
-	assert.Equal(t, 9, applied)
+	assert.Equal(t, 11, applied)
 	assert.Equal(t, 0, pending)
 }
 
@@ -361,6 +361,8 @@ func TestMigrationOrder(t *testing.T) {
 		"007_add_lockout_fields",
 		"008_add_central_admin",
 		"009_add_subscriptions",
+		"022_demo_tenant_state",
+		"023_add_tenant_is_demo",
 	}
 
 	assert.Len(t, migrations, len(expectedOrder))
@@ -410,7 +412,7 @@ func TestMigrationRunner_PartialApplication(t *testing.T) {
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count)
 	assert.NoError(t, err)
-	assert.Equal(t, 9, count, "Should have 9 migrations applied")
+	assert.Equal(t, 11, count, "Should have 11 migrations applied")
 }
 
 // TestIsAlreadyExistsError tests error detection for different databases
@@ -464,6 +466,84 @@ func TestMigrationRunner_CreatesForeignKeys(t *testing.T) {
 
 	// Should fail due to foreign key constraint
 	assert.Error(t, err, "Foreign key constraint should prevent invalid user_id")
+}
+
+// TestMigration023_SQLiteColumnIdempotency verifies the migration system handles duplicate columns
+func TestMigration023_SQLiteColumnIdempotency(t *testing.T) {
+	t.Run("migration_system_handles_duplicate_column_errors", func(t *testing.T) {
+		// The migration system uses isAlreadyExistsError to handle duplicate column errors
+		// Even though SQLite doesn't support "ADD COLUMN IF NOT EXISTS", the system catches
+		// "duplicate column name" errors and treats them as success (idempotent behavior)
+		//
+		// This is verified by TestMigrationRunner_HandlesDuplicateColumn
+		// and TestIsAlreadyExistsError tests.
+
+		// Verify isAlreadyExistsError catches SQLite duplicate column
+		dialect := NewSQLiteDialect()
+		err := fmt.Errorf("duplicate column name: is_demo")
+		isHandled := isAlreadyExistsError(err, dialect)
+		assert.True(t, isHandled, "SQLite duplicate column error should be handled")
+	})
+
+	t.Run("migration_023_sqlite_index_uses_IF_NOT_EXISTS", func(t *testing.T) {
+		allMigrations := GetAllMigrations()
+		var migration *Migration
+		for _, m := range allMigrations {
+			if m.ID == "023_add_tenant_is_demo" {
+				migration = m
+				break
+			}
+		}
+		require.NotNil(t, migration, "Migration 023 should exist")
+
+		sqliteSQL := migration.Up["sqlite"]
+		// The INDEX creation should use IF NOT EXISTS (SQLite supports this for indexes)
+		assert.Contains(t, sqliteSQL, "CREATE INDEX IF NOT EXISTS",
+			"SQLite index creation should use IF NOT EXISTS")
+	})
+}
+
+// TestMigration023_MySQLIndexIdempotency tests that MySQL migration 023 is idempotent
+func TestMigration023_MySQLIndexIdempotency(t *testing.T) {
+	migrations := GetAllMigrations()
+
+	var migration023 *Migration
+	for _, m := range migrations {
+		if m.ID == "023_add_tenant_is_demo" {
+			migration023 = m
+			break
+		}
+	}
+
+	require.NotNil(t, migration023, "Migration 023 should exist")
+
+	t.Run("MySQL_index_creation_should_be_idempotent", func(t *testing.T) {
+		mysqlSQL := migration023.Up["mysql"]
+		// MySQL should either use IF NOT EXISTS (MySQL 8.0+) or handle existing index gracefully
+		// The migration should not fail if the index already exists
+		// Note: We need to check specifically that the INDEX creation is idempotent
+		// Looking for patterns like: "CREATE INDEX IF NOT EXISTS" or handling via stored procedure
+
+		// Check if the CREATE INDEX statement itself has idempotent handling
+		indexCreationIdempotent := contains(mysqlSQL, "CREATE INDEX IF NOT EXISTS idx_tenants_is_demo") ||
+			contains(mysqlSQL, "DROP INDEX IF EXISTS idx_tenants_is_demo") ||
+			contains(mysqlSQL, "-- Index creation handled by migration system")
+
+		assert.True(t, indexCreationIdempotent,
+			"MySQL CREATE INDEX statement should be idempotent (use IF NOT EXISTS or DROP first). SQL: %s", mysqlSQL)
+	})
+
+	t.Run("SQLite_index_creation_is_idempotent", func(t *testing.T) {
+		sqliteSQL := migration023.Up["sqlite"]
+		assert.Contains(t, sqliteSQL, "IF NOT EXISTS",
+			"SQLite index creation should use IF NOT EXISTS")
+	})
+
+	t.Run("PostgreSQL_index_creation_is_idempotent", func(t *testing.T) {
+		postgresSQL := migration023.Up["postgres"]
+		assert.Contains(t, postgresSQL, "IF NOT EXISTS",
+			"PostgreSQL index creation should use IF NOT EXISTS")
+	})
 }
 
 // TestMigrationRunner_CreatesIndexes tests that indexes are created

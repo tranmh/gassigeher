@@ -49,6 +49,7 @@ func TenantMiddleware(tenantRepo *repository.TenantRepository, baseDomain string
 			// Inject tenant info into context
 			ctx := context.WithValue(r.Context(), TenantIDKey, tenant.ID)
 			ctx = context.WithValue(ctx, TenantSlugKey, tenant.Slug)
+			ctx = context.WithValue(ctx, IsDemoKey, tenant.IsDemo)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

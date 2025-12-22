@@ -83,6 +83,10 @@ func SeedDatabase(db *sql.DB, superAdminEmail string) error {
 	var testUsers []TestUser
 	log.Println("✓ Skipped test data (SaaS mode - each tenant creates own data)")
 
+	// Note: Demo tenant is created by DemoSeedService.EnsureDemoTenant() in main.go
+	// after the service is initialized. This avoids circular import issues.
+	log.Println("✓ Demo tenant will be created by DemoSeedService on startup")
+
 	// 9. Write credentials to file
 	err = writeCredentialsFile(superAdminEmail, superAdminPassword)
 	if err != nil {
@@ -527,5 +531,3 @@ func printSetupComplete(superAdminEmail, superAdminPassword string, testUsers []
 	fmt.Println("=============================================================")
 	fmt.Println()
 }
-
-// DONE
