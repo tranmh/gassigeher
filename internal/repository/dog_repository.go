@@ -343,6 +343,102 @@ func (r *DogRepository) CountFeatured() (int, error) {
 	return count, nil
 }
 
+// CountByTenant returns the number of dogs for a specific tenant
+// SaaS: Used for enforcing dog limits in the freemium model
+func (r *DogRepository) CountByTenant(tenantID int) (int, error) {
+	query := `SELECT COUNT(*) FROM dogs WHERE tenant_id = ?`
+
+	var count int
+	err := r.db.QueryRow(query, tenantID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count dogs by tenant: %w", err)
+	}
+
+	return count, nil
+}
+
+// ErrDogLimitExceeded is returned when the dog limit would be exceeded
+var ErrDogLimitExceeded = fmt.Errorf("dog limit exceeded")
+
+// CreateWithLimitCheck creates a dog atomically while checking the limit
+// This prevents race conditions where multiple requests could exceed the limit
+// SaaS: Used for enforcing dog limits in the freemium model
+func (r *DogRepository) CreateWithLimitCheck(dog *models.Dog, limit int) error {
+	// Start transaction
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback() // Will be no-op after commit
+
+	// Count dogs within transaction (serialized check)
+	var count int
+	err = tx.QueryRow(`SELECT COUNT(*) FROM dogs WHERE tenant_id = ?`, dog.TenantID).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to count dogs: %w", err)
+	}
+
+	// Check limit (-1 means unlimited)
+	if limit != -1 && count >= limit {
+		return ErrDogLimitExceeded
+	}
+
+	// Insert dog within same transaction
+	query := `
+		INSERT INTO dogs (
+			tenant_id, name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
+			pickup_location, walk_route, walk_duration, special_instructions,
+			default_morning_time, default_evening_time, is_available, external_link
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+	var tenantIDParam interface{}
+	if dog.TenantID > 0 {
+		tenantIDParam = dog.TenantID
+	} else {
+		tenantIDParam = nil
+	}
+
+	result, err := tx.Exec(
+		query,
+		tenantIDParam,
+		dog.Name,
+		dog.Breed,
+		dog.Size,
+		dog.Age,
+		dog.ColorID,
+		dog.Photo,
+		dog.PhotoThumbnail,
+		dog.SpecialNeeds,
+		dog.PickupLocation,
+		dog.WalkRoute,
+		dog.WalkDuration,
+		dog.SpecialInstructions,
+		dog.DefaultMorningTime,
+		dog.DefaultEveningTime,
+		dog.IsAvailable,
+		dog.ExternalLink,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create dog: %w", err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("failed to get dog ID: %w", err)
+	}
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	dog.ID = int(id)
+	dog.CreatedAt = time.Now()
+	dog.UpdatedAt = time.Now()
+	return nil
+}
+
 // Update updates a dog
 func (r *DogRepository) Update(dog *models.Dog) error {
 	query := `

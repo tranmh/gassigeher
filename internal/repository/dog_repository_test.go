@@ -813,6 +813,115 @@ func TestCanUserAccessDog(t *testing.T) {
 	}
 }
 
+// TestDogRepository_CountByTenant tests counting dogs per tenant (TDD RED Phase)
+func TestDogRepository_CountByTenant(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewDogRepository(db)
+
+	t.Run("count dogs for tenant with dogs", func(t *testing.T) {
+		// Create 3 dogs for tenant 1 (default tenant from SetupTestDB)
+		testutil.SeedTestDog(t, db, "Bella", "Labrador", "green")
+		testutil.SeedTestDog(t, db, "Max", "Beagle", "blue")
+		testutil.SeedTestDog(t, db, "Rocky", "Shepherd", "orange")
+
+		// Test count for tenant 1
+		count, err := repo.CountByTenant(1)
+		if err != nil {
+			t.Fatalf("CountByTenant() failed: %v", err)
+		}
+
+		if count != 3 {
+			t.Errorf("Expected 3 dogs for tenant 1, got %d", count)
+		}
+	})
+
+	t.Run("count dogs for tenant with no dogs", func(t *testing.T) {
+		// Use a fresh database
+		db2 := testutil.SetupTestDB(t)
+		repo2 := NewDogRepository(db2)
+
+		// Tenant 1 exists but has no dogs
+		count, err := repo2.CountByTenant(1)
+		if err != nil {
+			t.Fatalf("CountByTenant() failed: %v", err)
+		}
+
+		if count != 0 {
+			t.Errorf("Expected 0 dogs for tenant 1, got %d", count)
+		}
+	})
+
+	t.Run("count dogs for non-existent tenant", func(t *testing.T) {
+		// Use a fresh database
+		db3 := testutil.SetupTestDB(t)
+		repo3 := NewDogRepository(db3)
+
+		// Create a dog for tenant 1
+		testutil.SeedTestDog(t, db3, "Bella", "Labrador", "green")
+
+		// Count for non-existent tenant 999
+		count, err := repo3.CountByTenant(999)
+		if err != nil {
+			t.Fatalf("CountByTenant() failed: %v", err)
+		}
+
+		if count != 0 {
+			t.Errorf("Expected 0 dogs for non-existent tenant, got %d", count)
+		}
+	})
+
+	t.Run("count dogs for multiple tenants", func(t *testing.T) {
+		// Use a fresh database
+		db4 := testutil.SetupTestDB(t)
+		repo4 := NewDogRepository(db4)
+
+		// Create tenant 2
+		_, err := db4.Exec(`
+			INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
+			VALUES (2, 'tenant-2', 'Tenant 2', 'active', 'tenant2@example.com', datetime('now'), datetime('now'))
+		`)
+		if err != nil {
+			t.Fatalf("Failed to create tenant 2: %v", err)
+		}
+
+		// Create 3 dogs for tenant 1
+		testutil.SeedTestDog(t, db4, "Bella", "Labrador", "green")
+		testutil.SeedTestDog(t, db4, "Max", "Beagle", "blue")
+		testutil.SeedTestDog(t, db4, "Rocky", "Shepherd", "orange")
+
+		// Create 2 dogs for tenant 2 (directly via SQL since SeedTestDog uses tenant_id=1)
+		now := time.Now()
+		_, err = db4.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at) VALUES (2, ?, ?, ?, ?, ?, 1, ?)`,
+			"Luna", "Poodle", "small", 3, 1, now)
+		if err != nil {
+			t.Fatalf("Failed to create dog for tenant 2: %v", err)
+		}
+		_, err = db4.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at) VALUES (2, ?, ?, ?, ?, ?, 1, ?)`,
+			"Charlie", "Husky", "large", 4, 5, now)
+		if err != nil {
+			t.Fatalf("Failed to create dog for tenant 2: %v", err)
+		}
+
+		// Count for tenant 1
+		count1, err := repo4.CountByTenant(1)
+		if err != nil {
+			t.Fatalf("CountByTenant(1) failed: %v", err)
+		}
+		if count1 != 3 {
+			t.Errorf("Expected 3 dogs for tenant 1, got %d", count1)
+		}
+
+		// Count for tenant 2
+		count2, err := repo4.CountByTenant(2)
+		if err != nil {
+			t.Fatalf("CountByTenant(2) failed: %v", err)
+		}
+		if count2 != 2 {
+			t.Errorf("Expected 2 dogs for tenant 2, got %d", count2)
+		}
+	})
+}
+
 // TestCanUserAccessDogByColor tests color-based access control (new system)
 func TestCanUserAccessDogByColor(t *testing.T) {
 	tests := []struct {

@@ -121,6 +121,24 @@ func main() {
 	themeHandler := handlers.NewThemeHandler(db)
 	tenantHandler := handlers.NewTenantHandler(db, cfg)
 	centralAdminHandler := handlers.NewCentralAdminHandler(db, cfg)
+
+	// SaaS: Initialize Stripe service and billing handler
+	var stripeService *services.StripeService
+	if cfg.StripeSecretKey != "" {
+		stripeService = services.NewStripeService(
+			cfg.StripeSecretKey,
+			cfg.StripePublishableKey,
+			cfg.StripePriceMonthly,
+			cfg.StripePriceYearly,
+			cfg.BaseURL,
+		)
+		if cfg.StripeWebhookSecret != "" {
+			stripeService.SetWebhookSecret(cfg.StripeWebhookSecret)
+		}
+		log.Println("Stripe payment service initialized")
+	}
+	billingHandler := handlers.NewBillingHandler(db, stripeService)
+
 	router.HandleFunc("/api/health", healthHandler.Health).Methods("GET")
 
 	// Initialize booking time repositories and services
@@ -184,6 +202,9 @@ func main() {
 	router.HandleFunc("/api/tenants/register", tenantHandler.Register).Methods("POST")
 	router.HandleFunc("/api/tenants/check-slug", tenantHandler.CheckSlug).Methods("GET")
 
+	// SaaS Stripe webhook (public - verified by signature)
+	router.HandleFunc("/api/billing/webhook", billingHandler.HandleWebhook).Methods("POST")
+
 	// Protected routes (authenticated users)
 	protected := router.PathPrefix("/api").Subrouter()
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
@@ -234,6 +255,14 @@ func main() {
 	protected.HandleFunc("/walk-reports/{id}/photos", walkReportHandler.UploadPhoto).Methods("POST")
 	protected.HandleFunc("/walk-reports/{id}/photos/{photoId}", walkReportHandler.DeletePhoto).Methods("DELETE")
 	protected.HandleFunc("/dogs/{id}/walk-reports", walkReportHandler.GetDogWalkReports).Methods("GET")
+
+	// SaaS Billing routes (authenticated users)
+	protected.HandleFunc("/billing/subscription", billingHandler.GetSubscription).Methods("GET")
+	protected.HandleFunc("/billing/plans", billingHandler.GetPlans).Methods("GET")
+	protected.HandleFunc("/billing/usage", billingHandler.GetUsage).Methods("GET")
+	protected.HandleFunc("/billing/checkout", billingHandler.CreateCheckout).Methods("POST")
+	protected.HandleFunc("/billing/portal", billingHandler.CreateBillingPortal).Methods("POST")
+	protected.HandleFunc("/billing/cancel", billingHandler.CancelSubscription).Methods("POST")
 
 	// Admin-only routes
 	admin := protected.PathPrefix("").Subrouter()

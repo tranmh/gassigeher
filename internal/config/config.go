@@ -86,6 +86,13 @@ type Config struct {
 	S3Region     string
 	S3PublicURL  string // e.g., "https://gassigeher-uploads.fsn1.your-objectstorage.com"
 	S3UseSSL     bool
+
+	// Stripe Payment Configuration (SaaS)
+	StripeSecretKey      string // sk_live_xxx or sk_test_xxx
+	StripePublishableKey string // pk_live_xxx or pk_test_xxx
+	StripeWebhookSecret  string // whsec_xxx
+	StripePriceMonthly   string // price_xxx for monthly subscription
+	StripePriceYearly    string // price_xxx for yearly subscription
 }
 
 // Load loads configuration from environment variables
@@ -165,6 +172,13 @@ func Load() *Config {
 		S3Region:     getEnv("S3_REGION", ""),
 		S3PublicURL:  getEnv("S3_PUBLIC_URL", ""),
 		S3UseSSL:     getEnvAsBool("S3_USE_SSL", true),
+
+		// Stripe Payment Configuration (SaaS)
+		StripeSecretKey:      getEnv("STRIPE_SECRET_KEY", ""),
+		StripePublishableKey: getEnv("STRIPE_PUBLISHABLE_KEY", ""),
+		StripeWebhookSecret:  getEnv("STRIPE_WEBHOOK_SECRET", ""),
+		StripePriceMonthly:   getEnv("STRIPE_PRICE_MONTHLY", ""),
+		StripePriceYearly:    getEnv("STRIPE_PRICE_YEARLY", ""),
 	}
 }
 

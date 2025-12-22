@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Abrechnung - Gassigeher</title>
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <style>
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin: 30px 0;
+        }
+        .pricing-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            border: 2px solid #e0e0e0;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .pricing-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        }
+        .pricing-card.current {
+            border-color: #82b965;
+            background: linear-gradient(180deg, #f8fff5 0%, #fff 100%);
+        }
+        .pricing-card.recommended {
+            border-color: #82b965;
+            position: relative;
+        }
+        .pricing-card.recommended::before {
+            content: "Empfohlen";
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #82b965;
+            color: white;
+            padding: 4px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .plan-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #26272b;
+            margin: 0 0 8px 0;
+        }
+        .plan-price {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #82b965;
+            margin: 16px 0;
+        }
+        .plan-price span {
+            font-size: 1rem;
+            color: #666;
+            font-weight: 400;
+        }
+        .plan-features {
+            list-style: none;
+            padding: 0;
+            margin: 24px 0;
+            text-align: left;
+        }
+        .plan-features li {
+            padding: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #444;
+        }
+        .plan-features li::before {
+            content: "✓";
+            color: #82b965;
+            font-weight: bold;
+        }
+        .usage-bar {
+            background: #e0e0e0;
+            border-radius: 8px;
+            height: 12px;
+            overflow: hidden;
+            margin: 16px 0;
+        }
+        .usage-bar-fill {
+            background: linear-gradient(90deg, #82b965 0%, #6fa050 100%);
+            height: 100%;
+            border-radius: 8px;
+            transition: width 0.5s ease;
+        }
+        .usage-bar-fill.warning {
+            background: linear-gradient(90deg, #ffc107 0%, #e0a800 100%);
+        }
+        .usage-bar-fill.danger {
+            background: linear-gradient(90deg, #dc3545 0%, #c82333 100%);
+        }
+        .usage-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        .subscription-info {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .subscription-info h3 {
+            margin: 0 0 12px 0;
+            color: #26272b;
+        }
+        .subscription-detail {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .subscription-detail:last-child {
+            border-bottom: none;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-cancelled {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status-past_due {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .billing-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .billing-cycle-toggle {
+            display: flex;
+            justify-content: center;
+            gap: 0;
+            margin: 20px 0;
+            background: #f0f0f0;
+            border-radius: 8px;
+            padding: 4px;
+            max-width: 300px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .billing-cycle-toggle button {
+            flex: 1;
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: background 0.2s, color 0.2s;
+        }
+        .billing-cycle-toggle button.active {
+            background: #82b965;
+            color: white;
+        }
+        .savings-badge {
+            background: #82b965;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin-left: 4px;
+        }
+        .upgrade-cta {
+            background: linear-gradient(135deg, #82b965 0%, #6fa050 100%);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }
+        .upgrade-cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(130, 185, 101, 0.4);
+        }
+        .transparency-message {
+            background: linear-gradient(135deg, #f8fff5 0%, #e8f5e1 100%);
+            border: 1px solid #82b965;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 30px 0;
+            text-align: center;
+        }
+        .transparency-message h3 {
+            color: #26272b;
+            margin: 0 0 12px 0;
+        }
+        .transparency-message p {
+            color: #555;
+            margin: 0;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <a href="/" class="logo">Gassigeher</a>
+            <nav id="main-nav">
+                <ul>
+                    <li><a href="/dashboard.html" data-i18n="nav.dashboard">Dashboard</a></li>
+                    <li><a href="/dogs.html" data-i18n="dogs.title">Hunde</a></li>
+                    <li><a href="/profile.html" data-i18n="profile.title">Profil</a></li>
+                    <li><a href="/billing.html" data-i18n="billing.title" class="active">Abrechnung</a></li>
+                    <li id="admin-link" style="display:none;"><a href="/admin-dashboard.html" data-i18n="nav.admin_area">Admin-Bereich</a></li>
+                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+
+    <main style="padding: 40px 0;">
+        <div class="container">
+            <h1 data-i18n="billing.title">Abrechnung</h1>
+
+            <div id="alert-container"></div>
+
+            <!-- Usage Overview -->
+            <div class="card" id="usage-section">
+                <h2 data-i18n="billing.usage_overview">Nutzungsübersicht</h2>
+                <div id="usage-content">
+                    <p data-i18n="common.loading">Laden...</p>
+                </div>
+            </div>
+
+            <!-- Transparency Message -->
+            <div class="transparency-message">
+                <h3 data-i18n="billing.transparency_title">Einfach. Ehrlich. Transparent.</h3>
+                <p data-i18n="billing.transparency_message">Ein Limit. Sonst nichts. 10 Hunde kostenlos, alle Funktionen inklusive. Keine versteckten Kosten.</p>
+            </div>
+
+            <!-- Billing Cycle Toggle -->
+            <div class="billing-cycle-toggle" id="billing-toggle">
+                <button class="active" data-cycle="monthly" data-i18n="billing.monthly">Monatlich</button>
+                <button data-cycle="yearly">
+                    <span data-i18n="billing.yearly">Jährlich</span>
+                    <span class="savings-badge" data-i18n="billing.save_2_months">2 Monate gratis</span>
+                </button>
+            </div>
+
+            <!-- Pricing Plans -->
+            <div class="pricing-grid" id="pricing-grid">
+                <p data-i18n="common.loading">Laden...</p>
+            </div>
+
+            <!-- Current Subscription Details -->
+            <div class="card" id="subscription-section" style="display: none;">
+                <h2 data-i18n="billing.current_subscription">Aktuelles Abonnement</h2>
+                <div id="subscription-content"></div>
+            </div>
+
+            <!-- Open Source Notice -->
+            <div class="card" style="text-align: center; margin-top: 30px;">
+                <h3 data-i18n="billing.self_host_title">Lieber selbst hosten?</h3>
+                <p data-i18n="billing.self_host_message">Gassigeher ist Open Source. Laden Sie den Code herunter, hosten Sie selbst, unbegrenzte Hunde. Kein Problem.</p>
+                <a href="https://github.com/tranmh/gassigeher" target="_blank" class="btn btn-secondary" style="margin-top: 12px;">
+                    GitHub
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Gassigeher</p>
+        </div>
+    </footer>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/i18n.js"></script>
+    <script>
+        let currentBillingCycle = 'monthly';
+        let plans = [];
+        let currentSubscription = null;
+        let stripePublishableKey = null;
+
+        async function init() {
+            await window.i18n.load();
+
+            // Check authentication
+            const user = await api.getMe();
+            if (!user) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // Show admin link if admin
+            if (user.is_admin || user.is_super_admin) {
+                document.getElementById('admin-link').style.display = '';
+            }
+
+            // Load data
+            await Promise.all([
+                loadUsage(),
+                loadPlans(),
+                loadSubscription()
+            ]);
+
+            // Setup billing cycle toggle
+            setupBillingToggle();
+        }
+
+        async function loadUsage() {
+            try {
+                const response = await api.fetch('/api/billing/usage');
+                const data = await response.json();
+
+                const dogsUsed = data.dogs_used || 0;
+                const dogsLimit = data.dogs_limit || 10;
+                const percentage = dogsLimit === -1 ? 0 : Math.min(100, (dogsUsed / dogsLimit) * 100);
+
+                let barClass = '';
+                if (percentage >= 90) barClass = 'danger';
+                else if (percentage >= 70) barClass = 'warning';
+
+                const limitText = dogsLimit === -1 ? 'Unbegrenzt' : dogsLimit;
+
+                document.getElementById('usage-content').innerHTML = `
+                    <div class="usage-text">
+                        <span>${dogsUsed} ${window.i18n.t('billing.dogs_used')}</span>
+                        <span>${limitText} ${window.i18n.t('billing.dogs_limit')}</span>
+                    </div>
+                    <div class="usage-bar">
+                        <div class="usage-bar-fill ${barClass}" style="width: ${dogsLimit === -1 ? 0 : percentage}%"></div>
+                    </div>
+                    ${percentage >= 90 && dogsLimit !== -1 ? `
+                        <p style="color: #dc3545; margin-top: 12px;">
+                            <strong>${window.i18n.t('billing.limit_warning')}</strong>
+                        </p>
+                    ` : ''}
+                `;
+            } catch (error) {
+                console.error('Failed to load usage:', error);
+                document.getElementById('usage-content').innerHTML = `
+                    <p style="color: #dc3545;">${window.i18n.t('errors.unexpected_error')}</p>
+                `;
+            }
+        }
+
+        async function loadPlans() {
+            try {
+                const response = await api.fetch('/api/billing/plans');
+                const data = await response.json();
+
+                plans = data.plans || [];
+                stripePublishableKey = data.publishable_key;
+
+                renderPlans();
+            } catch (error) {
+                console.error('Failed to load plans:', error);
+                document.getElementById('pricing-grid').innerHTML = `
+                    <p style="color: #dc3545;">${window.i18n.t('errors.unexpected_error')}</p>
+                `;
+            }
+        }
+
+        async function loadSubscription() {
+            try {
+                const response = await api.fetch('/api/billing/subscription');
+                const data = await response.json();
+
+                currentSubscription = data.subscription;
+
+                if (currentSubscription && currentSubscription.plan_id > 1) {
+                    renderSubscriptionDetails();
+                }
+            } catch (error) {
+                console.error('Failed to load subscription:', error);
+            }
+        }
+
+        function renderPlans() {
+            const grid = document.getElementById('pricing-grid');
+
+            if (!plans.length) {
+                grid.innerHTML = `<p>${window.i18n.t('billing.no_plans')}</p>`;
+                return;
+            }
+
+            grid.innerHTML = plans.map(plan => {
+                const isCurrent = currentSubscription && currentSubscription.plan_id === plan.id;
+                const isPro = plan.slug === 'pro';
+                const price = currentBillingCycle === 'yearly' ? plan.price_yearly : plan.price_monthly;
+                const priceFormatted = price === 0 ? '0' : (price / 100).toFixed(0);
+                const period = currentBillingCycle === 'yearly' ? '/Jahr' : '/Monat';
+
+                const limitText = plan.max_dogs === -1 ? 'Unbegrenzt' : plan.max_dogs;
+
+                return `
+                    <div class="pricing-card ${isCurrent ? 'current' : ''} ${isPro && !isCurrent ? 'recommended' : ''}">
+                        <h3 class="plan-name">${escapeHtml(plan.name)}</h3>
+                        <div class="plan-price">
+                            €${priceFormatted}<span>${period}</span>
+                        </div>
+                        <ul class="plan-features">
+                            <li>${limitText} Hunde</li>
+                            <li>Alle Funktionen inklusive</li>
+                            <li>Kalender & Buchungen</li>
+                            <li>E-Mail Benachrichtigungen</li>
+                            ${isPro ? '<li>Prioritäts-Support</li>' : '<li>Community-Support</li>'}
+                        </ul>
+                        ${isCurrent ? `
+                            <button class="btn btn-secondary" style="width: 100%;" disabled>
+                                ${window.i18n.t('billing.current_plan')}
+                            </button>
+                        ` : isPro ? `
+                            <button class="upgrade-cta" onclick="upgradeToPro()">
+                                ${window.i18n.t('billing.upgrade_to_pro')}
+                            </button>
+                        ` : `
+                            <button class="btn btn-secondary" style="width: 100%;" disabled>
+                                ${window.i18n.t('billing.free_forever')}
+                            </button>
+                        `}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderSubscriptionDetails() {
+            const section = document.getElementById('subscription-section');
+            const content = document.getElementById('subscription-content');
+
+            if (!currentSubscription || currentSubscription.plan_id === 1) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = '';
+
+            const statusClass = `status-${currentSubscription.status}`;
+            const statusText = {
+                'active': 'Aktiv',
+                'cancelled': 'Gekündigt',
+                'past_due': 'Zahlung ausstehend',
+                'trialing': 'Testphase'
+            }[currentSubscription.status] || currentSubscription.status;
+
+            const periodEnd = currentSubscription.current_period_end
+                ? new Date(currentSubscription.current_period_end).toLocaleDateString('de-DE')
+                : '-';
+
+            content.innerHTML = `
+                <div class="subscription-info">
+                    <div class="subscription-detail">
+                        <span>${window.i18n.t('billing.status')}</span>
+                        <span class="status-badge ${statusClass}">${statusText}</span>
+                    </div>
+                    <div class="subscription-detail">
+                        <span>${window.i18n.t('billing.plan')}</span>
+                        <span>${currentSubscription.plan ? escapeHtml(currentSubscription.plan.name) : 'Pro'}</span>
+                    </div>
+                    <div class="subscription-detail">
+                        <span>${window.i18n.t('billing.billing_cycle')}</span>
+                        <span>${currentSubscription.billing_cycle === 'yearly' ? 'Jährlich' : 'Monatlich'}</span>
+                    </div>
+                    <div class="subscription-detail">
+                        <span>${window.i18n.t('billing.next_billing')}</span>
+                        <span>${periodEnd}</span>
+                    </div>
+                </div>
+                <div class="billing-actions">
+                    ${currentSubscription.stripe_customer_id ? `
+                        <button class="btn btn-secondary" onclick="openBillingPortal()">
+                            ${window.i18n.t('billing.manage_payment')}
+                        </button>
+                    ` : ''}
+                    ${currentSubscription.status === 'active' ? `
+                        <button class="btn btn-danger" onclick="cancelSubscription()">
+                            ${window.i18n.t('billing.cancel_subscription')}
+                        </button>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function setupBillingToggle() {
+            const toggle = document.getElementById('billing-toggle');
+            const buttons = toggle.querySelectorAll('button');
+
+            buttons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    buttons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentBillingCycle = btn.dataset.cycle;
+                    renderPlans();
+                });
+            });
+        }
+
+        async function upgradeToPro() {
+            try {
+                const response = await api.fetch('/api/billing/checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        plan_slug: 'pro',
+                        billing_cycle: currentBillingCycle
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.checkout_url) {
+                    window.location.href = data.checkout_url;
+                } else if (data.error) {
+                    showAlert(data.error, 'error');
+                }
+            } catch (error) {
+                console.error('Checkout error:', error);
+                showAlert(window.i18n.t('billing.checkout_error'), 'error');
+            }
+        }
+
+        async function openBillingPortal() {
+            try {
+                const response = await api.fetch('/api/billing/portal', {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (data.portal_url) {
+                    window.location.href = data.portal_url;
+                } else if (data.error) {
+                    showAlert(data.error, 'error');
+                }
+            } catch (error) {
+                console.error('Portal error:', error);
+                showAlert(window.i18n.t('errors.unexpected_error'), 'error');
+            }
+        }
+
+        async function cancelSubscription() {
+            if (!confirm(window.i18n.t('billing.cancel_confirm'))) {
+                return;
+            }
+
+            try {
+                const response = await api.fetch('/api/billing/cancel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert(window.i18n.t('billing.cancel_success'), 'success');
+                    await loadSubscription();
+                    renderPlans();
+                } else {
+                    showAlert(data.error || window.i18n.t('errors.unexpected_error'), 'error');
+                }
+            } catch (error) {
+                console.error('Cancel error:', error);
+                showAlert(window.i18n.t('errors.unexpected_error'), 'error');
+            }
+        }
+
+        // Security: Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showAlert(message, type) {
+            const container = document.getElementById('alert-container');
+            const alertClass = type === 'error' ? 'alert-error' : 'alert-success';
+            // Security: Escape message to prevent XSS
+            container.innerHTML = `
+                <div class="alert ${alertClass}">${escapeHtml(message)}</div>
+            `;
+            setTimeout(() => {
+                container.innerHTML = '';
+            }, 5000);
+        }
+
+        function toggleMenu() {
+            document.getElementById('main-nav').classList.toggle('active');
+            document.getElementById('nav-overlay').classList.toggle('active');
+        }
+
+        // Initialize
+        init();
+    </script>
+</body>
+</html>

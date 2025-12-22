@@ -51,6 +51,17 @@
 
             <div id="alert-container"></div>
 
+            <!-- Dog Limit Usage (SaaS) -->
+            <div id="dog-limit-info" style="display: none; background: #f8f9fa; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 16px;">
+                <div style="flex: 1;">
+                    <span id="dog-limit-text" style="font-size: 0.9rem; color: #666;"></span>
+                    <div style="background: #e0e0e0; border-radius: 4px; height: 6px; margin-top: 6px; overflow: hidden;">
+                        <div id="dog-limit-bar" style="background: #82b965; height: 100%; border-radius: 4px; transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+                <a href="/billing.html" id="upgrade-link" style="display: none; font-size: 0.85rem; color: #82b965; font-weight: 500; white-space: nowrap;">Upgrade</a>
+            </div>
+
             <!-- Add/Edit Dog Form (hidden by default) -->
             <div id="dog-form-container" class="card hidden" style="margin-bottom: 30px;">
                 <h3 id="form-title" data-i18n="dogs.add_dog">Hund hinzufügen</h3>
@@ -215,9 +226,10 @@
             // Initialize impersonation banner (shows if impersonating)
             await ImpersonationBanner.init();
 
-            // Load colors first, then dogs
+            // Load colors first, then dogs and limits
             await loadColors();
             loadDogs();
+            loadDogLimit();
 
             document.getElementById('dog-form').addEventListener('submit', handleFormSubmit);
 
@@ -302,6 +314,58 @@
             `;
         }
 
+        // SaaS: Track dog limit usage
+        let dogLimitData = { used: 0, limit: 10 };
+
+        async function loadDogLimit() {
+            try {
+                const response = await api.fetch('/api/billing/usage');
+                if (!response.ok) return; // Billing not available
+
+                const data = await response.json();
+                dogLimitData = {
+                    used: data.dogs_used || 0,
+                    limit: data.dogs_limit || 10
+                };
+
+                const infoDiv = document.getElementById('dog-limit-info');
+                const textSpan = document.getElementById('dog-limit-text');
+                const bar = document.getElementById('dog-limit-bar');
+                const upgradeLink = document.getElementById('upgrade-link');
+
+                // Show the info bar
+                infoDiv.style.display = 'flex';
+
+                const limitText = dogLimitData.limit === -1 ? 'Unbegrenzt' : dogLimitData.limit;
+                textSpan.textContent = `${dogLimitData.used} / ${limitText} Hunde`;
+
+                if (dogLimitData.limit === -1) {
+                    bar.style.width = '0%';
+                    upgradeLink.style.display = 'none';
+                } else {
+                    const percentage = Math.min(100, (dogLimitData.used / dogLimitData.limit) * 100);
+                    bar.style.width = `${percentage}%`;
+
+                    if (percentage >= 90) {
+                        bar.style.background = '#dc3545';
+                        upgradeLink.style.display = '';
+                    } else if (percentage >= 70) {
+                        bar.style.background = '#ffc107';
+                        upgradeLink.style.display = '';
+                    } else {
+                        upgradeLink.style.display = 'none';
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load dog limit:', error);
+            }
+        }
+
+        function canAddDog() {
+            if (dogLimitData.limit === -1) return true; // Unlimited
+            return dogLimitData.used < dogLimitData.limit;
+        }
+
         async function loadDogs() {
             try {
                 currentDogs = await api.getDogs();
@@ -359,6 +423,14 @@
         }
 
         function showAddDogForm() {
+            // SaaS: Check dog limit
+            if (!canAddDog()) {
+                showAlert('error', 'Hundelimit erreicht! Upgrade auf Pro für unbegrenzte Hunde.');
+                // Scroll to limit info
+                document.getElementById('dog-limit-info').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                return;
+            }
+
             document.getElementById('form-title').textContent = 'Hund hinzufügen';
             document.getElementById('dog-form').reset();
             document.getElementById('dog-id').value = '';
@@ -466,6 +538,7 @@
 
                 hideForm();
                 loadDogs();
+                loadDogLimit(); // Refresh usage after adding dog
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Speichern');
             }
@@ -505,6 +578,7 @@
                 await api.deleteDog(id);
                 showAlert('success', 'Hund erfolgreich gelöscht');
                 loadDogs();
+                loadDogLimit(); // Refresh usage after deleting dog
             } catch (error) {
                 // Check if error is due to future bookings
                 if (error.status === 409 && error.data && error.data.bookings) {
@@ -601,6 +675,7 @@
                 const message = `Hund wurde gelöscht und ${result.cancelled_count || bookingCount} Buchung(en) wurden storniert. Betroffene Benutzer wurden per E-Mail benachrichtigt.`;
                 showAlert('success', message);
                 loadDogs();
+                loadDogLimit(); // Refresh usage after deleting dog
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Löschen');
             }

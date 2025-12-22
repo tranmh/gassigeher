@@ -2,16 +2,27 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/testutil"
 )
+
+// contextWithTenantAndUser is a helper for tests that need explicit tenant control
+func contextWithTenantAndUser(ctx context.Context, tenantID, userID int) context.Context {
+	ctx = context.WithValue(ctx, middleware.TenantIDKey, tenantID)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, userID)
+	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
+	return ctx
+}
 
 // DONE: TestDogHandler_ListDogs tests listing dogs with filters
 func TestDogHandler_ListDogs(t *testing.T) {
@@ -262,6 +273,149 @@ func TestDogHandler_CreateDog(t *testing.T) {
 
 		if rec.Code != http.StatusBadRequest {
 			t.Errorf("Expected status 400 for invalid category, got %d", rec.Code)
+		}
+	})
+}
+
+// TestDogHandler_CreateDog_DogLimitEnforcement tests 10-dog limit per tenant (TDD RED Phase)
+func TestDogHandler_CreateDog_DogLimitEnforcement(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewDogHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
+
+	t.Run("rejects 11th dog for free tenant", func(t *testing.T) {
+		// Create 10 dogs for tenant 1 (the limit for free tier)
+		for i := 1; i <= 10; i++ {
+			testutil.SeedTestDog(t, db, fmt.Sprintf("Dog %d", i), "Labrador", "green")
+		}
+
+		// Try to create 11th dog - should fail
+		reqBody := map[string]interface{}{
+			"name":     "Dog 11 - Over Limit",
+			"breed":    "Poodle",
+			"size":     "medium",
+			"age":      3,
+			"category": "green",
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/dogs", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateDog(rec, req)
+
+		// Should return 409 Conflict (dog limit reached)
+		if rec.Code != http.StatusConflict {
+			t.Errorf("Expected status 409 (Conflict), got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		// Verify error message mentions limit
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+		if response["error"] == nil {
+			t.Error("Expected error message in response")
+		}
+	})
+
+	t.Run("allows creation within limit", func(t *testing.T) {
+		// Use fresh DB with no dogs
+		db2 := testutil.SetupTestDB(t)
+		handler2 := NewDogHandler(db2, cfg)
+		adminID2 := testutil.SeedTestUser(t, db2, "admin2@example.com", "Admin", "orange")
+
+		// Create 9 dogs (under limit)
+		for i := 1; i <= 9; i++ {
+			testutil.SeedTestDog(t, db2, fmt.Sprintf("Dog %d", i), "Labrador", "green")
+		}
+
+		// 10th dog should succeed
+		reqBody := map[string]interface{}{
+			"name":     "Dog 10 - At Limit",
+			"breed":    "Poodle",
+			"size":     "medium",
+			"age":      3,
+			"category": "green",
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/dogs", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), adminID2, "admin2@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler2.CreateDog(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Errorf("Expected status 201 for 10th dog, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+}
+
+// TestDogHandler_CreateDog_SetsTenantID tests that CreateDog sets TenantID from context (TDD RED Phase)
+func TestDogHandler_CreateDog_SetsTenantID(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewDogHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
+
+	t.Run("created dog has tenant_id from context", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"name":     "Tenant Test Dog",
+			"breed":    "Labrador",
+			"size":     "medium",
+			"age":      3,
+			"category": "green",
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/dogs", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateDog(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		dogID := int(response["id"].(float64))
+
+		// Verify dog has correct tenant_id in database
+		var tenantID *int
+		err := db.QueryRow("SELECT tenant_id FROM dogs WHERE id = ?", dogID).Scan(&tenantID)
+		if err != nil {
+			t.Fatalf("Failed to query dog tenant_id: %v", err)
+		}
+
+		if tenantID == nil {
+			t.Error("Expected dog to have tenant_id set, but it was NULL")
+		} else if *tenantID != 1 {
+			t.Errorf("Expected dog tenant_id to be 1, got %d", *tenantID)
+		}
+
+		// Also verify tenant_id is returned in the response
+		if response["tenant_id"] == nil {
+			t.Error("Expected tenant_id in response, but it was nil")
+		} else if int(response["tenant_id"].(float64)) != 1 {
+			t.Errorf("Expected tenant_id 1 in response, got %v", response["tenant_id"])
 		}
 	})
 }
@@ -864,4 +1018,47 @@ func TestDogHandler_GetBreeds(t *testing.T) {
 			t.Errorf("Expected 0 breeds, got %d", len(breeds))
 		}
 	})
+}
+
+// TestCreateDog_ProTierUnlimited tests that Pro tier tenants can create unlimited dogs
+// TDD RED PHASE: This test should FAIL because the code uses hardcoded limit of 10
+func TestCreateDog_ProTierUnlimited(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+
+	// Upgrade tenant 1 to Pro plan (plan_id = 2, which has max_dogs = -1 for unlimited)
+	_, err := db.Exec(`UPDATE tenant_subscriptions SET plan_id = 2 WHERE tenant_id = 1`)
+	if err != nil {
+		t.Fatalf("Failed to upgrade tenant to Pro: %v", err)
+	}
+
+	handler := NewDogHandler(db, &config.Config{UploadDir: t.TempDir()})
+
+	// Create 10 dogs to reach what would be the "free tier limit"
+	for i := 0; i < 10; i++ {
+		body := fmt.Sprintf(`{"name":"Dog%d","breed":"Lab","size":"medium","age":3,"color_id":1}`, i)
+		req := httptest.NewRequest(http.MethodPost, "/api/dogs", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = req.WithContext(contextWithTenantAndUser(req.Context(), 1, 1))
+		w := httptest.NewRecorder()
+		handler.CreateDog(w, req)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("Failed to create dog %d: %d - %s", i, w.Code, w.Body.String())
+		}
+	}
+
+	// Pro tier tenant should be able to create 11th dog (unlimited)
+	// BUG: Currently returns 409 Conflict because code uses hardcoded FreeTierDogLimit=10
+	body := `{"name":"Dog11","breed":"Lab","size":"medium","age":3,"color_id":1}`
+	req := httptest.NewRequest(http.MethodPost, "/api/dogs", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(contextWithTenantAndUser(req.Context(), 1, 1))
+	w := httptest.NewRecorder()
+
+	handler.CreateDog(w, req)
+
+	// Should return 201 Created, NOT 409 Conflict
+	if w.Code != http.StatusCreated {
+		t.Errorf("BUG: Pro tier should allow unlimited dogs. Expected 201, got %d: %s",
+			w.Code, w.Body.String())
+	}
 }

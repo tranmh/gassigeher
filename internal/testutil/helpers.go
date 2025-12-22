@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"context"
 	"database/sql"
 	"os"
 	"testing"
@@ -10,6 +11,15 @@ import (
 	_ "github.com/lib/pq"
 	_ "modernc.org/sqlite"
 	"github.com/tranmh/gassigeher/internal/database"
+)
+
+// Define context keys locally to avoid import cycle with middleware
+// These must match the values in internal/middleware/middleware.go
+type contextKey string
+
+const (
+	testTenantIDKey contextKey = "tenantID"
+	testUserIDKey   contextKey = "userID"
 )
 
 // SetupTestDB creates a test database (default: in-memory SQLite)
@@ -118,6 +128,16 @@ func SetupTestDBWithType(t *testing.T, dbType string) *sql.DB {
 	`)
 	if err != nil {
 		t.Fatalf("Failed to create test tenant: %v", err)
+	}
+
+	// SaaS: Create default free subscription for test tenant
+	// Migration 009 seeds subscriptions for existing tenants, but tenant 1 is created after migrations
+	_, err = db.Exec(`
+		INSERT INTO tenant_subscriptions (tenant_id, plan_id, status, created_at, updated_at)
+		VALUES (1, 1, 'active', datetime('now'), datetime('now'))
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create test subscription: %v", err)
 	}
 
 	// Update all default seed data to belong to test tenant
@@ -473,4 +493,36 @@ func ClearTable(t *testing.T, db *sql.DB, table string) {
 	if err != nil {
 		t.Fatalf("Failed to clear table %s: %v", table, err)
 	}
+}
+
+// ContextWithTenantID returns a context with the tenant ID set
+// Used in tests to simulate authenticated tenant context
+// NOTE: Uses local key that matches middleware.TenantIDKey value
+func ContextWithTenantID(ctx context.Context, tenantID int) context.Context {
+	return context.WithValue(ctx, testTenantIDKey, tenantID)
+}
+
+// ContextWithUserID returns a context with the user ID set
+// Used in tests to simulate authenticated user context
+// NOTE: Uses local key that matches middleware.UserIDKey value
+func ContextWithUserID(ctx context.Context, userID int) context.Context {
+	return context.WithValue(ctx, testUserIDKey, userID)
+}
+
+// ContextWithAuth returns a context with both tenant ID and user ID set
+func ContextWithAuth(ctx context.Context, tenantID, userID int) context.Context {
+	ctx = context.WithValue(ctx, testTenantIDKey, tenantID)
+	ctx = context.WithValue(ctx, testUserIDKey, userID)
+	return ctx
+}
+
+// GetTenantIDKey returns the tenant ID context key for use in handler tests
+// This allows handler tests to use context.WithValue directly with the correct key type
+func GetTenantIDKey() interface{} {
+	return testTenantIDKey
+}
+
+// GetUserIDKey returns the user ID context key for use in handler tests
+func GetUserIDKey() interface{} {
+	return testUserIDKey
 }

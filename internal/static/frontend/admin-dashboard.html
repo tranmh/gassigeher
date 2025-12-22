@@ -91,6 +91,24 @@
                 </div>
             </div>
 
+            <!-- Plan Usage Widget (SaaS) -->
+            <div class="card" id="plan-usage-widget" style="display: none; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0;" data-i18n="billing.usage_overview">Nutzungsübersicht</h3>
+                    <a href="/billing.html" class="btn btn-secondary" style="font-size: 0.85rem; padding: 6px 12px;" data-i18n="billing.manage_payment">Abrechnung</a>
+                </div>
+                <div id="plan-usage-content">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #666; margin-bottom: 8px;">
+                        <span id="usage-dogs-used">- Hunde</span>
+                        <span id="usage-dogs-limit">- Limit</span>
+                    </div>
+                    <div style="background: #e0e0e0; border-radius: 8px; height: 12px; overflow: hidden;">
+                        <div id="usage-bar-fill" style="background: linear-gradient(90deg, #82b965 0%, #6fa050 100%); height: 100%; border-radius: 8px; transition: width 0.5s ease; width: 0%;"></div>
+                    </div>
+                    <div id="usage-plan-info" style="margin-top: 12px; font-size: 0.9rem; color: #666;"></div>
+                </div>
+            </div>
+
             <!-- Recent Activity -->
             <div class="card">
                 <h3 data-i18n="admin_dashboard.recent_activity">Letzte Aktivitäten</h3>
@@ -162,6 +180,7 @@
 
             loadStats();
             loadActivity();
+            loadPlanUsage();
         });
 
         async function loadStats() {
@@ -220,6 +239,60 @@
             } catch (error) {
                 console.error('Failed to load activity:', error);
                 document.getElementById('activity-feed').innerHTML = '<p class="alert alert-error">Fehler beim Laden der Aktivitäten</p>';
+            }
+        }
+
+        async function loadPlanUsage() {
+            try {
+                const response = await api.fetch('/api/billing/usage');
+                if (!response.ok) {
+                    // Billing not enabled or error - hide widget
+                    return;
+                }
+
+                const data = await response.json();
+                const dogsUsed = data.dogs_used || 0;
+                const dogsLimit = data.dogs_limit || 10;
+
+                // Show the widget
+                const widget = document.getElementById('plan-usage-widget');
+                widget.style.display = '';
+
+                // Update text
+                document.getElementById('usage-dogs-used').textContent = `${dogsUsed} Hunde verwendet`;
+                const limitText = dogsLimit === -1 ? 'Unbegrenzt' : `${dogsLimit} Limit`;
+                document.getElementById('usage-dogs-limit').textContent = limitText;
+
+                // Update bar
+                const bar = document.getElementById('usage-bar-fill');
+                if (dogsLimit === -1) {
+                    bar.style.width = '0%';
+                } else {
+                    const percentage = Math.min(100, (dogsUsed / dogsLimit) * 100);
+                    bar.style.width = `${percentage}%`;
+
+                    // Change color based on usage
+                    if (percentage >= 90) {
+                        bar.style.background = 'linear-gradient(90deg, #dc3545 0%, #c82333 100%)';
+                    } else if (percentage >= 70) {
+                        bar.style.background = 'linear-gradient(90deg, #ffc107 0%, #e0a800 100%)';
+                    }
+                }
+
+                // Show plan info
+                const planInfo = document.getElementById('usage-plan-info');
+                if (dogsLimit === -1) {
+                    planInfo.innerHTML = '<span style="color: #82b965; font-weight: 500;">Pro Plan - Unbegrenzte Hunde</span>';
+                } else if (dogsUsed >= dogsLimit) {
+                    planInfo.innerHTML = '<span style="color: #dc3545; font-weight: 500;">Limit erreicht! <a href="/billing.html">Upgrade auf Pro</a></span>';
+                } else if (dogsUsed >= dogsLimit * 0.9) {
+                    planInfo.innerHTML = '<span style="color: #ffc107; font-weight: 500;">Fast am Limit - <a href="/billing.html">Upgrade auf Pro</a></span>';
+                } else {
+                    planInfo.textContent = `Free Plan - ${dogsLimit - dogsUsed} Hunde verfügbar`;
+                }
+            } catch (error) {
+                console.error('Failed to load plan usage:', error);
+                // Silently fail - widget stays hidden
             }
         }
     </script>

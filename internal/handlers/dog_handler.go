@@ -21,12 +21,13 @@ import (
 
 // DogHandler handles dog-related endpoints
 type DogHandler struct {
-	dogRepo      *repository.DogRepository
-	userRepo     *repository.UserRepository
-	bookingRepo  *repository.BookingRepository
-	imageService *services.ImageService
-	emailService *services.EmailService
-	config       *config.Config
+	dogRepo          *repository.DogRepository
+	userRepo         *repository.UserRepository
+	bookingRepo      *repository.BookingRepository
+	subscriptionRepo *repository.SubscriptionRepository // SaaS: For checking dog limits
+	imageService     *services.ImageService
+	emailService     *services.EmailService
+	config           *config.Config
 }
 
 // NewDogHandler creates a new dog handler
@@ -38,12 +39,13 @@ func NewDogHandler(db *sql.DB, cfg *config.Config) *DogHandler {
 	}
 
 	return &DogHandler{
-		dogRepo:      repository.NewDogRepository(db),
-		userRepo:     repository.NewUserRepository(db),
-		bookingRepo:  repository.NewBookingRepository(db),
-		imageService: services.NewImageService(cfg.UploadDir),
-		emailService: emailService,
-		config:       cfg,
+		dogRepo:          repository.NewDogRepository(db),
+		userRepo:         repository.NewUserRepository(db),
+		bookingRepo:      repository.NewBookingRepository(db),
+		subscriptionRepo: repository.NewSubscriptionRepository(db), // SaaS: For dog limit checks
+		imageService:     services.NewImageService(cfg.UploadDir),
+		emailService:     emailService,
+		config:           cfg,
 	}
 }
 
@@ -129,12 +131,30 @@ func (h *DogHandler) GetDog(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, dog)
 }
 
+// FreeTierDogLimit is the maximum number of dogs allowed for free tier tenants
+const FreeTierDogLimit = 10
+
 // CreateDog handles POST /api/dogs - create a new dog (admin only)
 func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) {
 	var req models.CreateDogRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid request body")
 		return
+	}
+
+	// SaaS: Get tenant_id from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	// SaaS: Get dog limit from subscription (will be used for atomic create)
+	var dogLimit int = -1 // Default unlimited for non-tenant mode
+	if tenantID > 0 {
+		var err error
+		dogLimit, err = h.subscriptionRepo.GetTenantDogLimit(tenantID)
+		if err != nil {
+			log.Printf("ERROR: Failed to get dog limit for tenant %d: %v", tenantID, err)
+			respondError(w, http.StatusInternalServerError, "Failed to check subscription")
+			return
+		}
 	}
 
 	// Validate required fields
@@ -177,6 +197,7 @@ func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) {
 
 	// Create dog
 	dog := &models.Dog{
+		TenantID:            tenantID, // SaaS: Set tenant_id from context
 		Name:                req.Name,
 		Breed:               req.Breed,
 		Size:                req.Size,
@@ -194,7 +215,19 @@ func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) {
 		IsAvailable:         true, // Default to available
 	}
 
-	if err := h.dogRepo.Create(dog); err != nil {
+	// SaaS: Use atomic create with limit check to prevent race conditions
+	if err := h.dogRepo.CreateWithLimitCheck(dog, dogLimit); err != nil {
+		if err == repository.ErrDogLimitExceeded {
+			// Get current count for error response
+			currentCount, _ := h.dogRepo.CountByTenant(tenantID)
+			respondJSON(w, http.StatusConflict, map[string]interface{}{
+				"error":         "Hundelimit erreicht",
+				"message":       "Sie haben das Maximum von 10 Hunden für das kostenlose Konto erreicht. Bitte upgraden Sie auf Pro für unbegrenzte Hunde.",
+				"current_count": currentCount,
+				"limit":         dogLimit,
+			})
+			return
+		}
 		log.Printf("ERROR: Failed to create dog: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to create dog")
 		return
