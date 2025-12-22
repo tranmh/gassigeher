@@ -76,7 +76,9 @@ type LoginResponse struct {
 	Token              string `json:"token"`
 	User               *User  `json:"user"`
 	IsAdmin            bool   `json:"is_admin"`
+	IsCentralAdmin     bool   `json:"is_central_admin"`     // SaaS: true if user is platform-wide admin
 	MustChangePassword bool   `json:"must_change_password"`
+	RedirectTo         string `json:"redirect_to"`          // SaaS: where to redirect after login
 }
 
 // VerifyEmailRequest represents email verification payload

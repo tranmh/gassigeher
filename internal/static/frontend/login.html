@@ -98,9 +98,10 @@
 
                     showAlert('success', 'Login erfolgreich!');
 
-                    // Redirect to dashboard
+                    // SaaS: Use redirect_to from server response
+                    const redirectTo = response.redirect_to || '/dashboard.html';
                     setTimeout(() => {
-                        window.location.href = '/dashboard.html';
+                        window.location.href = redirectTo;
                     }, 1000);
                 } catch (error) {
                     showAlert('error', error.message || window.i18n.t('errors.unexpected_error'));

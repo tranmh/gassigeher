@@ -950,3 +950,65 @@ func TestUserRepository_MustChangePasswordField(t *testing.T) {
 		}
 	})
 }
+
+// TestUserRepository_FindByEmail_CentralAdmin tests that FindByEmail returns is_central_admin flag
+// BUG: The current FindByEmail query doesn't include is_central_admin column
+func TestUserRepository_FindByEmail_CentralAdmin(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewUserRepository(db)
+
+	t.Run("central admin flag is returned", func(t *testing.T) {
+		// Create a Central Admin user directly in database
+		email := "central@admin.local"
+		_, err := db.Exec(`
+			INSERT INTO users (
+				first_name, last_name, email, password_hash,
+				is_admin, is_super_admin, is_central_admin,
+				is_verified, is_active, terms_accepted_at, last_activity_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+		`, "Central", "Admin", email, "hashedpw", 1, 1, 1, 1, 1)
+		if err != nil {
+			t.Fatalf("Failed to create central admin: %v", err)
+		}
+
+		// Find by email (tenantID=0 for global search)
+		user, err := repo.FindByEmail(email, 0)
+		if err != nil {
+			t.Fatalf("FindByEmail() failed: %v", err)
+		}
+		if user == nil {
+			t.Fatal("Expected user, got nil")
+		}
+
+		// This test should FAIL because FindByEmail doesn't include is_central_admin
+		if !user.IsCentralAdmin {
+			t.Error("Expected IsCentralAdmin to be true, got false - BUG: is_central_admin column not in SELECT query")
+		}
+	})
+
+	t.Run("regular user has central admin false", func(t *testing.T) {
+		email := "regular@user.local"
+		_, err := db.Exec(`
+			INSERT INTO users (
+				first_name, last_name, email, password_hash,
+				is_admin, is_super_admin, is_central_admin,
+				is_verified, is_active, terms_accepted_at, last_activity_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+		`, "Regular", "User", email, "hashedpw", 0, 0, 0, 1, 1)
+		if err != nil {
+			t.Fatalf("Failed to create regular user: %v", err)
+		}
+
+		user, err := repo.FindByEmail(email, 0)
+		if err != nil {
+			t.Fatalf("FindByEmail() failed: %v", err)
+		}
+		if user == nil {
+			t.Fatal("Expected user, got nil")
+		}
+
+		if user.IsCentralAdmin {
+			t.Error("Expected IsCentralAdmin to be false for regular user")
+		}
+	})
+}

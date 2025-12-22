@@ -427,6 +427,18 @@ func main() {
 		serveEmbeddedFile(w, r, frontendFS, "forgot-password.html")
 	}).Methods("GET")
 
+	// Root path: redirect to landing page if no tenant, otherwise serve frontend
+	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		tenantID := middleware.GetTenantID(r)
+		if tenantID == 0 {
+			// No tenant subdomain - redirect to landing page
+			http.Redirect(w, r, "/landing/", http.StatusTemporaryRedirect)
+			return
+		}
+		// Tenant exists - serve the frontend index
+		serveEmbeddedFile(w, r, frontendFS, "index.html")
+	}).Methods("GET")
+
 	// Static files from embedded frontend
 	router.PathPrefix("/").Handler(http.FileServer(http.FS(frontendFS)))
 

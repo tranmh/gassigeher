@@ -19,15 +19,15 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 }
 
 // Create creates a new user
-// SaaS: Now includes tenant_id for multi-tenancy
+// SaaS: Now includes tenant_id and is_central_admin for multi-tenancy
 func (r *UserRepository) Create(user *models.User) error {
 	query := `
 		INSERT INTO users (
 			tenant_id, first_name, last_name, email, phone, password_hash,
-			is_admin, is_super_admin, is_verified, is_active, must_change_password,
+			is_admin, is_super_admin, is_central_admin, is_verified, is_active, must_change_password,
 			verification_token, verification_token_expires,
 			terms_accepted_at, last_activity_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	// SaaS: Convert TenantID=0 to NULL for single-tenant mode
@@ -48,6 +48,7 @@ func (r *UserRepository) Create(user *models.User) error {
 		user.PasswordHash,
 		user.IsAdmin,
 		user.IsSuperAdmin,
+		user.IsCentralAdmin,
 		user.IsVerified,
 		user.IsActive,
 		user.MustChangePassword,
@@ -74,10 +75,10 @@ func (r *UserRepository) CreateTx(tx *sql.Tx, user *models.User) error {
 	query := `
 		INSERT INTO users (
 			tenant_id, first_name, last_name, email, phone, password_hash,
-			is_admin, is_super_admin, is_verified, is_active, must_change_password,
+			is_admin, is_super_admin, is_central_admin, is_verified, is_active, must_change_password,
 			verification_token, verification_token_expires,
 			terms_accepted_at, last_activity_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	// SaaS: Convert TenantID=0 to NULL for single-tenant mode
@@ -98,6 +99,7 @@ func (r *UserRepository) CreateTx(tx *sql.Tx, user *models.User) error {
 		user.PasswordHash,
 		user.IsAdmin,
 		user.IsSuperAdmin,
+		user.IsCentralAdmin,
 		user.IsVerified,
 		user.IsActive,
 		user.MustChangePassword,
@@ -129,7 +131,7 @@ func (r *UserRepository) FindByEmail(email string, tenantID int) (*models.User, 
 		// SaaS mode: filter by tenant
 		query = `
 			SELECT id, tenant_id, first_name, last_name, email, phone, password_hash,
-			       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
+			       is_admin, is_super_admin, is_central_admin, is_verified, is_active, is_deleted, must_change_password,
 			       verification_token, verification_token_expires, password_reset_token,
 			       password_reset_expires, profile_photo, anonymous_id,
 			       terms_accepted_at, last_activity_at, deactivated_at,
@@ -140,10 +142,10 @@ func (r *UserRepository) FindByEmail(email string, tenantID int) (*models.User, 
 		`
 		args = []interface{}{email, tenantID}
 	} else {
-		// Single-tenant mode: no tenant filter
+		// Single-tenant mode / Central Admin: no tenant filter
 		query = `
 			SELECT id, tenant_id, first_name, last_name, email, phone, password_hash,
-			       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
+			       is_admin, is_super_admin, is_central_admin, is_verified, is_active, is_deleted, must_change_password,
 			       verification_token, verification_token_expires, password_reset_token,
 			       password_reset_expires, profile_photo, anonymous_id,
 			       terms_accepted_at, last_activity_at, deactivated_at,
@@ -168,6 +170,7 @@ func (r *UserRepository) FindByEmail(email string, tenantID int) (*models.User, 
 		&user.PasswordHash,
 		&user.IsAdmin,
 		&user.IsSuperAdmin,
+		&user.IsCentralAdmin,
 		&user.IsVerified,
 		&user.IsActive,
 		&user.IsDeleted,
@@ -208,11 +211,11 @@ func (r *UserRepository) FindByEmail(email string, tenantID int) (*models.User, 
 }
 
 // FindByID finds a user by ID
-// SaaS: Now includes tenant_id in result
+// SaaS: Now includes tenant_id and is_central_admin in result
 func (r *UserRepository) FindByID(id int) (*models.User, error) {
 	query := `
 		SELECT id, tenant_id, first_name, last_name, email, phone, password_hash,
-		       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
+		       is_admin, is_super_admin, is_central_admin, is_verified, is_active, is_deleted, must_change_password,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
 		       terms_accepted_at, last_activity_at, deactivated_at,
@@ -235,6 +238,7 @@ func (r *UserRepository) FindByID(id int) (*models.User, error) {
 		&user.PasswordHash,
 		&user.IsAdmin,
 		&user.IsSuperAdmin,
+		&user.IsCentralAdmin,
 		&user.IsVerified,
 		&user.IsActive,
 		&user.IsDeleted,
@@ -275,11 +279,11 @@ func (r *UserRepository) FindByID(id int) (*models.User, error) {
 }
 
 // FindByVerificationToken finds a user by verification token
-// SaaS: Now includes tenant_id in result
+// SaaS: Now includes tenant_id and is_central_admin in result
 func (r *UserRepository) FindByVerificationToken(token string) (*models.User, error) {
 	query := `
 		SELECT id, tenant_id, first_name, last_name, email, phone, password_hash,
-		       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
+		       is_admin, is_super_admin, is_central_admin, is_verified, is_active, is_deleted, must_change_password,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
 		       terms_accepted_at, last_activity_at, deactivated_at,
@@ -302,6 +306,7 @@ func (r *UserRepository) FindByVerificationToken(token string) (*models.User, er
 		&user.PasswordHash,
 		&user.IsAdmin,
 		&user.IsSuperAdmin,
+		&user.IsCentralAdmin,
 		&user.IsVerified,
 		&user.IsActive,
 		&user.IsDeleted,
@@ -342,11 +347,11 @@ func (r *UserRepository) FindByVerificationToken(token string) (*models.User, er
 }
 
 // FindByPasswordResetToken finds a user by password reset token
-// SaaS: Now includes tenant_id in result
+// SaaS: Now includes tenant_id and is_central_admin in result
 func (r *UserRepository) FindByPasswordResetToken(token string) (*models.User, error) {
 	query := `
 		SELECT id, tenant_id, first_name, last_name, email, phone, password_hash,
-		       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
+		       is_admin, is_super_admin, is_central_admin, is_verified, is_active, is_deleted, must_change_password,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
 		       terms_accepted_at, last_activity_at, deactivated_at,
@@ -369,6 +374,7 @@ func (r *UserRepository) FindByPasswordResetToken(token string) (*models.User, e
 		&user.PasswordHash,
 		&user.IsAdmin,
 		&user.IsSuperAdmin,
+		&user.IsCentralAdmin,
 		&user.IsVerified,
 		&user.IsActive,
 		&user.IsDeleted,
@@ -563,11 +569,11 @@ func (r *UserRepository) Activate(userID int) error {
 }
 
 // FindInactiveUsers finds users who haven't been active for the specified number of days
-// SaaS: Filters by tenant_id
+// SaaS: Filters by tenant_id, includes is_central_admin
 func (r *UserRepository) FindInactiveUsers(tenantID int, days int) ([]*models.User, error) {
 	query := `
 		SELECT id, tenant_id, first_name, last_name, email, phone, password_hash,
-		       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
+		       is_admin, is_super_admin, is_central_admin, is_verified, is_active, is_deleted, must_change_password,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
 		       terms_accepted_at, last_activity_at, deactivated_at,
@@ -604,6 +610,7 @@ func (r *UserRepository) FindInactiveUsers(tenantID int, days int) ([]*models.Us
 			&user.PasswordHash,
 			&user.IsAdmin,
 			&user.IsSuperAdmin,
+			&user.IsCentralAdmin,
 			&user.IsVerified,
 			&user.IsActive,
 			&user.IsDeleted,
@@ -646,7 +653,7 @@ func (r *UserRepository) FindInactiveUsers(tenantID int, days int) ([]*models.Us
 func (r *UserRepository) FindAll(activeOnly *bool, tenantID int) ([]*models.User, error) {
 	query := `
 		SELECT id, tenant_id, first_name, last_name, email, phone, password_hash,
-		       is_admin, is_super_admin, is_verified, is_active, is_deleted, must_change_password,
+		       is_admin, is_super_admin, is_central_admin, is_verified, is_active, is_deleted, must_change_password,
 		       verification_token, verification_token_expires, password_reset_token,
 		       password_reset_expires, profile_photo, anonymous_id,
 		       terms_accepted_at, last_activity_at, deactivated_at,
@@ -695,6 +702,7 @@ func (r *UserRepository) FindAll(activeOnly *bool, tenantID int) ([]*models.User
 			&user.PasswordHash,
 			&user.IsAdmin,
 			&user.IsSuperAdmin,
+			&user.IsCentralAdmin,
 			&user.IsVerified,
 			&user.IsActive,
 			&user.IsDeleted,

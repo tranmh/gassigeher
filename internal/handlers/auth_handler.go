@@ -321,11 +321,23 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SaaS: Determine redirect destination based on user role
+	var redirectTo string
+	if user.IsCentralAdmin {
+		// Central Admin goes to platform admin panel
+		redirectTo = "/central/"
+	} else {
+		// Tenant users go to dashboard
+		redirectTo = "/dashboard.html"
+	}
+
 	respondJSON(w, http.StatusOK, models.LoginResponse{
 		Token:              token,
 		User:               user,
 		IsAdmin:            isAdmin,
+		IsCentralAdmin:     user.IsCentralAdmin,
 		MustChangePassword: user.MustChangePassword,
+		RedirectTo:         redirectTo,
 	})
 }
 

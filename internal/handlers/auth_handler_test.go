@@ -1097,3 +1097,115 @@ func contextWithUser(ctx context.Context, userID int, email string, isAdmin bool
 
 	return ctx
 }
+
+// TestAuthHandler_Login_CentralAdminRedirect tests that Central Admin login returns correct redirect
+// BUG: Central Admin should be redirected to /central/, not /dashboard.html
+func TestAuthHandler_Login_CentralAdminRedirect(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewAuthHandler(db, cfg)
+
+	// Create Central Admin user directly
+	authService := services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours)
+	hashedPw, _ := authService.HashPassword("CentralAdmin123!")
+	_, err := db.Exec(`
+		INSERT INTO users (
+			first_name, last_name, email, password_hash,
+			is_admin, is_super_admin, is_central_admin,
+			is_verified, is_active, terms_accepted_at, last_activity_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+	`, "Central", "Admin", "central@admin.local", hashedPw, 1, 1, 1, 1, 1)
+	if err != nil {
+		t.Fatalf("Failed to create Central Admin: %v", err)
+	}
+
+	t.Run("central admin login returns redirect to /central/", func(t *testing.T) {
+		reqBody := map[string]string{
+			"email":    "central@admin.local",
+			"password": "CentralAdmin123!",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/auth/login", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		// No tenant context (tenantID = 0, like accessing main domain)
+
+		rr := httptest.NewRecorder()
+		handler.Login(rr, req)
+
+		if rr.Code != http.StatusOK {
+			t.Fatalf("Expected 200, got %d: %s", rr.Code, rr.Body.String())
+		}
+
+		var response map[string]interface{}
+		if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
+
+		// Check is_central_admin is in response
+		isCentralAdmin, ok := response["is_central_admin"].(bool)
+		if !ok {
+			t.Error("Expected is_central_admin in response - BUG: LoginResponse missing is_central_admin field")
+		}
+		if !isCentralAdmin {
+			t.Error("Expected is_central_admin to be true")
+		}
+
+		// Check redirect_to is /central/
+		redirectTo, ok := response["redirect_to"].(string)
+		if !ok {
+			t.Error("Expected redirect_to in response - BUG: LoginResponse missing redirect_to field")
+		}
+		if redirectTo != "/central/" {
+			t.Errorf("Expected redirect_to to be '/central/', got '%s'", redirectTo)
+		}
+	})
+
+	t.Run("tenant user login returns redirect to dashboard", func(t *testing.T) {
+		// Create tenant user
+		hashedPw2, _ := authService.HashPassword("TenantUser123!")
+		_, err := db.Exec(`
+			INSERT INTO users (
+				tenant_id, first_name, last_name, email, password_hash,
+				is_admin, is_super_admin, is_central_admin,
+				is_verified, is_active, terms_accepted_at, last_activity_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+		`, 1, "Tenant", "User", "tenant@user.local", hashedPw2, 0, 0, 0, 1, 1)
+		if err != nil {
+			t.Fatalf("Failed to create tenant user: %v", err)
+		}
+
+		reqBody := map[string]string{
+			"email":    "tenant@user.local",
+			"password": "TenantUser123!",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/auth/login", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		// Add tenant context (tenantID = 1)
+		req = req.WithContext(context.WithValue(req.Context(), middleware.TenantIDKey, 1))
+
+		rr := httptest.NewRecorder()
+		handler.Login(rr, req)
+
+		if rr.Code != http.StatusOK {
+			t.Fatalf("Expected 200, got %d: %s", rr.Code, rr.Body.String())
+		}
+
+		var response map[string]interface{}
+		if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
+
+		// Check redirect_to is /dashboard.html
+		redirectTo, ok := response["redirect_to"].(string)
+		if !ok {
+			t.Error("Expected redirect_to in response")
+		}
+		if redirectTo != "/dashboard.html" {
+			t.Errorf("Expected redirect_to to be '/dashboard.html', got '%s'", redirectTo)
+		}
+	})
+}

@@ -51,58 +51,37 @@ func SeedDatabase(db *sql.DB, superAdminEmail string) error {
 		return fmt.Errorf("SUPER_ADMIN_EMAIL not set in .env - cannot create Super Admin")
 	}
 
-	// 3. Generate Super Admin
-	superAdminPassword := generateSecurePassword(20)
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(superAdminPassword), bcrypt.DefaultCost)
+	// 3. Generate Central Admin (platform-level admin for SaaS)
+	// In SaaS mode, this is the platform administrator who can manage all tenants
+	// They access the system via /central/ on the main domain
+	centralAdminPassword := generateSecurePassword(20)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(centralAdminPassword), bcrypt.DefaultCost)
 	if err != nil {
-		return fmt.Errorf("failed to hash super admin password: %w", err)
+		return fmt.Errorf("failed to hash central admin password: %w", err)
 	}
 
 	now := time.Now()
 	_, err = db.Exec(`
 		INSERT INTO users (
 			id, first_name, last_name, email, password_hash,
-			is_admin, is_super_admin, is_verified, is_active,
+			is_admin, is_super_admin, is_central_admin, is_verified, is_active,
 			terms_accepted_at, last_activity_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, 1, "Super", "Admin", superAdminEmail, string(hashedPassword),
-		true, true, true, true, now, now, now, now)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, 1, "Central", "Admin", superAdminEmail, string(hashedPassword),
+		true, true, true, true, true, now, now, now, now)
 
 	if err != nil {
-		return fmt.Errorf("failed to create Super Admin: %w", err)
+		return fmt.Errorf("failed to create Central Admin: %w", err)
 	}
 
-	log.Println("✓ Super Admin created (ID: 1)")
+	superAdminPassword := centralAdminPassword // For backward compatibility in credentials file
+	log.Println("✓ Central Admin created (ID: 1) - Platform administrator for SaaS")
 
-	// 4. Generate test users
-	testUsers, err := generateTestUsers(db)
-	if err != nil {
-		return fmt.Errorf("failed to generate test users: %w", err)
-	}
-
-	// 5. Generate dogs
-	err = generateDogs(db)
-	if err != nil {
-		return fmt.Errorf("failed to generate dogs: %w", err)
-	}
-
-	// 6. Assign colors to users based on test user levels
-	err = assignUserColors(db, testUsers)
-	if err != nil {
-		return fmt.Errorf("failed to assign user colors: %w", err)
-	}
-
-	// 7. Generate bookings
-	err = generateBookings(db)
-	if err != nil {
-		return fmt.Errorf("failed to generate bookings: %w", err)
-	}
-
-	// 8. Initialize default settings (if not exists)
-	err = initializeSystemSettings(db)
-	if err != nil {
-		return fmt.Errorf("failed to initialize system settings: %w", err)
-	}
+	// In SaaS mode, we skip test users/dogs/bookings since they don't belong to any tenant
+	// Each tenant will create their own data during registration
+	// Test data can be created per-tenant via admin UI or API
+	var testUsers []TestUser
+	log.Println("✓ Skipped test data (SaaS mode - each tenant creates own data)")
 
 	// 9. Write credentials to file
 	err = writeCredentialsFile(superAdminEmail, superAdminPassword)
@@ -459,12 +438,12 @@ func initializeSystemSettings(db *sql.DB) error {
 	return nil
 }
 
-// writeCredentialsFile writes Super Admin credentials to a file
+// writeCredentialsFile writes Central Admin credentials to a file
 // DONE
 func writeCredentialsFile(email, password string) error {
 	now := time.Now().Format("2006-01-02 15:04:05")
 	content := fmt.Sprintf(`=============================================================
-GASSIGEHER - SUPER ADMIN CREDENTIALS
+GASSIGEHER SAAS - CENTRAL ADMIN CREDENTIALS
 =============================================================
 
 EMAIL: %s
@@ -472,6 +451,19 @@ PASSWORD: %s
 
 CREATED: %s
 LAST UPDATED: %s
+
+=============================================================
+WHAT IS CENTRAL ADMIN?
+=============================================================
+
+Central Admin is the PLATFORM-LEVEL administrator who can:
+- Access /central/ dashboard on the main domain
+- Create and manage all tenants (animal shelters)
+- View platform-wide statistics
+- Promote/demote other Central Admins
+
+This is DIFFERENT from tenant-level Super Admin who manages
+a single shelter.
 
 =============================================================
 HOW TO CHANGE PASSWORD:
@@ -485,8 +477,8 @@ HOW TO CHANGE PASSWORD:
 
 IMPORTANT:
 - Keep this file secure (never commit to git)
-- This is the ONLY way to change Super Admin password
-- Super Admin email cannot be changed (defined in .env)
+- This is the ONLY way to change Central Admin password
+- Central Admin email cannot be changed (defined in .env)
 
 =============================================================
 `, email, password, now, now)
@@ -505,22 +497,32 @@ IMPORTANT:
 func printSetupComplete(superAdminEmail, superAdminPassword string, testUsers []TestUser) {
 	fmt.Println()
 	fmt.Println("=============================================================")
-	fmt.Println("  GASSIGEHER - INSTALLATION COMPLETE")
+	fmt.Println("  GASSIGEHER SAAS - INSTALLATION COMPLETE")
 	fmt.Println("=============================================================")
 	fmt.Println()
-	fmt.Println("SUPER ADMIN CREDENTIALS (SAVE THESE!):")
+	fmt.Println("CENTRAL ADMIN CREDENTIALS (SAVE THESE!):")
 	fmt.Printf("  Email:    %s\n", superAdminEmail)
 	fmt.Printf("  Password: %s\n", superAdminPassword)
 	fmt.Println()
-	fmt.Println("TEST USER CREDENTIALS:")
-	for i, user := range testUsers {
-		fmt.Printf("  %d. %s %s / %s / %s\n", i+1, user.FirstName, user.LastName, user.Email, user.Password)
-	}
+	fmt.Println("ACCESS POINTS:")
+	fmt.Println("  Landing Page:  http://gassigeher.local:8080/landing/")
+	fmt.Println("  Central Admin: http://gassigeher.local:8080/central/")
 	fmt.Println()
+	fmt.Println("NEXT STEPS:")
+	fmt.Println("  1. Login at /central/ with Central Admin credentials")
+	fmt.Println("  2. Create tenants (animal shelters)")
+	fmt.Println("  3. Each tenant gets their own Super Admin on registration")
+	fmt.Println()
+	if len(testUsers) > 0 {
+		fmt.Println("TEST USER CREDENTIALS (for demo tenant only):")
+		for i, user := range testUsers {
+			fmt.Printf("  %d. %s %s / %s / %s\n", i+1, user.FirstName, user.LastName, user.Email, user.Password)
+		}
+		fmt.Println()
+	}
 	fmt.Println("IMPORTANT:")
-	fmt.Println("- Super Admin password saved to: SUPER_ADMIN_CREDENTIALS.txt")
-	fmt.Println("- Change Super Admin password: Edit file and restart server")
-	fmt.Println("- Test users can be deleted after setup")
+	fmt.Println("- Central Admin password saved to: SUPER_ADMIN_CREDENTIALS.txt")
+	fmt.Println("- Change password: Edit file and restart server")
 	fmt.Println()
 	fmt.Println("=============================================================")
 	fmt.Println()
