@@ -26,7 +26,8 @@ type DogHandler struct {
 	dogRepo          *repository.DogRepository
 	userRepo         *repository.UserRepository
 	bookingRepo      *repository.BookingRepository
-	subscriptionRepo *repository.SubscriptionRepository // SaaS: For checking dog limits
+	subscriptionRepo *repository.SubscriptionRepository    // SaaS: For checking dog limits
+	colorRepo        *repository.ColorCategoryRepository   // For resolving legacy category to color_id
 	imageService     *services.ImageService
 	emailService     *services.EmailService
 	s3Service        *services.S3Service // SaaS: For S3 storage
@@ -65,7 +66,8 @@ func NewDogHandler(db *sql.DB, cfg *config.Config) *DogHandler {
 		dogRepo:          repository.NewDogRepository(db),
 		userRepo:         repository.NewUserRepository(db),
 		bookingRepo:      repository.NewBookingRepository(db),
-		subscriptionRepo: repository.NewSubscriptionRepository(db), // SaaS: For dog limit checks
+		subscriptionRepo: repository.NewSubscriptionRepository(db),    // SaaS: For dog limit checks
+		colorRepo:        repository.NewColorCategoryRepository(db),   // For resolving legacy category to color_id
 		imageService:     services.NewImageService(cfg.UploadDir),
 		emailService:     emailService,
 		s3Service:        s3Service,
@@ -204,11 +206,22 @@ func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If only legacy category is provided, validate it
+	// If only legacy category is provided, validate it and resolve to color_id
 	if req.ColorID == nil && req.Category != "" {
 		if req.Category != "green" && req.Category != "blue" && req.Category != "orange" {
 			respondError(w, http.StatusBadRequest, "Category must be green, blue, or orange")
 			return
+		}
+
+		// Resolve legacy category to color_id
+		color, err := h.colorRepo.FindByLegacyCategory(tenantID, req.Category)
+		if err != nil {
+			log.Printf("ERROR: Failed to resolve legacy category %s: %v", req.Category, err)
+			respondError(w, http.StatusInternalServerError, "Failed to resolve color category")
+			return
+		}
+		if color != nil {
+			req.ColorID = &color.ID
 		}
 	}
 

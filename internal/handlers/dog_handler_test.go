@@ -1062,3 +1062,86 @@ func TestCreateDog_ProTierUnlimited(t *testing.T) {
 			w.Code, w.Body.String())
 	}
 }
+
+// TestDogHandler_CreateDog_CategoryMapsToColorID tests that legacy category is mapped to color_id (TDD RED Phase)
+// BUG #1: When creating a dog with category="green" but no color_id, the color_id should be resolved
+func TestDogHandler_CreateDog_CategoryMapsToColorID(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewDogHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "blue")
+
+	t.Run("category green maps to color_id", func(t *testing.T) {
+		reqBody := `{"name":"Test Dog","breed":"Labrador","size":"medium","age":3,"category":"green"}`
+		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateDog(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		// Check that color_id is set (not nil)
+		colorID := response["color_id"]
+		if colorID == nil {
+			t.Error("BUG #1: color_id should be set when category is provided, got nil")
+		}
+	})
+
+	t.Run("category orange maps to color_id", func(t *testing.T) {
+		reqBody := `{"name":"Orange Dog","breed":"Beagle","size":"small","age":2,"category":"orange"}`
+		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateDog(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		colorID := response["color_id"]
+		if colorID == nil {
+			t.Error("BUG #1: color_id should be set when category='orange' is provided, got nil")
+		}
+	})
+
+	t.Run("category blue maps to color_id", func(t *testing.T) {
+		reqBody := `{"name":"Blue Dog","breed":"Shepherd","size":"large","age":4,"category":"blue"}`
+		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateDog(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		colorID := response["color_id"]
+		if colorID == nil {
+			t.Error("BUG #1: color_id should be set when category='blue' is provided, got nil")
+		}
+	})
+}

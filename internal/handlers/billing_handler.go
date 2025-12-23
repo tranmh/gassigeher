@@ -114,9 +114,19 @@ func (h *BillingHandler) GetUsage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Calculate over-limit status
+	overLimit := false
+	excessCount := 0
+	if dogsLimit != -1 && dogsUsed > dogsLimit {
+		overLimit = true
+		excessCount = dogsUsed - dogsLimit
+	}
+
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"dogs_used":  dogsUsed,
-		"dogs_limit": dogsLimit,
+		"dogs_used":    dogsUsed,
+		"dogs_limit":   dogsLimit,
+		"over_limit":   overLimit,
+		"excess_count": excessCount,
 	})
 }
 

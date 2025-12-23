@@ -511,3 +511,33 @@ func TestColorCategoriesCreation(t *testing.T) {
 		t.Errorf("Expected 5 color categories, got %d", count)
 	}
 }
+
+// TestLocalDevSeedService_SeedsBookingTimeRules tests that booking_time_rules are created (TDD RED Phase)
+// BUG #5: Local dev tenants don't have booking_time_rules which causes booking failures
+func TestLocalDevSeedService_SeedsBookingTimeRules(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	service := NewLocalDevSeedService(db)
+
+	// Ensure tenants exist
+	err := service.EnsureLocalDevTenants()
+	if err != nil {
+		t.Fatalf("EnsureLocalDevTenants() error: %v", err)
+	}
+
+	// Check that demo1 has booking_time_rules
+	var count int
+	err = db.QueryRow(`
+		SELECT COUNT(*)
+		FROM booking_time_rules
+		WHERE tenant_id = (SELECT id FROM tenants WHERE slug = 'demo1')
+	`).Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to count booking_time_rules: %v", err)
+	}
+
+	if count < 7 {
+		t.Errorf("BUG #5: Expected at least 7 booking_time_rules for demo1, got %d", count)
+	}
+}

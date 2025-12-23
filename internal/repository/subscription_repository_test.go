@@ -249,3 +249,55 @@ func TestSubscriptionRepository_GetTenantDogLimit(t *testing.T) {
 		}
 	})
 }
+
+// TestSubscriptionRepository_CancelSubscription_ResetsToPlanFree tests that cancellation resets plan to Free (TDD RED Phase)
+// BUG #3: When subscription is cancelled, plan_id should be reset to Free (1)
+func TestSubscriptionRepository_CancelSubscription_ResetsToPlanFree(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewSubscriptionRepository(db)
+
+	// First, delete any existing subscription for tenant 1
+	_, _ = db.Exec(`DELETE FROM tenant_subscriptions WHERE tenant_id = 1`)
+
+	// Create a Pro subscription for tenant 1 (tenant 1 exists from SetupTestDB)
+	_, err := db.Exec(`
+		INSERT INTO tenant_subscriptions (tenant_id, plan_id, status, created_at, updated_at)
+		VALUES (1, 2, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create Pro subscription: %v", err)
+	}
+
+	// Verify it's Pro
+	sub, err := repo.GetSubscriptionByTenant(1)
+	if err != nil {
+		t.Fatalf("GetSubscriptionByTenant() error: %v", err)
+	}
+	if sub == nil {
+		t.Fatal("Expected subscription to exist")
+	}
+	if sub.PlanID != 2 {
+		t.Errorf("Expected PlanID = 2 (Pro), got %d", sub.PlanID)
+	}
+
+	// Cancel subscription
+	err = repo.CancelSubscription(1, "test cancellation")
+	if err != nil {
+		t.Fatalf("CancelSubscription() error: %v", err)
+	}
+
+	// Verify plan_id is reset to Free (1)
+	sub, err = repo.GetSubscriptionByTenant(1)
+	if err != nil {
+		t.Fatalf("GetSubscriptionByTenant() after cancel error: %v", err)
+	}
+	if sub == nil {
+		t.Fatal("Expected subscription to still exist after cancellation")
+	}
+	if sub.Status != models.SubscriptionStatusCancelled {
+		t.Errorf("Expected status = 'cancelled', got %s", sub.Status)
+	}
+	if sub.PlanID != 1 {
+		t.Errorf("BUG #3: Expected plan_id = 1 (Free) after cancellation, got %d", sub.PlanID)
+	}
+}

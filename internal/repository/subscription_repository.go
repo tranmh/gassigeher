@@ -296,10 +296,11 @@ func (r *SubscriptionRepository) GetTenantDogLimit(tenantID int) (int, error) {
 	return maxDogs, nil
 }
 
-// CancelSubscription marks a subscription as cancelled
+// CancelSubscription marks a subscription as cancelled and resets to Free plan
 func (r *SubscriptionRepository) CancelSubscription(tenantID int, reason string) error {
 	query := `
 		UPDATE tenant_subscriptions SET
+			plan_id = 1,
 			status = ?,
 			cancelled_at = ?,
 			updated_at = ?

@@ -121,6 +121,18 @@ func (s *ProvisioningService) CreateDefaultSettings(tx *sql.Tx, tenantID int) er
 	return nil
 }
 
+// CreateDefaultSubscription creates a Free plan subscription for a new tenant
+func (s *ProvisioningService) CreateDefaultSubscription(tx *sql.Tx, tenantID int) error {
+	_, err := tx.Exec(
+		`INSERT INTO tenant_subscriptions (tenant_id, plan_id, status, created_at, updated_at) VALUES (?, 1, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+		tenantID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create subscription: %w", err)
+	}
+	return nil
+}
+
 // ProvisionTenant creates all default data for a new tenant
 func (s *ProvisioningService) ProvisionTenant(tx *sql.Tx, tenantID int) error {
 	// Create default color categories
@@ -136,6 +148,11 @@ func (s *ProvisioningService) ProvisionTenant(tx *sql.Tx, tenantID int) error {
 	// Create default system settings
 	if err := s.CreateDefaultSettings(tx, tenantID); err != nil {
 		return fmt.Errorf("CreateDefaultSettings failed: %w", err)
+	}
+
+	// Create Free plan subscription
+	if err := s.CreateDefaultSubscription(tx, tenantID); err != nil {
+		return fmt.Errorf("CreateDefaultSubscription failed: %w", err)
 	}
 
 	return nil

@@ -471,3 +471,77 @@ func TestBillingHandler_CreateCheckout_PlanSlugValidation(t *testing.T) {
 		}
 	})
 }
+
+// TestBillingHandler_GetUsage_ShowsOverLimitWarning tests that usage endpoint shows over_limit warning
+// Enhancement: Show visual indication when tenant is over their subscription limit
+func TestBillingHandler_GetUsage_ShowsOverLimitWarning(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	handler := NewBillingHandler(db, nil)
+
+	// Create 15 dogs for tenant 1 (over the 10 dog limit for Free plan)
+	for i := 0; i < 15; i++ {
+		_, err := db.Exec(`
+			INSERT INTO dogs (tenant_id, name, breed, size, age, is_available)
+			VALUES (1, ?, 'Test Breed', 'medium', 3, 1)
+		`, "Dog"+string(rune('A'+i)))
+		if err != nil {
+			t.Fatalf("Failed to create dog: %v", err)
+		}
+	}
+
+	t.Run("shows over_limit true when dogs exceed limit", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/billing/usage", nil)
+		req = req.WithContext(contextWithTenantID(req.Context(), 1))
+		w := httptest.NewRecorder()
+
+		handler.GetUsage(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", w.Code)
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &response)
+
+		// Check over_limit field exists and is true
+		overLimit, ok := response["over_limit"].(bool)
+		if !ok {
+			t.Error("Enhancement: Expected 'over_limit' field in usage response")
+		} else if !overLimit {
+			t.Error("Enhancement: Expected over_limit=true when dogs_used > dogs_limit")
+		}
+
+		// Check excess_count field
+		excessCount, ok := response["excess_count"].(float64)
+		if !ok {
+			t.Error("Enhancement: Expected 'excess_count' field in usage response")
+		} else if int(excessCount) != 5 {
+			t.Errorf("Expected excess_count=5 (15 dogs - 10 limit), got %v", excessCount)
+		}
+	})
+
+	t.Run("shows over_limit false when within limit", func(t *testing.T) {
+		// Delete some dogs to get under limit
+		_, _ = db.Exec(`DELETE FROM dogs WHERE tenant_id = 1`)
+		for i := 0; i < 5; i++ {
+			_, _ = db.Exec(`
+				INSERT INTO dogs (tenant_id, name, breed, size, age, is_available)
+				VALUES (1, ?, 'Test Breed', 'medium', 3, 1)
+			`, "Dog"+string(rune('A'+i)))
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/api/billing/usage", nil)
+		req = req.WithContext(contextWithTenantID(req.Context(), 1))
+		w := httptest.NewRecorder()
+
+		handler.GetUsage(w, req)
+
+		var response map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &response)
+
+		overLimit, ok := response["over_limit"].(bool)
+		if ok && overLimit {
+			t.Error("Expected over_limit=false when dogs_used <= dogs_limit")
+		}
+	})
+}

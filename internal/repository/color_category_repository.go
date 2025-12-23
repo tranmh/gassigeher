@@ -106,6 +106,36 @@ func (r *ColorCategoryRepository) FindByName(tenantID int, name string) (*models
 	return color, nil
 }
 
+// legacyCategoryToColorNames maps legacy category names (green/blue/orange) to German color names
+// This supports both uppercase and lowercase variations found in the database
+var legacyCategoryToColorNames = map[string][]string{
+	"green":  {"Grün", "Gruen", "grün", "gruen"},
+	"blue":   {"Blau", "blau", "Dunkelblau", "dunkelblau"},
+	"orange": {"Orange", "orange"},
+}
+
+// FindByLegacyCategory finds a color category by legacy category name (green/blue/orange)
+// This is used to map the legacy category field to the new color_id system
+func (r *ColorCategoryRepository) FindByLegacyCategory(tenantID int, category string) (*models.ColorCategory, error) {
+	colorNames, ok := legacyCategoryToColorNames[category]
+	if !ok {
+		return nil, nil // Unknown category
+	}
+
+	// Try each possible color name
+	for _, name := range colorNames {
+		color, err := r.FindByName(tenantID, name)
+		if err != nil {
+			return nil, err
+		}
+		if color != nil {
+			return color, nil
+		}
+	}
+
+	return nil, nil // No matching color found
+}
+
 // FindAll returns all color categories for a tenant ordered by sort_order
 func (r *ColorCategoryRepository) FindAll(tenantID int) ([]*models.ColorCategory, error) {
 	query := `

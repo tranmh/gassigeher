@@ -615,3 +615,75 @@ func TestIsReservedSlug(t *testing.T) {
 		}
 	}
 }
+
+// TestTenantHandler_Register_CreatesSubscription tests that registration creates a Free subscription (TDD RED Phase)
+// BUG #2: New tenants should get a tenant_subscriptions record with Free plan
+func TestTenantHandler_Register_CreatesSubscription(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+		BaseDomain:         "gassigeher.local",
+	}
+	handler := NewTenantHandler(db, cfg)
+
+	reqBody := map[string]string{
+		"organization_name": "Subscription Test Org",
+		"slug":              "subscription-test",
+		"contact_email":     "test@subscriptiontest.com",
+		"city":              "Berlin",
+		"postal_code":       "10115",
+		"federal_state":     "BE",
+		"admin_first_name":  "Admin",
+		"admin_last_name":   "Test",
+		"admin_email":       "admin@subscriptiontest.com",
+		"admin_password":    "password123",
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest("POST", "/api/tenants/register", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	handler.Register(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+
+	// Get the created tenant ID from the response
+	var response map[string]interface{}
+	json.Unmarshal(rec.Body.Bytes(), &response)
+
+	// Query database to check if subscription was created
+	var subscriptionCount int
+	err := db.QueryRow(`
+		SELECT COUNT(*) FROM tenant_subscriptions ts
+		JOIN tenants t ON ts.tenant_id = t.id
+		WHERE t.slug = ?
+	`, "subscription-test").Scan(&subscriptionCount)
+
+	if err != nil {
+		t.Fatalf("Failed to query subscription: %v", err)
+	}
+
+	if subscriptionCount != 1 {
+		t.Errorf("BUG #2: Expected 1 subscription for new tenant, got %d", subscriptionCount)
+	}
+
+	// Verify the subscription is for Free plan (plan_id = 1)
+	var planID int
+	err = db.QueryRow(`
+		SELECT ts.plan_id FROM tenant_subscriptions ts
+		JOIN tenants t ON ts.tenant_id = t.id
+		WHERE t.slug = ?
+	`, "subscription-test").Scan(&planID)
+
+	if err != nil {
+		t.Fatalf("Failed to query plan_id: %v", err)
+	}
+
+	if planID != 1 {
+		t.Errorf("Expected Free plan (plan_id=1), got plan_id=%d", planID)
+	}
+}

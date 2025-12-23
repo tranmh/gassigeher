@@ -147,6 +147,11 @@ func (s *LocalDevSeedService) seedProfile(tenantID int, profile LocalDevProfile,
 		return fmt.Errorf("failed to seed settings: %w", err)
 	}
 
+	// Always seed booking time rules
+	if err := s.seedBookingRules(tenantID); err != nil {
+		return fmt.Errorf("failed to seed booking rules: %w", err)
+	}
+
 	// Always create admin user
 	adminID, err := s.createAdminUser(tenantID, adminEmail)
 	if err != nil {
@@ -233,6 +238,37 @@ func (s *LocalDevSeedService) seedSettings(tenantID int) error {
 	for key, value := range settings {
 		if err := s.settingsRepo.Upsert(tenantID, key, value); err != nil {
 			log.Printf("Warning: failed to set setting %s: %v", key, err)
+		}
+	}
+
+	return nil
+}
+
+// seedBookingRules creates default booking time rules for a tenant
+func (s *LocalDevSeedService) seedBookingRules(tenantID int) error {
+	rules := []struct {
+		DayType   string
+		RuleName  string
+		StartTime string
+		EndTime   string
+		IsBlocked bool
+	}{
+		{"weekday", "morning", "08:00", "12:00", false},
+		{"weekday", "lunch", "12:00", "14:00", true},
+		{"weekday", "afternoon", "14:00", "18:00", false},
+		{"weekend", "morning", "09:00", "12:00", false},
+		{"weekend", "afternoon", "14:00", "17:00", false},
+		{"holiday", "morning", "10:00", "12:00", false},
+		{"holiday", "afternoon", "14:00", "16:00", false},
+	}
+
+	for _, r := range rules {
+		_, err := s.db.Exec(
+			`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked) VALUES (?, ?, ?, ?, ?, ?)`,
+			tenantID, r.DayType, r.RuleName, r.StartTime, r.EndTime, r.IsBlocked,
+		)
+		if err != nil {
+			log.Printf("Warning: failed to create booking rule %s/%s: %v", r.DayType, r.RuleName, err)
 		}
 	}
 
