@@ -1,6 +1,40 @@
 // Dog Photo Display Helper Functions
 
 /**
+ * Validate and sanitize a hex color code
+ * @param {string} hexCode - The hex color code to validate
+ * @returns {string} - Valid hex code or fallback color
+ */
+function sanitizeHexCode(hexCode) {
+    if (!hexCode || typeof hexCode !== 'string') {
+        return '#808080'; // Default gray
+    }
+    // Only allow valid hex color format: #RGB, #RRGGBB, or #RRGGBBAA
+    const hexPattern = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;
+    if (hexPattern.test(hexCode)) {
+        return hexCode;
+    }
+    return '#808080'; // Default gray for invalid values
+}
+
+/**
+ * Escape a value for safe use in HTML attributes
+ * @param {any} value - The value to escape
+ * @returns {string} - Safe string for HTML attributes
+ */
+function escapeForAttribute(value) {
+    if (value === null || value === undefined) {
+        return '';
+    }
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+/**
  * Get the photo URL for a dog, with fallback to placeholder
  * @param {Object} dog - Dog object with photo and color fields
  * @param {boolean} useThumbnail - Whether to use thumbnail (default: false)
@@ -46,7 +80,9 @@ function getDogPhotoHtml(dog, useThumbnail = false, className = 'dog-card-image'
     const photoUrl = getDogPhotoUrl(dog, useThumbnail);
     const altText = getDogPhotoAlt(dog);
     const loadingAttr = lazyLoad ? ' loading="lazy"' : '';
-    const uniqueId = `dog-img-${dog.id || Math.random().toString(36).substr(2, 9)}`;
+    // Sanitize dog.id to prevent XSS in onload handler
+    const safeId = escapeForAttribute(dog.id) || Math.random().toString(36).substring(2, 11);
+    const uniqueId = `dog-img-${safeId}`;
 
     // For SVG placeholders, no skeleton needed
     const isSvgPlaceholder = photoUrl.includes('.svg');
@@ -185,12 +221,14 @@ function getCalendarDogCell(dog, color) {
         };
         const icon = patternIcons[dogColor.pattern_icon] || '●';
         const safeColorName = typeof sanitizeHTML !== 'undefined' ? sanitizeHTML(dogColor.name) : dogColor.name;
+        // Sanitize hex_code to prevent CSS injection
+        const safeHexCode = sanitizeHexCode(dogColor.hex_code);
 
         return `<div class="calendar-dog-name-cell">
             <img src="${photoUrl}" alt="${altText}" class="calendar-dog-photo" loading="lazy">
             <div>
                 <div style="font-weight: 700; font-size: 1rem; color: var(--text-dark);">${safeDogName}</div>
-                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 0.7rem; padding: 2px 8px; background: ${dogColor.hex_code}20; border: 1px solid ${dogColor.hex_code}; color: ${dogColor.hex_code}; border-radius: 4px; margin-top: 4px;">
+                <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 0.7rem; padding: 2px 8px; background: ${safeHexCode}20; border: 1px solid ${safeHexCode}; color: ${safeHexCode}; border-radius: 4px; margin-top: 4px;">
                     ${icon} ${safeColorName}
                 </span>
             </div>

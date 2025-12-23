@@ -45,7 +45,21 @@ async function apiRequest(endpoint, options = {}) {
         throw new Error(error.error || 'Request failed');
     }
 
-    return response.json();
+    // Handle empty responses (204 No Content)
+    if (response.status === 204) {
+        return null;
+    }
+
+    // Try to parse JSON, handle empty or non-JSON responses gracefully
+    const text = await response.text();
+    if (!text) {
+        return null;
+    }
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        return null;
+    }
 }
 
 // Central Admin API

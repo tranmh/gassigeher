@@ -302,8 +302,9 @@ class DogPhotoManager {
      * Initialize for a specific dog (edit mode)
      */
     initForDog(dog) {
-        this.currentDogId = dog.id;
+        // Reset first, then set currentDogId (reset() clears it)
         this.reset();
+        this.currentDogId = dog.id;
 
         if (dog.photo) {
             // Show current photo

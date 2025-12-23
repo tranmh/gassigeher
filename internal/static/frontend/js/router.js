@@ -34,6 +34,7 @@ class Router {
     navigate(path, pushState = true) {
         // Find matching route
         let handler = this.routes[path];
+        let params = {};
 
         // Try exact match first, then wildcard
         if (!handler) {
@@ -41,8 +42,14 @@ class Router {
             for (const route in this.routes) {
                 if (route.includes(':')) {
                     const pattern = new RegExp('^' + route.replace(/:[^\s/]+/g, '([^/]+)') + '$');
-                    if (pattern.test(path)) {
+                    const match = pattern.exec(path);
+                    if (match) {
                         handler = this.routes[route];
+                        // Extract param names and values
+                        const paramNames = (route.match(/:[^\s/]+/g) || []).map(p => p.substring(1));
+                        paramNames.forEach((name, index) => {
+                            params[name] = match[index + 1];
+                        });
                         break;
                     }
                 }
@@ -61,8 +68,8 @@ class Router {
             window.history.pushState({}, '', path);
         }
 
-        // Call route handler
-        handler();
+        // Call route handler with extracted params
+        handler(params);
     }
 
     // Get query parameters
@@ -74,7 +81,12 @@ class Router {
         for (const pair of pairs) {
             const [key, value] = pair.split('=');
             if (key) {
-                params[decodeURIComponent(key)] = decodeURIComponent(value || '');
+                try {
+                    params[decodeURIComponent(key)] = decodeURIComponent(value || '');
+                } catch (e) {
+                    // Handle malformed URI encoding gracefully
+                    params[key] = value || '';
+                }
             }
         }
 

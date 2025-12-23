@@ -57,6 +57,10 @@ class I18n {
 
     // Manual method to update translations for a specific element or container
     updateElement(element = document) {
+        // Handle null/undefined element gracefully
+        if (!element) {
+            element = document;
+        }
         element.querySelectorAll('[data-i18n]').forEach(el => {
             const key = el.dataset.i18n;
             const translation = this.t(key);

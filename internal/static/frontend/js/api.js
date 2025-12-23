@@ -22,7 +22,7 @@ class API {
 
     // Check if user is authenticated
     isAuthenticated() {
-        return !!this.token;
+        return !!(this.token && this.token.trim());
     }
 
     // Make HTTP request
@@ -40,17 +40,34 @@ class API {
             headers,
         };
 
-        if (data && (method === 'POST' || method === 'PUT')) {
+        if (data && (method === 'POST' || method === 'PUT' || method === 'DELETE')) {
             options.body = JSON.stringify(data);
         }
 
         try {
             const response = await fetch(`${this.baseURL}${endpoint}`, options);
-            const responseData = await response.json();
+
+            // Handle empty responses (204 No Content)
+            const text = await response.text();
+            let responseData = null;
+            if (text) {
+                try {
+                    responseData = JSON.parse(text);
+                } catch (parseError) {
+                    // Server returned non-JSON (e.g., HTML error page)
+                    if (!response.ok) {
+                        const error = new Error('Request failed');
+                        error.status = response.status;
+                        throw error;
+                    }
+                    // For successful non-JSON responses, return null
+                    return null;
+                }
+            }
 
             if (!response.ok) {
                 // Create error with response data attached
-                const error = new Error(responseData.error || 'Request failed');
+                const error = new Error((responseData && responseData.error) || 'Request failed');
                 error.status = response.status;
                 error.data = responseData;
                 throw error;
@@ -77,10 +94,22 @@ class API {
                 body: formData,
             });
 
-            const responseData = await response.json();
+            // Handle empty responses (204 No Content)
+            const text = await response.text();
+            let responseData = null;
+            if (text) {
+                try {
+                    responseData = JSON.parse(text);
+                } catch (parseError) {
+                    if (!response.ok) {
+                        throw new Error('Upload failed');
+                    }
+                    return null;
+                }
+            }
 
             if (!response.ok) {
-                throw new Error(responseData.error || 'Upload failed');
+                throw new Error((responseData && responseData.error) || 'Upload failed');
             }
 
             return responseData;
