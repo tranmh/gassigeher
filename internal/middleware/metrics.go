@@ -30,6 +30,15 @@ type MetricsCollector struct {
 
 	// Start time for uptime calculation
 	startTime time.Time
+
+	// Tenant-aware metrics (tenant_id|method|path|status -> count)
+	tenantRequestCounts map[string]int64
+
+	// Tenant request durations
+	tenantDurations map[string]*durationStats
+
+	// Active requests per tenant
+	tenantActiveRequests map[int]int64
 }
 
 type durationStats struct {
@@ -41,11 +50,14 @@ type durationStats struct {
 
 // Global metrics collector instance
 var Metrics = &MetricsCollector{
-	requestCounts:    make(map[string]int64),
-	requestDurations: make(map[string]*durationStats),
-	errorCounts:      make(map[string]int64),
-	requestSizes:     make(map[string]int64),
-	startTime:        time.Now(),
+	requestCounts:        make(map[string]int64),
+	requestDurations:     make(map[string]*durationStats),
+	errorCounts:          make(map[string]int64),
+	requestSizes:         make(map[string]int64),
+	startTime:            time.Now(),
+	tenantRequestCounts:  make(map[string]int64),
+	tenantDurations:      make(map[string]*durationStats),
+	tenantActiveRequests: make(map[int]int64),
 }
 
 // MetricsMiddleware collects request metrics
@@ -72,6 +84,9 @@ func MetricsMiddleware(next http.Handler) http.Handler {
 		path := normalizePath(r.URL.Path)
 		key := r.Method + "|" + path + "|" + strconv.Itoa(wrapped.statusCode)
 
+		// Get tenant ID from context (may be 0 if no tenant)
+		tenantID := GetTenantID(r)
+
 		Metrics.mu.Lock()
 		defer Metrics.mu.Unlock()
 
@@ -96,6 +111,26 @@ func MetricsMiddleware(next http.Handler) http.Handler {
 		if wrapped.statusCode >= 400 {
 			errorKey := strconv.Itoa(wrapped.statusCode)
 			Metrics.errorCounts[errorKey]++
+		}
+
+		// Track tenant-specific metrics (only if tenant is present)
+		if tenantID > 0 {
+			tenantKey := strconv.Itoa(tenantID) + "|" + r.Method + "|" + path + "|" + strconv.Itoa(wrapped.statusCode)
+			Metrics.tenantRequestCounts[tenantKey]++
+
+			// Update tenant duration stats
+			if Metrics.tenantDurations[tenantKey] == nil {
+				Metrics.tenantDurations[tenantKey] = &durationStats{min: duration, max: duration}
+			}
+			tenantStats := Metrics.tenantDurations[tenantKey]
+			tenantStats.sum += duration
+			tenantStats.count++
+			if duration < tenantStats.min {
+				tenantStats.min = duration
+			}
+			if duration > tenantStats.max {
+				tenantStats.max = duration
+			}
 		}
 	})
 }
@@ -242,6 +277,39 @@ func (m *MetricsCollector) GetPrometheusMetrics() string {
 	sb.WriteString("\n# HELP process_uptime_seconds Process uptime in seconds\n")
 	sb.WriteString("# TYPE process_uptime_seconds gauge\n")
 	sb.WriteString("process_uptime_seconds " + strconv.FormatFloat(time.Since(m.startTime).Seconds(), 'f', 0, 64) + "\n")
+
+	// Tenant-specific metrics
+	if len(m.tenantRequestCounts) > 0 {
+		sb.WriteString("\n# HELP http_requests_by_tenant_total Total HTTP requests per tenant\n")
+		sb.WriteString("# TYPE http_requests_by_tenant_total counter\n")
+
+		for key, count := range m.tenantRequestCounts {
+			parts := strings.Split(key, "|")
+			if len(parts) != 4 {
+				continue
+			}
+			tenantID, method, path, status := parts[0], parts[1], parts[2], parts[3]
+			sb.WriteString("http_requests_by_tenant_total{tenant_id=\"" + tenantID + "\",method=\"" + method + "\",path=\"" + path + "\",status=\"" + status + "\"} " + strconv.FormatInt(count, 10) + "\n")
+		}
+
+		sb.WriteString("\n# HELP http_request_duration_by_tenant_seconds HTTP request duration per tenant in seconds\n")
+		sb.WriteString("# TYPE http_request_duration_by_tenant_seconds summary\n")
+
+		for key, stats := range m.tenantDurations {
+			parts := strings.Split(key, "|")
+			if len(parts) != 4 {
+				continue
+			}
+			tenantID, method, path := parts[0], parts[1], parts[2]
+
+			if stats.count > 0 {
+				avg := stats.sum / float64(stats.count)
+				sb.WriteString("http_request_duration_by_tenant_seconds{tenant_id=\"" + tenantID + "\",method=\"" + method + "\",path=\"" + path + "\",quantile=\"0.5\"} " + strconv.FormatFloat(avg, 'f', 6, 64) + "\n")
+				sb.WriteString("http_request_duration_by_tenant_seconds{tenant_id=\"" + tenantID + "\",method=\"" + method + "\",path=\"" + path + "\",quantile=\"min\"} " + strconv.FormatFloat(stats.min, 'f', 6, 64) + "\n")
+				sb.WriteString("http_request_duration_by_tenant_seconds{tenant_id=\"" + tenantID + "\",method=\"" + method + "\",path=\"" + path + "\",quantile=\"max\"} " + strconv.FormatFloat(stats.max, 'f', 6, 64) + "\n")
+			}
+		}
+	}
 
 	return sb.String()
 }

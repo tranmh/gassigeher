@@ -30,6 +30,8 @@ import (
 func main() {
 	// Parse command-line flags
 	envPath := flag.String("env", "./.env", "Path to the .env file")
+	resetTenant := flag.String("reset-tenant", "", "Reset a specific local dev tenant by slug (local dev only)")
+	resetAllTenants := flag.Bool("reset-all-tenants", false, "Reset all local dev tenants (local dev only)")
 	flag.Parse()
 
 	// Check if the .env file exists
@@ -102,6 +104,39 @@ func main() {
 	if err := demoSeedService.EnsureDemoTenant(); err != nil {
 		log.Printf("Warning: Failed to ensure demo tenant: %v", err)
 		// Don't exit - demo is optional
+	}
+
+	// Local development: Handle tenant reset commands (only in local dev mode)
+	if cfg.IsLocalDevelopment() {
+		localDevService := services.NewLocalDevSeedService(db)
+
+		// Handle reset commands
+		if *resetTenant != "" {
+			log.Printf("Resetting local dev tenant: %s", *resetTenant)
+			if err := localDevService.ResetTenant(*resetTenant); err != nil {
+				log.Fatalf("Failed to reset tenant %s: %v", *resetTenant, err)
+			}
+			log.Printf("Tenant '%s' reset successfully", *resetTenant)
+			return
+		}
+
+		if *resetAllTenants {
+			log.Println("Resetting all local dev tenants...")
+			if err := localDevService.ResetAllTenants(); err != nil {
+				log.Fatalf("Failed to reset all tenants: %v", err)
+			}
+			log.Println("All local dev tenants reset successfully")
+			return
+		}
+
+		// Ensure local dev tenants exist
+		if err := localDevService.EnsureLocalDevTenants(); err != nil {
+			log.Printf("Warning: Failed to ensure local dev tenants: %v", err)
+			// Don't exit - local dev tenants are optional
+		}
+		log.Println("Local development mode: tenants demo1-4 available")
+	} else if *resetTenant != "" || *resetAllTenants {
+		log.Fatal("Tenant reset is only available in local development mode (BASE_DOMAIN must end with .local)")
 	}
 
 	// Initialize router
@@ -475,6 +510,7 @@ func main() {
 	centralAdmin.HandleFunc("/admins/{id}/promote", centralAdminHandler.PromoteToCentralAdmin).Methods("POST")
 	centralAdmin.HandleFunc("/admins/{id}/demote", centralAdminHandler.DemoteFromCentralAdmin).Methods("POST")
 	centralAdmin.HandleFunc("/users/search", centralAdminHandler.SearchUsers).Methods("GET")
+	centralAdmin.HandleFunc("/tenants/{id}/reset", centralAdminHandler.ResetLocalDevTenant).Methods("POST")
 
 	// Feature flags management (central admin only)
 	centralAdmin.HandleFunc("/feature-flags", featureFlagHandler.ListFlags).Methods("GET")

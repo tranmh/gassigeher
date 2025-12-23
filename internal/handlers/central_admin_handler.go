@@ -13,6 +13,7 @@ import (
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
+	"github.com/tranmh/gassigeher/internal/services"
 )
 
 // CentralAdminHandler handles platform-wide administration
@@ -585,4 +586,61 @@ func (h *CentralAdminHandler) ExportTenantData(w http.ResponseWriter, r *http.Re
 	log.Printf("AUDIT: Central admin %d exported data for tenant %d (%s)", adminID, tenantID, tenant.Slug)
 
 	respondJSON(w, http.StatusOK, export)
+}
+
+// ResetLocalDevTenant resets a local development tenant to its initial state
+// POST /api/central-admin/tenants/{id}/reset
+// Only available in local development mode
+func (h *CentralAdminHandler) ResetLocalDevTenant(w http.ResponseWriter, r *http.Request) {
+	// Check if in local development mode
+	if !h.cfg.IsLocalDevelopment() {
+		respondError(w, http.StatusForbidden, "Reset ist nur im lokalen Entwicklungsmodus verfügbar")
+		return
+	}
+
+	vars := mux.Vars(r)
+	tenantID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Ungültige Tierheim-ID")
+		return
+	}
+
+	// Find tenant
+	tenant, err := h.tenantRepo.FindByID(tenantID)
+	if err != nil || tenant == nil {
+		respondError(w, http.StatusNotFound, "Tierheim nicht gefunden")
+		return
+	}
+
+	// Check if this is a local dev tenant (demo1-demo4)
+	isLocalDevTenant := false
+	for _, cfg := range services.LocalDevTenants {
+		if cfg.Slug == tenant.Slug {
+			isLocalDevTenant = true
+			break
+		}
+	}
+
+	if !isLocalDevTenant {
+		respondError(w, http.StatusBadRequest, "Nur lokale Entwicklungs-Tierheime können zurückgesetzt werden (demo1-demo4)")
+		return
+	}
+
+	// Reset the tenant
+	localDevService := services.NewLocalDevSeedService(h.db)
+	if err := localDevService.ResetTenant(tenant.Slug); err != nil {
+		log.Printf("Error resetting local dev tenant: %v", err)
+		respondError(w, http.StatusInternalServerError, "Fehler beim Zurücksetzen des Tierheims")
+		return
+	}
+
+	// Audit log
+	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	log.Printf("AUDIT: Central admin %d reset local dev tenant %d (%s)", adminID, tenantID, tenant.Slug)
+
+	respondJSON(w, http.StatusOK, map[string]string{
+		"message":  "Tierheim erfolgreich zurückgesetzt",
+		"slug":     tenant.Slug,
+		"password": services.LocalDevPassword,
+	})
 }

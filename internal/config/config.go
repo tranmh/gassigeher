@@ -232,4 +232,15 @@ func getEnvAsBool(key string, defaultValue bool) bool {
 	return valueStr == "true" || valueStr == "1" || valueStr == "yes"
 }
 
+// IsLocalDevelopment returns true if running in local development mode
+// Detected by checking if BaseDomain ends with .local or .localhost
+func (c *Config) IsLocalDevelopment() bool {
+	if c.BaseDomain == "" {
+		return false
+	}
+	return strings.HasSuffix(c.BaseDomain, ".local") ||
+		strings.HasSuffix(c.BaseDomain, ".localhost") ||
+		c.BaseDomain == "localhost"
+}
+
 // DONE

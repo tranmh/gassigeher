@@ -303,3 +303,35 @@ func TestGetDBConfig(t *testing.T) {
 		}
 	})
 }
+
+// TestIsLocalDevelopment tests the IsLocalDevelopment method
+func TestIsLocalDevelopment(t *testing.T) {
+	tests := []struct {
+		name       string
+		baseDomain string
+		want       bool
+	}{
+		// Local development domains
+		{"gassigeher.local", "gassigeher.local", true},
+		{"subdomain.local", "example.local", true},
+		{"localhost suffix", "app.localhost", true},
+		{"plain localhost", "localhost", true},
+
+		// Production domains
+		{"gassigeher.org", "gassigeher.org", false},
+		{"gassigeher.com", "gassigeher.com", false},
+		{"empty domain", "", false},
+		{"localdomain (not .local)", "localdomain", false},
+		{"local in middle", "local.example.com", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{BaseDomain: tt.baseDomain}
+			got := cfg.IsLocalDevelopment()
+			if got != tt.want {
+				t.Errorf("IsLocalDevelopment() with BaseDomain=%q = %v, want %v", tt.baseDomain, got, tt.want)
+			}
+		})
+	}
+}
