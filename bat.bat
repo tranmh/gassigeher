@@ -16,11 +16,31 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
-echo [1/6] Checking Go version...
+echo [1/8] Checking Go version...
 go version
 echo.
 
-echo [2/6] Downloading dependencies...
+echo [2/8] Compiling SCSS...
+where npm >nul 2>nul
+if %ERRORLEVEL% NEQ 0 (
+    echo [SKIP] npm not found - SCSS compilation skipped
+    echo        Make sure main.css exists or install npm
+    echo.
+) else (
+    if not exist "node_modules" (
+        echo Installing npm dependencies...
+        npm install
+    )
+    npm run sass:prod
+    if %ERRORLEVEL% NEQ 0 (
+        echo [ERROR] SCSS compilation failed
+        exit /b 1
+    )
+    echo [OK] SCSS compiled successfully
+    echo.
+)
+
+echo [3/8] Downloading dependencies...
 go mod download
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Failed to download dependencies
@@ -29,7 +49,7 @@ if %ERRORLEVEL% NEQ 0 (
 echo [OK] Dependencies downloaded
 echo.
 
-echo [3/6] Preparing version info...
+echo [4/8] Preparing version info...
 set VERSION=1.3
 for /f %%i in ('git rev-parse --short HEAD 2^>nul') do set GIT_COMMIT=%%i
 if "%GIT_COMMIT%"=="" set GIT_COMMIT=unknown
@@ -39,7 +59,7 @@ set LDFLAGS=-X github.com/tranmh/gassigeher/internal/version.Version=%VERSION% -
 echo [OK] Version: %VERSION% (%GIT_COMMIT%)
 echo.
 
-echo [4/6] Building application for Windows...
+echo [5/8] Building application for Windows...
 go build -ldflags "%LDFLAGS%" -o gassigeher.exe ./cmd/server
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Windows build failed
@@ -48,7 +68,7 @@ if %ERRORLEVEL% NEQ 0 (
 echo [OK] Windows build successful: gassigeher.exe v%VERSION% (%GIT_COMMIT%)
 echo.
 
-echo [5/6] Building application for Linux (cross-compile)...
+echo [6/8] Building application for Linux (cross-compile)...
 set GOOS=linux
 set GOARCH=amd64
 go build -ldflags "%LDFLAGS%" -o gassigeher ./cmd/server
@@ -61,7 +81,7 @@ set GOOS=
 set GOARCH=
 echo.
 
-echo [6/7] Running Go tests (short mode - skips slow property tests)...
+echo [7/8] Running Go tests (short mode - skips slow property tests)...
 go test -short -cover ./...
 if %ERRORLEVEL% NEQ 0 (
     echo [WARNING] Some Go tests failed
@@ -73,7 +93,7 @@ if %ERRORLEVEL% NEQ 0 (
 echo Note: Run 'go test ./...' without -short for full property-based tests (~5 min)
 echo.
 
-echo [7/7] Running frontend tests...
+echo [8/8] Running frontend tests...
 where npm >nul 2>nul
 if %ERRORLEVEL% NEQ 0 (
     echo [SKIP] npm not found - frontend tests skipped

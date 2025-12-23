@@ -49,3 +49,7 @@ hetzner_recovery_key.txt
 
 # Rapid property-based testing fail files
 testdata/rapid/
+
+# Compiled CSS (generated from SCSS)
+internal/static/frontend/assets/css/main.css
+internal/static/frontend/assets/css/main.css.map

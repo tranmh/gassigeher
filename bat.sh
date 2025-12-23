@@ -21,11 +21,30 @@ if ! command -v go &> /dev/null; then
     exit 1
 fi
 
-echo "[1/4] Checking Go version..."
+echo "[1/6] Checking Go version..."
 go version
 echo ""
 
-echo "[2/4] Downloading dependencies..."
+echo "[2/6] Compiling SCSS..."
+if command -v npm &> /dev/null; then
+    # Check if node_modules exists, install if not
+    if [ ! -d "node_modules" ]; then
+        echo "Installing npm dependencies..."
+        npm install
+    fi
+    if npm run sass:prod; then
+        echo -e "${GREEN}[OK] SCSS compiled successfully${NC}"
+    else
+        echo -e "${RED}[ERROR] SCSS compilation failed${NC}"
+        exit 1
+    fi
+else
+    echo -e "${YELLOW}[SKIP] npm not found - SCSS compilation skipped${NC}"
+    echo -e "${YELLOW}       Make sure main.css exists or install npm${NC}"
+fi
+echo ""
+
+echo "[3/6] Downloading dependencies..."
 if go mod download; then
     echo -e "${GREEN}[OK] Dependencies downloaded${NC}"
 else
@@ -34,7 +53,7 @@ else
 fi
 echo ""
 
-echo "[3/4] Building application..."
+echo "[4/6] Building application..."
 # Get version info for ldflags
 VERSION="1.3"
 GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
@@ -52,7 +71,7 @@ else
 fi
 echo ""
 
-echo "[4/5] Running Go tests (short mode - skips slow property tests)..."
+echo "[5/6] Running Go tests (short mode - skips slow property tests)..."
 if go test -short -cover ./...; then
     echo -e "${GREEN}[OK] All Go tests passed${NC}"
 else
@@ -62,7 +81,7 @@ echo ""
 echo "Note: Run 'go test ./...' without -short for full property-based tests (~5 min)"
 echo ""
 
-echo "[5/5] Running frontend tests..."
+echo "[6/6] Running frontend tests..."
 if command -v npm &> /dev/null; then
     # Check if node_modules exists, install if not
     if [ ! -d "node_modules" ]; then

@@ -1,0 +1,218 @@
+// ============================================================================
+// Banners Component
+// ============================================================================
+// Logo banner, impersonation banner, and demo banner styles
+
+@use '../abstracts' as *;
+
+// ============================================================================
+// Logo Banner - Site-wide logo above navigation
+// ============================================================================
+
+.logo-banner {
+  background-color: $card-bg;
+  text-align: center;
+  padding: 15px 0;
+  border-bottom: 1px solid $border-light;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.logo-banner-link {
+  display: inline-block;
+  text-decoration: none;
+}
+
+.logo-banner-img {
+  max-height: 80px;
+  max-width: 90%;
+  width: auto;
+  height: auto;
+  @include transition(opacity);
+
+  &:hover {
+    opacity: 0.9;
+  }
+}
+
+// Tablet responsive
+@media (max-width: $breakpoint-mobile) {
+  .logo-banner {
+    padding: 10px 15px;
+  }
+
+  .logo-banner-img {
+    max-height: 60px;
+    max-width: 85%;
+  }
+}
+
+// Mobile responsive
+@media (max-width: 480px) {
+  .logo-banner {
+    padding: 8px 10px;
+  }
+
+  .logo-banner-img {
+    max-height: 50px;
+  }
+}
+
+// ============================================================================
+// Impersonation Banner
+// ============================================================================
+
+#impersonation-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #dc3545;
+  color: white;
+  padding: 12px 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  z-index: $z-index-toast;
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+
+  strong {
+    font-weight: 700;
+  }
+
+  button {
+    background: white;
+    color: #dc3545;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: $font-weight-semibold;
+    font-size: 14px;
+    @include transition(background-color, transform);
+
+    &:hover {
+      background: #f8f9fa;
+      transform: scale(1.02);
+    }
+
+    &:active {
+      transform: scale(0.98);
+    }
+  }
+}
+
+body.impersonating {
+  padding-top: 52px;
+}
+
+// Mobile responsive for impersonation banner
+@media (max-width: 600px) {
+  #impersonation-banner {
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 15px;
+    text-align: center;
+  }
+
+  body.impersonating {
+    padding-top: 85px;
+  }
+}
+
+// ============================================================================
+// Demo Banner
+// ============================================================================
+
+#demo-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+  padding: 10px 20px;
+  z-index: $z-index-dropdown;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+  .demo-banner-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    flex-wrap: wrap;
+  }
+
+  .demo-label {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: $font-size-tiny;
+    letter-spacing: 1px;
+  }
+
+  .demo-text {
+    font-size: 0.9rem;
+  }
+
+  .reset-info {
+    opacity: 0.8;
+    font-size: 0.85rem;
+  }
+
+  .demo-link {
+    background: white;
+    color: #3b82f6;
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-weight: $font-weight-semibold;
+    font-size: 0.85rem;
+    text-decoration: none;
+    @include transition(all);
+
+    &:hover {
+      background: #f0f4ff;
+      transform: scale(1.02);
+    }
+  }
+}
+
+body.demo-mode {
+  padding-top: 52px;
+}
+
+// Handle both impersonation and demo banners
+body.demo-mode.impersonating {
+  padding-top: 104px;
+}
+
+body.demo-mode.impersonating #demo-banner {
+  top: 52px;
+}
+
+// Mobile responsive for demo banner
+@media (max-width: 600px) {
+  #demo-banner {
+    padding: 8px 12px;
+
+    .demo-banner-content {
+      flex-direction: column;
+      gap: 8px;
+      text-align: center;
+    }
+
+    .demo-text {
+      font-size: 0.8rem;
+    }
+  }
+
+  body.demo-mode {
+    padding-top: 90px;
+  }
+
+  body.demo-mode.impersonating {
+    padding-top: 175px;
+  }
+}
