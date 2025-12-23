@@ -121,6 +121,11 @@ func (s *DemoSeedService) SeedDemoData(tenantID int, adminPassword string) error
 		return fmt.Errorf("failed to seed colors: %w", err)
 	}
 
+	// Seed booking time rules (required for users to be able to book)
+	if err := s.seedBookingTimeRules(tenantID); err != nil {
+		return fmt.Errorf("failed to seed booking time rules: %w", err)
+	}
+
 	// Seed users
 	userIDs, err := s.seedDemoUsers(tenantID, adminPassword)
 	if err != nil {
@@ -507,6 +512,51 @@ func (s *DemoSeedService) seedDemoBookings(tenantID int, userIDs map[string]int,
 	return nil
 }
 
+// seedBookingTimeRules creates default booking time rules for the demo tenant
+// Without these rules, users cannot book any time slots
+func (s *DemoSeedService) seedBookingTimeRules(tenantID int) error {
+	// Check if rules already exist (idempotent)
+	var existingCount int
+	err := s.db.QueryRow("SELECT COUNT(*) FROM booking_time_rules WHERE tenant_id = ?", tenantID).Scan(&existingCount)
+	if err != nil {
+		return fmt.Errorf("failed to check existing rules: %w", err)
+	}
+	if existingCount > 0 {
+		log.Printf("Booking time rules already exist for tenant %d, skipping", tenantID)
+		return nil
+	}
+
+	// Default rules matching ProvisioningService
+	rules := []struct {
+		DayType   string
+		RuleName  string
+		StartTime string
+		EndTime   string
+		IsBlocked bool
+	}{
+		{"weekday", "morning", "08:00", "12:00", false},
+		{"weekday", "lunch", "12:00", "14:00", true},
+		{"weekday", "afternoon", "14:00", "18:00", false},
+		{"weekend", "morning", "09:00", "12:00", false},
+		{"weekend", "afternoon", "14:00", "17:00", false},
+		{"holiday", "morning", "10:00", "12:00", false},
+		{"holiday", "afternoon", "14:00", "16:00", false},
+	}
+
+	for _, r := range rules {
+		_, err := s.db.Exec(
+			`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked) VALUES (?, ?, ?, ?, ?, ?)`,
+			tenantID, r.DayType, r.RuleName, r.StartTime, r.EndTime, r.IsBlocked,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create booking time rule %s/%s: %w", r.DayType, r.RuleName, err)
+		}
+	}
+
+	log.Printf("Created %d booking time rules for demo tenant", len(rules))
+	return nil
+}
+
 // initializeDemoSettings sets up default system settings for demo tenant
 func (s *DemoSeedService) initializeDemoSettings(tenantID int) error {
 	settings := map[string]string{
@@ -578,6 +628,7 @@ func (s *DemoSeedService) deleteAllTenantData(tenantID int) error {
 		"users",
 		"color_categories",
 		"system_settings",
+		"booking_time_rules",
 	}
 
 	for _, table := range tables {

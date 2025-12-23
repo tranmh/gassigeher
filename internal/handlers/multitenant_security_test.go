@@ -735,3 +735,150 @@ func TestMultiTenant_ApproveBooking_ZeroTenantID_Blocked(t *testing.T) {
 		t.Errorf("SECURITY BUG: Booking was actually approved with tenantID=0!")
 	}
 }
+
+// ====================================================================================
+// BUG #1: CROSS-TENANT DOG ACCESS IN CreateBooking - INFORMATION LEAK
+// ====================================================================================
+// When booking a dog from another tenant, the system returns a color category error
+// instead of "Dog not found". This reveals the existence of dogs in other tenants.
+// ====================================================================================
+
+// TestMultiTenant_CreateBooking_CrossTenantDog_ReturnsNotFound tests that booking
+// a dog from another tenant returns "Dog not found" not "color category error"
+// TDD RED PHASE: This test should FAIL until we add tenant check in CreateBooking
+func TestMultiTenant_CreateBooking_CrossTenantDog_ReturnsNotFound(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewBookingHandler(db, cfg)
+
+	// Create user in tenant 1
+	userID := testutil.SeedTestUser(t, db, "user@tenant1.com", "Test User", "green")
+
+	// Create tenant 2
+	now := testutil.Now()
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
+		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create tenant 2: %v", err)
+	}
+
+	// Create color for tenant 2
+	_, err = db.Exec(`INSERT INTO color_categories (id, tenant_id, name, hex_code, sort_order, created_at, updated_at)
+		VALUES (100, 2, 'Green', '#00FF00', 1, ?, ?)`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create color for tenant 2: %v", err)
+	}
+
+	// Create dog in tenant 2
+	_, err = db.Exec(`INSERT INTO dogs (id, tenant_id, name, breed, size, age, color_id, is_available, created_at, updated_at)
+		VALUES (100, 2, 'OtherTenantDog', 'Labrador', 'large', 3, 100, 1, ?, ?)`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create dog in tenant 2: %v", err)
+	}
+
+	// User from tenant 1 tries to book dog from tenant 2
+	futureDate := testutil.GetFutureDate(7)
+	reqBody := map[string]interface{}{
+		"dog_id":         100, // Dog from tenant 2
+		"date":           futureDate,
+		"scheduled_time": "14:00",
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest("POST", "/api/v1/bookings", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 1) // User is in tenant 1
+	ctx = context.WithValue(ctx, middleware.UserIDKey, userID)
+	ctx = context.WithValue(ctx, middleware.EmailKey, "user@tenant1.com")
+	ctx = context.WithValue(ctx, middleware.IsAdminKey, false)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateBooking(rec, req)
+
+	// BUG: Currently returns 403 "Du hast nicht die erforderliche Farbkategorie"
+	// Should return 404 "Dog not found" to avoid information leakage
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("BUG: Expected 404 'Dog not found' for cross-tenant dog, got %d: %s",
+			rec.Code, rec.Body.String())
+	}
+
+	// Verify the error message is "Dog not found", not color-related
+	var resp map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err == nil {
+		if resp["error"] != "Dog not found" {
+			t.Errorf("BUG: Expected error 'Dog not found', got '%s' - information leak!", resp["error"])
+		}
+	}
+}
+
+// TestMultiTenant_CreateBooking_CrossTenantDog_AdminAlsoBlocked tests that even admins
+// cannot book dogs from other tenants
+// TDD RED PHASE: This test should FAIL
+func TestMultiTenant_CreateBooking_CrossTenantDog_AdminAlsoBlocked(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewBookingHandler(db, cfg)
+
+	// Create admin user in tenant 1
+	userID := testutil.SeedTestUser(t, db, "admin@tenant1.com", "Admin User", "green")
+	// Make them admin
+	_, err := db.Exec(`UPDATE users SET is_admin = 1 WHERE id = ?`, userID)
+	if err != nil {
+		t.Fatalf("Failed to make user admin: %v", err)
+	}
+
+	// Create tenant 2
+	now := testutil.Now()
+	_, err = db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
+		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create tenant 2: %v", err)
+	}
+
+	// Create color for tenant 2
+	_, err = db.Exec(`INSERT INTO color_categories (id, tenant_id, name, hex_code, sort_order, created_at, updated_at)
+		VALUES (100, 2, 'Green', '#00FF00', 1, ?, ?)`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create color for tenant 2: %v", err)
+	}
+
+	// Create dog in tenant 2
+	_, err = db.Exec(`INSERT INTO dogs (id, tenant_id, name, breed, size, age, color_id, is_available, created_at, updated_at)
+		VALUES (100, 2, 'OtherTenantDog', 'Labrador', 'large', 3, 100, 1, ?, ?)`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create dog in tenant 2: %v", err)
+	}
+
+	// Admin from tenant 1 tries to book dog from tenant 2
+	futureDate := testutil.GetFutureDate(7)
+	reqBody := map[string]interface{}{
+		"dog_id":         100, // Dog from tenant 2
+		"date":           futureDate,
+		"scheduled_time": "14:00",
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest("POST", "/api/v1/bookings", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 1) // Admin is in tenant 1
+	ctx = context.WithValue(ctx, middleware.UserIDKey, userID)
+	ctx = context.WithValue(ctx, middleware.EmailKey, "admin@tenant1.com")
+	ctx = context.WithValue(ctx, middleware.IsAdminKey, true) // Is admin!
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateBooking(rec, req)
+
+	// BUG: Admin bypasses color check but should still get "Dog not found"
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("BUG: Admin from tenant 1 should not access dogs from tenant 2. Got %d: %s",
+			rec.Code, rec.Body.String())
+	}
+}

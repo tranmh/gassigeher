@@ -1404,9 +1404,9 @@ func TestBookingHandler_ColorBasedPermission(t *testing.T) {
 		// User has this color, so CAN access the dog
 		now := time.Now()
 		result, _ := db.Exec(`
-			INSERT INTO dogs (name, breed, size, age, color_id, is_available, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		`, "ColorDog", "TestBreed", "medium", 3, colorID, true, now, now)
+			INSERT INTO dogs (name, breed, size, age, color_id, is_available, tenant_id, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, "ColorDog", "TestBreed", "medium", 3, colorID, true, 1, now, now)
 		dogID, _ := result.LastInsertId()
 
 		// Try to book - should SUCCEED because user has the dog's color
@@ -1445,9 +1445,9 @@ func TestBookingHandler_ColorBasedPermission(t *testing.T) {
 		// User does NOT have this color, so CANNOT access
 		now := time.Now()
 		result, _ := db.Exec(`
-			INSERT INTO dogs (name, breed, size, age, color_id, is_available, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		`, "RedDog", "TestBreed", "small", 2, colorID, true, now, now)
+			INSERT INTO dogs (name, breed, size, age, color_id, is_available, tenant_id, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, "RedDog", "TestBreed", "small", 2, colorID, true, 1, now, now)
 		dogID, _ := result.LastInsertId()
 
 		// Try to book - should FAIL because user doesn't have the dog's color

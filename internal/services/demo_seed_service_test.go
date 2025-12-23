@@ -362,6 +362,79 @@ func TestDemoAdminEmail(t *testing.T) {
 	}
 }
 
+// ====================================================================================
+// BUG #2: MISSING BOOKING TIME RULES IN DEMO TENANT
+// ====================================================================================
+// Demo tenants should have default booking time rules so users can actually book.
+// Without these rules, the booking time slots API returns empty/null.
+// ====================================================================================
+
+// TestDemoSeedService_SeedDemoData_CreatesBookingTimeRules tests that booking time rules are created
+// TDD RED PHASE: This test should FAIL until we add booking time rules seeding
+func TestDemoSeedService_SeedDemoData_CreatesBookingTimeRules(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	service := NewDemoSeedService(db)
+
+	// Create demo tenant
+	err := service.EnsureDemoTenant()
+	if err != nil {
+		t.Fatalf("EnsureDemoTenant() failed: %v", err)
+	}
+
+	// Get demo tenant ID
+	var tenantID int
+	err = db.QueryRow("SELECT id FROM tenants WHERE slug = ?", DemoTenantSlug).Scan(&tenantID)
+	if err != nil {
+		t.Fatalf("Failed to get demo tenant ID: %v", err)
+	}
+
+	// BUG: Check if booking time rules were created
+	var count int
+	err = db.QueryRow("SELECT COUNT(*) FROM booking_time_rules WHERE tenant_id = ?", tenantID).Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to count booking time rules: %v", err)
+	}
+
+	// Should have at least 5 rules (weekday morning, weekday lunch, weekday afternoon, weekend morning, weekend afternoon)
+	if count < 5 {
+		t.Errorf("BUG: Expected at least 5 booking time rules for demo tenant, got %d. Users cannot book without these rules!", count)
+	}
+}
+
+// TestDemoSeedService_ResetDemoTenant_PreservesBookingTimeRules tests that reset recreates rules
+// TDD RED PHASE: This test should FAIL
+func TestDemoSeedService_ResetDemoTenant_PreservesBookingTimeRules(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	service := NewDemoSeedService(db)
+
+	// Create demo tenant
+	err := service.EnsureDemoTenant()
+	if err != nil {
+		t.Fatalf("EnsureDemoTenant() failed: %v", err)
+	}
+
+	// Get demo tenant ID
+	var tenantID int
+	db.QueryRow("SELECT id FROM tenants WHERE slug = ?", DemoTenantSlug).Scan(&tenantID)
+
+	// Reset tenant
+	err = service.ResetDemoTenant()
+	if err != nil {
+		t.Fatalf("ResetDemoTenant() failed: %v", err)
+	}
+
+	// Check booking time rules after reset
+	var count int
+	err = db.QueryRow("SELECT COUNT(*) FROM booking_time_rules WHERE tenant_id = ?", tenantID).Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to count booking time rules: %v", err)
+	}
+
+	if count < 5 {
+		t.Errorf("BUG: Expected at least 5 booking time rules after reset, got %d", count)
+	}
+}
+
 // TestDemoSeedService_SeedDemoColors_Idempotent tests that color seeding is idempotent
 func TestDemoSeedService_SeedDemoColors_Idempotent(t *testing.T) {
 	db := testutil.SetupTestDB(t)

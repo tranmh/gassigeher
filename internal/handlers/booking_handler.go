@@ -112,6 +112,13 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SaaS: Verify dog belongs to current tenant (prevents cross-tenant booking)
+	// Returns "Dog not found" to avoid information leakage about other tenants' dogs
+	if tenantID > 0 && dog.TenantID != tenantID {
+		respondError(w, http.StatusNotFound, "Dog not found")
+		return
+	}
+
 	// Check if dog is available
 	if !dog.IsAvailable {
 		respondError(w, http.StatusBadRequest, "Dog is currently unavailable")
