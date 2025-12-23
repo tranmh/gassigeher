@@ -288,10 +288,11 @@ func ValidateSlug(slug string) error {
 		return errors.New("slug must be less than 100 characters")
 	}
 
-	// Slug must be lowercase alphanumeric with hyphens
-	slugRegex := regexp.MustCompile(`^[a-z0-9][a-z0-9-]*[a-z0-9]$`)
+	// Slug must start with letter, contain only lowercase letters, numbers, and hyphens
+	// BUGFIX: Changed from [a-z0-9] to [a-z] to match isValidSlug in tenant_handler.go
+	slugRegex := regexp.MustCompile(`^[a-z][a-z0-9-]*[a-z0-9]$`)
 	if !slugRegex.MatchString(slug) {
-		return errors.New("slug must contain only lowercase letters, numbers, and hyphens")
+		return errors.New("slug must start with a letter and contain only lowercase letters, numbers, and hyphens")
 	}
 
 	// No consecutive hyphens

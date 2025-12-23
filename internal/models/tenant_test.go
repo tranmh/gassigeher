@@ -30,7 +30,9 @@ func TestValidateSlug(t *testing.T) {
 		{"reserved slug mail", "mail", true},
 		{"demo is not reserved", "demo", false},
 		{"single character", "a", true},
-		{"only numbers", "123456", false},
+		// BUGFIX: Changed from false to true - slugs must start with letter (to match isValidSlug in handler)
+		{"only numbers", "123456", true},
+		{"starts with number", "1tierheim", true},
 	}
 
 	for _, tt := range tests {
