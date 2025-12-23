@@ -61,9 +61,9 @@ func TestColorCategoryHandler_ListColors(t *testing.T) {
 		}
 		json.Unmarshal(rec.Body.Bytes(), &response)
 
-		// Should have at least 7 default colors from migration
-		if len(response.Colors) < 7 {
-			t.Errorf("Expected at least 7 colors, got %d", len(response.Colors))
+		// Should have at least 5 default colors from migration
+		if len(response.Colors) < 5 {
+			t.Errorf("Expected at least 5 colors, got %d", len(response.Colors))
 		}
 	})
 }

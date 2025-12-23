@@ -312,14 +312,20 @@ func TestExperienceRequestHandler_ApproveRequest_AssignsColors(t *testing.T) {
 			t.Errorf("Expected 3 colors (gruen, gelb, orange) for orange level, got %d", colorCount)
 		}
 
-		// Verify specific colors are present
+		// Verify specific colors are present (by name, not hardcoded IDs)
 		var hasGruen, hasGelb, hasOrange int
-		db.QueryRow("SELECT COUNT(*) FROM user_colors WHERE user_id = ? AND color_id = 1", userID).Scan(&hasGruen)
-		db.QueryRow("SELECT COUNT(*) FROM user_colors WHERE user_id = ? AND color_id = 2", userID).Scan(&hasGelb)
-		db.QueryRow("SELECT COUNT(*) FROM user_colors WHERE user_id = ? AND color_id = 3", userID).Scan(&hasOrange)
+		db.QueryRow(`SELECT COUNT(*) FROM user_colors uc
+			JOIN color_categories cc ON uc.color_id = cc.id AND uc.tenant_id = cc.tenant_id
+			WHERE uc.user_id = ? AND LOWER(cc.name) = 'gruen'`, userID).Scan(&hasGruen)
+		db.QueryRow(`SELECT COUNT(*) FROM user_colors uc
+			JOIN color_categories cc ON uc.color_id = cc.id AND uc.tenant_id = cc.tenant_id
+			WHERE uc.user_id = ? AND LOWER(cc.name) = 'gelb'`, userID).Scan(&hasGelb)
+		db.QueryRow(`SELECT COUNT(*) FROM user_colors uc
+			JOIN color_categories cc ON uc.color_id = cc.id AND uc.tenant_id = cc.tenant_id
+			WHERE uc.user_id = ? AND LOWER(cc.name) = 'orange'`, userID).Scan(&hasOrange)
 
 		if hasGruen != 1 || hasGelb != 1 || hasOrange != 1 {
-			t.Errorf("Expected colors 1,2,3 for orange level. gruen=%d, gelb=%d, orange=%d", hasGruen, hasGelb, hasOrange)
+			t.Errorf("Expected colors gruen, gelb, orange for orange level. gruen=%d, gelb=%d, orange=%d", hasGruen, hasGelb, hasOrange)
 		}
 	})
 

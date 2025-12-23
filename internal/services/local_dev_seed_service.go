@@ -353,7 +353,7 @@ func (s *LocalDevSeedService) seedMediumProfile(tenantID, adminID int) error {
 	}
 
 	// Add 5 blocked dates
-	return s.createBlockedDates(tenantID, 5)
+	return s.createBlockedDates(tenantID, adminID, 5)
 }
 
 // seedStressProfile: 1 admin + 100 users, 50 dogs, 500 bookings
@@ -410,7 +410,7 @@ func (s *LocalDevSeedService) seedStressProfile(tenantID, adminID int) error {
 	}
 
 	// Add 20 blocked dates
-	return s.createBlockedDates(tenantID, 20)
+	return s.createBlockedDates(tenantID, adminID, 20)
 }
 
 // userConfig for user creation
@@ -603,7 +603,7 @@ func (s *LocalDevSeedService) createBookings(tenantID int, userIDs map[string]in
 }
 
 // createBlockedDates creates blocked dates for testing
-func (s *LocalDevSeedService) createBlockedDates(tenantID, count int) error {
+func (s *LocalDevSeedService) createBlockedDates(tenantID, adminID, count int) error {
 	today := time.Now()
 
 	for i := 0; i < count; i++ {
@@ -612,9 +612,10 @@ func (s *LocalDevSeedService) createBlockedDates(tenantID, count int) error {
 		date := today.AddDate(0, 0, daysAhead)
 
 		blocked := &models.BlockedDate{
-			TenantID: tenantID,
-			Date:     date.Format("2006-01-02"),
-			Reason:   fmt.Sprintf("Testsperrung %d", i+1),
+			TenantID:  tenantID,
+			Date:      date.Format("2006-01-02"),
+			Reason:    fmt.Sprintf("Testsperrung %d", i+1),
+			CreatedBy: adminID,
 		}
 
 		if err := s.blockedRepo.Create(blocked); err != nil {

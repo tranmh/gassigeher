@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,16 @@ import (
 	"github.com/tranmh/gassigeher/internal/config"
 	"github.com/tranmh/gassigeher/internal/testutil"
 )
+
+// getColorIDByName looks up a color ID by name for tenant 1
+func getColorIDByName(t *testing.T, db *sql.DB, colorName string) int {
+	var colorID int
+	err := db.QueryRow(`SELECT id FROM color_categories WHERE tenant_id = 1 AND LOWER(name) = LOWER(?)`, colorName).Scan(&colorID)
+	if err != nil {
+		t.Fatalf("Failed to get color ID for %s: %v", colorName, err)
+	}
+	return colorID
+}
 
 // TestUserColorHandler_GetUserColors tests getting user's assigned colors
 func TestUserColorHandler_GetUserColors(t *testing.T) {
@@ -103,7 +114,8 @@ func TestUserColorHandler_AddColorToUser(t *testing.T) {
 	userID := testutil.SeedTestUserWithoutColors(t, db, "nocolor@example.com", "No Color User", "green")
 
 	t.Run("adds color to user", func(t *testing.T) {
-		reqBody := map[string]int{"color_id": 1} // gruen color
+		colorID := getColorIDByName(t, db, "gruen")
+		reqBody := map[string]int{"color_id": colorID}
 		body, _ := json.Marshal(reqBody)
 
 		req := httptest.NewRequest("POST", "/api/admin/users/"+strconv.Itoa(userID)+"/colors", bytes.NewReader(body))
@@ -121,14 +133,15 @@ func TestUserColorHandler_AddColorToUser(t *testing.T) {
 
 		// Verify color was added
 		var count int
-		db.QueryRow("SELECT COUNT(*) FROM user_colors WHERE user_id = ? AND color_id = 1", userID).Scan(&count)
+		db.QueryRow("SELECT COUNT(*) FROM user_colors WHERE user_id = ? AND color_id = ?", userID, colorID).Scan(&count)
 		if count != 1 {
 			t.Errorf("Expected color to be added, got count %d", count)
 		}
 	})
 
 	t.Run("returns 409 if user already has color", func(t *testing.T) {
-		reqBody := map[string]int{"color_id": 1} // Same color again
+		colorID := getColorIDByName(t, db, "gruen")
+		reqBody := map[string]int{"color_id": colorID} // Same color again
 		body, _ := json.Marshal(reqBody)
 
 		req := httptest.NewRequest("POST", "/api/admin/users/"+strconv.Itoa(userID)+"/colors", bytes.NewReader(body))
@@ -146,7 +159,8 @@ func TestUserColorHandler_AddColorToUser(t *testing.T) {
 	})
 
 	t.Run("returns 403 for non-admin", func(t *testing.T) {
-		reqBody := map[string]int{"color_id": 2}
+		colorID := getColorIDByName(t, db, "gelb")
+		reqBody := map[string]int{"color_id": colorID}
 		body, _ := json.Marshal(reqBody)
 
 		req := httptest.NewRequest("POST", "/api/admin/users/"+strconv.Itoa(userID)+"/colors", bytes.NewReader(body))
@@ -213,15 +227,16 @@ func TestUserColorHandler_RemoveColorFromUser(t *testing.T) {
 	userID := testutil.SeedTestUser(t, db, "user@example.com", "Test User", "green")
 
 	t.Run("removes color from user", func(t *testing.T) {
+		colorID := getColorIDByName(t, db, "gruen")
 		// First verify user has the color
 		var count int
-		db.QueryRow("SELECT COUNT(*) FROM user_colors WHERE user_id = ? AND color_id = 1", userID).Scan(&count)
+		db.QueryRow("SELECT COUNT(*) FROM user_colors WHERE user_id = ? AND color_id = ?", userID, colorID).Scan(&count)
 		if count == 0 {
-			t.Skip("User doesn't have color 1, skipping test")
+			t.Skip("User doesn't have gruen color, skipping test")
 		}
 
-		req := httptest.NewRequest("DELETE", "/api/admin/users/"+strconv.Itoa(userID)+"/colors/1", nil)
-		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(userID), "colorId": "1"})
+		req := httptest.NewRequest("DELETE", "/api/admin/users/"+strconv.Itoa(userID)+"/colors/"+strconv.Itoa(colorID), nil)
+		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(userID), "colorId": strconv.Itoa(colorID)})
 		ctx := contextWithTenant(req.Context(), 1, adminID, true)
 		req = req.WithContext(ctx)
 
@@ -233,7 +248,7 @@ func TestUserColorHandler_RemoveColorFromUser(t *testing.T) {
 		}
 
 		// Verify color was removed
-		db.QueryRow("SELECT COUNT(*) FROM user_colors WHERE user_id = ? AND color_id = 1", userID).Scan(&count)
+		db.QueryRow("SELECT COUNT(*) FROM user_colors WHERE user_id = ? AND color_id = ?", userID, colorID).Scan(&count)
 		if count != 0 {
 			t.Errorf("Expected color to be removed, got count %d", count)
 		}
@@ -280,7 +295,10 @@ func TestUserColorHandler_SetUserColors(t *testing.T) {
 	userID := testutil.SeedTestUser(t, db, "user@example.com", "Test User", "green")
 
 	t.Run("replaces all user colors", func(t *testing.T) {
-		reqBody := map[string][]int{"color_ids": {1, 2, 3}} // gruen, gelb, orange
+		gruen := getColorIDByName(t, db, "gruen")
+		gelb := getColorIDByName(t, db, "gelb")
+		orange := getColorIDByName(t, db, "orange")
+		reqBody := map[string][]int{"color_ids": {gruen, gelb, orange}}
 		body, _ := json.Marshal(reqBody)
 
 		req := httptest.NewRequest("PUT", "/api/admin/users/"+strconv.Itoa(userID)+"/colors", bytes.NewReader(body))
@@ -330,7 +348,8 @@ func TestUserColorHandler_SetUserColors(t *testing.T) {
 	})
 
 	t.Run("returns 403 for non-admin", func(t *testing.T) {
-		reqBody := map[string][]int{"color_ids": {1}}
+		colorID := getColorIDByName(t, db, "gruen")
+		reqBody := map[string][]int{"color_ids": {colorID}}
 		body, _ := json.Marshal(reqBody)
 
 		req := httptest.NewRequest("PUT", "/api/admin/users/"+strconv.Itoa(userID)+"/colors", bytes.NewReader(body))
@@ -348,7 +367,8 @@ func TestUserColorHandler_SetUserColors(t *testing.T) {
 	})
 
 	t.Run("returns 400 for non-existent color ID", func(t *testing.T) {
-		reqBody := map[string][]int{"color_ids": {1, 99999}}
+		colorID := getColorIDByName(t, db, "gruen")
+		reqBody := map[string][]int{"color_ids": {colorID, 99999}}
 		body, _ := json.Marshal(reqBody)
 
 		req := httptest.NewRequest("PUT", "/api/admin/users/"+strconv.Itoa(userID)+"/colors", bytes.NewReader(body))

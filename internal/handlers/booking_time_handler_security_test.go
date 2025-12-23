@@ -28,6 +28,55 @@ func setupSecurityTest(t *testing.T) (*sql.DB, *BookingTimeHandler, *HolidayHand
 		t.Fatalf("Failed to run migrations: %v", err)
 	}
 
+	// Create test tenant
+	now := time.Now().Format("2006-01-02 15:04:05")
+	_, err = db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, federal_state, created_at, updated_at)
+		VALUES (1, 'test-tenant', 'Test Tenant', 'active', 'test@example.com', 'BW', ?, ?)`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create test tenant: %v", err)
+	}
+
+	// Assign default colors to tenant 1
+	db.Exec(`UPDATE color_categories SET tenant_id = 1 WHERE tenant_id IS NULL`)
+
+	// Insert system settings for tenant 1
+	_, err = db.Exec(`INSERT INTO system_settings (tenant_id, key, value, updated_at) VALUES
+		(1, 'booking_advance_days', '14', ?),
+		(1, 'cancellation_notice_hours', '12', ?),
+		(1, 'auto_deactivation_days', '365', ?),
+		(1, 'morning_walk_requires_approval', 'true', ?),
+		(1, 'use_feiertage_api', 'false', ?),
+		(1, 'feiertage_state', 'BW', ?),
+		(1, 'booking_time_granularity', '15', ?),
+		(1, 'feiertage_cache_days', '7', ?),
+		(1, 'site_logo', '', ?),
+		(1, 'registration_password', 'TEST1234', ?),
+		(1, 'whatsapp_group_enabled', 'false', ?),
+		(1, 'whatsapp_group_link', '', ?),
+		(1, 'default_color_for_new_users', '1', ?)`,
+		now, now, now, now, now, now, now, now, now, now, now, now, now)
+	if err != nil {
+		t.Fatalf("Failed to seed system settings: %v", err)
+	}
+
+	// Insert booking time rules for tenant 1
+	_, err = db.Exec(`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked, created_at, updated_at) VALUES
+		(1, 'weekday', 'Vormittag', '08:30', '12:00', 0, ?, ?),
+		(1, 'weekday', 'Mittagspause', '12:00', '14:00', 1, ?, ?),
+		(1, 'weekday', 'Nachmittag', '14:00', '17:00', 0, ?, ?),
+		(1, 'weekday', 'Fütterungszeit', '17:00', '18:00', 1, ?, ?),
+		(1, 'weekday', 'Abend', '18:00', '19:00', 0, ?, ?),
+		(1, 'weekend', 'Vormittag', '09:00', '12:00', 0, ?, ?),
+		(1, 'weekend', 'Mittagspause', '12:00', '14:00', 1, ?, ?),
+		(1, 'weekend', 'Nachmittag', '14:00', '17:00', 0, ?, ?),
+		(1, 'holiday', 'Vormittag', '09:00', '12:00', 0, ?, ?),
+		(1, 'holiday', 'Mittagspause', '12:00', '14:00', 1, ?, ?),
+		(1, 'holiday', 'Nachmittag', '14:00', '16:00', 0, ?, ?)`,
+		now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now)
+	if err != nil {
+		t.Fatalf("Failed to seed booking time rules: %v", err)
+	}
+
 	// Verify that booking_time_rules table exists and has data
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM booking_time_rules").Scan(&count)
@@ -35,7 +84,7 @@ func setupSecurityTest(t *testing.T) (*sql.DB, *BookingTimeHandler, *HolidayHand
 		t.Fatalf("Failed to query booking_time_rules: %v", err)
 	}
 	if count == 0 {
-		t.Fatalf("No default booking time rules seeded! Migration may have failed.")
+		t.Fatalf("No booking time rules seeded!")
 	}
 
 	bookingTimeRepo := repository.NewBookingTimeRepository(db)

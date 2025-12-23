@@ -170,14 +170,21 @@ func (r *DogRepository) FindAll(filter *models.DogFilterRequest, tenantID int) (
 			args = append(args, *filter.MaxAge)
 		}
 
-		// Category filter maps to color_id via color name lookup
+		// Category filter maps to color_id via color name lookup using subquery
 		if filter.Category != nil && *filter.Category != "" {
-			// Map category name to color_id
-			colorMap := map[string]int{"green": 1, "orange": 3, "blue": 5}
-			if colorID, ok := colorMap[*filter.Category]; ok {
-				query += " AND color_id = ?"
-				args = append(args, colorID)
+			// Map English category names to German color names
+			categoryToColorName := map[string]string{
+				"green":  "gruen",
+				"orange": "orange",
+				"blue":   "dunkelblau",
 			}
+			colorName := *filter.Category
+			if mapped, ok := categoryToColorName[colorName]; ok {
+				colorName = mapped
+			}
+			// Use subquery to find color_id by name for the same tenant
+			query += " AND color_id IN (SELECT id FROM color_categories WHERE tenant_id = dogs.tenant_id AND LOWER(name) = LOWER(?))"
+			args = append(args, colorName)
 		}
 
 		if filter.Available != nil {

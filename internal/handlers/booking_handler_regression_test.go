@@ -91,10 +91,43 @@ func setupRegressionTest(t *testing.T) (*sql.DB, func()) {
 		t.Fatalf("Expected 4 dogs inserted, got %d", rowsAffected)
 	}
 
-	// Seed system settings (update existing default settings)
-	db.Exec(`UPDATE system_settings SET value = '14' WHERE key = 'booking_advance_days' AND tenant_id = 1`)
-	db.Exec(`UPDATE system_settings SET value = '12' WHERE key = 'cancellation_notice_hours' AND tenant_id = 1`)
-	db.Exec(`UPDATE system_settings SET value = '365' WHERE key = 'auto_deactivation_days' AND tenant_id = 1`)
+	// Seed system settings (INSERT instead of UPDATE - table is empty after migrations)
+	_, err = db.Exec(`INSERT INTO system_settings (tenant_id, key, value, updated_at) VALUES
+		(1, 'booking_advance_days', '14', ?),
+		(1, 'cancellation_notice_hours', '12', ?),
+		(1, 'auto_deactivation_days', '365', ?),
+		(1, 'morning_walk_requires_approval', 'true', ?),
+		(1, 'use_feiertage_api', 'false', ?),
+		(1, 'feiertage_state', 'BW', ?),
+		(1, 'booking_time_granularity', '15', ?),
+		(1, 'feiertage_cache_days', '7', ?),
+		(1, 'site_logo', '', ?),
+		(1, 'registration_password', 'TEST1234', ?),
+		(1, 'whatsapp_group_enabled', 'false', ?),
+		(1, 'whatsapp_group_link', '', ?),
+		(1, 'default_color_for_new_users', '1', ?)`,
+		now, now, now, now, now, now, now, now, now, now, now, now, now)
+	if err != nil {
+		t.Fatalf("Failed to seed system settings: %v", err)
+	}
+
+	// Seed booking time rules (INSERT - table is empty after migrations)
+	_, err = db.Exec(`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked, created_at, updated_at) VALUES
+		(1, 'weekday', 'Vormittag', '08:30', '12:00', 0, ?, ?),
+		(1, 'weekday', 'Mittagspause', '12:00', '14:00', 1, ?, ?),
+		(1, 'weekday', 'Nachmittag', '14:00', '17:00', 0, ?, ?),
+		(1, 'weekday', 'Fütterungszeit', '17:00', '18:00', 1, ?, ?),
+		(1, 'weekday', 'Abend', '18:00', '19:00', 0, ?, ?),
+		(1, 'weekend', 'Vormittag', '09:00', '12:00', 0, ?, ?),
+		(1, 'weekend', 'Mittagspause', '12:00', '14:00', 1, ?, ?),
+		(1, 'weekend', 'Nachmittag', '14:00', '17:00', 0, ?, ?),
+		(1, 'holiday', 'Vormittag', '09:00', '12:00', 0, ?, ?),
+		(1, 'holiday', 'Mittagspause', '12:00', '14:00', 1, ?, ?),
+		(1, 'holiday', 'Nachmittag', '14:00', '16:00', 0, ?, ?)`,
+		now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now)
+	if err != nil {
+		t.Fatalf("Failed to seed booking time rules: %v", err)
+	}
 
 	cleanup := func() {
 		db.Close()

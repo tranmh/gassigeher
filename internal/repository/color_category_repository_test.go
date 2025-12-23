@@ -128,9 +128,9 @@ func TestColorCategoryRepository_FindAll(t *testing.T) {
 			t.Fatalf("FindAll() failed: %v", err)
 		}
 
-		// Should have at least the 7 default colors
-		if len(colors) < 7 {
-			t.Errorf("Expected at least 7 colors, got %d", len(colors))
+		// Should have at least the 5 default colors
+		if len(colors) < 5 {
+			t.Errorf("Expected at least 5 colors, got %d", len(colors))
 		}
 
 		// Verify ordering
@@ -220,9 +220,9 @@ func TestColorCategoryRepository_Count(t *testing.T) {
 			t.Fatalf("Count() failed: %v", err)
 		}
 
-		// Should have at least 7 default colors from migration
-		if count < 7 {
-			t.Errorf("Expected at least 7 colors, got %d", count)
+		// Should have at least 5 default colors from migration
+		if count < 5 {
+			t.Errorf("Expected at least 5 colors, got %d", count)
 		}
 	})
 }

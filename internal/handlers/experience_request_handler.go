@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
@@ -21,6 +22,7 @@ type ExperienceRequestHandler struct {
 	requestRepo   *repository.ExperienceRequestRepository
 	userRepo      *repository.UserRepository
 	userColorRepo *repository.UserColorRepository
+	colorRepo     *repository.ColorCategoryRepository
 	emailService  *services.EmailService
 }
 
@@ -38,6 +40,7 @@ func NewExperienceRequestHandler(db *sql.DB, cfg *config.Config) *ExperienceRequ
 		requestRepo:   repository.NewExperienceRequestRepository(db),
 		userRepo:      repository.NewUserRepository(db),
 		userColorRepo: repository.NewUserColorRepository(db),
+		colorRepo:     repository.NewColorCategoryRepository(db),
 		emailService:  emailService,
 	}
 }
@@ -79,8 +82,8 @@ func (h *ExperienceRequestHandler) CreateRequest(w http.ResponseWriter, r *http.
 	}
 
 	// Check if user already has this level or higher
-	// Determine current level from user's assigned colors
-	// Color IDs: 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau
+	// Determine current level from user's assigned colors by color name
+	// Level hierarchy: green < orange < blue (blue is highest)
 	colors, err := h.userColorRepo.GetUserColors(tenantID, userID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get user colors")
@@ -88,11 +91,12 @@ func (h *ExperienceRequestHandler) CreateRequest(w http.ResponseWriter, r *http.
 	}
 	currentLevel := "green"
 	for _, color := range colors {
-		if color.ID == 4 || color.ID == 5 {
+		colorNameLower := strings.ToLower(color.Name)
+		if colorNameLower == "hellblau" || colorNameLower == "dunkelblau" {
 			currentLevel = "blue"
 			break
 		}
-		if color.ID == 2 || color.ID == 3 {
+		if colorNameLower == "gelb" || colorNameLower == "orange" {
 			currentLevel = "orange"
 			// Don't break, continue checking for blue
 		}
@@ -233,16 +237,25 @@ func (h *ExperienceRequestHandler) ApproveRequest(w http.ResponseWriter, r *http
 	}
 
 	// Assign colors based on the requested experience level
-	// Color IDs: 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau
-	colorsByLevel := map[string][]int{
-		"green":  {1},             // only gruen
-		"orange": {1, 2, 3},       // gruen, gelb, orange
-		"blue":   {1, 2, 3, 4, 5}, // all main colors
+	// Look up color IDs by name (dynamically, not hardcoded)
+	colorNamesByLevel := map[string][]string{
+		"green":  {"gruen"},
+		"orange": {"gruen", "gelb", "orange"},
+		"blue":   {"gruen", "gelb", "orange", "hellblau", "dunkelblau"},
 	}
-	if colors, ok := colorsByLevel[experienceRequest.RequestedLevel]; ok {
-		if err := h.userColorRepo.SetUserColors(tenantID, user.ID, colors, reviewerID); err != nil {
-			// Log but don't fail the approval
-			println("Warning: Failed to assign colors to user:", err.Error())
+	if colorNames, ok := colorNamesByLevel[experienceRequest.RequestedLevel]; ok {
+		var colorIDs []int
+		for _, colorName := range colorNames {
+			color, err := h.colorRepo.FindByName(tenantID, colorName)
+			if err == nil && color != nil {
+				colorIDs = append(colorIDs, color.ID)
+			}
+		}
+		if len(colorIDs) > 0 {
+			if err := h.userColorRepo.SetUserColors(tenantID, user.ID, colorIDs, reviewerID); err != nil {
+				// Log but don't fail the approval
+				println("Warning: Failed to assign colors to user:", err.Error())
+			}
 		}
 	}
 

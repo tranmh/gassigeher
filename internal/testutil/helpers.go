@@ -169,11 +169,45 @@ func SetupTestDBWithType(t *testing.T, dbType string) *sql.DB {
 		t.Fatalf("Failed to create test subscription: %v", err)
 	}
 
-	// Update all default seed data to belong to test tenant
-	// This updates the default data inserted by migration 002 which has tenant_id = NULL
-	_, _ = db.Exec(`UPDATE color_categories SET tenant_id = 1 WHERE tenant_id IS NULL`)
-	_, _ = db.Exec(`UPDATE booking_time_rules SET tenant_id = 1 WHERE tenant_id IS NULL`)
-	_, _ = db.Exec(`UPDATE system_settings SET tenant_id = 1 WHERE tenant_id IS NULL`)
+	// Insert color categories for tenant 1 (copy from global categories)
+	_, _ = db.Exec(`INSERT INTO color_categories (tenant_id, name, hex_code, pattern_icon, sort_order, created_at, updated_at) VALUES
+		(1, 'gruen', '#82b965', 'circle', 1, ?, ?),
+		(1, 'gelb', '#f9c74f', 'triangle', 2, ?, ?),
+		(1, 'orange', '#f3722c', 'square', 3, ?, ?),
+		(1, 'hellblau', '#90e0ef', 'diamond', 4, ?, ?),
+		(1, 'dunkelblau', '#4361ee', 'star', 5, ?, ?)
+	`, now, now, now, now, now, now, now, now, now, now)
+
+	// Insert system settings for tenant 1
+	_, _ = db.Exec(`INSERT INTO system_settings (tenant_id, key, value, updated_at) VALUES
+		(1, 'booking_advance_days', '14', ?),
+		(1, 'cancellation_notice_hours', '12', ?),
+		(1, 'auto_deactivation_days', '365', ?),
+		(1, 'morning_walk_requires_approval', 'true', ?),
+		(1, 'use_feiertage_api', 'false', ?),
+		(1, 'feiertage_state', 'BW', ?),
+		(1, 'booking_time_granularity', '15', ?),
+		(1, 'feiertage_cache_days', '7', ?),
+		(1, 'site_logo', '', ?),
+		(1, 'registration_password', 'TEST1234', ?),
+		(1, 'whatsapp_group_enabled', 'false', ?),
+		(1, 'whatsapp_group_link', '', ?),
+		(1, 'default_color_for_new_users', '1', ?)
+	`, now, now, now, now, now, now, now, now, now, now, now, now, now)
+
+	// Insert booking time rules for tenant 1 (matches expected test data)
+	// Weekday rules with blocked periods (German names for error messages)
+	_, _ = db.Exec(`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked, created_at, updated_at) VALUES
+		(1, 'weekday', 'Vormittag', '08:30', '12:00', 0, ?, ?),
+		(1, 'weekday', 'Mittagspause', '12:00', '14:00', 1, ?, ?),
+		(1, 'weekday', 'Nachmittag', '14:00', '17:00', 0, ?, ?),
+		(1, 'weekday', 'Fütterungszeit', '17:00', '18:00', 1, ?, ?),
+		(1, 'weekday', 'Abend', '18:00', '19:00', 0, ?, ?),
+		(1, 'weekend', 'Vormittag', '09:00', '12:00', 0, ?, ?),
+		(1, 'weekend', 'Nachmittag', '14:00', '17:00', 0, ?, ?),
+		(1, 'holiday', 'Vormittag', '10:00', '12:00', 0, ?, ?),
+		(1, 'holiday', 'Nachmittag', '14:00', '16:00', 0, ?, ?)
+	`, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now)
 
 	// Cleanup after test
 	t.Cleanup(func() {
@@ -409,22 +443,35 @@ func truncateAndResetData(t *testing.T, db *sql.DB, dialect database.Dialect) {
 		(1, 'dunkelblau', '#4361ee', 'star', 5, ?, ?)
 	`, now, now, now, now, now, now, now, now, now, now)
 
-	// 4. Default system settings
-	_, _ = db.Exec(`INSERT INTO system_settings (tenant_id, ` + "`key`" + `, value, updated_at) VALUES
+	// 4. Default system settings (all 13 settings expected by tests)
+	_, _ = db.Exec(`INSERT INTO system_settings (tenant_id, `+"`key`"+`, value, updated_at) VALUES
 		(1, 'booking_advance_days', '14', ?),
 		(1, 'cancellation_notice_hours', '12', ?),
-		(1, 'auto_deactivation_days', '365', ?)
-	`, now, now, now)
+		(1, 'auto_deactivation_days', '365', ?),
+		(1, 'morning_walk_requires_approval', 'true', ?),
+		(1, 'use_feiertage_api', 'false', ?),
+		(1, 'feiertage_state', 'BW', ?),
+		(1, 'booking_time_granularity', '15', ?),
+		(1, 'feiertage_cache_days', '7', ?),
+		(1, 'site_logo', '', ?),
+		(1, 'registration_password', 'TEST1234', ?),
+		(1, 'whatsapp_group_enabled', 'false', ?),
+		(1, 'whatsapp_group_link', '', ?),
+		(1, 'default_color_for_new_users', '1', ?)
+	`, now, now, now, now, now, now, now, now, now, now, now, now, now)
 
-	// 5. Default booking time rules (simplified set)
+	// 5. Default booking time rules (matches expected test data, German names)
 	_, _ = db.Exec(`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked, created_at, updated_at) VALUES
-		(1, 'weekday', 'morning', '08:00', '12:00', 0, ?, ?),
-		(1, 'weekday', 'afternoon', '14:00', '18:00', 0, ?, ?),
-		(1, 'weekend', 'morning', '09:00', '12:00', 0, ?, ?),
-		(1, 'weekend', 'afternoon', '14:00', '17:00', 0, ?, ?),
-		(1, 'holiday', 'morning', '10:00', '12:00', 0, ?, ?),
-		(1, 'holiday', 'afternoon', '14:00', '16:00', 0, ?, ?)
-	`, now, now, now, now, now, now, now, now, now, now, now, now)
+		(1, 'weekday', 'Vormittag', '08:30', '12:00', 0, ?, ?),
+		(1, 'weekday', 'Mittagspause', '12:00', '14:00', 1, ?, ?),
+		(1, 'weekday', 'Nachmittag', '14:00', '17:00', 0, ?, ?),
+		(1, 'weekday', 'Fütterungszeit', '17:00', '18:00', 1, ?, ?),
+		(1, 'weekday', 'Abend', '18:00', '19:00', 0, ?, ?),
+		(1, 'weekend', 'Vormittag', '09:00', '12:00', 0, ?, ?),
+		(1, 'weekend', 'Nachmittag', '14:00', '17:00', 0, ?, ?),
+		(1, 'holiday', 'Vormittag', '10:00', '12:00', 0, ?, ?),
+		(1, 'holiday', 'Nachmittag', '14:00', '16:00', 0, ?, ?)
+	`, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now)
 }
 
 // DONE: SeedTestUser creates a test user and returns the ID
@@ -456,23 +503,25 @@ func SeedTestUser(t *testing.T, db *sql.DB, email, name, level string) int {
 	userID, _ := result.LastInsertId()
 
 	// Assign colors based on level parameter for the color system
-	// Color IDs: 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau
-	colorsByLevel := map[string][]int{
-		"green":  {1},             // only gruen
-		"orange": {1, 2, 3},       // gruen, gelb, orange
-		"blue":   {1, 2, 3, 4, 5}, // all main colors
+	// Query color IDs from database by name (case-insensitive) for tenant 1
+	colorNamesByLevel := map[string][]string{
+		"green":  {"gruen"},                                        // only gruen
+		"orange": {"gruen", "gelb", "orange"},                      // gruen, gelb, orange
+		"blue":   {"gruen", "gelb", "orange", "hellblau", "dunkelblau"}, // all main colors
 	}
-	colors, ok := colorsByLevel[level]
+	colorNames, ok := colorNamesByLevel[level]
 	if !ok {
-		colors = colorsByLevel["green"] // default to green
+		colorNames = colorNamesByLevel["green"] // default to green
 	}
 
-	for _, colorID := range colors {
-		_, err := db.Exec(`INSERT INTO user_colors (tenant_id, user_id, color_id) VALUES (1, ?, ?)`, userID, colorID)
+	for _, colorName := range colorNames {
+		var colorID int
+		err := db.QueryRow(`SELECT id FROM color_categories WHERE tenant_id = 1 AND LOWER(name) = LOWER(?)`, colorName).Scan(&colorID)
 		if err != nil {
 			// Color might not exist in test DB - that's ok for some tests
-			// Just log but don't fail
+			continue
 		}
+		_, _ = db.Exec(`INSERT INTO user_colors (tenant_id, user_id, color_id) VALUES (1, ?, ?)`, userID, colorID)
 	}
 
 	return int(userID)
@@ -547,16 +596,22 @@ func splitName(name string) []string {
 func SeedTestDog(t *testing.T, db *sql.DB, name, breed, category string) int {
 	now := time.Now()
 
-	// Map category to color_id for the color system
-	// Color IDs: 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau
-	colorByCategory := map[string]int{
-		"green":  1, // gruen
-		"orange": 3, // orange
-		"blue":   5, // dunkelblau
+	// Map category to color name for the color system
+	colorNameByCategory := map[string]string{
+		"green":  "gruen",     // green dogs
+		"orange": "orange",    // orange dogs
+		"blue":   "dunkelblau", // blue dogs
 	}
-	colorID, ok := colorByCategory[category]
+	colorName, ok := colorNameByCategory[category]
 	if !ok {
-		colorID = 1 // default to gruen
+		colorName = "gruen" // default to green
+	}
+
+	// Query color ID from database
+	var colorID int
+	err := db.QueryRow(`SELECT id FROM color_categories WHERE tenant_id = 1 AND LOWER(name) = LOWER(?)`, colorName).Scan(&colorID)
+	if err != nil {
+		t.Fatalf("Failed to find color %s for dog: %v", colorName, err)
 	}
 
 	result, err := db.Exec(`
