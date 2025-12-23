@@ -106,6 +106,7 @@ func main() {
 	// Apply global middleware
 	// SaaS Phase 5: Global rate limiter (100 requests/second burst 200 per IP)
 	router.Use(middleware.GlobalRateLimit(100, 200))
+	router.Use(middleware.MetricsMiddleware) // Collect request metrics
 	router.Use(middleware.LoggingMiddleware)
 	router.Use(middleware.SecurityHeadersMiddleware)
 	router.Use(middleware.CORSMiddleware(cfg.BaseURL))
@@ -134,7 +135,7 @@ func main() {
 	experienceHandler := handlers.NewExperienceRequestHandler(db, cfg)
 	reactivationHandler := handlers.NewReactivationRequestHandler(db, cfg)
 	dashboardHandler := handlers.NewDashboardHandler(db, cfg)
-	healthHandler := handlers.NewHealthHandler()
+	healthHandler := handlers.NewHealthHandler(db)
 	walkReportHandler := handlers.NewWalkReportHandler(db, cfg)
 	colorCategoryHandler := handlers.NewColorCategoryHandler(db, cfg)
 	colorRequestHandler := handlers.NewColorRequestHandler(db, cfg)
@@ -144,6 +145,15 @@ func main() {
 	centralAdminHandler := handlers.NewCentralAdminHandler(db, cfg)
 	contactHandler := handlers.NewContactHandler(cfg)
 	demoHandler := handlers.NewDemoHandler(db)
+	auditHandler := handlers.NewAuditHandler(db)
+	metricsHandler := handlers.NewMetricsHandler()
+	consentHandler := handlers.NewConsentHandler(db)
+	featureFlagHandler := handlers.NewFeatureFlagHandler(db)
+
+	// Initialize global cache service
+	cacheService := services.NewDefaultCacheService()
+	cacheHandler := handlers.NewCacheHandler(cacheService)
+	log.Println("Cache service initialized (5min TTL, 10000 max entries)")
 
 	// SaaS: Initialize Stripe service and billing handler
 	var stripeService *services.StripeService
@@ -162,7 +172,16 @@ func main() {
 	}
 	billingHandler := handlers.NewBillingHandler(db, stripeService)
 
+	// Infrastructure endpoints (unversioned - for monitoring tools)
 	router.HandleFunc("/api/health", healthHandler.Health).Methods("GET")
+	router.HandleFunc("/api/ready", healthHandler.Ready).Methods("GET")
+	router.HandleFunc("/api/health/detailed", healthHandler.DetailedHealth).Methods("GET")
+	router.HandleFunc("/metrics", metricsHandler.GetPrometheusMetrics).Methods("GET")
+	router.HandleFunc("/api/metrics", metricsHandler.GetMetrics).Methods("GET")
+
+	// API Version redirect middleware (redirects legacy /api/* to /api/v1/*)
+	// Excluded: /api/health, /api/ready, /api/version, /api/metrics
+	router.Use(middleware.APIVersionRedirect)
 
 	// Initialize booking time repositories and services
 	bookingTimeRepo := repository.NewBookingTimeRepository(db)
@@ -180,77 +199,85 @@ func main() {
 	cronService.Start()
 	defer cronService.Stop()
 
-	// Version endpoint (public)
+	// Version endpoint (public, unversioned for infrastructure)
 	router.HandleFunc("/api/version", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(version.Get())
 	}).Methods("GET")
 
+	// ========================================
+	// API v1 Routes (versioned endpoints)
+	// ========================================
+
 	// Public routes
 	// Auth endpoint rate limiting: 3 requests per minute per IP (conservative)
 	// Shared bucket across register, forgot-password, reset-password
-	registerRoute := router.PathPrefix("/api/auth/register").Subrouter()
+	registerRoute := router.PathPrefix("/api/v1/auth/register").Subrouter()
 	registerRoute.Use(middleware.RateLimitAuthEndpoint)
 	registerRoute.HandleFunc("", authHandler.Register).Methods("POST")
 
-	router.HandleFunc("/api/auth/verify-email", authHandler.VerifyEmail).Methods("POST")
+	router.HandleFunc("/api/v1/auth/verify-email", authHandler.VerifyEmail).Methods("POST")
 
 	// BUG FIX #6: Add rate limiting to login endpoint (5/min - separate from auth endpoints)
-	loginRoute := router.PathPrefix("/api/auth/login").Subrouter()
+	loginRoute := router.PathPrefix("/api/v1/auth/login").Subrouter()
 	loginRoute.Use(middleware.RateLimitLogin)
 	loginRoute.HandleFunc("", authHandler.Login).Methods("POST")
 	// DONE: BUG #6 - Rate limiting applied to login
 
 	// Password reset endpoints with auth rate limiting (3/min shared bucket)
-	forgotPasswordRoute := router.PathPrefix("/api/auth/forgot-password").Subrouter()
+	forgotPasswordRoute := router.PathPrefix("/api/v1/auth/forgot-password").Subrouter()
 	forgotPasswordRoute.Use(middleware.RateLimitAuthEndpoint)
 	forgotPasswordRoute.HandleFunc("", authHandler.ForgotPassword).Methods("POST")
 
-	resetPasswordRoute := router.PathPrefix("/api/auth/reset-password").Subrouter()
+	resetPasswordRoute := router.PathPrefix("/api/v1/auth/reset-password").Subrouter()
 	resetPasswordRoute.Use(middleware.RateLimitAuthEndpoint)
 	resetPasswordRoute.HandleFunc("", authHandler.ResetPassword).Methods("POST")
 
 	// Reactivation request (public - for deactivated users)
-	router.HandleFunc("/api/reactivation-requests", reactivationHandler.CreateRequest).Methods("POST")
+	router.HandleFunc("/api/v1/reactivation-requests", reactivationHandler.CreateRequest).Methods("POST")
 
 	// Booking time routes (public - for time slot availability)
-	router.HandleFunc("/api/booking-times/available", bookingTimeHandler.GetAvailableSlots).Methods("GET")
-	router.HandleFunc("/api/booking-times/rules-for-date", bookingTimeHandler.GetRulesForDate).Methods("GET")
-	router.HandleFunc("/api/holidays", holidayHandler.GetHolidays).Methods("GET")
+	router.HandleFunc("/api/v1/booking-times/available", bookingTimeHandler.GetAvailableSlots).Methods("GET")
+	router.HandleFunc("/api/v1/booking-times/rules-for-date", bookingTimeHandler.GetRulesForDate).Methods("GET")
+	router.HandleFunc("/api/v1/holidays", holidayHandler.GetHolidays).Methods("GET")
 
 	// Featured dogs (public - for homepage)
-	router.HandleFunc("/api/dogs/featured", dogHandler.GetFeaturedDogs).Methods("GET")
+	router.HandleFunc("/api/v1/dogs/featured", dogHandler.GetFeaturedDogs).Methods("GET")
 
 	// Color categories (public - for filters)
-	router.HandleFunc("/api/colors", colorCategoryHandler.ListColors).Methods("GET")
+	router.HandleFunc("/api/v1/colors", colorCategoryHandler.ListColors).Methods("GET")
 
 	// Site logo (public - for displaying logo on all pages)
-	router.HandleFunc("/api/settings/logo", settingsHandler.GetLogo).Methods("GET")
+	router.HandleFunc("/api/v1/settings/logo", settingsHandler.GetLogo).Methods("GET")
 
 	// WhatsApp group settings (public - for displaying join button)
-	router.HandleFunc("/api/settings/whatsapp", settingsHandler.GetWhatsAppSettings).Methods("GET")
+	router.HandleFunc("/api/v1/settings/whatsapp", settingsHandler.GetWhatsAppSettings).Methods("GET")
 
 	// Theme CSS (public - for dynamic styling)
-	router.HandleFunc("/api/theme/css", themeHandler.GetCSS).Methods("GET")
-	router.HandleFunc("/api/theme/presets", themeHandler.GetPresets).Methods("GET")
+	router.HandleFunc("/api/v1/theme/css", themeHandler.GetCSS).Methods("GET")
+	router.HandleFunc("/api/v1/theme/presets", themeHandler.GetPresets).Methods("GET")
 
 	// Tenant registration (public - for self-service signup)
-	router.HandleFunc("/api/tenants/register", tenantHandler.Register).Methods("POST")
-	router.HandleFunc("/api/tenants/check-slug", tenantHandler.CheckSlug).Methods("GET")
+	router.HandleFunc("/api/v1/tenants/register", tenantHandler.Register).Methods("POST")
+	router.HandleFunc("/api/v1/tenants/check-slug", tenantHandler.CheckSlug).Methods("GET")
 
 	// Contact form (public - for landing page inquiries)
-	router.HandleFunc("/api/contact", contactHandler.Submit).Methods("POST")
+	router.HandleFunc("/api/v1/contact", contactHandler.Submit).Methods("POST")
 
 	// SaaS Stripe webhook (public - verified by signature)
-	router.HandleFunc("/api/billing/webhook", billingHandler.HandleWebhook).Methods("POST")
+	router.HandleFunc("/api/v1/billing/webhook", billingHandler.HandleWebhook).Methods("POST")
 
 	// Demo tenant endpoints (public - for demo landing page)
-	router.HandleFunc("/api/demo/credentials", demoHandler.GetCredentials).Methods("GET")
-	router.HandleFunc("/api/demo/status", demoHandler.GetStatus).Methods("GET")
+	router.HandleFunc("/api/v1/demo/credentials", demoHandler.GetCredentials).Methods("GET")
+	router.HandleFunc("/api/v1/demo/status", demoHandler.GetStatus).Methods("GET")
+
+	// Consent versions (public - for displaying current ToS/Privacy versions)
+	router.HandleFunc("/api/v1/consent/versions", consentHandler.GetCurrentConsentVersions).Methods("GET")
 
 	// Protected routes (authenticated users)
-	protected := router.PathPrefix("/api").Subrouter()
+	protected := router.PathPrefix("/api/v1").Subrouter()
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+	protected.Use(middleware.AddVersionHeader)
 
 	// Auth
 	protected.HandleFunc("/auth/change-password", authHandler.ChangePassword).Methods("PUT")
@@ -259,6 +286,10 @@ func main() {
 	protected.HandleFunc("/users/me", userHandler.GetMe).Methods("GET")
 	protected.HandleFunc("/users/me", userHandler.UpdateMe).Methods("PUT")
 	protected.HandleFunc("/users/me/photo", userHandler.UploadPhoto).Methods("POST")
+	protected.HandleFunc("/users/me/export", userHandler.ExportMyData).Methods("GET")
+	protected.HandleFunc("/users/me/consent", consentHandler.GetConsentStatus).Methods("GET")
+	protected.HandleFunc("/users/me/consent/history", consentHandler.GetConsentHistory).Methods("GET")
+	protected.HandleFunc("/users/me/consent", consentHandler.UpdateConsent).Methods("POST")
 	protected.HandleFunc("/users/me", userHandler.DeleteAccount).Methods("DELETE")
 
 	// Tenant info (authenticated users)
@@ -306,6 +337,10 @@ func main() {
 	protected.HandleFunc("/billing/checkout", billingHandler.CreateCheckout).Methods("POST")
 	protected.HandleFunc("/billing/portal", billingHandler.CreateBillingPortal).Methods("POST")
 	protected.HandleFunc("/billing/cancel", billingHandler.CancelSubscription).Methods("POST")
+
+	// Feature flags (authenticated users - check if flags are enabled)
+	protected.HandleFunc("/feature-flags/{key}/check", featureFlagHandler.CheckFlag).Methods("GET")
+	protected.HandleFunc("/feature-flags/check", featureFlagHandler.CheckMultipleFlags).Methods("POST")
 
 	// Admin-only routes
 	admin := protected.PathPrefix("").Subrouter()
@@ -364,6 +399,21 @@ func main() {
 	admin.HandleFunc("/admin/stats", dashboardHandler.GetStats).Methods("GET")
 	admin.HandleFunc("/admin/activity", dashboardHandler.GetRecentActivity).Methods("GET")
 
+	// Audit logs (admin only)
+	admin.HandleFunc("/admin/audit-logs", auditHandler.ListAuditLogs).Methods("GET")
+	admin.HandleFunc("/admin/audit-logs/actions", auditHandler.GetAuditLogActions).Methods("GET")
+	admin.HandleFunc("/admin/audit-logs/entity-types", auditHandler.GetAuditLogEntityTypes).Methods("GET")
+
+	// Feature flags (admin only - tenant-level management)
+	admin.HandleFunc("/admin/feature-flags", featureFlagHandler.GetTenantFlags).Methods("GET")
+	admin.HandleFunc("/admin/feature-flags/{id}", featureFlagHandler.SetTenantFlag).Methods("PUT")
+	admin.HandleFunc("/admin/feature-flags/{id}", featureFlagHandler.ResetTenantFlag).Methods("DELETE")
+
+	// Cache management (admin only)
+	admin.HandleFunc("/admin/cache/stats", cacheHandler.GetStats).Methods("GET")
+	admin.HandleFunc("/admin/cache", cacheHandler.Clear).Methods("DELETE")
+	admin.HandleFunc("/admin/cache/prefix", cacheHandler.ClearPrefix).Methods("DELETE")
+
 	// Booking time management (admin only)
 	admin.HandleFunc("/admin/booking-times/rules", bookingTimeHandler.GetRules).Methods("GET")
 	admin.HandleFunc("/admin/booking-times/rules", bookingTimeHandler.UpdateRules).Methods("PUT")
@@ -421,6 +471,13 @@ func main() {
 	centralAdmin.HandleFunc("/admins/{id}/promote", centralAdminHandler.PromoteToCentralAdmin).Methods("POST")
 	centralAdmin.HandleFunc("/admins/{id}/demote", centralAdminHandler.DemoteFromCentralAdmin).Methods("POST")
 	centralAdmin.HandleFunc("/users/search", centralAdminHandler.SearchUsers).Methods("GET")
+
+	// Feature flags management (central admin only)
+	centralAdmin.HandleFunc("/feature-flags", featureFlagHandler.ListFlags).Methods("GET")
+	centralAdmin.HandleFunc("/feature-flags", featureFlagHandler.CreateFlag).Methods("POST")
+	centralAdmin.HandleFunc("/feature-flags/{id}", featureFlagHandler.GetFlag).Methods("GET")
+	centralAdmin.HandleFunc("/feature-flags/{id}", featureFlagHandler.UpdateFlag).Methods("PUT")
+	centralAdmin.HandleFunc("/feature-flags/{id}", featureFlagHandler.DeleteFlag).Methods("DELETE")
 
 	// Uploads directory (user photos, dog photos) - must remain on filesystem
 	router.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))

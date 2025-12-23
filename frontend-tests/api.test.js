@@ -86,7 +86,7 @@ describe('API class - Request Method', () => {
 
     await window.api.request('GET', '/test');
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/test', {
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/test', {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -100,7 +100,7 @@ describe('API class - Request Method', () => {
 
     await window.api.request('GET', '/test');
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/test', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/test', expect.objectContaining({
       headers: expect.objectContaining({
         'Authorization': 'Bearer bearer-token',
       }),
@@ -112,7 +112,7 @@ describe('API class - Request Method', () => {
 
     await window.api.request('POST', '/test', { name: 'test' });
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/test', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/test', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ name: 'test' }),
     }));
@@ -123,7 +123,7 @@ describe('API class - Request Method', () => {
 
     await window.api.request('PUT', '/users/1', { name: 'updated' });
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/users/1', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/users/1', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ name: 'updated' }),
     }));
@@ -170,7 +170,7 @@ describe('API class - Auth Endpoints', () => {
   test('register should POST to /auth/register', async () => {
     await window.api.register({ email: 'test@example.com', password: 'pass123' });
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/auth/register', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/register', expect.objectContaining({
       method: 'POST',
     }));
   });
@@ -178,7 +178,7 @@ describe('API class - Auth Endpoints', () => {
   test('verifyEmail should POST token', async () => {
     await window.api.verifyEmail('verify-token');
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/auth/verify-email', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/verify-email', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ token: 'verify-token' }),
     }));
@@ -189,7 +189,7 @@ describe('API class - Auth Endpoints', () => {
 
     const result = await window.api.login('test@example.com', 'password');
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/auth/login', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/login', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ email: 'test@example.com', password: 'password' }),
     }));
@@ -206,7 +206,7 @@ describe('API class - Auth Endpoints', () => {
   test('forgotPassword should POST email', async () => {
     await window.api.forgotPassword('test@example.com');
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/auth/forgot-password', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/forgot-password', expect.objectContaining({
       body: JSON.stringify({ email: 'test@example.com' }),
     }));
   });
@@ -214,7 +214,7 @@ describe('API class - Auth Endpoints', () => {
   test('resetPassword should POST token and passwords', async () => {
     await window.api.resetPassword('reset-token', 'newpass', 'newpass');
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/auth/reset-password', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/reset-password', expect.objectContaining({
       body: JSON.stringify({
         token: 'reset-token',
         password: 'newpass',
@@ -226,7 +226,7 @@ describe('API class - Auth Endpoints', () => {
   test('changePassword should PUT password data', async () => {
     await window.api.changePassword('oldpass', 'newpass', 'newpass');
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/auth/change-password', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/change-password', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({
         old_password: 'oldpass',
@@ -244,45 +244,45 @@ describe('API class - User Endpoints', () => {
 
   test('getMe should GET /users/me', async () => {
     await window.api.getMe();
-    expect(fetchMock).toHaveBeenCalledWith('/api/users/me', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/users/me', expect.objectContaining({
       method: 'GET',
     }));
   });
 
   test('updateMe should PUT /users/me', async () => {
     await window.api.updateMe({ first_name: 'John' });
-    expect(fetchMock).toHaveBeenCalledWith('/api/users/me', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/users/me', expect.objectContaining({
       method: 'PUT',
     }));
   });
 
   test('deleteAccount should DELETE /users/me', async () => {
     await window.api.deleteAccount('mypassword');
-    expect(fetchMock).toHaveBeenCalledWith('/api/users/me', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/users/me', expect.objectContaining({
       method: 'DELETE',
     }));
   });
 
   test('getUsers should GET /users', async () => {
     await window.api.getUsers();
-    expect(fetchMock).toHaveBeenCalledWith('/api/users', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/users', expect.objectContaining({
       method: 'GET',
     }));
   });
 
   test('getUsers with activeOnly should add query param', async () => {
     await window.api.getUsers(true);
-    expect(fetchMock).toHaveBeenCalledWith('/api/users?active=true', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/users?active=true', expect.anything());
   });
 
   test('getUser should GET specific user', async () => {
     await window.api.getUser(123);
-    expect(fetchMock).toHaveBeenCalledWith('/api/users/123', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/users/123', expect.anything());
   });
 
   test('deactivateUser should PUT with reason', async () => {
     await window.api.deactivateUser(123, 'Inactive');
-    expect(fetchMock).toHaveBeenCalledWith('/api/users/123/deactivate', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/users/123/deactivate', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ reason: 'Inactive' }),
     }));
@@ -290,7 +290,7 @@ describe('API class - User Endpoints', () => {
 
   test('activateUser should PUT with optional message', async () => {
     await window.api.activateUser(123, 'Welcome back');
-    expect(fetchMock).toHaveBeenCalledWith('/api/users/123/activate', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/users/123/activate', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ message: 'Welcome back' }),
     }));
@@ -298,7 +298,7 @@ describe('API class - User Endpoints', () => {
 
   test('createUser should POST to /users', async () => {
     await window.api.createUser({ email: 'new@example.com' });
-    expect(fetchMock).toHaveBeenCalledWith('/api/users', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/users', expect.objectContaining({
       method: 'POST',
     }));
   });
@@ -311,56 +311,56 @@ describe('API class - Dog Endpoints', () => {
 
   test('getDogs should GET /dogs', async () => {
     await window.api.getDogs();
-    expect(fetchMock).toHaveBeenCalledWith('/api/dogs', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/dogs', expect.anything());
   });
 
   test('getDogs with filters should add query params', async () => {
     await window.api.getDogs({ available: true, color_id: 2 });
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/api/dogs?'),
+      expect.stringContaining('/api/v1/dogs?'),
       expect.anything()
     );
   });
 
   test('getDog should GET specific dog', async () => {
     await window.api.getDog(5);
-    expect(fetchMock).toHaveBeenCalledWith('/api/dogs/5', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/dogs/5', expect.anything());
   });
 
   test('getBreeds should GET /dogs/breeds', async () => {
     await window.api.getBreeds();
-    expect(fetchMock).toHaveBeenCalledWith('/api/dogs/breeds', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/dogs/breeds', expect.anything());
   });
 
   test('createDog should POST to /dogs', async () => {
     await window.api.createDog({ name: 'Buddy' });
-    expect(fetchMock).toHaveBeenCalledWith('/api/dogs', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/dogs', expect.objectContaining({
       method: 'POST',
     }));
   });
 
   test('updateDog should PUT to /dogs/:id', async () => {
     await window.api.updateDog(5, { name: 'Buddy Updated' });
-    expect(fetchMock).toHaveBeenCalledWith('/api/dogs/5', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/dogs/5', expect.objectContaining({
       method: 'PUT',
     }));
   });
 
   test('deleteDog should DELETE /dogs/:id', async () => {
     await window.api.deleteDog(5);
-    expect(fetchMock).toHaveBeenCalledWith('/api/dogs/5', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/dogs/5', expect.objectContaining({
       method: 'DELETE',
     }));
   });
 
   test('deleteDog with force should add query param', async () => {
     await window.api.deleteDog(5, true);
-    expect(fetchMock).toHaveBeenCalledWith('/api/dogs/5?force=true', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/dogs/5?force=true', expect.anything());
   });
 
   test('toggleDogAvailability should PUT availability', async () => {
     await window.api.toggleDogAvailability(5, true, null);
-    expect(fetchMock).toHaveBeenCalledWith('/api/dogs/5/availability', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/dogs/5/availability', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ is_available: true, unavailable_reason: null }),
     }));
@@ -368,7 +368,7 @@ describe('API class - Dog Endpoints', () => {
 
   test('setDogFeatured should PUT featured status', async () => {
     await window.api.setDogFeatured(5, true);
-    expect(fetchMock).toHaveBeenCalledWith('/api/dogs/5/featured', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/dogs/5/featured', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ is_featured: true }),
     }));
@@ -376,7 +376,7 @@ describe('API class - Dog Endpoints', () => {
 
   test('getFeaturedDogs should GET /dogs/featured', async () => {
     await window.api.getFeaturedDogs();
-    expect(fetchMock).toHaveBeenCalledWith('/api/dogs/featured', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/dogs/featured', expect.anything());
   });
 });
 
@@ -387,32 +387,32 @@ describe('API class - Booking Endpoints', () => {
 
   test('createBooking should POST to /bookings', async () => {
     await window.api.createBooking({ dog_id: 1, date: '2025-01-01' });
-    expect(fetchMock).toHaveBeenCalledWith('/api/bookings', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/bookings', expect.objectContaining({
       method: 'POST',
     }));
   });
 
   test('getBookings should GET /bookings', async () => {
     await window.api.getBookings();
-    expect(fetchMock).toHaveBeenCalledWith('/api/bookings', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/bookings', expect.anything());
   });
 
   test('getBookings with filters should add query params', async () => {
     await window.api.getBookings({ status: 'scheduled' });
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/api/bookings?'),
+      expect.stringContaining('/api/v1/bookings?'),
       expect.anything()
     );
   });
 
   test('getBooking should GET specific booking', async () => {
     await window.api.getBooking(10);
-    expect(fetchMock).toHaveBeenCalledWith('/api/bookings/10', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/bookings/10', expect.anything());
   });
 
   test('cancelBooking should PUT with optional reason', async () => {
     await window.api.cancelBooking(10, 'No longer needed');
-    expect(fetchMock).toHaveBeenCalledWith('/api/bookings/10/cancel', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/bookings/10/cancel', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ reason: 'No longer needed' }),
     }));
@@ -420,7 +420,7 @@ describe('API class - Booking Endpoints', () => {
 
   test('moveBooking should PUT new date and time', async () => {
     await window.api.moveBooking(10, '2025-02-01', '10:00', 'Rescheduled');
-    expect(fetchMock).toHaveBeenCalledWith('/api/bookings/10/move', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/bookings/10/move', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({
         date: '2025-02-01',
@@ -432,7 +432,7 @@ describe('API class - Booking Endpoints', () => {
 
   test('addBookingNotes should PUT notes', async () => {
     await window.api.addBookingNotes(10, 'Walk went well');
-    expect(fetchMock).toHaveBeenCalledWith('/api/bookings/10/notes', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/bookings/10/notes', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ notes: 'Walk went well' }),
     }));
@@ -440,7 +440,7 @@ describe('API class - Booking Endpoints', () => {
 
   test('getCalendarData should GET with year and month', async () => {
     await window.api.getCalendarData(2025, 6);
-    expect(fetchMock).toHaveBeenCalledWith('/api/bookings/calendar/2025/6', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/bookings/calendar/2025/6', expect.anything());
   });
 });
 
@@ -451,33 +451,33 @@ describe('API class - Color Endpoints', () => {
 
   test('getColors should GET /colors', async () => {
     await window.api.getColors();
-    expect(fetchMock).toHaveBeenCalledWith('/api/colors', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/colors', expect.anything());
   });
 
   test('createColor should POST to /colors', async () => {
     await window.api.createColor({ name: 'Green', hex_code: '#00ff00' });
-    expect(fetchMock).toHaveBeenCalledWith('/api/colors', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/colors', expect.objectContaining({
       method: 'POST',
     }));
   });
 
   test('updateColor should PUT to /colors/:id', async () => {
     await window.api.updateColor(2, { name: 'Blue' });
-    expect(fetchMock).toHaveBeenCalledWith('/api/colors/2', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/colors/2', expect.objectContaining({
       method: 'PUT',
     }));
   });
 
   test('deleteColor should DELETE /colors/:id', async () => {
     await window.api.deleteColor(2);
-    expect(fetchMock).toHaveBeenCalledWith('/api/colors/2', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/colors/2', expect.objectContaining({
       method: 'DELETE',
     }));
   });
 
   test('getColorStats should GET /colors/:id/stats', async () => {
     await window.api.getColorStats(2);
-    expect(fetchMock).toHaveBeenCalledWith('/api/colors/2/stats', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/colors/2/stats', expect.anything());
   });
 });
 
@@ -488,12 +488,12 @@ describe('API class - Settings Endpoints', () => {
 
   test('getSettings should GET /settings', async () => {
     await window.api.getSettings();
-    expect(fetchMock).toHaveBeenCalledWith('/api/settings', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/settings', expect.anything());
   });
 
   test('updateSetting should PUT to /settings/:key', async () => {
     await window.api.updateSetting('booking_advance_days', '14');
-    expect(fetchMock).toHaveBeenCalledWith('/api/settings/booking_advance_days', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/settings/booking_advance_days', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ value: '14' }),
     }));
@@ -501,12 +501,12 @@ describe('API class - Settings Endpoints', () => {
 
   test('getLogo should GET /settings/logo', async () => {
     await window.api.getLogo();
-    expect(fetchMock).toHaveBeenCalledWith('/api/settings/logo', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/settings/logo', expect.anything());
   });
 
   test('resetLogo should DELETE /settings/logo', async () => {
     await window.api.resetLogo();
-    expect(fetchMock).toHaveBeenCalledWith('/api/settings/logo', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/settings/logo', expect.objectContaining({
       method: 'DELETE',
     }));
   });
@@ -519,38 +519,38 @@ describe('API class - Admin Endpoints', () => {
 
   test('getAdminStats should GET /admin/stats', async () => {
     await window.api.getAdminStats();
-    expect(fetchMock).toHaveBeenCalledWith('/api/admin/stats', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/stats', expect.anything());
   });
 
   test('getRecentActivity should GET /admin/activity', async () => {
     await window.api.getRecentActivity();
-    expect(fetchMock).toHaveBeenCalledWith('/api/admin/activity', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/activity', expect.anything());
   });
 
   test('promoteToAdmin should POST', async () => {
     await window.api.promoteToAdmin(5);
-    expect(fetchMock).toHaveBeenCalledWith('/api/admin/users/5/promote', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/users/5/promote', expect.objectContaining({
       method: 'POST',
     }));
   });
 
   test('demoteAdmin should POST', async () => {
     await window.api.demoteAdmin(5);
-    expect(fetchMock).toHaveBeenCalledWith('/api/admin/users/5/demote', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/users/5/demote', expect.objectContaining({
       method: 'POST',
     }));
   });
 
   test('impersonateUser should POST', async () => {
     await window.api.impersonateUser(5);
-    expect(fetchMock).toHaveBeenCalledWith('/api/admin/users/5/impersonate', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/users/5/impersonate', expect.objectContaining({
       method: 'POST',
     }));
   });
 
   test('endImpersonation should POST', async () => {
     await window.api.endImpersonation();
-    expect(fetchMock).toHaveBeenCalledWith('/api/end-impersonation', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/end-impersonation', expect.objectContaining({
       method: 'POST',
     }));
   });
@@ -563,37 +563,37 @@ describe('API class - Booking Time Endpoints', () => {
 
   test('getAvailableTimeSlots should GET with date param', async () => {
     await window.api.getAvailableTimeSlots('2025-01-15');
-    expect(fetchMock).toHaveBeenCalledWith('/api/booking-times/available?date=2025-01-15', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/booking-times/available?date=2025-01-15', expect.anything());
   });
 
   test('getRulesForDate should GET with date param', async () => {
     await window.api.getRulesForDate('2025-01-15');
-    expect(fetchMock).toHaveBeenCalledWith('/api/booking-times/rules-for-date?date=2025-01-15', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/booking-times/rules-for-date?date=2025-01-15', expect.anything());
   });
 
   test('getBookingTimeRules should GET admin rules', async () => {
     await window.api.getBookingTimeRules();
-    expect(fetchMock).toHaveBeenCalledWith('/api/admin/booking-times/rules', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/booking-times/rules', expect.anything());
   });
 
   test('updateBookingTimeRules should PUT rules', async () => {
     const rules = [{ id: 1, start_time: '09:00' }];
     await window.api.updateBookingTimeRules(rules);
-    expect(fetchMock).toHaveBeenCalledWith('/api/admin/booking-times/rules', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/booking-times/rules', expect.objectContaining({
       method: 'PUT',
     }));
   });
 
   test('createBookingTimeRule should POST new rule', async () => {
     await window.api.createBookingTimeRule({ day_type: 'weekday', rule_name: 'Morning' });
-    expect(fetchMock).toHaveBeenCalledWith('/api/admin/booking-times/rules', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/booking-times/rules', expect.objectContaining({
       method: 'POST',
     }));
   });
 
   test('deleteBookingTimeRule should DELETE rule', async () => {
     await window.api.deleteBookingTimeRule(3);
-    expect(fetchMock).toHaveBeenCalledWith('/api/admin/booking-times/rules/3', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/booking-times/rules/3', expect.objectContaining({
       method: 'DELETE',
     }));
   });
@@ -610,7 +610,7 @@ describe('API class - Upload Methods', () => {
 
     await window.api.uploadFile('/test/upload', formData);
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/test/upload', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/test/upload', expect.objectContaining({
       method: 'POST',
       body: formData,
     }));
@@ -634,14 +634,14 @@ describe('API class - Upload Methods', () => {
     const file = new File([''], 'photo.jpg', { type: 'image/jpeg' });
     await window.api.uploadPhoto(file);
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/users/me/photo', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/users/me/photo', expect.anything());
   });
 
   test('uploadDogPhoto should use correct endpoint with dog ID', async () => {
     const file = new File([''], 'dog.jpg', { type: 'image/jpeg' });
     await window.api.uploadDogPhoto(5, file);
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/dogs/5/photo', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/dogs/5/photo', expect.anything());
   });
 });
 
@@ -652,43 +652,43 @@ describe('API class - Walk Report Endpoints', () => {
 
   test('createWalkReport should POST report', async () => {
     await window.api.createWalkReport({ booking_id: 1, notes: 'Great walk' });
-    expect(fetchMock).toHaveBeenCalledWith('/api/walk-reports', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/walk-reports', expect.objectContaining({
       method: 'POST',
     }));
   });
 
   test('getWalkReport should GET specific report', async () => {
     await window.api.getWalkReport(5);
-    expect(fetchMock).toHaveBeenCalledWith('/api/walk-reports/5', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/walk-reports/5', expect.anything());
   });
 
   test('getWalkReportByBooking should GET by booking ID', async () => {
     await window.api.getWalkReportByBooking(10);
-    expect(fetchMock).toHaveBeenCalledWith('/api/walk-reports/by-booking/10', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/walk-reports/by-booking/10', expect.anything());
   });
 
   test('updateWalkReport should PUT report', async () => {
     await window.api.updateWalkReport(5, { notes: 'Updated' });
-    expect(fetchMock).toHaveBeenCalledWith('/api/walk-reports/5', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/walk-reports/5', expect.objectContaining({
       method: 'PUT',
     }));
   });
 
   test('deleteWalkReport should DELETE report', async () => {
     await window.api.deleteWalkReport(5);
-    expect(fetchMock).toHaveBeenCalledWith('/api/walk-reports/5', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/walk-reports/5', expect.objectContaining({
       method: 'DELETE',
     }));
   });
 
   test('getDogWalkReports should GET with limit', async () => {
     await window.api.getDogWalkReports(3, 5);
-    expect(fetchMock).toHaveBeenCalledWith('/api/dogs/3/walk-reports?limit=5', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/dogs/3/walk-reports?limit=5', expect.anything());
   });
 
   test('deleteWalkReportPhoto should DELETE photo', async () => {
     await window.api.deleteWalkReportPhoto(5, 2);
-    expect(fetchMock).toHaveBeenCalledWith('/api/walk-reports/5/photos/2', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/walk-reports/5/photos/2', expect.objectContaining({
       method: 'DELETE',
     }));
   });

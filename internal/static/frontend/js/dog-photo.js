@@ -273,7 +273,7 @@ class DogPhotoManager {
         // For now, we'll just alert that it's not implemented
         alert('Foto-Entfernung muss noch über Backend-Endpoint implementiert werden');
 
-        // TODO: Implement when DELETE /api/dogs/:id/photo endpoint is available
+        // TODO: Implement when DELETE /api/v1/dogs/:id/photo endpoint is available
         // try {
         //     await api.removeDogPhoto(this.currentDogId);
         //     // Refresh dog data

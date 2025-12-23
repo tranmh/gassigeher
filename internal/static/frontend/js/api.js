@@ -1,7 +1,7 @@
 // API Client for backend communication
 class API {
     constructor() {
-        this.baseURL = '/api';
+        this.baseURL = '/api/v1';
         this.token = localStorage.getItem('gassigeher_token');
     }
 

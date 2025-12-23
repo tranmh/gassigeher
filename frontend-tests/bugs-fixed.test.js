@@ -35,7 +35,7 @@ beforeEach(() => {
 describe('FIX #1: api.js - deleteAccount() sends password', () => {
   const API = class {
     constructor() {
-      this.baseURL = '/api';
+      this.baseURL = '/api/v1';
       this.token = localStorage.getItem('gassigeher_token');
     }
 
@@ -101,7 +101,7 @@ describe('FIX #1: api.js - deleteAccount() sends password', () => {
     await api.deleteAccount('mySecretPassword');
 
     const [url, options] = fetch.mock.calls[0];
-    expect(url).toBe('/api/users/me');
+    expect(url).toBe('/api/v1/users/me');
     expect(options.method).toBe('DELETE');
     expect(options.body).toBeDefined();
     expect(JSON.parse(options.body)).toEqual({ password: 'mySecretPassword' });

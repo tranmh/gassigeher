@@ -148,7 +148,7 @@ function initSlugChecker() {
 
         debounceTimer = setTimeout(async () => {
             try {
-                const response = await fetch(`/api/tenants/check-slug?slug=${encodeURIComponent(slug)}`);
+                const response = await fetch(`/api/v1/tenants/check-slug?slug=${encodeURIComponent(slug)}`);
                 const data = await response.json();
 
                 if (data.available) {
@@ -209,7 +209,7 @@ function initRegistrationForm() {
         };
 
         try {
-            const response = await fetch('/api/tenants/register', {
+            const response = await fetch('/api/v1/tenants/register', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -323,7 +323,7 @@ async function initiateProCheckout(registrationResult) {
         // First, we need to authenticate to get a token
         // The tenant was just created, so we need to login to the tenant subdomain
         const baseUrl = checkoutData.login_url.replace(/\/login\/?$/, '');
-        const loginResponse = await fetch(`${baseUrl}/api/auth/login`, {
+        const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -345,7 +345,7 @@ async function initiateProCheckout(registrationResult) {
         const token = loginData.token;
 
         // Now create checkout session with the token
-        const billingResponse = await fetch(`${baseUrl}/api/billing/checkout`, {
+        const billingResponse = await fetch(`${baseUrl}/api/v1/billing/checkout`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

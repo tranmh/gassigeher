@@ -166,6 +166,7 @@ func TestRegisterRequest_Validate(t *testing.T) {
 				Password:             "securePass123",
 				ConfirmPassword:      "securePass123",
 				AcceptTerms:          true,
+				AcceptPrivacy:        true,
 				RegistrationPassword: "ABC12345",
 			},
 			wantErr: false,

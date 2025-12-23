@@ -334,7 +334,7 @@ describe('DemoBanner API integration', () => {
     jest.restoreAllMocks();
   });
 
-  test('should call /api/demo/status when on demo subdomain', async () => {
+  test('should call /api/v1/demo/status when on demo subdomain', async () => {
     // Mock location
     delete window.location;
     window.location = { hostname: 'demo.gassigeher.org' };
@@ -351,7 +351,7 @@ describe('DemoBanner API integration', () => {
 
     await DemoBanner.init();
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/demo/status');
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/demo/status');
   });
 
   test('should not call API when not on demo subdomain', async () => {

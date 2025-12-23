@@ -33,7 +33,7 @@ async function apiRequest(endpoint, options = {}) {
         }
     };
 
-    const response = await fetch(`/api${endpoint}`, config);
+    const response = await fetch(`/api/v1${endpoint}`, config);
 
     if (response.status === 401 || response.status === 403) {
         logout();

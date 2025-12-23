@@ -40,6 +40,7 @@ func TestAuthHandler_Register(t *testing.T) {
 			"password":              "Test1234",
 			"confirm_password":      "Test1234",
 			"accept_terms":          true,
+			"accept_privacy":        true,
 			"registration_password": testRegPassword,
 		}
 
@@ -225,6 +226,7 @@ func TestAuthHandler_Register(t *testing.T) {
 			"password":              "Test1234",
 			"confirm_password":      "Test1234",
 			"accept_terms":          true,
+			"accept_privacy":        true,
 			"registration_password": testRegPassword,
 		}
 
@@ -269,6 +271,7 @@ func TestAuthHandler_Register_AssignsDefaultColor(t *testing.T) {
 			"password":              "Test1234",
 			"confirm_password":      "Test1234",
 			"accept_terms":          true,
+			"accept_privacy":        true,
 			"registration_password": testRegPassword,
 		}
 

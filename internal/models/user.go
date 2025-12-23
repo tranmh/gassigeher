@@ -62,6 +62,7 @@ type RegisterRequest struct {
 	Password             string `json:"password"`
 	ConfirmPassword      string `json:"confirm_password"`
 	AcceptTerms          bool   `json:"accept_terms"`
+	AcceptPrivacy        bool   `json:"accept_privacy"`
 	RegistrationPassword string `json:"registration_password"`
 }
 
@@ -190,6 +191,9 @@ func (r *RegisterRequest) Validate() error {
 	}
 	if !r.AcceptTerms {
 		return errors.New("Sie müssen die AGB akzeptieren")
+	}
+	if !r.AcceptPrivacy {
+		return errors.New("Sie müssen die Datenschutzerklärung akzeptieren")
 	}
 	// Validate registration password format
 	if strings.TrimSpace(r.RegistrationPassword) == "" {

@@ -25,6 +25,7 @@ import (
 
 // UserHandler handles user-related endpoints
 type UserHandler struct {
+	db            *sql.DB
 	userRepo      *repository.UserRepository
 	userColorRepo *repository.UserColorRepository
 	authService   *services.AuthService
@@ -61,6 +62,7 @@ func NewUserHandler(db *sql.DB, cfg *config.Config) *UserHandler {
 	}
 
 	return &UserHandler{
+		db:            db,
 		userRepo:      repository.NewUserRepository(db),
 		userColorRepo: repository.NewUserColorRepository(db),
 		authService:   services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours),
@@ -1135,4 +1137,218 @@ func (h *UserHandler) AdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"message": "Benutzer erfolgreich gelöscht"})
+}
+
+// ExportMyData exports all personal data for the authenticated user (GDPR compliance)
+// GET /api/users/me/export
+func (h *UserHandler) ExportMyData(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok {
+		respondError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	tenantID := middleware.GetTenantID(r)
+
+	// Get user data
+	user, err := h.userRepo.FindByID(userID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Fehler beim Laden der Benutzerdaten")
+		return
+	}
+	if user == nil {
+		respondError(w, http.StatusNotFound, "Benutzer nicht gefunden")
+		return
+	}
+
+	// Sanitize sensitive fields
+	user.PasswordHash = nil
+	user.VerificationToken = nil
+	user.PasswordResetToken = nil
+	user.VerificationTokenExpires = nil
+
+	export := map[string]interface{}{
+		"user":        user,
+		"exported_at": time.Now().Format(time.RFC3339),
+		"tenant_id":   tenantID,
+	}
+
+	// Get user's bookings
+	var bookings []map[string]interface{}
+	rows, err := h.db.Query(`
+		SELECT b.id, b.date, b.walk_type, b.status, b.notes, b.created_at,
+		       d.name as dog_name, d.breed as dog_breed
+		FROM bookings b
+		LEFT JOIN dogs d ON b.dog_id = d.id
+		WHERE b.user_id = ? AND b.tenant_id = ?
+		ORDER BY b.date DESC`, userID, tenantID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var booking struct {
+				ID        int
+				Date      string
+				WalkType  string
+				Status    string
+				Notes     *string
+				CreatedAt time.Time
+				DogName   *string
+				DogBreed  *string
+			}
+			if err := rows.Scan(&booking.ID, &booking.Date, &booking.WalkType, &booking.Status,
+				&booking.Notes, &booking.CreatedAt, &booking.DogName, &booking.DogBreed); err == nil {
+				bookings = append(bookings, map[string]interface{}{
+					"id":         booking.ID,
+					"date":       booking.Date,
+					"walk_type":  booking.WalkType,
+					"status":     booking.Status,
+					"notes":      booking.Notes,
+					"created_at": booking.CreatedAt,
+					"dog_name":   booking.DogName,
+					"dog_breed":  booking.DogBreed,
+				})
+			}
+		}
+	}
+	export["bookings"] = bookings
+	export["booking_count"] = len(bookings)
+
+	// Get user's walk reports
+	var walkReports []map[string]interface{}
+	rows, err = h.db.Query(`
+		SELECT wr.id, wr.booking_id, wr.weather, wr.mood_before, wr.mood_after,
+		       wr.walked_distance_meters, wr.duration_minutes, wr.notes, wr.created_at
+		FROM walk_reports wr
+		JOIN bookings b ON wr.booking_id = b.id
+		WHERE b.user_id = ? AND b.tenant_id = ?
+		ORDER BY wr.created_at DESC`, userID, tenantID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var report struct {
+				ID              int
+				BookingID       int
+				Weather         *string
+				MoodBefore      *string
+				MoodAfter       *string
+				DistanceMeters  *int
+				DurationMinutes *int
+				Notes           *string
+				CreatedAt       time.Time
+			}
+			if err := rows.Scan(&report.ID, &report.BookingID, &report.Weather, &report.MoodBefore,
+				&report.MoodAfter, &report.DistanceMeters, &report.DurationMinutes,
+				&report.Notes, &report.CreatedAt); err == nil {
+				walkReports = append(walkReports, map[string]interface{}{
+					"id":                     report.ID,
+					"booking_id":             report.BookingID,
+					"weather":                report.Weather,
+					"mood_before":            report.MoodBefore,
+					"mood_after":             report.MoodAfter,
+					"walked_distance_meters": report.DistanceMeters,
+					"duration_minutes":       report.DurationMinutes,
+					"notes":                  report.Notes,
+					"created_at":             report.CreatedAt,
+				})
+			}
+		}
+	}
+	export["walk_reports"] = walkReports
+
+	// Get user's experience requests
+	var experienceRequests []map[string]interface{}
+	rows, err = h.db.Query(`
+		SELECT id, requested_level, reason, status, admin_notes, created_at, updated_at
+		FROM experience_requests
+		WHERE user_id = ? AND tenant_id = ?
+		ORDER BY created_at DESC`, userID, tenantID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var req struct {
+				ID             int
+				RequestedLevel string
+				Reason         string
+				Status         string
+				AdminNotes     *string
+				CreatedAt      time.Time
+				UpdatedAt      *time.Time
+			}
+			if err := rows.Scan(&req.ID, &req.RequestedLevel, &req.Reason, &req.Status,
+				&req.AdminNotes, &req.CreatedAt, &req.UpdatedAt); err == nil {
+				experienceRequests = append(experienceRequests, map[string]interface{}{
+					"id":              req.ID,
+					"requested_level": req.RequestedLevel,
+					"reason":          req.Reason,
+					"status":          req.Status,
+					"admin_notes":     req.AdminNotes,
+					"created_at":      req.CreatedAt,
+					"updated_at":      req.UpdatedAt,
+				})
+			}
+		}
+	}
+	export["experience_requests"] = experienceRequests
+
+	// Get user's color requests
+	var colorRequests []map[string]interface{}
+	rows, err = h.db.Query(`
+		SELECT cr.id, cr.status, cr.reason, cr.admin_notes, cr.created_at, cr.updated_at,
+		       cc.name as color_name, cc.hex_code
+		FROM color_requests cr
+		LEFT JOIN color_categories cc ON cr.color_id = cc.id
+		WHERE cr.user_id = ? AND cr.tenant_id = ?
+		ORDER BY cr.created_at DESC`, userID, tenantID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var req struct {
+				ID         int
+				Status     string
+				Reason     *string
+				AdminNotes *string
+				CreatedAt  time.Time
+				UpdatedAt  *time.Time
+				ColorName  *string
+				HexCode    *string
+			}
+			if err := rows.Scan(&req.ID, &req.Status, &req.Reason, &req.AdminNotes,
+				&req.CreatedAt, &req.UpdatedAt, &req.ColorName, &req.HexCode); err == nil {
+				colorRequests = append(colorRequests, map[string]interface{}{
+					"id":          req.ID,
+					"status":      req.Status,
+					"reason":      req.Reason,
+					"admin_notes": req.AdminNotes,
+					"created_at":  req.CreatedAt,
+					"updated_at":  req.UpdatedAt,
+					"color_name":  req.ColorName,
+					"hex_code":    req.HexCode,
+				})
+			}
+		}
+	}
+	export["color_requests"] = colorRequests
+
+	// Fetch user's assigned colors
+	colorPtrs, _ := h.userColorRepo.GetUserColors(tenantID, userID)
+	var colors []map[string]interface{}
+	for _, c := range colorPtrs {
+		if c != nil {
+			colors = append(colors, map[string]interface{}{
+				"id":       c.ID,
+				"name":     c.Name,
+				"hex_code": c.HexCode,
+			})
+		}
+	}
+	export["assigned_colors"] = colors
+
+	// Set headers for file download
+	w.Header().Set("Content-Disposition", "attachment; filename=meine-daten.json")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	// Log the export for audit
+	log.Printf("AUDIT: User %d exported their personal data from tenant %d", userID, tenantID)
+
+	json.NewEncoder(w).Encode(export)
 }

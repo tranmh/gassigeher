@@ -15,7 +15,7 @@ class DemoBanner {
 
             if (isDemo) {
                 // Fetch demo status to get next reset time
-                const response = await fetch('/api/demo/status');
+                const response = await fetch('/api/v1/demo/status');
                 if (response.ok) {
                     const data = await response.json();
                     if (data.is_demo) {

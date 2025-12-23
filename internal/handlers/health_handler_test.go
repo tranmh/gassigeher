@@ -1,15 +1,25 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // TestHealthHandler_Health tests the health check endpoint
 func TestHealthHandler_Health(t *testing.T) {
-	handler := NewHealthHandler()
+	// Create in-memory database for testing
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+	defer db.Close()
+
+	handler := NewHealthHandler(db)
 
 	t.Run("returns ok status", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/health", nil)

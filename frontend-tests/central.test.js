@@ -52,7 +52,7 @@ async function apiRequest(endpoint, options = {}) {
       ...options.headers
     }
   };
-  const response = await fetch(`/api${endpoint}`, config);
+  const response = await fetch(`/api/v1${endpoint}`, config);
   if (response.status === 401 || response.status === 403) {
     logout();
     throw new Error('Unauthorized');
@@ -223,7 +223,7 @@ describe('apiRequest', () => {
 
     await apiRequest('/test');
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/test', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/test', expect.objectContaining({
       headers: expect.objectContaining({
         'Authorization': 'Bearer my-token',
       }),
@@ -239,7 +239,7 @@ describe('apiRequest', () => {
 
     await apiRequest('/test');
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/test', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/test', expect.objectContaining({
       headers: expect.objectContaining({
         'Content-Type': 'application/json',
       }),
@@ -312,7 +312,7 @@ describe('apiRequest', () => {
 
     await apiRequest('/test', { method: 'POST', body: JSON.stringify({ data: 'test' }) });
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/test', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/test', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ data: 'test' }),
     }));
@@ -331,13 +331,13 @@ describe('centralAPI', () => {
   test('getStats should call correct endpoint', async () => {
     await centralAPI.getStats();
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/central-admin/stats', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/central-admin/stats', expect.anything());
   });
 
   test('getTenants should call correct endpoint', async () => {
     await centralAPI.getTenants();
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/central-admin/tenants?', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/central-admin/tenants?', expect.anything());
   });
 
   test('getTenants should add search param', async () => {
@@ -361,13 +361,13 @@ describe('centralAPI', () => {
   test('getTenant should call correct endpoint with ID', async () => {
     await centralAPI.getTenant(5);
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/central-admin/tenants/5', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/central-admin/tenants/5', expect.anything());
   });
 
   test('updateTenant should PUT to correct endpoint', async () => {
     await centralAPI.updateTenant(5, { name: 'Updated' });
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/central-admin/tenants/5', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/central-admin/tenants/5', expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ name: 'Updated' }),
     }));
@@ -376,7 +376,7 @@ describe('centralAPI', () => {
   test('activateTenant should POST to correct endpoint', async () => {
     await centralAPI.activateTenant(5);
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/central-admin/tenants/5/activate', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/central-admin/tenants/5/activate', expect.objectContaining({
       method: 'POST',
     }));
   });
@@ -384,7 +384,7 @@ describe('centralAPI', () => {
   test('deactivateTenant should POST to correct endpoint', async () => {
     await centralAPI.deactivateTenant(5);
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/central-admin/tenants/5/deactivate', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/central-admin/tenants/5/deactivate', expect.objectContaining({
       method: 'POST',
     }));
   });
@@ -392,20 +392,20 @@ describe('centralAPI', () => {
   test('getTenantUsers should call correct endpoint', async () => {
     await centralAPI.getTenantUsers(5);
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/central-admin/tenants/5/users', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/central-admin/tenants/5/users', expect.anything());
   });
 
   test('exportTenant should call correct endpoint', async () => {
     await centralAPI.exportTenant(5);
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/central-admin/tenants/5/export', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/central-admin/tenants/5/export', expect.anything());
   });
 
   test('searchUsers should call correct endpoint with query', async () => {
     await centralAPI.searchUsers('john');
 
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/central-admin/users/search?q=john',
+      '/api/v1/central-admin/users/search?q=john',
       expect.anything()
     );
   });
@@ -414,7 +414,7 @@ describe('centralAPI', () => {
     await centralAPI.searchUsers('john doe');
 
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/central-admin/users/search?q=john%20doe',
+      '/api/v1/central-admin/users/search?q=john%20doe',
       expect.anything()
     );
   });
@@ -422,13 +422,13 @@ describe('centralAPI', () => {
   test('getAdmins should call correct endpoint', async () => {
     await centralAPI.getAdmins();
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/central-admin/admins', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/central-admin/admins', expect.anything());
   });
 
   test('promoteToAdmin should POST to correct endpoint', async () => {
     await centralAPI.promoteToAdmin(10);
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/central-admin/admins/10/promote', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/central-admin/admins/10/promote', expect.objectContaining({
       method: 'POST',
     }));
   });
@@ -436,7 +436,7 @@ describe('centralAPI', () => {
   test('demoteAdmin should POST to correct endpoint', async () => {
     await centralAPI.demoteAdmin(10);
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/central-admin/admins/10/demote', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/central-admin/admins/10/demote', expect.objectContaining({
       method: 'POST',
     }));
   });

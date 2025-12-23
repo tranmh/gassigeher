@@ -31,7 +31,7 @@
 
         // Try to fetch logo URL from API
         try {
-            const response = await fetch('/api/settings/logo');
+            const response = await fetch('/api/v1/settings/logo');
             if (response.ok) {
                 const data = await response.json();
                 logoImg.src = data.logo_url || DEFAULT_LOGO;

@@ -245,7 +245,7 @@
 
         async function loadPlanUsage() {
             try {
-                const response = await api.fetch('/api/billing/usage');
+                const response = await api.fetch('/api/v1/billing/usage');
                 if (!response.ok) {
                     // Billing not enabled or error - hide widget
                     return;

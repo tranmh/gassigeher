@@ -188,7 +188,7 @@
         // Load colors from API
         async function loadColors() {
             try {
-                const response = await fetch('/api/colors');
+                const response = await fetch('/api/v1/colors');
                 if (!response.ok) return;
                 const data = await response.json();
                 allColors = data.colors || [];
@@ -248,7 +248,7 @@
                     await loadColors();
                 }
 
-                const response = await fetch('/api/dogs/featured');
+                const response = await fetch('/api/v1/dogs/featured');
                 if (!response.ok) return;
 
                 const dogs = await response.json();

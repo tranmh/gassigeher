@@ -330,7 +330,7 @@
 
         async function loadUsage() {
             try {
-                const response = await api.fetch('/api/billing/usage');
+                const response = await api.fetch('/api/v1/billing/usage');
                 const data = await response.json();
 
                 const dogsUsed = data.dogs_used || 0;
@@ -367,7 +367,7 @@
 
         async function loadPlans() {
             try {
-                const response = await api.fetch('/api/billing/plans');
+                const response = await api.fetch('/api/v1/billing/plans');
                 const data = await response.json();
 
                 plans = data.plans || [];
@@ -384,7 +384,7 @@
 
         async function loadSubscription() {
             try {
-                const response = await api.fetch('/api/billing/subscription');
+                const response = await api.fetch('/api/v1/billing/subscription');
                 const data = await response.json();
 
                 currentSubscription = data.subscription;
@@ -518,7 +518,7 @@
 
         async function upgradeToPro() {
             try {
-                const response = await api.fetch('/api/billing/checkout', {
+                const response = await api.fetch('/api/v1/billing/checkout', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -542,7 +542,7 @@
 
         async function openBillingPortal() {
             try {
-                const response = await api.fetch('/api/billing/portal', {
+                const response = await api.fetch('/api/v1/billing/portal', {
                     method: 'POST'
                 });
 
@@ -565,7 +565,7 @@
             }
 
             try {
-                const response = await api.fetch('/api/billing/cancel', {
+                const response = await api.fetch('/api/v1/billing/cancel', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({})

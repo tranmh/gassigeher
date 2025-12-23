@@ -320,7 +320,7 @@
 
         async function loadDogLimit() {
             try {
-                const response = await api.fetch('/api/billing/usage');
+                const response = await api.fetch('/api/v1/billing/usage');
                 if (!response.ok) return; // Billing not available
 
                 const data = await response.json();

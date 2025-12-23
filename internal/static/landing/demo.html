@@ -321,7 +321,7 @@
             const container = document.getElementById('credentials-container');
 
             try {
-                const response = await fetch('/api/demo/credentials');
+                const response = await fetch('/api/v1/demo/credentials');
                 if (!response.ok) {
                     throw new Error('Demo-Zugangsdaten nicht verfuegbar');
                 }
