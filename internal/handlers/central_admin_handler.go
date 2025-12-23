@@ -153,13 +153,20 @@ func (h *CentralAdminHandler) ListTenants(w http.ResponseWriter, r *http.Request
 	tenants := []TenantListItem{}
 	for rows.Next() {
 		var t TenantListItem
+		var lastLoginStr sql.NullString // SQLite returns datetime as string
 		err := rows.Scan(
 			&t.ID, &t.Slug, &t.Name, &t.ContactEmail, &t.Status, &t.CreatedAt,
-			&t.UserCount, &t.DogCount, &t.LastLoginAt,
+			&t.UserCount, &t.DogCount, &lastLoginStr,
 		)
 		if err != nil {
 			log.Printf("Error scanning tenant: %v", err)
 			continue
+		}
+		// Convert string to time if present
+		if lastLoginStr.Valid && lastLoginStr.String != "" {
+			if parsed, parseErr := time.Parse("2006-01-02 15:04:05", lastLoginStr.String); parseErr == nil {
+				t.LastLoginAt = &parsed
+			}
 		}
 		tenants = append(tenants, t)
 	}
@@ -178,7 +185,7 @@ func (h *CentralAdminHandler) GetTenant(w http.ResponseWriter, r *http.Request) 
 	}
 
 	tenant, err := h.tenantRepo.FindByID(tenantID)
-	if err != nil {
+	if err != nil || tenant == nil {
 		respondError(w, http.StatusNotFound, "Tierheim nicht gefunden")
 		return
 	}
@@ -218,7 +225,7 @@ func (h *CentralAdminHandler) UpdateTenant(w http.ResponseWriter, r *http.Reques
 	}
 
 	tenant, err := h.tenantRepo.FindByID(tenantID)
-	if err != nil {
+	if err != nil || tenant == nil {
 		respondError(w, http.StatusNotFound, "Tierheim nicht gefunden")
 		return
 	}
@@ -267,7 +274,7 @@ func (h *CentralAdminHandler) ActivateTenant(w http.ResponseWriter, r *http.Requ
 	}
 
 	tenant, err := h.tenantRepo.FindByID(tenantID)
-	if err != nil {
+	if err != nil || tenant == nil {
 		respondError(w, http.StatusNotFound, "Tierheim nicht gefunden")
 		return
 	}
@@ -296,7 +303,7 @@ func (h *CentralAdminHandler) DeactivateTenant(w http.ResponseWriter, r *http.Re
 	}
 
 	tenant, err := h.tenantRepo.FindByID(tenantID)
-	if err != nil {
+	if err != nil || tenant == nil {
 		respondError(w, http.StatusNotFound, "Tierheim nicht gefunden")
 		return
 	}
@@ -364,7 +371,7 @@ func (h *CentralAdminHandler) PromoteToCentralAdmin(w http.ResponseWriter, r *ht
 	}
 
 	user, err := h.userRepo.FindByID(userID)
-	if err != nil {
+	if err != nil || user == nil {
 		respondError(w, http.StatusNotFound, "Benutzer nicht gefunden")
 		return
 	}
@@ -407,7 +414,7 @@ func (h *CentralAdminHandler) DemoteFromCentralAdmin(w http.ResponseWriter, r *h
 	}
 
 	user, err := h.userRepo.FindByID(userID)
-	if err != nil {
+	if err != nil || user == nil {
 		respondError(w, http.StatusNotFound, "Benutzer nicht gefunden")
 		return
 	}
@@ -442,8 +449,8 @@ func (h *CentralAdminHandler) GetTenantUsers(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Verify tenant exists
-	_, err = h.tenantRepo.FindByID(tenantID)
-	if err != nil {
+	tenant, err := h.tenantRepo.FindByID(tenantID)
+	if err != nil || tenant == nil {
 		respondError(w, http.StatusNotFound, "Tierheim nicht gefunden")
 		return
 	}
@@ -530,7 +537,7 @@ func (h *CentralAdminHandler) ExportTenantData(w http.ResponseWriter, r *http.Re
 	}
 
 	tenant, err := h.tenantRepo.FindByID(tenantID)
-	if err != nil {
+	if err != nil || tenant == nil {
 		respondError(w, http.StatusNotFound, "Tierheim nicht gefunden")
 		return
 	}

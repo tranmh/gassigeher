@@ -185,6 +185,7 @@ func (h *TenantHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	// 4. Provision default data (colors, booking rules, settings)
 	if err := h.provisioningService.ProvisionTenant(tx, tenantID); err != nil {
+		fmt.Printf("Provisioning error for tenant %d: %v\n", tenantID, err)
 		respondError(w, http.StatusInternalServerError, "Fehler bei der Einrichtung")
 		return
 	}

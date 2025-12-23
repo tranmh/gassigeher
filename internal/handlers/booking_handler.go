@@ -328,8 +328,13 @@ func (h *BookingHandler) GetBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SaaS: Require valid tenant context (SECURITY FIX: tenantID=0 bypass vulnerability)
+	if tenantID == 0 {
+		respondError(w, http.StatusBadRequest, "Tenant context required")
+		return
+	}
 	// SaaS: Verify booking belongs to current tenant
-	if tenantID > 0 && booking.TenantID != tenantID {
+	if booking.TenantID != tenantID {
 		respondError(w, http.StatusNotFound, "Booking not found")
 		return
 	}
@@ -377,8 +382,13 @@ func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SaaS: Require valid tenant context (SECURITY FIX: tenantID=0 bypass vulnerability)
+	if tenantID == 0 {
+		respondError(w, http.StatusBadRequest, "Tenant context required")
+		return
+	}
 	// SaaS: Verify booking belongs to current tenant
-	if tenantID > 0 && booking.TenantID != tenantID {
+	if booking.TenantID != tenantID {
 		respondError(w, http.StatusNotFound, "Booking not found")
 		return
 	}
@@ -509,8 +519,13 @@ func (h *BookingHandler) AddNotes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SaaS: Require valid tenant context (SECURITY FIX: tenantID=0 bypass vulnerability)
+	if tenantID == 0 {
+		respondError(w, http.StatusBadRequest, "Tenant context required")
+		return
+	}
 	// SaaS: Verify booking belongs to current tenant
-	if tenantID > 0 && booking.TenantID != tenantID {
+	if booking.TenantID != tenantID {
 		respondError(w, http.StatusNotFound, "Booking not found")
 		return
 	}
@@ -575,8 +590,13 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SaaS: Require valid tenant context (SECURITY FIX: tenantID=0 bypass vulnerability)
+	if tenantID == 0 {
+		respondError(w, http.StatusBadRequest, "Tenant context required")
+		return
+	}
 	// SaaS: Verify booking belongs to current tenant
-	if tenantID > 0 && booking.TenantID != tenantID {
+	if booking.TenantID != tenantID {
 		respondError(w, http.StatusNotFound, "Booking not found")
 		return
 	}
@@ -795,7 +815,12 @@ func (h *BookingHandler) ApprovePendingBooking(w http.ResponseWriter, r *http.Re
 		respondError(w, http.StatusNotFound, "Booking not found")
 		return
 	}
-	if tenantID > 0 && booking.TenantID != tenantID {
+	// SaaS: Require valid tenant context (SECURITY FIX: tenantID=0 bypass vulnerability)
+	if tenantID == 0 {
+		respondError(w, http.StatusBadRequest, "Tenant context required")
+		return
+	}
+	if booking.TenantID != tenantID {
 		respondError(w, http.StatusNotFound, "Booking not found")
 		return
 	}
@@ -874,7 +899,12 @@ func (h *BookingHandler) RejectPendingBooking(w http.ResponseWriter, r *http.Req
 		respondError(w, http.StatusNotFound, "Booking not found")
 		return
 	}
-	if tenantID > 0 && booking.TenantID != tenantID {
+	// SaaS: Require valid tenant context (SECURITY FIX: tenantID=0 bypass vulnerability)
+	if tenantID == 0 {
+		respondError(w, http.StatusBadRequest, "Tenant context required")
+		return
+	}
+	if booking.TenantID != tenantID {
 		respondError(w, http.StatusNotFound, "Booking not found")
 		return
 	}

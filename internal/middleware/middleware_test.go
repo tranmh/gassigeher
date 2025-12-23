@@ -535,3 +535,486 @@ func TestRateLimitLogin_NoConcurrentBlocking(t *testing.T) {
 			"Rate limiter should not hold mutex during handler execution.", totalTime)
 	}
 }
+
+// TestRequireSuperAdmin tests super admin authorization middleware
+func TestRequireSuperAdmin(t *testing.T) {
+	middleware := RequireSuperAdmin
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	t.Run("super admin allowed", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/superadmin/test", nil)
+		ctx := context.WithValue(req.Context(), IsSuperAdminKey, true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		middleware(testHandler).ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200 for super admin, got %d", rec.Code)
+		}
+	})
+
+	t.Run("non-super admin forbidden", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/superadmin/test", nil)
+		ctx := context.WithValue(req.Context(), IsSuperAdminKey, false)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		middleware(testHandler).ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("Expected status 403 for non-super admin, got %d", rec.Code)
+		}
+	})
+
+	t.Run("missing super admin flag in context", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/superadmin/test", nil)
+		rec := httptest.NewRecorder()
+
+		middleware(testHandler).ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("Expected status 403 when super admin flag missing, got %d", rec.Code)
+		}
+	})
+
+	t.Run("regular admin is not super admin", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/superadmin/test", nil)
+		ctx := context.WithValue(req.Context(), IsAdminKey, true)
+		ctx = context.WithValue(ctx, IsSuperAdminKey, false)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		middleware(testHandler).ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("Expected status 403 for regular admin, got %d", rec.Code)
+		}
+	})
+}
+
+// TestRequireCentralAdmin tests central admin authorization middleware
+func TestRequireCentralAdmin(t *testing.T) {
+	middleware := RequireCentralAdmin
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	t.Run("central admin allowed", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/central/test", nil)
+		ctx := context.WithValue(req.Context(), IsCentralAdminKey, true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		middleware(testHandler).ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200 for central admin, got %d", rec.Code)
+		}
+	})
+
+	t.Run("non-central admin forbidden", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/central/test", nil)
+		ctx := context.WithValue(req.Context(), IsCentralAdminKey, false)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		middleware(testHandler).ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("Expected status 403 for non-central admin, got %d", rec.Code)
+		}
+	})
+
+	t.Run("missing central admin flag in context", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/central/test", nil)
+		rec := httptest.NewRecorder()
+
+		middleware(testHandler).ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("Expected status 403 when central admin flag missing, got %d", rec.Code)
+		}
+	})
+
+	t.Run("super admin is not automatically central admin", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/central/test", nil)
+		ctx := context.WithValue(req.Context(), IsSuperAdminKey, true)
+		ctx = context.WithValue(ctx, IsCentralAdminKey, false)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		middleware(testHandler).ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("Expected status 403 for super admin without central admin flag, got %d", rec.Code)
+		}
+	})
+}
+
+// TestExtractSubdomain tests the subdomain extraction function
+func TestExtractSubdomain(t *testing.T) {
+	tests := []struct {
+		name       string
+		host       string
+		baseDomain string
+		expected   string
+	}{
+		{"valid subdomain", "tierheim-goeppingen.gassigeher.org", "gassigeher.org", "tierheim-goeppingen"},
+		{"no subdomain", "gassigeher.org", "gassigeher.org", ""},
+		{"localhost", "localhost", "gassigeher.org", ""},
+		{"localhost with port", "localhost:8080", "gassigeher.org", ""},
+		{"127.0.0.1", "127.0.0.1", "gassigeher.org", ""},
+		{"host with port", "tierheim.gassigeher.org:8080", "gassigeher.org", "tierheim"},
+		{"empty base domain", "tierheim.gassigeher.org", "", ""},
+		{"base domain with port", "tierheim.gassigeher.org", "gassigeher.org:8080", "tierheim"},
+		{"multi-level subdomain rejected", "sub1.sub2.gassigeher.org", "gassigeher.org", ""},
+		{"www subdomain", "www.gassigeher.org", "gassigeher.org", "www"},
+		{"different domain", "tierheim.example.com", "gassigeher.org", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractSubdomain(tt.host, tt.baseDomain)
+			if result != tt.expected {
+				t.Errorf("extractSubdomain(%q, %q) = %q, want %q", tt.host, tt.baseDomain, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestRequireTenant tests the tenant requirement middleware
+func TestRequireTenant(t *testing.T) {
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := RequireTenant(testHandler)
+
+	t.Run("tenant present - allowed", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/test", nil)
+		ctx := context.WithValue(req.Context(), TenantIDKey, 1)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200 with tenant, got %d", rec.Code)
+		}
+	})
+
+	t.Run("tenant missing - rejected", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/test", nil)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400 without tenant, got %d", rec.Code)
+		}
+	})
+
+	t.Run("tenant zero - rejected", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/test", nil)
+		ctx := context.WithValue(req.Context(), TenantIDKey, 0)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400 with tenant=0, got %d", rec.Code)
+		}
+	})
+}
+
+// TestOptionalTenant tests the optional tenant middleware
+func TestOptionalTenant(t *testing.T) {
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := OptionalTenant(testHandler)
+
+	t.Run("passes through with tenant", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/test", nil)
+		ctx := context.WithValue(req.Context(), TenantIDKey, 1)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", rec.Code)
+		}
+	})
+
+	t.Run("passes through without tenant", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/test", nil)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", rec.Code)
+		}
+	})
+}
+
+// TestGetTenantID tests the tenant ID helper function
+func TestGetTenantID(t *testing.T) {
+	t.Run("returns tenant ID from context", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/test", nil)
+		ctx := context.WithValue(req.Context(), TenantIDKey, 42)
+		req = req.WithContext(ctx)
+
+		tenantID := GetTenantID(req)
+		if tenantID != 42 {
+			t.Errorf("Expected tenant ID 42, got %d", tenantID)
+		}
+	})
+
+	t.Run("returns 0 when not set", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/test", nil)
+
+		tenantID := GetTenantID(req)
+		if tenantID != 0 {
+			t.Errorf("Expected tenant ID 0, got %d", tenantID)
+		}
+	})
+}
+
+// TestGetTenantSlug tests the tenant slug helper function
+func TestGetTenantSlug(t *testing.T) {
+	t.Run("returns tenant slug from context", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/test", nil)
+		ctx := context.WithValue(req.Context(), TenantSlugKey, "tierheim-goeppingen")
+		req = req.WithContext(ctx)
+
+		slug := GetTenantSlug(req)
+		if slug != "tierheim-goeppingen" {
+			t.Errorf("Expected slug 'tierheim-goeppingen', got '%s'", slug)
+		}
+	})
+
+	t.Run("returns empty string when not set", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/test", nil)
+
+		slug := GetTenantSlug(req)
+		if slug != "" {
+			t.Errorf("Expected empty slug, got '%s'", slug)
+		}
+	})
+}
+
+// TestGlobalRateLimiter tests the global rate limiter
+func TestGlobalRateLimiter(t *testing.T) {
+	t.Run("creates new limiter for IP", func(t *testing.T) {
+		limiter := NewGlobalRateLimiter(10, 5)
+		defer limiter.Close()
+
+		l1 := limiter.GetLimiter("192.168.1.1")
+		if l1 == nil {
+			t.Error("Expected limiter to be created")
+		}
+	})
+
+	t.Run("reuses existing limiter for same IP", func(t *testing.T) {
+		limiter := NewGlobalRateLimiter(10, 5)
+		defer limiter.Close()
+
+		l1 := limiter.GetLimiter("192.168.1.1")
+		l2 := limiter.GetLimiter("192.168.1.1")
+
+		if l1 != l2 {
+			t.Error("Expected same limiter instance for same IP")
+		}
+	})
+
+	t.Run("creates different limiters for different IPs", func(t *testing.T) {
+		limiter := NewGlobalRateLimiter(10, 5)
+		defer limiter.Close()
+
+		l1 := limiter.GetLimiter("192.168.1.1")
+		l2 := limiter.GetLimiter("192.168.1.2")
+
+		if l1 == l2 {
+			t.Error("Expected different limiter instances for different IPs")
+		}
+	})
+}
+
+// TestGlobalRateLimit_Middleware tests the global rate limit middleware
+func TestGlobalRateLimit_Middleware(t *testing.T) {
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	t.Run("allows requests within limit", func(t *testing.T) {
+		// High RPS limit for this test
+		handler := GlobalRateLimit(100, 10)(testHandler)
+
+		req := httptest.NewRequest("GET", "/api/test", nil)
+		req.RemoteAddr = "192.168.1.100:12345"
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", rec.Code)
+		}
+	})
+
+	t.Run("rate limits excessive requests", func(t *testing.T) {
+		// Very low limit - 1 request per second, burst of 1
+		handler := GlobalRateLimit(1, 1)(testHandler)
+
+		// First request should succeed
+		req1 := httptest.NewRequest("GET", "/api/test", nil)
+		req1.RemoteAddr = "10.0.0.50:12345"
+		rec1 := httptest.NewRecorder()
+		handler.ServeHTTP(rec1, req1)
+
+		if rec1.Code != http.StatusOK {
+			t.Errorf("First request: expected status 200, got %d", rec1.Code)
+		}
+
+		// Immediate second request should be rate limited
+		req2 := httptest.NewRequest("GET", "/api/test", nil)
+		req2.RemoteAddr = "10.0.0.50:12345"
+		rec2 := httptest.NewRecorder()
+		handler.ServeHTTP(rec2, req2)
+
+		if rec2.Code != http.StatusTooManyRequests {
+			t.Errorf("Second request: expected status 429, got %d", rec2.Code)
+		}
+
+		// Verify Retry-After header
+		if rec2.Header().Get("Retry-After") == "" {
+			t.Error("Expected Retry-After header on rate limited response")
+		}
+	})
+}
+
+// TestAuthMiddleware_ImpersonationClaims tests impersonation claims extraction
+func TestAuthMiddleware_ImpersonationClaims(t *testing.T) {
+	jwtSecret := "test-secret"
+	authService := services.NewAuthService(jwtSecret, 24)
+	middleware := AuthMiddleware(jwtSecret)
+
+	t.Run("extracts impersonation claims when present", func(t *testing.T) {
+		// Generate impersonation token
+		// GenerateImpersonationJWT(targetUserID, targetEmail, targetIsAdmin, targetIsSuperAdmin, targetIsCentralAdmin, originalUserID, tenantID)
+		impersonatedToken, err := authService.GenerateImpersonationJWT(2, "user@example.com", false, false, false, 1, 1)
+		if err != nil {
+			t.Fatalf("Failed to generate impersonation token: %v", err)
+		}
+
+		var capturedOriginalUserID, capturedIsImpersonating interface{}
+		testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			capturedOriginalUserID = r.Context().Value(OriginalUserIDKey)
+			capturedIsImpersonating = r.Context().Value(IsImpersonatingKey)
+			w.WriteHeader(http.StatusOK)
+		})
+
+		req := httptest.NewRequest("GET", "/api/test", nil)
+		req.Header.Set("Authorization", "Bearer "+impersonatedToken)
+		ctx := context.WithValue(req.Context(), TenantIDKey, 1)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		middleware(testHandler).ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", rec.Code)
+		}
+
+		if capturedIsImpersonating != true {
+			t.Error("Expected isImpersonating to be true")
+		}
+
+		if capturedOriginalUserID != 1 {
+			t.Errorf("Expected originalUserID 1, got %v", capturedOriginalUserID)
+		}
+	})
+}
+
+// TestAuthMiddleware_CentralAdminClaim tests central admin claim extraction
+func TestAuthMiddleware_CentralAdminClaim(t *testing.T) {
+	jwtSecret := "test-secret"
+	authService := services.NewAuthService(jwtSecret, 24)
+	middleware := AuthMiddleware(jwtSecret)
+
+	t.Run("extracts central admin claim when true", func(t *testing.T) {
+		// Generate token with central admin claim
+		token, _ := authService.GenerateJWT(1, "central@example.com", false, false, true, 0)
+
+		var capturedIsCentralAdmin interface{}
+		testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			capturedIsCentralAdmin = r.Context().Value(IsCentralAdminKey)
+			w.WriteHeader(http.StatusOK)
+		})
+
+		req := httptest.NewRequest("GET", "/api/test", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		rec := httptest.NewRecorder()
+		middleware(testHandler).ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", rec.Code)
+		}
+
+		if capturedIsCentralAdmin != true {
+			t.Error("Expected isCentralAdmin to be true")
+		}
+	})
+}
+
+// TestLoggingMiddleware_RequestID tests that request ID is generated and set
+func TestLoggingMiddleware_RequestID(t *testing.T) {
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check request ID is in context
+		requestID := r.Context().Value(RequestIDKey)
+		if requestID == nil {
+			t.Error("Expected request ID in context")
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := LoggingMiddleware(testHandler)
+
+	req := httptest.NewRequest("GET", "/api/test", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	// Check X-Request-ID header is set
+	if rec.Header().Get("X-Request-ID") == "" {
+		t.Error("Expected X-Request-ID header to be set")
+	}
+}
+
+// TestLoggingMiddleware_CapturesStatusCode tests status code capture
+func TestLoggingMiddleware_CapturesStatusCode(t *testing.T) {
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte("created"))
+	})
+
+	handler := LoggingMiddleware(testHandler)
+
+	req := httptest.NewRequest("POST", "/api/test", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Errorf("Expected status 201, got %d", rec.Code)
+	}
+}

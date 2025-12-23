@@ -562,3 +562,176 @@ func TestMultiTenant_RejectBooking_CrossTenantBlocked(t *testing.T) {
 		t.Error("BUG: Cross-tenant rejection actually changed the booking status!")
 	}
 }
+
+// ====================================================================================
+// NEW BUG: TenantID == 0 BYPASS VULNERABILITY
+// ====================================================================================
+// The pattern `if tenantID > 0 && booking.TenantID != tenantID` has a critical flaw:
+// When tenantID is 0 (not set in context), the ENTIRE tenant check is bypassed!
+// This means ANY request without proper tenant context can access ANY booking.
+// ====================================================================================
+
+// TestMultiTenant_GetBooking_ZeroTenantID_Blocked tests that tenantID=0 is blocked
+// TDD RED PHASE: This test should FAIL - exposes the tenantID==0 bypass bug
+func TestMultiTenant_GetBooking_ZeroTenantID_Blocked(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewBookingHandler(db, cfg)
+
+	// Create user and dog for tenant 1
+	userID := testutil.SeedTestUser(t, db, "user@tenant1.com", "Test User", "green")
+	dogID := testutil.SeedTestDog(t, db, "Buddy", "Labrador", "green")
+
+	bookingRepo := repository.NewBookingRepository(db)
+
+	// Create booking for tenant 1
+	booking := &models.Booking{
+		TenantID:       1,
+		UserID:         userID,
+		DogID:          dogID,
+		Date:           "2025-12-26",
+		ScheduledTime:  "10:00",
+		Status:         "scheduled",
+		ApprovalStatus: "approved",
+	}
+	if err := bookingRepo.Create(booking); err != nil {
+		t.Fatalf("Failed to create booking: %v", err)
+	}
+
+	// Try to access with tenantID = 0 (not set) - this should be BLOCKED
+	req := httptest.NewRequest("GET", fmt.Sprintf("/api/bookings/%d", booking.ID), nil)
+	req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", booking.ID)})
+	// CRITICAL: TenantIDKey = 0 (default when not set) simulates missing tenant context
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 0) // tenantID = 0!
+	ctx = context.WithValue(ctx, middleware.UserIDKey, userID)
+	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.GetBooking(rec, req)
+
+	// BUG: The current code allows this because `if tenantID > 0 && ...` is false when tenantID=0
+	// This bypasses ALL tenant isolation!
+	if rec.Code == http.StatusOK {
+		t.Errorf("SECURITY BUG: GetBooking allowed access with tenantID=0 - tenant isolation bypassed!")
+		t.Errorf("Current code: 'if tenantID > 0 && booking.TenantID != tenantID' - condition is false when tenantID=0")
+	}
+
+	// Should return 400 (bad request - no tenant) or 403 (forbidden)
+	if rec.Code != http.StatusBadRequest && rec.Code != http.StatusForbidden && rec.Code != http.StatusNotFound {
+		t.Errorf("Expected 400/403/404, got %d. Response: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestMultiTenant_CancelBooking_ZeroTenantID_Blocked tests that cancellation fails with tenantID=0
+// TDD RED PHASE: This test should FAIL - exposes the tenantID==0 bypass bug
+func TestMultiTenant_CancelBooking_ZeroTenantID_Blocked(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewBookingHandler(db, cfg)
+
+	// Create user and dog for tenant 1
+	userID := testutil.SeedTestUser(t, db, "user@tenant1.com", "Test User", "green")
+	dogID := testutil.SeedTestDog(t, db, "Buddy", "Labrador", "green")
+
+	bookingRepo := repository.NewBookingRepository(db)
+
+	// Create booking for tenant 1
+	booking := &models.Booking{
+		TenantID:       1,
+		UserID:         userID,
+		DogID:          dogID,
+		Date:           testutil.GetFutureDate(14),
+		ScheduledTime:  "11:00",
+		Status:         "scheduled",
+		ApprovalStatus: "approved",
+	}
+	if err := bookingRepo.Create(booking); err != nil {
+		t.Fatalf("Failed to create booking: %v", err)
+	}
+
+	reqBody := map[string]interface{}{
+		"reason": "Testing zero tenant ID bypass",
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/bookings/%d", booking.ID), bytes.NewReader(body))
+	req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", booking.ID)})
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 0) // tenantID = 0!
+	ctx = context.WithValue(ctx, middleware.UserIDKey, userID)
+	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CancelBooking(rec, req)
+
+	// BUG: This should fail but likely succeeds due to the bypass
+	if rec.Code == http.StatusOK {
+		t.Errorf("SECURITY BUG: CancelBooking allowed with tenantID=0 - tenant isolation bypassed!")
+	}
+
+	// Verify booking wasn't actually cancelled
+	savedBooking, _ := bookingRepo.FindByID(booking.ID)
+	if savedBooking != nil && savedBooking.Status == "cancelled" {
+		t.Errorf("SECURITY BUG: Booking was actually cancelled with tenantID=0!")
+	}
+}
+
+// TestMultiTenant_ApproveBooking_ZeroTenantID_Blocked tests approval fails with tenantID=0
+// TDD RED PHASE: This test should FAIL
+func TestMultiTenant_ApproveBooking_ZeroTenantID_Blocked(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewBookingHandler(db, cfg)
+
+	// Create user and dog for tenant 1
+	userID := testutil.SeedTestUser(t, db, "user@tenant1.com", "Test User", "green")
+	dogID := testutil.SeedTestDog(t, db, "Buddy", "Labrador", "green")
+
+	bookingRepo := repository.NewBookingRepository(db)
+
+	// Create pending booking for tenant 1
+	booking := &models.Booking{
+		TenantID:         1,
+		UserID:           userID,
+		DogID:            dogID,
+		Date:             testutil.GetFutureDate(7),
+		ScheduledTime:    "09:00",
+		Status:           "scheduled",
+		RequiresApproval: true,
+		ApprovalStatus:   "pending",
+	}
+	if err := bookingRepo.Create(booking); err != nil {
+		t.Fatalf("Failed to create booking: %v", err)
+	}
+
+	req := httptest.NewRequest("PUT", fmt.Sprintf("/api/bookings/%d/approve", booking.ID), nil)
+	req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", booking.ID)})
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 0) // tenantID = 0!
+	ctx = context.WithValue(ctx, middleware.UserIDKey, userID)
+	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.ApprovePendingBooking(rec, req)
+
+	// BUG: This should fail but likely succeeds
+	if rec.Code == http.StatusOK {
+		t.Errorf("SECURITY BUG: ApprovePendingBooking allowed with tenantID=0!")
+	}
+
+	// Verify booking wasn't actually approved
+	savedBooking, _ := bookingRepo.FindByID(booking.ID)
+	if savedBooking != nil && savedBooking.ApprovalStatus == "approved" {
+		t.Errorf("SECURITY BUG: Booking was actually approved with tenantID=0!")
+	}
+}

@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"fmt"
 )
 
 // ProvisioningService handles default data setup for new tenants
@@ -79,8 +80,12 @@ func (s *ProvisioningService) CreateDefaultSettings(tx *sql.Tx, tenantID int) er
 	}
 
 	for key, value := range settings {
+		// Use INSERT OR REPLACE to handle schema where key alone is unique
+		// This handles cases where the original schema hasn't been fully migrated
+		// to the (tenant_id, key) composite key.
+		// Note: 'key' is a reserved word in SQL, so we use backticks/quotes.
 		_, err := tx.Exec(
-			`INSERT INTO system_settings (tenant_id, key, value) VALUES (?, ?, ?)`,
+			"INSERT OR REPLACE INTO system_settings (tenant_id, `key`, value) VALUES (?, ?, ?)",
 			tenantID, key, value,
 		)
 		if err != nil {
@@ -94,17 +99,17 @@ func (s *ProvisioningService) CreateDefaultSettings(tx *sql.Tx, tenantID int) er
 func (s *ProvisioningService) ProvisionTenant(tx *sql.Tx, tenantID int) error {
 	// Create default color categories
 	if err := s.CreateDefaultColors(tx, tenantID); err != nil {
-		return err
+		return fmt.Errorf("CreateDefaultColors failed: %w", err)
 	}
 
 	// Create default booking time rules
 	if err := s.CreateDefaultBookingRules(tx, tenantID); err != nil {
-		return err
+		return fmt.Errorf("CreateDefaultBookingRules failed: %w", err)
 	}
 
 	// Create default system settings
 	if err := s.CreateDefaultSettings(tx, tenantID); err != nil {
-		return err
+		return fmt.Errorf("CreateDefaultSettings failed: %w", err)
 	}
 
 	return nil

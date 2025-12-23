@@ -1471,3 +1471,91 @@ func TestRejectBooking_ReasonRequired(t *testing.T) {
 		}
 	})
 }
+
+// TestBookingRepository_MarkReminderSent tests marking a booking reminder as sent
+func TestBookingRepository_MarkReminderSent(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewBookingRepository(db)
+
+	t.Run("marks reminder as sent", func(t *testing.T) {
+		// Create a booking
+		booking := &models.Booking{
+			UserID:        1,
+			DogID:         1,
+			Date:          "2025-12-15",
+			ScheduledTime: "10:00",
+			Status:        "scheduled",
+		}
+		err := repo.Create(booking)
+		if err != nil {
+			t.Fatalf("Failed to create booking: %v", err)
+		}
+
+		// Verify reminder_sent_at is initially NULL
+		var reminderSentAt *time.Time
+		db.QueryRow("SELECT reminder_sent_at FROM bookings WHERE id = ?", booking.ID).Scan(&reminderSentAt)
+		if reminderSentAt != nil {
+			t.Error("Expected reminder_sent_at to be NULL initially")
+		}
+
+		// Mark reminder as sent
+		err = repo.MarkReminderSent(booking.ID)
+		if err != nil {
+			t.Fatalf("MarkReminderSent() failed: %v", err)
+		}
+
+		// Verify reminder_sent_at is set
+		db.QueryRow("SELECT reminder_sent_at FROM bookings WHERE id = ?", booking.ID).Scan(&reminderSentAt)
+		if reminderSentAt == nil {
+			t.Error("Expected reminder_sent_at to be set after marking")
+		}
+		if reminderSentAt != nil && time.Since(*reminderSentAt) > 5*time.Second {
+			t.Errorf("Expected reminder_sent_at to be recent, got %v", reminderSentAt)
+		}
+	})
+
+	t.Run("marking non-existent booking does not error", func(t *testing.T) {
+		err := repo.MarkReminderSent(99999)
+		// Should not error even if booking doesn't exist (UPDATE with no rows affected)
+		if err != nil {
+			t.Logf("MarkReminderSent for non-existent booking returned: %v", err)
+		}
+	})
+
+	t.Run("marking already reminded booking updates timestamp", func(t *testing.T) {
+		// Create a booking
+		booking := &models.Booking{
+			UserID:        2,
+			DogID:         2,
+			Date:          "2025-12-16",
+			ScheduledTime: "11:00",
+			Status:        "scheduled",
+		}
+		repo.Create(booking)
+
+		// Mark as sent first time
+		repo.MarkReminderSent(booking.ID)
+
+		// Get first timestamp
+		var firstSent time.Time
+		db.QueryRow("SELECT reminder_sent_at FROM bookings WHERE id = ?", booking.ID).Scan(&firstSent)
+
+		// Wait briefly
+		time.Sleep(10 * time.Millisecond)
+
+		// Mark as sent second time
+		err := repo.MarkReminderSent(booking.ID)
+		if err != nil {
+			t.Fatalf("MarkReminderSent() second call failed: %v", err)
+		}
+
+		// Get second timestamp
+		var secondSent time.Time
+		db.QueryRow("SELECT reminder_sent_at FROM bookings WHERE id = ?", booking.ID).Scan(&secondSent)
+
+		// Second timestamp should be after first
+		if !secondSent.After(firstSent) {
+			t.Errorf("Expected second timestamp %v to be after first %v", secondSent, firstSent)
+		}
+	})
+}

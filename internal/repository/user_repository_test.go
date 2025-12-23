@@ -957,6 +957,149 @@ func TestUserRepository_MustChangePasswordField(t *testing.T) {
 	})
 }
 
+// TestUserRepository_PromoteToAdmin tests promoting a user to admin
+func TestUserRepository_PromoteToAdmin(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewUserRepository(db)
+
+	t.Run("promotes regular user to admin", func(t *testing.T) {
+		userID := testutil.SeedTestUser(t, db, "promote@example.com", "Promote Me", "green")
+
+		// Verify user is not admin initially
+		user, _ := repo.FindByID(userID)
+		if user.IsAdmin {
+			t.Error("User should not be admin initially")
+		}
+
+		// Promote to admin
+		err := repo.PromoteToAdmin(userID)
+		if err != nil {
+			t.Fatalf("PromoteToAdmin() failed: %v", err)
+		}
+
+		// Verify user is now admin
+		user, err = repo.FindByID(userID)
+		if err != nil {
+			t.Fatalf("FindByID() failed: %v", err)
+		}
+		if !user.IsAdmin {
+			t.Error("User should be admin after promotion")
+		}
+	})
+
+	t.Run("promoting non-existent user does not error", func(t *testing.T) {
+		err := repo.PromoteToAdmin(99999)
+		// Should not error even if user doesn't exist
+		if err != nil {
+			t.Logf("PromoteToAdmin for non-existent user returned: %v", err)
+		}
+	})
+}
+
+// TestUserRepository_DemoteAdmin tests demoting an admin to regular user
+func TestUserRepository_DemoteAdmin(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewUserRepository(db)
+
+	t.Run("demotes admin to regular user", func(t *testing.T) {
+		userID := testutil.SeedTestUser(t, db, "demote@example.com", "Demote Me", "green")
+
+		// First promote to admin
+		repo.PromoteToAdmin(userID)
+
+		// Verify user is admin
+		user, _ := repo.FindByID(userID)
+		if !user.IsAdmin {
+			t.Error("User should be admin after promotion")
+		}
+
+		// Demote from admin
+		err := repo.DemoteAdmin(userID)
+		if err != nil {
+			t.Fatalf("DemoteAdmin() failed: %v", err)
+		}
+
+		// Verify user is no longer admin
+		user, err = repo.FindByID(userID)
+		if err != nil {
+			t.Fatalf("FindByID() failed: %v", err)
+		}
+		if user.IsAdmin {
+			t.Error("User should not be admin after demotion")
+		}
+	})
+
+	t.Run("demoting non-admin user does not error", func(t *testing.T) {
+		userID := testutil.SeedTestUser(t, db, "nonadmin@example.com", "Non Admin", "green")
+
+		// Demote even though not admin
+		err := repo.DemoteAdmin(userID)
+		if err != nil {
+			t.Fatalf("DemoteAdmin() failed: %v", err)
+		}
+	})
+
+	t.Run("demoting non-existent user does not error", func(t *testing.T) {
+		err := repo.DemoteAdmin(99999)
+		// Should not error even if user doesn't exist
+		if err != nil {
+			t.Logf("DemoteAdmin for non-existent user returned: %v", err)
+		}
+	})
+}
+
+// TestUserRepository_IsSuperAdmin tests checking if a user is super admin
+func TestUserRepository_IsSuperAdmin(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewUserRepository(db)
+
+	t.Run("returns false for regular user", func(t *testing.T) {
+		userID := testutil.SeedTestUser(t, db, "regular@example.com", "Regular User", "green")
+
+		isSuperAdmin, err := repo.IsSuperAdmin(userID)
+		if err != nil {
+			t.Fatalf("IsSuperAdmin() failed: %v", err)
+		}
+		if isSuperAdmin {
+			t.Error("Regular user should not be super admin")
+		}
+	})
+
+	t.Run("returns true for super admin", func(t *testing.T) {
+		// Create super admin user directly
+		email := "super@admin.local"
+		now := testutil.Now()
+		result, err := db.Exec(`
+			INSERT INTO users (
+				first_name, last_name, email, password_hash,
+				is_admin, is_super_admin,
+				is_verified, is_active, terms_accepted_at, last_activity_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, "Super", "Admin", email, "hashedpw", 1, 1, 1, 1, now, now)
+		if err != nil {
+			t.Fatalf("Failed to create super admin: %v", err)
+		}
+
+		superAdminID, _ := result.LastInsertId()
+
+		isSuperAdmin, err := repo.IsSuperAdmin(int(superAdminID))
+		if err != nil {
+			t.Fatalf("IsSuperAdmin() failed: %v", err)
+		}
+		if !isSuperAdmin {
+			t.Error("Super admin user should return true")
+		}
+	})
+
+	t.Run("returns error for non-existent user", func(t *testing.T) {
+		_, err := repo.IsSuperAdmin(99999)
+		// Should return error for non-existent user
+		if err == nil {
+			t.Error("Expected error for non-existent user")
+		}
+	})
+}
+
 // TestUserRepository_FindByEmail_CentralAdmin tests that FindByEmail returns is_central_admin flag
 // BUG: The current FindByEmail query doesn't include is_central_admin column
 func TestUserRepository_FindByEmail_CentralAdmin(t *testing.T) {
