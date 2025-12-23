@@ -52,12 +52,14 @@ else
 fi
 echo ""
 
-echo "[4/5] Running Go tests..."
-if go test -v -cover ./...; then
+echo "[4/5] Running Go tests (short mode - skips slow property tests)..."
+if go test -short -cover ./...; then
     echo -e "${GREEN}[OK] All Go tests passed${NC}"
 else
     echo -e "${YELLOW}[WARNING] Some Go tests failed${NC}"
 fi
+echo ""
+echo "Note: Run 'go test ./...' without -short for full property-based tests (~5 min)"
 echo ""
 
 echo "[5/5] Running frontend tests..."

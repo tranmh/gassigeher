@@ -1018,3 +1018,206 @@ func TestLoggingMiddleware_CapturesStatusCode(t *testing.T) {
 		t.Errorf("Expected status 201, got %d", rec.Code)
 	}
 }
+
+// =============================================================================
+// Auth Endpoint Rate Limiter Tests
+// =============================================================================
+
+// TestRateLimitAuthEndpoint tests auth endpoint rate limiting (3/min per IP)
+func TestRateLimitAuthEndpoint(t *testing.T) {
+	ResetAuthRateLimiter()
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := RateLimitAuthEndpoint(testHandler)
+
+	t.Run("allows up to 3 requests per minute", func(t *testing.T) {
+		ResetAuthRateLimiter()
+
+		for i := 0; i < 3; i++ {
+			req := httptest.NewRequest("POST", "/api/auth/register", nil)
+			req.RemoteAddr = "192.168.1.100:12345"
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Errorf("Request %d should succeed, got %d", i+1, rec.Code)
+			}
+		}
+	})
+
+	t.Run("blocks 4th request within minute", func(t *testing.T) {
+		// Continue from previous test (same IP, limiter not reset)
+		req := httptest.NewRequest("POST", "/api/auth/register", nil)
+		req.RemoteAddr = "192.168.1.100:12345"
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusTooManyRequests {
+			t.Errorf("4th request should be blocked, got %d", rec.Code)
+		}
+
+		if rec.Header().Get("Retry-After") == "" {
+			t.Error("Expected Retry-After header")
+		}
+
+		if rec.Header().Get("Content-Type") != "application/json" {
+			t.Error("Expected Content-Type application/json")
+		}
+	})
+
+	t.Run("different IPs have separate limits", func(t *testing.T) {
+		ResetAuthRateLimiter()
+
+		// IP1: use all 3 requests
+		for i := 0; i < 3; i++ {
+			req := httptest.NewRequest("POST", "/api/auth/register", nil)
+			req.RemoteAddr = "10.0.0.1:12345"
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+		}
+
+		// IP2: should still have all 3 requests available
+		req := httptest.NewRequest("POST", "/api/auth/register", nil)
+		req.RemoteAddr = "10.0.0.2:12345"
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Different IP should succeed, got %d", rec.Code)
+		}
+	})
+}
+
+// TestRateLimitAuthEndpoint_SharedAcrossEndpoints verifies register and
+// password reset share the same rate limit bucket
+func TestRateLimitAuthEndpoint_SharedAcrossEndpoints(t *testing.T) {
+	ResetAuthRateLimiter()
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := RateLimitAuthEndpoint(testHandler)
+
+	// Use 1 request on register
+	req := httptest.NewRequest("POST", "/api/auth/register", nil)
+	req.RemoteAddr = "192.168.1.50:12345"
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("1st request should succeed, got %d", rec.Code)
+	}
+
+	// Use 1 request on forgot-password
+	req = httptest.NewRequest("POST", "/api/auth/forgot-password", nil)
+	req.RemoteAddr = "192.168.1.50:12345"
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("2nd request should succeed, got %d", rec.Code)
+	}
+
+	// Use 1 request on reset-password (3rd request)
+	req = httptest.NewRequest("POST", "/api/auth/reset-password", nil)
+	req.RemoteAddr = "192.168.1.50:12345"
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("3rd request should succeed, got %d", rec.Code)
+	}
+
+	// 4th request (any auth endpoint) should be blocked
+	req = httptest.NewRequest("POST", "/api/auth/register", nil)
+	req.RemoteAddr = "192.168.1.50:12345"
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusTooManyRequests {
+		t.Errorf("4th request should be blocked, got %d", rec.Code)
+	}
+}
+
+// TestRateLimitAuthEndpoint_IPSpoofingPrevention tests that auth rate limiting
+// cannot be bypassed by spoofing X-Forwarded-For header
+func TestRateLimitAuthEndpoint_IPSpoofingPrevention(t *testing.T) {
+	ResetAuthRateLimiter()
+	SetAuthRateLimiterTrustedProxies(nil) // No trusted proxies
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := RateLimitAuthEndpoint(testHandler)
+
+	// Make 3 requests with same RemoteAddr but different X-Forwarded-For
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest("POST", "/api/auth/register", nil)
+		req.RemoteAddr = "192.168.1.200:12345"
+		// Attacker tries to spoof different IPs
+		req.Header.Set("X-Forwarded-For", "10.0.0."+string(rune('1'+i)))
+
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Request %d should succeed, got status %d", i+1, rec.Code)
+		}
+	}
+
+	// 4th request should be rate limited (based on RemoteAddr, not spoofed header)
+	req := httptest.NewRequest("POST", "/api/auth/register", nil)
+	req.RemoteAddr = "192.168.1.200:12345"
+	req.Header.Set("X-Forwarded-For", "completely-different-ip")
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusTooManyRequests {
+		t.Errorf("4th request should be rate limited, got status %d (expected 429)", rec.Code)
+	}
+}
+
+// TestRateLimitAuthEndpoint_TrustedProxy tests auth rate limiting with trusted proxy
+func TestRateLimitAuthEndpoint_TrustedProxy(t *testing.T) {
+	ResetAuthRateLimiter()
+	SetAuthRateLimiterTrustedProxies([]string{"127.0.0.1"})
+	defer SetAuthRateLimiterTrustedProxies(nil) // Reset after test
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := RateLimitAuthEndpoint(testHandler)
+
+	// Make 3 requests from trusted proxy with same client IP
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest("POST", "/api/auth/register", nil)
+		req.RemoteAddr = "127.0.0.1:12345" // Trusted proxy
+		req.Header.Set("X-Forwarded-For", "203.0.113.99") // Real client IP
+
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Request %d should succeed, got status %d", i+1, rec.Code)
+		}
+	}
+
+	// 4th request should be rate limited based on client IP from header
+	req := httptest.NewRequest("POST", "/api/auth/register", nil)
+	req.RemoteAddr = "127.0.0.1:12345"
+	req.Header.Set("X-Forwarded-For", "203.0.113.99")
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusTooManyRequests {
+		t.Errorf("4th request should be rate limited, got status %d", rec.Code)
+	}
+}

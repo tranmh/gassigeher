@@ -205,6 +205,9 @@ func TestProperty_PasswordOnlyASCII(t *testing.T) {
 // ============================================================================
 
 func TestProperty_HashPasswordRoundTrip(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow bcrypt property test in short mode")
+	}
 	rapid.Check(t, func(t *rapid.T) {
 		// bcrypt has a 72-byte limit, test around that boundary
 		password := rapid.StringN(1, 100, -1).Draw(t, "password")
@@ -224,6 +227,9 @@ func TestProperty_HashPasswordRoundTrip(t *testing.T) {
 }
 
 func TestProperty_HashPasswordUniqueness(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow bcrypt property test in short mode")
+	}
 	rapid.Check(t, func(t *rapid.T) {
 		password := rapid.StringN(1, 50, -1).Draw(t, "password")
 		service := NewAuthService("test-secret", 24)
@@ -251,6 +257,9 @@ func TestProperty_HashPasswordUniqueness(t *testing.T) {
 }
 
 func TestProperty_WrongPasswordFails(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow bcrypt property test in short mode")
+	}
 	rapid.Check(t, func(t *rapid.T) {
 		password1 := rapid.StringN(1, 50, -1).Draw(t, "password1")
 		password2 := rapid.StringN(1, 50, -1).Draw(t, "password2")
@@ -275,6 +284,9 @@ func TestProperty_WrongPasswordFails(t *testing.T) {
 
 // Test bcrypt 72-byte truncation behavior
 func TestProperty_BcryptTruncation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping slow bcrypt property test in short mode")
+	}
 	rapid.Check(t, func(t *rapid.T) {
 		// Generate password longer than 72 bytes
 		baseLen := rapid.IntRange(73, 100).Draw(t, "len")

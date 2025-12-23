@@ -61,8 +61,8 @@ set GOOS=
 set GOARCH=
 echo.
 
-echo [6/7] Running Go tests...
-go test -v -cover ./...
+echo [6/7] Running Go tests (short mode - skips slow property tests)...
+go test -short -cover ./...
 if %ERRORLEVEL% NEQ 0 (
     echo [WARNING] Some Go tests failed
     echo.
@@ -70,6 +70,8 @@ if %ERRORLEVEL% NEQ 0 (
     echo [OK] All Go tests passed
     echo.
 )
+echo Note: Run 'go test ./...' without -short for full property-based tests (~5 min)
+echo.
 
 echo [7/7] Running frontend tests...
 where npm >nul 2>nul
