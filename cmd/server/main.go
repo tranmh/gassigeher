@@ -218,9 +218,8 @@ func main() {
 	router.HandleFunc("/metrics", metricsHandler.GetPrometheusMetrics).Methods("GET")
 	router.HandleFunc("/api/metrics", metricsHandler.GetMetrics).Methods("GET")
 
-	// API Version redirect middleware (redirects legacy /api/* to /api/v1/*)
-	// Excluded: /api/health, /api/ready, /api/version, /api/metrics
-	router.Use(middleware.APIVersionRedirect)
+	// NOTE: API Version redirect is applied via WrapWithVersionRedirect at server startup
+	// (router.Use() doesn't work because gorilla/mux runs middleware AFTER route matching)
 
 	// Initialize booking time repositories and services
 	bookingTimeRepo := repository.NewBookingTimeRepository(db)
@@ -585,9 +584,14 @@ func main() {
 		port = "8080"
 	}
 
+	// Wrap router with API version redirect (rewrites /api/* to /api/v1/*)
+	// This must be done as a wrapper, not middleware, because gorilla/mux
+	// runs middleware AFTER route matching (so unversioned routes would 404)
+	wrappedRouter := middleware.WrapWithVersionRedirect(router)
+
 	srv := &http.Server{
 		Addr:         ":" + port,
-		Handler:      router,
+		Handler:      wrappedRouter,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,

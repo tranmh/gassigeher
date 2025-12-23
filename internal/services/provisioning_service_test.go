@@ -202,8 +202,60 @@ func TestProvisioningService_ProvisionTenant(t *testing.T) {
 	if ruleCount != 7 {
 		t.Errorf("Expected 7 booking rules, got %d", ruleCount)
 	}
-	if settingCount != 3 {
-		t.Errorf("Expected 3 settings, got %d", settingCount)
+	if settingCount != 4 {
+		t.Errorf("Expected 4 settings (including registration_password), got %d", settingCount)
+	}
+}
+
+// TestProvisioningService_CreateDefaultSettings_IncludesRegistrationPassword tests that
+// registration_password is included in default settings (required for user registration)
+func TestProvisioningService_CreateDefaultSettings_IncludesRegistrationPassword(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	service := NewProvisioningService(db)
+
+	// Create a new tenant
+	result, err := db.Exec(`
+		INSERT INTO tenants (slug, name, contact_email, federal_state, status)
+		VALUES ('regpass-test', 'RegPass Test', 'regpass@example.com', 'BW', 'active')
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create tenant: %v", err)
+	}
+	tenantID, _ := result.LastInsertId()
+
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("Failed to begin transaction: %v", err)
+	}
+	defer tx.Rollback()
+
+	err = service.CreateDefaultSettings(tx, int(tenantID))
+	if err != nil {
+		t.Fatalf("CreateDefaultSettings failed: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("Failed to commit: %v", err)
+	}
+
+	// Verify registration_password was created
+	var registrationPassword string
+	err = db.QueryRow("SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'registration_password'", tenantID).Scan(&registrationPassword)
+	if err != nil {
+		t.Fatalf("registration_password setting not found: %v", err)
+	}
+
+	// Should be exactly 8 alphanumeric characters
+	if len(registrationPassword) != 8 {
+		t.Errorf("Expected registration_password to be 8 characters, got %d: '%s'", len(registrationPassword), registrationPassword)
+	}
+
+	// Should be alphanumeric only (A-Z, 0-9)
+	for _, c := range registrationPassword {
+		if !((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+			t.Errorf("registration_password contains invalid character: '%c' in '%s'", c, registrationPassword)
+			break
+		}
 	}
 }
 

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"fmt"
 )
@@ -71,12 +72,37 @@ func (s *ProvisioningService) CreateDefaultBookingRules(tx *sql.Tx, tenantID int
 	return nil
 }
 
+// generateRegistrationPassword generates a random 8-character alphanumeric password
+// Format: uppercase letters and digits (e.g., "AB12CD34")
+func generateRegistrationPassword() (string, error) {
+	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	result := make([]byte, 8)
+	randomBytes := make([]byte, 8)
+
+	if _, err := rand.Read(randomBytes); err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+
+	for i := 0; i < 8; i++ {
+		result[i] = chars[randomBytes[i]%byte(len(chars))]
+	}
+
+	return string(result), nil
+}
+
 // CreateDefaultSettings creates default system settings for a tenant
 func (s *ProvisioningService) CreateDefaultSettings(tx *sql.Tx, tenantID int) error {
+	// Generate a random registration password for this tenant
+	registrationPassword, err := generateRegistrationPassword()
+	if err != nil {
+		return fmt.Errorf("failed to generate registration password: %w", err)
+	}
+
 	settings := map[string]string{
 		"booking_advance_days":      "14",
 		"cancellation_notice_hours": "12",
 		"auto_deactivation_days":    "365",
+		"registration_password":     registrationPassword,
 	}
 
 	for key, value := range settings {
