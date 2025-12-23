@@ -5,15 +5,18 @@
 
 set -e
 
+# Installation directory (Docker Compose default)
+INSTALL_DIR="${INSTALL_DIR:-/opt/gassigeher}"
+
 # Load environment variables if .env exists
-ENV_FILE="${ENV_FILE:-/var/gassigeher/.env}"
+ENV_FILE="${ENV_FILE:-$INSTALL_DIR/.env}"
 if [ -f "$ENV_FILE" ]; then
     export $(grep -v '^#' "$ENV_FILE" | xargs)
 fi
 
 # Configuration with defaults
-DB_TYPE="${DB_TYPE:-sqlite}"
-LOG_FILE="${LOG_FILE:-/var/gassigeher/logs/restore.log}"
+DB_TYPE="${DB_TYPE:-postgres}"
+LOG_FILE="${LOG_FILE:-$INSTALL_DIR/logs/restore.log}"
 
 # Ensure log directory exists
 mkdir -p "$(dirname "$LOG_FILE")"
@@ -162,17 +165,9 @@ restore_postgres() {
     local pass="${DB_PASSWORD:-}"
     local name="${DB_NAME:-gassigeher}"
     local backup_file="$1"
-    local temp_file="/tmp/gassigeher_restore_$$.dump"
+    local temp_file="/tmp/gassigeher_restore_$$.sql"
 
-    log "Starting PostgreSQL restore to $name on $host:$port..."
-
-    # Check if pg_restore is available
-    if ! command -v pg_restore &> /dev/null; then
-        error_exit "pg_restore not found. Install postgresql-client package."
-    fi
-
-    # Set password via environment variable
-    export PGPASSWORD="$pass"
+    log "Starting PostgreSQL restore to $name..."
 
     # Decompress if needed
     if [[ "$backup_file" == *.gz ]]; then
@@ -182,29 +177,52 @@ restore_postgres() {
         cp "$backup_file" "$temp_file" || error_exit "Copy failed"
     fi
 
-    # Drop and recreate database
-    log "WARNING: This will replace all data in database '$name'"
-    log "Dropping and recreating database..."
+    # Check if running via Docker Compose
+    local docker_compose_file="$INSTALL_DIR/docker-compose.yml"
+    if [ -f "$docker_compose_file" ] && docker compose -f "$docker_compose_file" ps db 2>/dev/null | grep -q "running"; then
+        log "Using Docker Compose container for restore..."
 
-    # Terminate existing connections
-    psql -h "$host" -p "$port" -U "$user" -d postgres -c "
-        SELECT pg_terminate_backend(pid)
-        FROM pg_stat_activity
-        WHERE datname = '$name' AND pid <> pg_backend_pid();
-    " 2>/dev/null || true
+        # Stop the app to release connections
+        log "Stopping app container..."
+        docker compose -f "$docker_compose_file" stop app 2>/dev/null || true
 
-    psql -h "$host" -p "$port" -U "$user" -d postgres -c "DROP DATABASE IF EXISTS $name;" || error_exit "Failed to drop database"
-    psql -h "$host" -p "$port" -U "$user" -d postgres -c "CREATE DATABASE $name;" || error_exit "Failed to create database"
+        # Drop and recreate database
+        log "Dropping and recreating database..."
+        docker compose -f "$docker_compose_file" exec -T db psql -U "$user" -d postgres -c "DROP DATABASE IF EXISTS $name;"
+        docker compose -f "$docker_compose_file" exec -T db psql -U "$user" -d postgres -c "CREATE DATABASE $name;"
 
-    # Restore using pg_restore (for custom format dumps)
-    log "Restoring data..."
-    pg_restore -h "$host" -p "$port" -U "$user" -d "$name" --no-owner --no-privileges "$temp_file" || {
-        # If pg_restore fails, try plain SQL restore
-        log "pg_restore failed, trying psql..."
+        # Restore
+        log "Restoring data..."
+        cat "$temp_file" | docker compose -f "$docker_compose_file" exec -T db psql -U "$user" -d "$name" || error_exit "Restore failed"
+
+        # Restart app
+        log "Restarting app container..."
+        docker compose -f "$docker_compose_file" start app
+    else
+        # Check if psql is available locally
+        if ! command -v psql &> /dev/null; then
+            error_exit "psql not found. Install postgresql-client package."
+        fi
+
+        log "Using local psql to $host:$port..."
+        export PGPASSWORD="$pass"
+
+        # Terminate existing connections
+        psql -h "$host" -p "$port" -U "$user" -d postgres -c "
+            SELECT pg_terminate_backend(pid)
+            FROM pg_stat_activity
+            WHERE datname = '$name' AND pid <> pg_backend_pid();
+        " 2>/dev/null || true
+
+        psql -h "$host" -p "$port" -U "$user" -d postgres -c "DROP DATABASE IF EXISTS $name;" || error_exit "Failed to drop database"
+        psql -h "$host" -p "$port" -U "$user" -d postgres -c "CREATE DATABASE $name;" || error_exit "Failed to create database"
+
+        # Restore
+        log "Restoring data..."
         psql -h "$host" -p "$port" -U "$user" -d "$name" < "$temp_file" || error_exit "Restore failed"
-    }
 
-    unset PGPASSWORD
+        unset PGPASSWORD
+    fi
 
     # Cleanup
     rm -f "$temp_file"

@@ -1,0 +1,41 @@
+[Unit]
+Description=Gassigeher SaaS Platform
+Documentation=https://github.com/tranmh/gassigeher
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gassigeher
+Group=gassigeher
+WorkingDirectory=/opt/gassigeher
+ExecStart=/opt/gassigeher/gassigeher -env /opt/gassigeher/.env
+Restart=always
+RestartSec=5
+
+# Graceful shutdown configuration
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=35
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/gassigeher/uploads /opt/gassigeher/logs /opt/gassigeher/gassigeher.db
+PrivateTmp=true
+
+# Resource limits
+LimitNOFILE=65535
+MemoryMax=1G
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=gassigeher
+
+# Environment
+Environment=PORT=8080
+
+[Install]
+WantedBy=multi-user.target
