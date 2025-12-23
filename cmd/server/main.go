@@ -519,8 +519,17 @@ func main() {
 		serveEmbeddedFile(w, r, frontendFS, "forgot-password.html")
 	}).Methods("GET")
 
-	// Root path: redirect to landing page if no tenant, otherwise serve frontend
+	// Root path: serve frontend or redirect to landing page
+	// Simple mode (no BASE_DOMAIN): always serve frontend index.html
+	// SaaS mode (BASE_DOMAIN set): redirect to landing if no tenant subdomain
+	saasMode := cfg.BaseDomain != ""
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if !saasMode {
+			// Simple mode - serve frontend directly
+			serveEmbeddedFile(w, r, frontendFS, "index.html")
+			return
+		}
+		// SaaS mode - check for tenant
 		tenantID := middleware.GetTenantID(r)
 		if tenantID == 0 {
 			// No tenant subdomain - redirect to landing page
