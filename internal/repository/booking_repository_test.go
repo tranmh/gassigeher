@@ -17,19 +17,19 @@ import (
 func setupTestDB(t *testing.T) *sql.DB {
 	db := testutil.SetupTestDB(t)
 
-	// Insert test users with explicit IDs
+	// Insert test users with explicit IDs (tenant_id = 1 from testutil.SetupTestDB)
 	now := time.Now()
 	_, err := db.Exec(`
-		INSERT INTO users (id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
-		VALUES (1, 'Test', 'User', 'test@example.com', 'hash', 1, 1, ?, ?, ?)
+		INSERT INTO users (id, tenant_id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
+		VALUES (1, 1, 'Test', 'User', 'test@example.com', 'hash', 1, 1, ?, ?, ?)
 	`, now, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create test user 1: %v", err)
 	}
 
 	_, err = db.Exec(`
-		INSERT INTO users (id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
-		VALUES (2, 'Test', 'User 2', 'test2@example.com', 'hash', 1, 1, ?, ?, ?)
+		INSERT INTO users (id, tenant_id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
+		VALUES (2, 1, 'Test', 'User 2', 'test2@example.com', 'hash', 1, 1, ?, ?, ?)
 	`, now, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create test user 2: %v", err)
@@ -37,49 +37,49 @@ func setupTestDB(t *testing.T) *sql.DB {
 
 	// Insert more test users for complete test coverage
 	_, err = db.Exec(`
-		INSERT INTO users (id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
-		VALUES (3, 'Test', 'User 3', 'test3@example.com', 'hash', 1, 1, ?, ?, ?)
+		INSERT INTO users (id, tenant_id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
+		VALUES (3, 1, 'Test', 'User 3', 'test3@example.com', 'hash', 1, 1, ?, ?, ?)
 	`, now, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create test user 3: %v", err)
 	}
 
 	_, err = db.Exec(`
-		INSERT INTO users (id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
-		VALUES (4, 'Test', 'User 4', 'test4@example.com', 'hash', 1, 1, ?, ?, ?)
+		INSERT INTO users (id, tenant_id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
+		VALUES (4, 1, 'Test', 'User 4', 'test4@example.com', 'hash', 1, 1, ?, ?, ?)
 	`, now, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create test user 4: %v", err)
 	}
 
-	// Insert test dogs with explicit IDs
+	// Insert test dogs with explicit IDs (tenant_id = 1)
 	_, err = db.Exec(`
-		INSERT INTO dogs (id, name, breed, color_id, is_available, created_at)
-		VALUES (1, 'Buddy', 'Labrador', 1, 1, ?)
+		INSERT INTO dogs (id, tenant_id, name, breed, color_id, is_available, created_at)
+		VALUES (1, 1, 'Buddy', 'Labrador', 1, 1, ?)
 	`, now)
 	if err != nil {
 		t.Fatalf("Failed to create test dog 1: %v", err)
 	}
 
 	_, err = db.Exec(`
-		INSERT INTO dogs (id, name, breed, color_id, is_available, created_at)
-		VALUES (2, 'Max', 'German Shepherd', 1, 1, ?)
+		INSERT INTO dogs (id, tenant_id, name, breed, color_id, is_available, created_at)
+		VALUES (2, 1, 'Max', 'German Shepherd', 1, 1, ?)
 	`, now)
 	if err != nil {
 		t.Fatalf("Failed to create test dog 2: %v", err)
 	}
 
 	_, err = db.Exec(`
-		INSERT INTO dogs (id, name, breed, color_id, is_available, created_at)
-		VALUES (3, 'Rocky', 'Bulldog', 1, 1, ?)
+		INSERT INTO dogs (id, tenant_id, name, breed, color_id, is_available, created_at)
+		VALUES (3, 1, 'Rocky', 'Bulldog', 1, 1, ?)
 	`, now)
 	if err != nil {
 		t.Fatalf("Failed to create test dog 3: %v", err)
 	}
 
 	_, err = db.Exec(`
-		INSERT INTO dogs (id, name, breed, color_id, is_available, created_at)
-		VALUES (4, 'Luna', 'Poodle', 1, 1, ?)
+		INSERT INTO dogs (id, tenant_id, name, breed, color_id, is_available, created_at)
+		VALUES (4, 1, 'Luna', 'Poodle', 1, 1, ?)
 	`, now)
 	if err != nil {
 		t.Fatalf("Failed to create test dog 4: %v", err)
@@ -821,9 +821,9 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 	}
 
 	t.Run("returns bookings in reminder window", func(t *testing.T) {
-		// Skip if 90 minutes from now crosses midnight (test would be invalid)
-		if crossesMidnight(90 * time.Minute) {
-			t.Skip("Skipping test: 90 minutes from now crosses midnight")
+		// Skip if 2 hours from now crosses midnight (GetForReminders uses 1-2 hour window)
+		if crossesMidnight(2 * time.Hour) {
+			t.Skip("Skipping test: 2 hours from now crosses midnight, GetForReminders window invalid")
 		}
 
 		// Create booking scheduled 1.5 hours from now (on same day)
@@ -832,6 +832,7 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 		reminderScheduledTime := reminderTime.Format("15:04")
 
 		booking := &models.Booking{
+			TenantID:      1,
 			UserID:        1,
 			DogID:         1,
 			Date:          reminderDate,
@@ -877,6 +878,7 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 		futureScheduledTime := futureTime.Format("15:04")
 
 		booking := &models.Booking{
+			TenantID:      1,
 			UserID:        2,
 			DogID:         2,
 			Date:          futureDate,
@@ -900,9 +902,9 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 	})
 
 	t.Run("does not return completed bookings", func(t *testing.T) {
-		// Skip if 90 minutes from now crosses midnight
-		if crossesMidnight(90 * time.Minute) {
-			t.Skip("Skipping test: 90 minutes from now crosses midnight")
+		// Skip if 2 hours from now crosses midnight (GetForReminders uses 1-2 hour window)
+		if crossesMidnight(2 * time.Hour) {
+			t.Skip("Skipping test: 2 hours from now crosses midnight")
 		}
 
 		// Create completed booking in reminder window
@@ -912,6 +914,7 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 
 		completedTime := time.Now()
 		booking := &models.Booking{
+			TenantID:      1,
 			UserID:        3,
 			DogID:         3,
 			Date:          reminderDate,
@@ -939,9 +942,9 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 	})
 
 	t.Run("does not return cancelled bookings", func(t *testing.T) {
-		// Skip if 90 minutes from now crosses midnight
-		if crossesMidnight(90 * time.Minute) {
-			t.Skip("Skipping test: 90 minutes from now crosses midnight")
+		// Skip if 2 hours from now crosses midnight (GetForReminders uses 1-2 hour window)
+		if crossesMidnight(2 * time.Hour) {
+			t.Skip("Skipping test: 2 hours from now crosses midnight")
 		}
 
 		// Create cancelled booking in reminder window
@@ -950,6 +953,7 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 		reminderScheduledTime := reminderTime.Format("15:04")
 
 		booking := &models.Booking{
+			TenantID:      1,
 			UserID:        4,
 			DogID:         4,
 			Date:          reminderDate,
