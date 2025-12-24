@@ -161,6 +161,7 @@ func (h *ImportHandler) PreviewImport(w http.ResponseWriter, r *http.Request) {
 }
 
 // suggestMappings auto-detects field mappings based on column headers
+// First match wins - later matches do not overwrite earlier suggestions
 func (h *ImportHandler) suggestMappings(headers []string, tenantID int) map[string]string {
 	suggestions := make(map[string]string)
 
@@ -178,53 +179,69 @@ func (h *ImportHandler) suggestMappings(headers []string, tenantID int) map[stri
 		headerLower := strings.ToLower(strings.TrimSpace(header))
 		idx := strconv.Itoa(i)
 
-		// Check each pattern
-		for _, p := range namePatterns {
-			if strings.Contains(headerLower, p) {
-				suggestions["name"] = idx
-				break
+		// Check each pattern - first match wins (don't overwrite existing suggestions)
+		if _, exists := suggestions["name"]; !exists {
+			for _, p := range namePatterns {
+				if strings.Contains(headerLower, p) {
+					suggestions["name"] = idx
+					break
+				}
 			}
 		}
-		for _, p := range breedPatterns {
-			if strings.Contains(headerLower, p) {
-				suggestions["breed"] = idx
-				break
+		if _, exists := suggestions["breed"]; !exists {
+			for _, p := range breedPatterns {
+				if strings.Contains(headerLower, p) {
+					suggestions["breed"] = idx
+					break
+				}
 			}
 		}
-		for _, p := range agePatterns {
-			if strings.Contains(headerLower, p) {
-				suggestions["age"] = idx
-				break
+		if _, exists := suggestions["age"]; !exists {
+			for _, p := range agePatterns {
+				if strings.Contains(headerLower, p) {
+					suggestions["age"] = idx
+					break
+				}
 			}
 		}
-		for _, p := range sizePatterns {
-			if strings.Contains(headerLower, p) {
-				suggestions["size"] = idx
-				break
+		if _, exists := suggestions["size"]; !exists {
+			for _, p := range sizePatterns {
+				if strings.Contains(headerLower, p) {
+					suggestions["size"] = idx
+					break
+				}
 			}
 		}
-		for _, p := range colorPatterns {
-			if strings.Contains(headerLower, p) {
-				suggestions["color"] = idx
-				break
+		if _, exists := suggestions["color"]; !exists {
+			for _, p := range colorPatterns {
+				if strings.Contains(headerLower, p) {
+					suggestions["color"] = idx
+					break
+				}
 			}
 		}
-		for _, p := range instructionPatterns {
-			if strings.Contains(headerLower, p) {
-				suggestions["special_instructions"] = idx
-				break
+		if _, exists := suggestions["special_instructions"]; !exists {
+			for _, p := range instructionPatterns {
+				if strings.Contains(headerLower, p) {
+					suggestions["special_instructions"] = idx
+					break
+				}
 			}
 		}
-		for _, p := range locationPatterns {
-			if strings.Contains(headerLower, p) {
-				suggestions["pickup_location"] = idx
-				break
+		if _, exists := suggestions["pickup_location"]; !exists {
+			for _, p := range locationPatterns {
+				if strings.Contains(headerLower, p) {
+					suggestions["pickup_location"] = idx
+					break
+				}
 			}
 		}
-		for _, p := range availablePatterns {
-			if strings.Contains(headerLower, p) {
-				suggestions["is_available"] = idx
-				break
+		if _, exists := suggestions["is_available"]; !exists {
+			for _, p := range availablePatterns {
+				if strings.Contains(headerLower, p) {
+					suggestions["is_available"] = idx
+					break
+				}
 			}
 		}
 	}
@@ -433,8 +450,15 @@ func parseSize(size string) string {
 }
 
 func parseAge(ageStr string) (int, error) {
-	// Try to parse as number first
-	s := strings.ToLower(strings.TrimSpace(ageStr))
+	s := strings.TrimSpace(ageStr)
+	if s == "" {
+		return 0, fmt.Errorf("leeres Alter")
+	}
+
+	// Must start with a digit (rejects negative ages like "-3" and garbage like "a1b2")
+	if len(s) == 0 || s[0] < '0' || s[0] > '9' {
+		return 0, fmt.Errorf("ungültiges Alter: muss mit einer Zahl beginnen")
+	}
 
 	// Extract numbers from strings like "3 Jahre" or "5 years"
 	numStr := ""
@@ -447,10 +471,20 @@ func parseAge(ageStr string) (int, error) {
 	}
 
 	if numStr == "" {
-		return 0, fmt.Errorf("no age found")
+		return 0, fmt.Errorf("keine Zahl gefunden")
 	}
 
-	return strconv.Atoi(numStr)
+	age, err := strconv.Atoi(numStr)
+	if err != nil {
+		return 0, err
+	}
+
+	// Validate reasonable age for a dog (max 30 years)
+	if age > 30 {
+		return 0, fmt.Errorf("unrealistisches Alter: %d Jahre (max 30)", age)
+	}
+
+	return age, nil
 }
 
 func parseAvailable(val string) bool {

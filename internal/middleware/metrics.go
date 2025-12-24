@@ -454,34 +454,39 @@ func (m *MetricsCollector) cleanup() {
 }
 
 // trimMap keeps only the top N entries by value (count)
+// When counts are equal, keys are sorted alphabetically for deterministic results
 func trimMap(m map[string]int64, maxEntries int) map[string]int64 {
 	if len(m) <= maxEntries {
 		return m
 	}
 
-	// Find min threshold to keep
-	counts := make([]int64, 0, len(m))
-	for _, count := range m {
-		counts = append(counts, count)
+	// Create slice of key-count pairs for sorting
+	type kv struct {
+		key   string
+		count int64
+	}
+	pairs := make([]kv, 0, len(m))
+	for k, v := range m {
+		pairs = append(pairs, kv{k, v})
 	}
 
-	// Simple sort to find threshold (not efficient for large maps, but cleanup is infrequent)
-	for i := 0; i < len(counts); i++ {
-		for j := i + 1; j < len(counts); j++ {
-			if counts[i] < counts[j] {
-				counts[i], counts[j] = counts[j], counts[i]
+	// Sort by count descending, then by key ascending for determinism
+	for i := 0; i < len(pairs); i++ {
+		for j := i + 1; j < len(pairs); j++ {
+			// Sort by count descending
+			if pairs[i].count < pairs[j].count {
+				pairs[i], pairs[j] = pairs[j], pairs[i]
+			} else if pairs[i].count == pairs[j].count && pairs[i].key > pairs[j].key {
+				// When counts are equal, sort by key ascending for determinism
+				pairs[i], pairs[j] = pairs[j], pairs[i]
 			}
 		}
 	}
 
-	threshold := counts[maxEntries-1]
-
-	// Keep entries above threshold
+	// Keep top N entries
 	newMap := make(map[string]int64)
-	for key, count := range m {
-		if count >= threshold && len(newMap) < maxEntries {
-			newMap[key] = count
-		}
+	for i := 0; i < maxEntries && i < len(pairs); i++ {
+		newMap[pairs[i].key] = pairs[i].count
 	}
 
 	return newMap

@@ -2,6 +2,7 @@ package cron
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"time"
 )
@@ -106,6 +107,11 @@ func (c *TenantActivityChecker) CheckAndFlagInactiveTenants() error {
 			log.Printf("Tenant '%s' (ID: %d) flagged as inactive - last activity: %v",
 				slug, tenantID, mostRecentActivity)
 		}
+	}
+
+	// Check for errors during row iteration
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("error iterating tenant rows: %w", err)
 	}
 
 	log.Printf("Tenant activity check complete. Found %d inactive tenants", inactiveCount)
