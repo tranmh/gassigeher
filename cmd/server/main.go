@@ -519,7 +519,8 @@ func main() {
 	centralAdmin.HandleFunc("/feature-flags/{id}", featureFlagHandler.DeleteFlag).Methods("DELETE")
 
 	// Uploads directory (user photos, dog photos) - must remain on filesystem
-	router.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
+	// BUG FIX #4: Use SafeFileServer to prevent null byte injection and path traversal
+	router.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", handlers.SafeFileServer(http.Dir("./uploads"))))
 
 	// Get embedded landing page filesystem (for SaaS landing page)
 	landingFS, err := static.LandingFS()

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -351,6 +352,137 @@ func TestUpdateProfileRequest_Validate(t *testing.T) {
 			err := tt.req.Validate()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// SECURITY TEST: TestUpdateProfileRequest_EmailCRLFInjection tests email CRLF/header injection prevention
+// This is a critical security test - CRLF injection in email fields can lead to:
+// - SMTP header injection attacks
+// - Email spoofing
+// - BCC injection to send copies to attackers
+func TestUpdateProfileRequest_EmailCRLFInjection(t *testing.T) {
+	tests := []struct {
+		name    string
+		email   string
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "Valid email",
+			email:   "user@example.com",
+			wantErr: false,
+		},
+		{
+			name:    "CRLF injection with newline",
+			email:   "test@test.com\nBcc: evil@hacker.com",
+			wantErr: true,
+			errMsg:  "Steuerzeichen",
+		},
+		{
+			name:    "CRLF injection with carriage return",
+			email:   "test@test.com\rBcc: evil@hacker.com",
+			wantErr: true,
+			errMsg:  "Steuerzeichen",
+		},
+		{
+			name:    "CRLF injection with both",
+			email:   "test@test.com\r\nBcc: evil@hacker.com",
+			wantErr: true,
+			errMsg:  "Steuerzeichen",
+		},
+		{
+			name:    "Null byte injection",
+			email:   "test@test.com\x00evil",
+			wantErr: true,
+			errMsg:  "Steuerzeichen",
+		},
+		{
+			name:    "Tab character injection",
+			email:   "test@test.com\tBcc: evil@hacker.com",
+			wantErr: true,
+			errMsg:  "Steuerzeichen",
+		},
+		{
+			name:    "Invalid email format - no @",
+			email:   "invalid-email",
+			wantErr: true,
+			errMsg:  "E-Mail-Format",
+		},
+		{
+			name:    "Invalid email format - no domain",
+			email:   "test@",
+			wantErr: true,
+			errMsg:  "E-Mail-Format",
+		},
+		{
+			name:    "Invalid email format - no local part",
+			email:   "@example.com",
+			wantErr: true,
+			errMsg:  "E-Mail-Format",
+		},
+		{
+			name:    "Valid email with subdomain",
+			email:   "user@mail.example.com",
+			wantErr: false,
+		},
+		{
+			name:    "Valid email with plus addressing",
+			email:   "user+tag@example.com",
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := UpdateProfileRequest{
+				Email: &tt.email,
+			}
+			err := req.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SECURITY: Validate() error = %v, wantErr %v for email %q", err, tt.wantErr, tt.email)
+			}
+			if tt.wantErr && err != nil && tt.errMsg != "" {
+				if !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(tt.errMsg)) {
+					t.Errorf("Expected error containing %q, got %q", tt.errMsg, err.Error())
+				}
+			}
+		})
+	}
+}
+
+// SECURITY TEST: TestAdminUpdateUserRequest_EmailCRLFInjection tests admin email updates
+func TestAdminUpdateUserRequest_EmailCRLFInjection(t *testing.T) {
+	crlfEmail := "test@test.com\nBcc: evil@hacker.com"
+	validEmail := "valid@example.com"
+
+	tests := []struct {
+		name    string
+		req     AdminUpdateUserRequest
+		wantErr bool
+	}{
+		{
+			name: "CRLF injection blocked",
+			req: AdminUpdateUserRequest{
+				Email: &crlfEmail,
+			},
+			wantErr: true,
+		},
+		{
+			name: "Valid email accepted",
+			req: AdminUpdateUserRequest{
+				Email: &validEmail,
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.req.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SECURITY: Validate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

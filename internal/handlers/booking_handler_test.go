@@ -1474,3 +1474,42 @@ func TestBookingHandler_ColorBasedPermission(t *testing.T) {
 		}
 	})
 }
+
+// TestBookingHandler_UniqueConstraintErrorMessages tests that unique constraint
+// errors are handled consistently across all database backends (SQLite, MySQL, PostgreSQL)
+// TDD RED PHASE: This test verifies error message detection patterns
+func TestBookingHandler_UniqueConstraintErrorMessages(t *testing.T) {
+	// Test that our error detection works for all database error formats
+	testCases := []struct {
+		name     string
+		errorMsg string
+		expected bool
+	}{
+		// SQLite error formats
+		{"SQLite UNIQUE constraint", "UNIQUE constraint failed: bookings.dog_id", true},
+		{"SQLite unique constraint lowercase", "unique constraint failed", true},
+
+		// MySQL error formats
+		{"MySQL Duplicate entry", "Error 1062: Duplicate entry '1-2024-01-01-09:00' for key 'idx_unique_booking'", true},
+		{"MySQL duplicate entry lowercase", "duplicate entry", true},
+
+		// PostgreSQL error formats
+		{"PostgreSQL duplicate key", "ERROR: duplicate key value violates unique constraint \"idx_unique_booking\"", true},
+		{"PostgreSQL violates unique", "violates unique constraint", true},
+
+		// Non-matching errors (should return false)
+		{"Generic database error", "database connection failed", false},
+		{"Foreign key error", "FOREIGN KEY constraint failed", false},
+		{"Empty error", "", false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := isUniqueConstraintError(tc.errorMsg)
+			if result != tc.expected {
+				t.Errorf("isUniqueConstraintError(%q) = %v, expected %v",
+					tc.errorMsg, result, tc.expected)
+			}
+		})
+	}
+}

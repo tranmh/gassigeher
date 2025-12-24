@@ -847,3 +847,227 @@ func containsHTML(s string) bool {
 	}
 	return false
 }
+
+// =============================================================================
+// BUG #1: GLOBAL EMAIL UNIQUENESS - Same email across tenants
+// =============================================================================
+// CRITICAL: The same email can be registered as admin in multiple tenants.
+// This creates login ambiguity and potential security issues.
+// =============================================================================
+
+// TestTenantHandler_Register_RejectsDuplicateEmailAcrossTenants tests that the same
+// email cannot be used to register as admin in multiple tenants
+// TDD RED PHASE: This test should FAIL until we implement global email uniqueness
+func TestTenantHandler_Register_RejectsDuplicateEmailAcrossTenants(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+		BaseDomain:         "gassigeher.org",
+	}
+	handler := NewTenantHandler(db, cfg)
+
+	// First registration - should succeed
+	reqBody1 := map[string]string{
+		"organization_name": "First Shelter",
+		"slug":              "first-shelter",
+		"contact_email":     "contact@first-shelter.de",
+		"city":              "Berlin",
+		"postal_code":       "10115",
+		"federal_state":     "BE",
+		"admin_first_name":  "Max",
+		"admin_last_name":   "Mustermann",
+		"admin_email":       "shared@example.com", // This email will be used twice
+		"admin_password":    "SecurePass123!",
+	}
+	body1, _ := json.Marshal(reqBody1)
+
+	req1 := httptest.NewRequest("POST", "/api/tenants/register", bytes.NewReader(body1))
+	req1.Header.Set("Content-Type", "application/json")
+
+	rec1 := httptest.NewRecorder()
+	handler.Register(rec1, req1)
+
+	if rec1.Code != http.StatusCreated {
+		t.Fatalf("First registration should succeed, got %d: %s", rec1.Code, rec1.Body.String())
+	}
+
+	// Second registration with SAME admin email - should FAIL
+	reqBody2 := map[string]string{
+		"organization_name": "Second Shelter",
+		"slug":              "second-shelter",
+		"contact_email":     "contact@second-shelter.de",
+		"city":              "Munich",
+		"postal_code":       "80331",
+		"federal_state":     "BY",
+		"admin_first_name":  "Anna",
+		"admin_last_name":   "Schmidt",
+		"admin_email":       "shared@example.com", // SAME email as first tenant!
+		"admin_password":    "AnotherPass456!",
+	}
+	body2, _ := json.Marshal(reqBody2)
+
+	req2 := httptest.NewRequest("POST", "/api/tenants/register", bytes.NewReader(body2))
+	req2.Header.Set("Content-Type", "application/json")
+
+	rec2 := httptest.NewRecorder()
+	handler.Register(rec2, req2)
+
+	// BUG: Currently returns 201 (success), should return 409 (conflict)
+	if rec2.Code == http.StatusCreated {
+		t.Errorf("BUG: Same email 'shared@example.com' was allowed to register in TWO different tenants!")
+		t.Errorf("This creates login ambiguity and potential security issues.")
+	}
+
+	// Expected behavior: reject with 409 Conflict
+	if rec2.Code != http.StatusConflict {
+		t.Errorf("Expected status 409 Conflict for duplicate email across tenants, got %d: %s",
+			rec2.Code, rec2.Body.String())
+	}
+
+	// Verify there's only ONE user with this email
+	var userCount int
+	err := db.QueryRow("SELECT COUNT(*) FROM users WHERE email = ?", "shared@example.com").Scan(&userCount)
+	if err != nil {
+		t.Fatalf("Failed to count users: %v", err)
+	}
+
+	if userCount > 1 {
+		t.Errorf("BUG: Found %d users with email 'shared@example.com' - should be only 1!", userCount)
+	}
+}
+
+// TestTenantHandler_Register_AllowsDifferentEmails tests that different emails can register
+func TestTenantHandler_Register_AllowsDifferentEmails(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+		BaseDomain:         "gassigeher.org",
+	}
+	handler := NewTenantHandler(db, cfg)
+
+	// First registration
+	reqBody1 := map[string]string{
+		"organization_name": "Shelter A",
+		"slug":              "shelter-a",
+		"contact_email":     "contact@shelter-a.de",
+		"city":              "Berlin",
+		"postal_code":       "10115",
+		"federal_state":     "BE",
+		"admin_first_name":  "Admin",
+		"admin_last_name":   "One",
+		"admin_email":       "admin1@unique.com",
+		"admin_password":    "SecurePass123!",
+	}
+	body1, _ := json.Marshal(reqBody1)
+
+	req1 := httptest.NewRequest("POST", "/api/tenants/register", bytes.NewReader(body1))
+	req1.Header.Set("Content-Type", "application/json")
+
+	rec1 := httptest.NewRecorder()
+	handler.Register(rec1, req1)
+
+	if rec1.Code != http.StatusCreated {
+		t.Fatalf("First registration should succeed, got %d", rec1.Code)
+	}
+
+	// Second registration with DIFFERENT email - should succeed
+	reqBody2 := map[string]string{
+		"organization_name": "Shelter B",
+		"slug":              "shelter-b",
+		"contact_email":     "contact@shelter-b.de",
+		"city":              "Munich",
+		"postal_code":       "80331",
+		"federal_state":     "BY",
+		"admin_first_name":  "Admin",
+		"admin_last_name":   "Two",
+		"admin_email":       "admin2@unique.com", // Different email
+		"admin_password":    "AnotherPass456!",
+	}
+	body2, _ := json.Marshal(reqBody2)
+
+	req2 := httptest.NewRequest("POST", "/api/tenants/register", bytes.NewReader(body2))
+	req2.Header.Set("Content-Type", "application/json")
+
+	rec2 := httptest.NewRecorder()
+	handler.Register(rec2, req2)
+
+	if rec2.Code != http.StatusCreated {
+		t.Errorf("Second registration with different email should succeed, got %d: %s",
+			rec2.Code, rec2.Body.String())
+	}
+}
+
+// TestTenantHandler_CheckSlug_RateLimiting tests rate limiting on slug enumeration
+// TDD RED PHASE: This test should FAIL until we add rate limiting to CheckSlug
+// BUG: Without rate limiting, attackers can enumerate all tenant slugs
+func TestTenantHandler_CheckSlug_RateLimiting(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewTenantHandler(db, cfg)
+
+	t.Run("SECURITY: rate limits excessive slug checks from same IP", func(t *testing.T) {
+		// Simulate an attacker trying to enumerate tenant slugs
+		// After 10 requests in quick succession, should get rate limited
+
+		var rateLimitedCount int
+		var successCount int
+
+		// Make 15 requests - should get rate limited after ~10
+		for i := 0; i < 15; i++ {
+			slug := "test-slug-" + string(rune('a'+i))
+			req := httptest.NewRequest("GET", "/api/tenants/check-slug?slug="+slug, nil)
+			req.RemoteAddr = "192.168.1.100:12345" // Same IP for all requests
+
+			rec := httptest.NewRecorder()
+			handler.CheckSlug(rec, req)
+
+			if rec.Code == http.StatusTooManyRequests {
+				rateLimitedCount++
+			} else if rec.Code == http.StatusOK {
+				successCount++
+			}
+		}
+
+		// SECURITY FIX: Should rate limit after ~10 requests
+		if rateLimitedCount == 0 {
+			t.Errorf("SECURITY BUG: CheckSlug endpoint has no rate limiting! "+
+				"Attackers can enumerate all tenant slugs. "+
+				"Got %d successes, %d rate limited (expected some rate limiting)",
+				successCount, rateLimitedCount)
+		}
+
+		t.Logf("Rate limiting test: %d successful, %d rate limited", successCount, rateLimitedCount)
+	})
+
+	t.Run("SECURITY: different IPs are not rate limited together", func(t *testing.T) {
+		// Different IPs should have separate rate limit counters
+		// Create a fresh handler for this test
+		handler2 := NewTenantHandler(db, cfg)
+
+		// Make 5 requests from IP A
+		for i := 0; i < 5; i++ {
+			slug := "test-a-" + string(rune('a'+i))
+			req := httptest.NewRequest("GET", "/api/tenants/check-slug?slug="+slug, nil)
+			req.RemoteAddr = "10.0.0.1:12345"
+
+			rec := httptest.NewRecorder()
+			handler2.CheckSlug(rec, req)
+		}
+
+		// Request from different IP should still work
+		req := httptest.NewRequest("GET", "/api/tenants/check-slug?slug=different-ip-test", nil)
+		req.RemoteAddr = "10.0.0.2:54321" // Different IP
+
+		rec := httptest.NewRecorder()
+		handler2.CheckSlug(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Different IP should not be rate limited, got status %d", rec.Code)
+		}
+	})
+}

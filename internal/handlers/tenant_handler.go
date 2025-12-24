@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/tranmh/gassigeher/internal/config"
 	"github.com/tranmh/gassigeher/internal/middleware"
@@ -14,6 +16,76 @@ import (
 	"github.com/tranmh/gassigeher/internal/repository"
 	"github.com/tranmh/gassigeher/internal/services"
 )
+
+// slugRateLimiter provides rate limiting for slug enumeration prevention
+type slugRateLimiter struct {
+	requests map[string]*rateLimitRecord
+	mu       sync.RWMutex
+	limit    int           // max requests per window
+	window   time.Duration // time window
+}
+
+type rateLimitRecord struct {
+	count       int
+	windowStart time.Time
+}
+
+func newSlugRateLimiter() *slugRateLimiter {
+	return &slugRateLimiter{
+		requests: make(map[string]*rateLimitRecord),
+		limit:    10,          // 10 requests
+		window:   time.Minute, // per minute
+	}
+}
+
+// checkLimit returns true if the request should be allowed, false if rate limited
+func (r *slugRateLimiter) checkLimit(ip string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	now := time.Now()
+	record, exists := r.requests[ip]
+
+	if !exists || now.Sub(record.windowStart) >= r.window {
+		// New window or first request
+		r.requests[ip] = &rateLimitRecord{
+			count:       1,
+			windowStart: now,
+		}
+		return true
+	}
+
+	// Within the same window
+	record.count++
+	if record.count > r.limit {
+		return false
+	}
+	return true
+}
+
+// getClientIP extracts the client IP address from the request
+func getClientIP(r *http.Request) string {
+	// Check X-Forwarded-For header (from reverse proxy)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// Take first IP if comma-separated
+		if idx := strings.Index(xff, ","); idx != -1 {
+			return strings.TrimSpace(xff[:idx])
+		}
+		return strings.TrimSpace(xff)
+	}
+
+	// Check X-Real-IP header
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return strings.TrimSpace(xri)
+	}
+
+	// Fall back to RemoteAddr (strip port)
+	addr := r.RemoteAddr
+	if idx := strings.LastIndex(addr, ":"); idx != -1 {
+		return addr[:idx]
+	}
+	return addr
+}
 
 // TenantHandler handles tenant-related endpoints
 type TenantHandler struct {
@@ -24,6 +96,7 @@ type TenantHandler struct {
 	authService         *services.AuthService
 	provisioningService *services.ProvisioningService
 	emailService        *services.EmailService
+	slugRateLimiter     *slugRateLimiter // Rate limiter for slug enumeration prevention
 }
 
 // NewTenantHandler creates a new tenant handler
@@ -37,6 +110,7 @@ func NewTenantHandler(db *sql.DB, cfg *config.Config) *TenantHandler {
 		authService:         services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours),
 		provisioningService: services.NewProvisioningService(db),
 		emailService:        emailService,
+		slugRateLimiter:     newSlugRateLimiter(),
 	}
 }
 
@@ -117,6 +191,18 @@ func (h *TenantHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(req.AdminPassword) < 8 {
 		respondError(w, http.StatusBadRequest, "Passwort muss mindestens 8 Zeichen haben")
+		return
+	}
+
+	// SECURITY: Check if admin email is already used in ANY tenant
+	// This prevents login ambiguity and potential account takeover
+	emailExists, err := h.userRepo.EmailExistsGlobally(req.AdminEmail)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Fehler bei der E-Mail-Prüfung")
+		return
+	}
+	if emailExists {
+		respondError(w, http.StatusConflict, "Diese E-Mail-Adresse wird bereits verwendet")
 		return
 	}
 
@@ -231,6 +317,14 @@ func (h *TenantHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 // CheckSlug checks if a slug is available
 func (h *TenantHandler) CheckSlug(w http.ResponseWriter, r *http.Request) {
+	// Rate limiting to prevent tenant slug enumeration attacks
+	clientIP := getClientIP(r)
+	if !h.slugRateLimiter.checkLimit(clientIP) {
+		w.Header().Set("Retry-After", "60")
+		respondError(w, http.StatusTooManyRequests, "Zu viele Anfragen. Bitte warten Sie eine Minute.")
+		return
+	}
+
 	slug := r.URL.Query().Get("slug")
 	if slug == "" {
 		respondError(w, http.StatusBadRequest, "Slug erforderlich")

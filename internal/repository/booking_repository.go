@@ -280,6 +280,40 @@ func (r *BookingRepository) CheckDoubleBooking(dogID int, date, scheduledTime st
 	return count > 0, nil
 }
 
+// CheckDoubleBookingForTenant checks if a dog is already booked for the given date and scheduled time
+// within a specific tenant. This provides defense-in-depth for multi-tenant isolation.
+// SaaS: Always use this method instead of CheckDoubleBooking for tenant-specific operations.
+func (r *BookingRepository) CheckDoubleBookingForTenant(tenantID, dogID int, date, scheduledTime string) (bool, error) {
+	var query string
+	var args []interface{}
+
+	if tenantID > 0 {
+		// SaaS mode: filter by tenant for defense-in-depth
+		query = `
+			SELECT COUNT(*)
+			FROM bookings
+			WHERE tenant_id = ? AND dog_id = ? AND date = ? AND scheduled_time = ? AND status = 'scheduled'
+		`
+		args = []interface{}{tenantID, dogID, date, scheduledTime}
+	} else {
+		// Single-tenant mode: no tenant filter
+		query = `
+			SELECT COUNT(*)
+			FROM bookings
+			WHERE dog_id = ? AND date = ? AND scheduled_time = ? AND status = 'scheduled'
+		`
+		args = []interface{}{dogID, date, scheduledTime}
+	}
+
+	var count int
+	err := r.db.QueryRow(query, args...).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("failed to check double booking for tenant: %w", err)
+	}
+
+	return count > 0, nil
+}
+
 // AutoComplete marks all past scheduled bookings as completed
 func (r *BookingRepository) AutoComplete() (int, error) {
 	// Get current date and time

@@ -210,6 +210,19 @@ func (r *UserRepository) FindByEmail(email string, tenantID int) (*models.User, 
 	return user, nil
 }
 
+// EmailExistsGlobally checks if an email is already registered in ANY tenant
+// Used during tenant registration to prevent the same email from being used as admin
+// in multiple tenants, which would create login ambiguity.
+func (r *UserRepository) EmailExistsGlobally(email string) (bool, error) {
+	query := `SELECT COUNT(*) FROM users WHERE email = ? AND is_deleted = 0`
+	var count int
+	err := r.db.QueryRow(query, email).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("failed to check email existence: %w", err)
+	}
+	return count > 0, nil
+}
+
 // FindByID finds a user by ID
 // SaaS: Now includes tenant_id and is_central_admin in result
 func (r *UserRepository) FindByID(id int) (*models.User, error) {

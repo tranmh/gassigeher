@@ -125,6 +125,33 @@ type AdminUpdateUserRequest struct {
 // Supports formats like: 0123456789, +49 123456789, (0123) 456789, 0123-456789
 var phoneRegex = regexp.MustCompile(`^\+?[\s\-\.]?(?:\()?[0-9]{1,4}(?:\))?[\s\-\.]?[0-9]{1,4}[\s\-\.]?[0-9]{3,}[\s\-\.]?[0-9]{0,4}$`)
 
+// emailRegex validates basic email format
+var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+
+// ValidateEmail validates an email address for security and format
+// SECURITY: Prevents CRLF/header injection attacks and validates basic format
+func ValidateEmail(email string) error {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return errors.New("E-Mail ist erforderlich")
+	}
+
+	// SECURITY: Check for control characters that could enable header injection
+	// This prevents CRLF injection (\r\n), null bytes (\x00), and other control chars
+	for _, r := range email {
+		if r < 32 || r == 127 { // ASCII control characters (0-31) and DEL (127)
+			return errors.New("E-Mail enthält ungültige Steuerzeichen")
+		}
+	}
+
+	// Validate basic email format
+	if !emailRegex.MatchString(email) {
+		return errors.New("Ungültiges E-Mail-Format")
+	}
+
+	return nil
+}
+
 // ValidatePhone validates a phone number format
 func ValidatePhone(phone string) error {
 	phone = strings.TrimSpace(phone)
@@ -174,8 +201,8 @@ func (r *RegisterRequest) Validate() error {
 	if strings.TrimSpace(r.LastName) == "" {
 		return errors.New("Nachname ist erforderlich")
 	}
-	if strings.TrimSpace(r.Email) == "" {
-		return errors.New("E-Mail ist erforderlich")
+	if err := ValidateEmail(r.Email); err != nil {
+		return err
 	}
 	if err := ValidatePhone(r.Phone); err != nil {
 		return err
@@ -207,8 +234,10 @@ func (r *RegisterRequest) Validate() error {
 
 // Validate validates the UpdateProfileRequest
 func (u *UpdateProfileRequest) Validate() error {
-	if u.Email != nil && strings.TrimSpace(*u.Email) == "" {
-		return errors.New("E-Mail darf nicht leer sein")
+	if u.Email != nil {
+		if err := ValidateEmail(*u.Email); err != nil {
+			return err
+		}
 	}
 	if u.Phone != nil {
 		if err := ValidatePhone(*u.Phone); err != nil {
@@ -226,8 +255,10 @@ func (a *AdminUpdateUserRequest) Validate() error {
 	if a.LastName != nil && strings.TrimSpace(*a.LastName) == "" {
 		return errors.New("Nachname darf nicht leer sein")
 	}
-	if a.Email != nil && strings.TrimSpace(*a.Email) == "" {
-		return errors.New("E-Mail darf nicht leer sein")
+	if a.Email != nil {
+		if err := ValidateEmail(*a.Email); err != nil {
+			return err
+		}
 	}
 	if a.Phone != nil {
 		if err := ValidatePhone(*a.Phone); err != nil {
@@ -260,8 +291,8 @@ func (r *AdminCreateUserRequest) Validate() error {
 	if r.LastName == "" {
 		return errors.New("Nachname ist erforderlich")
 	}
-	if r.Email == "" {
-		return errors.New("E-Mail ist erforderlich")
+	if err := ValidateEmail(r.Email); err != nil {
+		return err
 	}
 	if r.Phone != nil && *r.Phone != "" {
 		trimmedPhone := strings.TrimSpace(*r.Phone)

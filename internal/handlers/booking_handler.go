@@ -191,8 +191,8 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check for double-booking
-	isDoubleBooked, err := h.bookingRepo.CheckDoubleBooking(req.DogID, req.Date, req.ScheduledTime)
+	// Check for double-booking (tenant-aware for defense-in-depth)
+	isDoubleBooked, err := h.bookingRepo.CheckDoubleBookingForTenant(tenantID, req.DogID, req.Date, req.ScheduledTime)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check availability")
 		return
@@ -235,8 +235,8 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.bookingRepo.Create(booking); err != nil {
 		// BUGFIX #2: Detect UNIQUE constraint violation (race condition scenario)
-		// SQLite returns error containing "UNIQUE constraint failed" when duplicate booking occurs
-		if strings.Contains(err.Error(), "UNIQUE constraint") || strings.Contains(err.Error(), "unique constraint") {
+		// Uses isUniqueConstraintError for cross-database support (SQLite, MySQL, PostgreSQL)
+		if isUniqueConstraintError(err.Error()) {
 			respondError(w, http.StatusConflict, "This dog is already booked for this time")
 			return
 		}
@@ -629,8 +629,8 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check for double-booking at new time
-	isDoubleBooked, err := h.bookingRepo.CheckDoubleBooking(booking.DogID, req.Date, req.ScheduledTime)
+	// Check for double-booking at new time (tenant-aware for defense-in-depth)
+	isDoubleBooked, err := h.bookingRepo.CheckDoubleBookingForTenant(tenantID, booking.DogID, req.Date, req.ScheduledTime)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check availability")
 		return
@@ -936,4 +936,36 @@ func (h *BookingHandler) RejectPendingBooking(w http.ResponseWriter, r *http.Req
 	respondJSON(w, http.StatusOK, map[string]string{
 		"message": "Booking rejected successfully",
 	})
+}
+
+// isUniqueConstraintError checks if an error is a unique constraint violation
+// across all supported databases (SQLite, MySQL, PostgreSQL)
+func isUniqueConstraintError(errMsg string) bool {
+	if errMsg == "" {
+		return false
+	}
+	errLower := strings.ToLower(errMsg)
+
+	// SQLite: "UNIQUE constraint failed" or "unique constraint failed"
+	if strings.Contains(errLower, "unique constraint") {
+		return true
+	}
+
+	// MySQL: "Duplicate entry" or "Error 1062"
+	if strings.Contains(errLower, "duplicate entry") {
+		return true
+	}
+	if strings.Contains(errLower, "error 1062") {
+		return true
+	}
+
+	// PostgreSQL: "duplicate key" or "violates unique constraint"
+	if strings.Contains(errLower, "duplicate key") {
+		return true
+	}
+	if strings.Contains(errLower, "violates unique constraint") {
+		return true
+	}
+
+	return false
 }

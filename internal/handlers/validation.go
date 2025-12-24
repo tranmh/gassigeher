@@ -25,15 +25,44 @@ type ValidationError struct {
 // htmlTagRegex matches HTML tags including script, img, etc.
 var htmlTagRegex = regexp.MustCompile(`<[^>]*>`)
 
+// dangerousProtocolRegex matches dangerous URI protocols (javascript:, data:, vbscript:, etc.)
+// Case-insensitive, handles URL encoding and whitespace variations
+var dangerousProtocolRegex = regexp.MustCompile(`(?i)^\s*(javascript|data|vbscript|file)\s*:`)
+
+// htmlEntityColonRegex matches HTML entity encoded colons (&#58; &#x3a; etc.)
+var htmlEntityColonRegex = regexp.MustCompile(`(?i)&#(x)?0*3[aA];?|&#0*58;?`)
+
 // StripHTMLTags removes all HTML tags from a string, preserving the text content
 func StripHTMLTags(s string) string {
 	return htmlTagRegex.ReplaceAllString(s, "")
 }
 
-// SanitizeString removes HTML tags and trims whitespace
+// StripDangerousProtocols removes dangerous URI protocols from a string
+// BUG FIX #3: Block javascript:, data:, vbscript:, file: protocols
+func StripDangerousProtocols(s string) string {
+	// First, decode HTML entities for colons to catch obfuscation attempts
+	decoded := htmlEntityColonRegex.ReplaceAllString(s, ":")
+
+	// Remove any string that starts with a dangerous protocol
+	if dangerousProtocolRegex.MatchString(decoded) {
+		return ""
+	}
+
+	// Also check if original string matches (in case of partial encoding)
+	if dangerousProtocolRegex.MatchString(s) {
+		return ""
+	}
+
+	return s
+}
+
+// SanitizeString removes HTML tags, dangerous protocols, and trims whitespace
+// BUG FIX #3: Now also blocks javascript: and other dangerous protocols
 func SanitizeString(s string) string {
 	// Strip HTML tags
 	s = StripHTMLTags(s)
+	// Strip dangerous protocols (javascript:, data:, vbscript:, etc.)
+	s = StripDangerousProtocols(s)
 	// Trim whitespace
 	s = strings.TrimSpace(s)
 	return s
@@ -133,17 +162,37 @@ func ValidateDogSpecialInstructions(instructions *string) (*string, *ValidationE
 }
 
 // ValidateDogExternalLink validates and sanitizes external_link field
+// BUG FIX #3: Explicitly validates URL protocol safety
 func ValidateDogExternalLink(link *string) (*string, *ValidationError) {
 	if link == nil {
 		return nil, nil
 	}
+
+	// Check for dangerous protocols BEFORE sanitization
+	// BUG FIX #3: Reject URLs with dangerous protocols immediately
+	originalLower := strings.ToLower(strings.TrimSpace(*link))
+	dangerousProtocols := []string{"javascript:", "data:", "vbscript:", "file:"}
+	for _, proto := range dangerousProtocols {
+		if strings.HasPrefix(originalLower, proto) {
+			return nil, &ValidationError{Field: "external_link", Message: "Invalid URL protocol"}
+		}
+	}
+
 	sanitized := SanitizeString(*link)
 	if len(sanitized) > MaxDogExternalLinkLength {
 		return nil, &ValidationError{Field: "external_link", Message: "External link must be 500 characters or less"}
 	}
+
+	// BUG FIX #3: If original had content but sanitization made it empty,
+	// this indicates malicious content was removed - reject it
+	if sanitized == "" && strings.TrimSpace(*link) != "" {
+		return nil, &ValidationError{Field: "external_link", Message: "Invalid URL content"}
+	}
+
 	if sanitized == "" {
 		return nil, nil
 	}
+
 	return &sanitized, nil
 }
 
