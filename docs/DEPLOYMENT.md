@@ -1,21 +1,45 @@
 # Gassigeher - Production Deployment Guide
 
-**Complete step-by-step guide for deploying Gassigeher to a production Linux server.**
+**Complete step-by-step guide for deploying Gassigeher to a production server.**
 
-**Status**: ✅ Deployment package ready | systemd service | nginx config | SSL setup | Automated backups
+**Status**: ✅ Deployment package ready | Simple-Mode & SaaS-Mode supported
 
-> **Prerequisites**: Ubuntu 22.04 LTS, root access, domain name, Gmail API credentials
-> **Deployment Time**: ~1-2 hours for complete setup
-> **Quick Links**: [README](../README.md) | [API Docs](API.md) | [Admin Guide](ADMIN_GUIDE.md)
+> **Quick Links**: [README](../README.md) | [API Docs](API.md) | [Admin Guide](ADMIN_GUIDE.md) | [SaaS Implementation](SaaS_Implementation_Plan.md)
 
 ---
 
-## Prerequisites
+## Deployment Modes
+
+Gassigeher supports two deployment modes:
+
+| Mode | Infrastructure | Database | Best For |
+|------|---------------|----------|----------|
+| **Simple-Mode** | nginx + systemd | SQLite/MySQL/PostgreSQL | Individual shelters |
+| **SaaS-Mode** | Docker + Caddy | PostgreSQL with RLS | Platform for 500+ shelters |
+
+### Simple-Mode Deployment
+- **Time**: ~1-2 hours
+- **Prerequisites**: Ubuntu 22.04 LTS, root access, domain name
+- **Stack**: nginx reverse proxy + systemd service
+- **SSL**: Let's Encrypt via certbot
+
+### SaaS-Mode Deployment
+- **Time**: ~2-4 hours
+- **Prerequisites**: Ubuntu 22.04 LTS, root access, wildcard domain (*.gassigeher.org)
+- **Stack**: Docker + Caddy reverse proxy
+- **SSL**: Wildcard certificate via DNS challenge
+- **Additional**: Hetzner S3, Stripe account
+
+---
+
+## Simple-Mode Deployment
+
+### Prerequisites
 
 - Ubuntu 22.04 LTS (or similar Linux distribution)
 - Root or sudo access
 - Domain name pointing to your server
-- Gmail account for email notifications
+- Email provider credentials (Gmail API or SMTP)
 
 ## Server Requirements
 
@@ -726,26 +750,233 @@ For high traffic (beyond single server):
 
 ---
 
-**Deployment Status**: Ready for production deployment ✅
+## SaaS-Mode Deployment
+
+This section covers deploying Gassigeher as a multi-tenant SaaS platform.
+
+### Prerequisites
+
+- Ubuntu 22.04 LTS (or similar Linux distribution)
+- Root or sudo access
+- Wildcard domain (e.g., `*.gassigeher.org`)
+- Hetzner DNS (for wildcard SSL via DNS challenge)
+- Hetzner Object Storage (for S3-compatible storage)
+- Stripe account (for billing)
+- Email provider credentials
+
+### Server Requirements
+
+- **CPU**: 2+ cores recommended
+- **RAM**: 4GB minimum, 8GB+ recommended
+- **Disk**: 50GB minimum
+- **Docker**: 24.0+
+- **Docker Compose**: 2.0+
+
+### 1. Install Docker
+
+```bash
+# Install Docker
+curl -fsSL https://get.docker.com | sh
+
+# Add user to docker group
+sudo usermod -aG docker $USER
+
+# Verify
+docker --version
+docker compose version
+```
+
+### 2. Clone Repository
+
+```bash
+cd /opt
+sudo git clone https://github.com/yourrepo/gassigeher.git
+cd gassigeher
+```
+
+### 3. Configure Environment
+
+```bash
+# Copy example configuration
+cp .env.example .env
+
+# Edit configuration
+nano .env
+```
+
+**Key SaaS configuration:**
+
+```bash
+# Enable SaaS mode
+BASE_URL=https://gassigeher.org
+BASE_DOMAIN=gassigeher.org
+
+# PostgreSQL (required for SaaS)
+DB_TYPE=postgres
+DB_HOST=postgres
+DB_PORT=5432
+DB_NAME=gassigeher
+DB_USER=gassigeher
+DB_PASSWORD=your-secure-password
+
+# S3 Storage (Hetzner Object Storage)
+USE_S3=true
+S3_ENDPOINT=fsn1.your-objectstorage.com
+S3_ACCESS_KEY=your-access-key
+S3_SECRET_KEY=your-secret-key
+S3_BUCKET_NAME=gassigeher-uploads
+S3_REGION=fsn1
+S3_PUBLIC_URL=https://gassigeher-uploads.fsn1.your-objectstorage.com
+
+# Stripe Billing
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_PUBLISHABLE_KEY=pk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_MONTHLY=price_...
+STRIPE_PRICE_YEARLY=price_...
+
+# Central Admin
+CENTRAL_ADMIN_EMAIL=admin@gassigeher.org
+
+# DNS for wildcard SSL
+HETZNER_DNS_TOKEN=your-dns-api-token
+```
+
+### 4. Configure Caddyfile
+
+The included `Caddyfile` handles wildcard SSL via Hetzner DNS challenge:
+
+```caddyfile
+{
+    email admin@gassigeher.org
+    acme_dns hetzner {env.HETZNER_DNS_TOKEN}
+}
+
+# Landing page (root domain)
+gassigeher.org {
+    reverse_proxy gassigeher:8080
+}
+
+# Wildcard for tenants
+*.gassigeher.org {
+    reverse_proxy gassigeher:8080
+}
+```
+
+### 5. Start Services
+
+```bash
+# Start with production compose file
+docker compose -f docker-compose.prod.yml up -d
+
+# Check logs
+docker compose -f docker-compose.prod.yml logs -f
+
+# Check status
+docker compose -f docker-compose.prod.yml ps
+```
+
+### 6. Initialize Central Admin
+
+On first startup, the central admin account is created automatically.
+Check the logs for initial credentials:
+
+```bash
+docker compose -f docker-compose.prod.yml logs gassigeher | grep -i "central admin"
+```
+
+### 7. Create First Tenant
+
+1. Visit `https://gassigeher.org` (landing page)
+2. Click "Register Your Shelter"
+3. Fill in tenant details and choose a subdomain
+4. First tenant admin is created automatically
+
+Or create manually:
+
+```bash
+# Access the application container
+docker compose -f docker-compose.prod.yml exec gassigeher sh
+
+# Use CLI to create tenant
+./gassigeher -create-tenant -slug=tierheim-goeppingen -name="Tierheim Göppingen" -email=admin@tierheim.de
+```
+
+### SaaS Maintenance
+
+#### Database Backups
+
+```bash
+# Backup PostgreSQL
+docker compose -f docker-compose.prod.yml exec postgres pg_dump -U gassigeher gassigeher > backup_$(date +%Y%m%d).sql
+
+# Restore
+cat backup_20240101.sql | docker compose -f docker-compose.prod.yml exec -T postgres psql -U gassigeher gassigeher
+```
+
+#### Update Application
+
+```bash
+# Pull latest code
+git pull
+
+# Rebuild and restart
+docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml up -d
+```
+
+#### Monitor Tenants
+
+```bash
+# List all tenants
+docker compose -f docker-compose.prod.yml exec postgres psql -U gassigeher -c "SELECT slug, name, status FROM tenants;"
+
+# Check tenant stats
+curl https://gassigeher.org/api/v1/central-admin/stats -H "Authorization: Bearer <admin-token>"
+```
+
+### SaaS Security Checklist
+
+- [ ] Wildcard SSL certificate working
+- [ ] PostgreSQL RLS policies enabled
+- [ ] S3 bucket configured with proper permissions
+- [ ] Stripe webhook endpoint secured
+- [ ] Rate limiting configured
+- [ ] Brute force protection enabled
+- [ ] Central admin password changed
+- [ ] DNS challenge token secured
+- [ ] Database backups automated
+- [ ] Monitoring configured
+
+---
+
+**Deployment Status**: Ready for production deployment ✅ (Simple-Mode & SaaS-Mode)
 
 ---
 
 ## Related Documentation
 
-**Database Setup:**
+**Simple-Mode Setup:**
 - [Database_Selection_Guide.md](Database_Selection_Guide.md) - Choosing the right database
 - [MySQL_Setup_Guide.md](MySQL_Setup_Guide.md) - Complete MySQL configuration
 - [PostgreSQL_Setup_Guide.md](PostgreSQL_Setup_Guide.md) - Complete PostgreSQL configuration
 - [MultiDatabase_Testing_Guide.md](MultiDatabase_Testing_Guide.md) - Testing across databases
 
+**SaaS-Mode Setup:**
+- [SaaS_Implementation_Plan.md](SaaS_Implementation_Plan.md) - Complete SaaS architecture
+- [PostgreSQL_Setup_Guide.md](PostgreSQL_Setup_Guide.md) - PostgreSQL with RLS
+- `docker-compose.prod.yml` - Production Docker stack
+- `Caddyfile` - Wildcard SSL configuration
+
 **After Deployment:**
 - [USER_GUIDE.md](USER_GUIDE.md) - Share with end users
-- [ADMIN_GUIDE.md](ADMIN_GUIDE.md) - Train administrators
+- [ADMIN_GUIDE.md](ADMIN_GUIDE.md) - Train tenant administrators
 - [API.md](API.md) - For developers/integrations
 
 **Technical Reference:**
-- [README.md](../README.md) - Project overview
-- [ImplementationPlan.md](ImplementationPlan.md) - Complete architecture
+- [README.md](../README.md) - Project overview (both modes)
+- [ImplementationPlan.md](ImplementationPlan.md) - Simple-Mode architecture
+- [SaaS_Implementation_Plan.md](SaaS_Implementation_Plan.md) - SaaS architecture
 - [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) - Executive summary
 - [DatabasesSupportPlan.md](DatabasesSupportPlan.md) - Multi-database implementation details
 

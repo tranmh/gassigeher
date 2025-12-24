@@ -1,10 +1,13 @@
 # Gassigeher - Dog Walking Booking System
 
-**Status**: **100% COMPLETE** | **PRODUCTION READY** | **READY TO DEPLOY**
+**Status**: **PRODUCTION READY** | **Simple-Mode & SaaS**
 
-A complete, production-ready web-based dog walking booking system built with Go and Vanilla JavaScript.
+A complete, production-ready web-based dog walking booking system for animal shelters. Built with Go and Vanilla JavaScript, available in two deployment modes:
 
-**Implementation**: All 10 phases complete | 71 API endpoints | 26 pages | 18 email types | GDPR-compliant
+- **Simple-Mode**: Single-tenant deployment for individual shelters
+- **SaaS-Mode**: Multi-tenant platform serving 500+ shelters via subdomains
+
+**Implementation**: 85+ API endpoints | 30+ pages | 18 email types | GDPR-compliant | Multi-database support
 
 ---
 
@@ -28,6 +31,57 @@ bat.bat         # Windows
 ```
 
 For production deployment, see **[DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
+
+---
+
+## Deployment Modes
+
+### Simple-Mode (Single-Tenant)
+
+Best for individual shelters running their own instance.
+
+```bash
+# No BASE_DOMAIN = Simple-Mode
+BASE_URL=https://gassigeher.yourshelter.com
+# BASE_DOMAIN is NOT set
+```
+
+**Characteristics:**
+- Single organization deployment
+- Direct URL access (no subdomains)
+- SQLite, MySQL, or PostgreSQL database
+- Local filesystem storage for uploads
+- Global rate limiting
+
+### SaaS-Mode (Multi-Tenant)
+
+Best for hosting multiple shelters on a single platform.
+
+```bash
+# Set BASE_DOMAIN to enable SaaS mode
+BASE_URL=https://gassigeher.org
+BASE_DOMAIN=gassigeher.org
+```
+
+**Characteristics:**
+- Multi-tenant via subdomains (e.g., `tierheim-goeppingen.gassigeher.org`)
+- Tenant data isolation with PostgreSQL Row-Level Security (RLS)
+- Per-tenant theming with 10 color presets
+- S3 object storage (Hetzner)
+- Stripe billing integration
+- Central admin dashboard
+- Per-tenant rate limiting
+- Landing page with self-service registration
+
+| Feature | Simple-Mode | SaaS-Mode |
+|---------|-------------|-----------|
+| Tenants | 1 | Unlimited |
+| URL | Single domain | Subdomains |
+| Database | SQLite/MySQL/PostgreSQL | PostgreSQL with RLS |
+| Storage | Local filesystem | S3 (with fallback) |
+| Theming | Fixed | Per-tenant customizable |
+| Billing | None | Stripe integration |
+| Admin | Local super admin | Central + tenant admins |
 
 ---
 
@@ -94,6 +148,19 @@ For production deployment, see **[DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
 - **Configurable BASE_URL** - No hardcoded localhost URLs
 - Comprehensive test suite (305+ tests)
 
+### SaaS-Mode Features (Multi-Tenant)
+- **Subdomain-based routing** - Each shelter gets `{slug}.gassigeher.org`
+- **PostgreSQL Row-Level Security** - Database-enforced data isolation
+- **Per-tenant theming** - 10 color presets + custom colors
+- **S3 object storage** - Hetzner Object Storage with local fallback
+- **Stripe billing** - Subscription management with free/pro tiers
+- **Central admin dashboard** - Platform-wide management
+- **Self-service registration** - Shelters can register their own tenant
+- **Landing page** - Marketing site with feature showcase
+- **Per-tenant rate limiting** - Configurable limits by subscription tier
+- **Feature flags** - Enable/disable features per tenant
+- **Demo tenant** - Read-only demo for prospective shelters
+
 ## Tech Stack
 
 **Backend:**
@@ -117,26 +184,41 @@ For production deployment, see **[DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
 ```
 gassigeher/
 ├── cmd/
-│   └── server/
-│       └── main.go           # Application entry point
+│   ├── server/
+│   │   └── main.go           # Application entry point
+│   └── migrate-to-saas/      # Migration tool for single→multi-tenant
 ├── internal/
 │   ├── config/               # Configuration management
 │   ├── cron/                 # Scheduled jobs (auto-complete, reminders, deactivation)
-│   ├── database/             # Database setup and migrations (21 migrations)
-│   ├── handlers/             # HTTP request handlers (14 handlers)
+│   ├── database/             # Database setup and migrations (25+ migrations)
+│   ├── handlers/             # HTTP request handlers (16 handlers)
+│   │   ├── tenant_handler.go # SaaS: Tenant registration
+│   │   ├── theme_handler.go  # SaaS: Dynamic theming
+│   │   ├── billing_handler.go # SaaS: Stripe billing
+│   │   └── central_admin_handler.go # SaaS: Platform admin
 │   ├── logging/              # Production logging with rotation
-│   ├── middleware/           # Auth, logging, CORS middleware
-│   ├── models/               # Data models
-│   ├── repository/           # Database operations (12 repositories)
-│   ├── services/             # Business logic (auth, email, holidays, booking times)
-│   ├── static/               # Embedded frontend files
-│   │   └── frontend/         # HTML, JS, CSS, i18n
+│   ├── middleware/           # Auth, logging, CORS, tenant middleware
+│   │   ├── tenant.go         # SaaS: Subdomain→tenant resolution
+│   │   └── ratelimit_tenant.go # SaaS: Per-tenant rate limiting
+│   ├── models/               # Data models (including Tenant, Theme)
+│   ├── repository/           # Database operations (14 repositories)
+│   ├── services/             # Business logic
+│   │   ├── s3_service.go     # SaaS: S3 object storage
+│   │   └── provisioning_service.go # SaaS: Tenant setup
+│   ├── static/
+│   │   ├── frontend/         # Tenant app (HTML, JS, CSS, i18n)
+│   │   ├── landing/          # SaaS: Landing page
+│   │   └── central/          # SaaS: Central admin dashboard
 │   └── version/              # Build version information
 ├── docs/                     # Documentation files
 ├── deploy/                   # Production deployment configs
-├── uploads/                  # User and dog photos
+├── uploads/                  # User and dog photos (Simple-Mode)
 ├── .env                      # Environment variables
 ├── .env.example              # Environment template
+├── Dockerfile                # Docker build
+├── docker-compose.yml        # Development stack
+├── docker-compose.prod.yml   # Production stack
+├── Caddyfile                 # SaaS: Wildcard SSL reverse proxy
 ├── go.mod                    # Go dependencies
 └── README.md                 # This file
 ```
@@ -363,6 +445,38 @@ PORT=3000 ./gassigeher
 - `GET /api/health` - Health check endpoint
 - `GET /api/version` - Get version information
 
+### SaaS-Mode: Tenant Management (Public)
+- `POST /api/v1/tenants/register` - Self-service tenant registration
+- `GET /api/v1/tenants/check-slug` - Check subdomain availability
+
+### SaaS-Mode: Tenant Management (Protected)
+- `GET /api/v1/tenants/me` - Get current tenant info
+- `PUT /api/v1/tenants/me` - Update tenant settings (Admin)
+
+### SaaS-Mode: Theming
+- `GET /api/v1/theme/css` - Dynamic CSS variables for tenant
+- `GET /api/v1/theme/presets` - List 10 color presets
+- `PUT /api/admin/theme` - Update tenant theme (Admin)
+
+### SaaS-Mode: Billing (Stripe)
+- `GET /api/v1/billing/subscription` - Current subscription status
+- `GET /api/v1/billing/plans` - Available subscription plans
+- `POST /api/v1/billing/checkout` - Create Stripe checkout session
+- `POST /api/v1/billing/portal` - Redirect to Stripe billing portal
+- `POST /api/v1/billing/cancel` - Cancel subscription
+
+### SaaS-Mode: Central Admin (Platform Admin Only)
+- `GET /api/v1/central-admin/stats` - Platform-wide statistics
+- `GET /api/v1/central-admin/tenants` - List all tenants
+- `GET /api/v1/central-admin/tenants/{id}` - Tenant details
+- `POST /api/v1/central-admin/tenants/{id}/activate` - Activate tenant
+- `POST /api/v1/central-admin/tenants/{id}/deactivate` - Deactivate tenant
+- `GET /api/v1/central-admin/feature-flags` - Platform feature flags
+
+### SaaS-Mode: Demo
+- `GET /api/v1/demo/credentials` - Demo tenant login credentials
+- `GET /api/v1/demo/status` - Demo tenant status
+
 ## Database
 
 The application supports **three database backends** with automatic migrations and feature parity:
@@ -371,9 +485,11 @@ The application supports **three database backends** with automatic migrations a
 
 | Database | Best For | Max Users | Setup Time | Cost |
 |----------|----------|-----------|------------|------|
-| **SQLite** (default) | Development, small deployments | <1,000 | 5 min | $0 |
-| **MySQL** | Web apps, medium deployments | 10,000+ | 30 min | $ |
-| **PostgreSQL** | Enterprise, complex queries | 100,000+ | 45 min | $$ |
+| **SQLite** (default) | Development, small deployments (Simple-Mode) | <1,000 | 5 min | $0 |
+| **MySQL** | Web apps, medium deployments (Simple-Mode) | 10,000+ | 30 min | $ |
+| **PostgreSQL** | Enterprise, SaaS-Mode (required for RLS) | 100,000+ | 45 min | $$ |
+
+> **Note**: SaaS-Mode requires PostgreSQL for Row-Level Security (RLS) tenant isolation. Simple-Mode can use any of the three databases.
 
 ### Quick Start - SQLite (Default)
 
@@ -442,7 +558,9 @@ See **[PostgreSQL_Setup_Guide.md](docs/PostgreSQL_Setup_Guide.md)** for complete
 See **[Database_Selection_Guide.md](docs/Database_Selection_Guide.md)** for detailed comparison.
 
 ### Tables Created (All Databases)
-- `users` - User accounts and profiles (with first_name, last_name)
+
+**Core Tables (Simple-Mode & SaaS):**
+- `users` - User accounts and profiles (with first_name, last_name, tenant_id)
 - `dogs` - Dog information (with is_featured, external_link)
 - `bookings` - Walk bookings (with approval workflow)
 - `blocked_dates` - Admin-blocked dates (global or per-dog)
@@ -454,11 +572,17 @@ See **[Database_Selection_Guide.md](docs/Database_Selection_Guide.md)** for deta
 - `feiertage_cache` - Holiday API cache
 - `schema_migrations` - Migration version tracking
 
-All 21 migrations run automatically on application startup.
+**SaaS-Mode Tables:**
+- `tenants` - Tenant organizations (slug, name, status, contact info)
+- `tenant_settings` - Per-tenant branding (theme, colors, logo)
+- `feature_flags` - Platform and tenant feature toggles
+- `subscriptions` - Stripe subscription tracking
+
+All 25+ migrations run automatically on application startup.
 
 ## Implementation Status
 
-### ALL PHASES COMPLETE (10 of 10)
+### Simple-Mode: ALL PHASES COMPLETE (10 of 10)
 
 - **Phase 1**: Foundation (Auth, Database, Email)
 - **Phase 2**: Dog Management (CRUD, Photos, Categories)
@@ -471,7 +595,22 @@ All 21 migrations run automatically on application startup.
 - **Phase 9**: Polish & Testing (Test suite, Security, Documentation)
 - **Phase 10**: Deployment (Production setup, Documentation)
 
-**Status: PRODUCTION READY**
+### SaaS-Mode: COMPLETE (12 Phases)
+
+- **Phase 1**: Database Foundation (tenants table, tenant_id columns)
+- **Phase 2**: Tenant Middleware & JWT (subdomain resolution, JWT claims)
+- **Phase 3**: Repository Layer Updates (tenant filtering, RLS)
+- **Phase 4**: Handler Layer Updates (tenant context extraction)
+- **Phase 5**: Enhanced Security (rate limiting, brute force protection)
+- **Phase 6**: Hetzner S3 Storage (object storage, tenant isolation)
+- **Phase 7**: Theming System (10 presets, custom colors)
+- **Phase 8**: Tenant Registration (self-service signup)
+- **Phase 9**: Landing Page (marketing site, registration)
+- **Phase 10**: Central Admin Dashboard (platform management)
+- **Phase 11**: Docker Infrastructure (containerized deployment)
+- **Phase 12**: Testing & Migration (tenant isolation tests)
+
+**Status: PRODUCTION READY** (both modes)
 
 ### Current Coverage
 - **Backend Tests**: 305+ tests passing
@@ -623,7 +762,7 @@ The application implements multiple security measures:
 
 ## Documentation
 
-**Complete documentation suite: 9,500+ lines across 15 comprehensive guides**
+**Complete documentation suite: 12,000+ lines across 18+ comprehensive guides**
 
 See **[DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md)** for navigation guide.
 
@@ -631,15 +770,16 @@ See **[DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md)** for navigation gui
 
 | Document | Lines | Purpose | Audience |
 |----------|-------|---------|----------|
-| **[README.md](README.md)** | 800+ | Project overview, setup, API list | Developers |
-| **[ImplementationPlan.md](docs/ImplementationPlan.md)** | 1,500+ | Complete architecture & all 10 phases | Technical Leads |
-| **[API.md](docs/API.md)** | 600+ | Complete REST API reference with examples | Developers/Integrators |
-| **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** | 600+ | Production deployment (SQLite, MySQL, PostgreSQL) | DevOps/System Admins |
+| **[README.md](README.md)** | 900+ | Project overview, both modes, API list | Developers |
+| **[ImplementationPlan.md](docs/ImplementationPlan.md)** | 1,500+ | Simple-Mode architecture & all 10 phases | Technical Leads |
+| **[SaaS_Implementation_Plan.md](docs/SaaS_Implementation_Plan.md)** | 2,400+ | SaaS architecture & all 12 phases | Technical Leads |
+| **[API.md](docs/API.md)** | 800+ | Complete REST API reference with examples | Developers/Integrators |
+| **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** | 800+ | Production deployment (both modes) | DevOps/System Admins |
 | **[USER_GUIDE.md](docs/USER_GUIDE.md)** | 350+ | How to use the application (German) | End Users |
 | **[ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md)** | 500+ | Administrator operations manual | Administrators |
-| **[PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md)** | 500+ | Executive summary & statistics | Stakeholders |
-| **[CLAUDE.md](CLAUDE.md)** | 600+ | AI assistant development guide | AI Developers |
-| **[DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md)** | 200+ | Documentation navigation | Everyone |
+| **[PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md)** | 700+ | Executive summary & statistics | Stakeholders |
+| **[CLAUDE.md](CLAUDE.md)** | 1,200+ | AI assistant development guide | AI Developers |
+| **[DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md)** | 250+ | Documentation navigation | Everyone |
 
 ### Database Documentation
 
@@ -717,29 +857,34 @@ See **[DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md)** for navigation gui
 
 ## Project Statistics
 
-| Category | Count |
-|----------|-------|
-| **Implementation Phases** | 10/10 (100%) |
-| **Backend Files** | 131 Go files |
-| **Frontend Pages** | 26 HTML pages |
-| **API Endpoints** | 71 REST endpoints |
-| **Database Tables** | 11 with indexes |
-| **Database Migrations** | 21 |
-| **Email Templates** | 18 HTML templates |
-| **Test Cases** | 305+ (all passing) |
-| **German Translations** | 400+ strings |
-| **Documentation Files** | 15 guides |
-| **Deployment Configs** | 3 production files |
-| **Security Measures** | 12+ implemented |
-| **Cron Jobs** | 3 automated tasks |
+| Category | Simple-Mode | SaaS-Mode |
+|----------|-------------|-----------|
+| **Implementation Phases** | 10/10 | 12/12 |
+| **Backend Files** | 131 Go files | 150+ Go files |
+| **Frontend Pages** | 26 HTML pages | 30+ HTML pages |
+| **API Endpoints** | 71 REST endpoints | 85+ REST endpoints |
+| **Database Tables** | 11 with indexes | 15 with indexes + RLS |
+| **Database Migrations** | 21 | 25+ |
+| **Email Templates** | 18 HTML templates | 20+ HTML templates |
+| **Test Cases** | 305+ (all passing) | 350+ (all passing) |
+| **German Translations** | 400+ strings | 450+ strings |
+| **Theme Presets** | 1 (classic) | 10 color presets |
+| **Documentation Files** | 15 guides | 18+ guides |
+| **Deployment Configs** | 3 production files | Docker + Caddy |
+| **Security Measures** | 12+ implemented | 15+ implemented |
+| **Cron Jobs** | 3 automated tasks | 4 automated tasks |
 
 ## Complete Feature List
 
-**Implemented (60+ features)**:
+**Core Features (Simple-Mode & SaaS - 60+ features)**:
 User registration with password • Email verification • JWT authentication • Password reset • Profile management (first/last name) • Photo uploads • Experience levels (Green/Orange/Blue) • Level promotions • Dog browsing • Featured dogs • External dog links • Advanced filters • Dog booking • Booking approval workflow • Configurable time slots • Holiday integration • Booking cancellation • Booking notes • Booking reminders • Dashboard • GDPR account deletion • Auto-deactivation with notification • Reactivation workflow • Admin dashboard • Dog management • Dog-specific blocking • Availability toggle • Booking management • Move bookings • Block dates (global/per-dog) • User management • Admin promotion/demotion • Experience approvals • Registration password • Site logo configuration • WhatsApp integration • System settings • Real-time statistics • Activity feed • Email notifications (18 types) • Multi-provider email (Gmail/SMTP) • BCC admin copy • Auto-completion • Security headers • German i18n • Mobile-responsive design • SCSS modular styling • Terms & privacy pages • Embedded frontend • Version display • Health check • CI/CD pipeline • E2E testing
+
+**SaaS-Mode Features (20+ additional)**:
+Subdomain-based multi-tenancy • PostgreSQL Row-Level Security • Per-tenant data isolation • Tenant self-registration • Landing page • Feature showcase • 10 color theme presets • Custom color overrides • Per-tenant logo/favicon • S3 object storage • Tenant-organized file paths • Stripe billing integration • Free/Pro subscription tiers • Central admin dashboard • Platform statistics • Tenant activation/deactivation • Per-tenant rate limiting • Feature flags (platform + tenant) • Demo tenant mode • Brute force protection • Exponential lockout • Docker containerization • Caddy wildcard SSL • DNS challenge automation
 
 ## What Makes Gassigeher Special
 
+### Core Features (Both Modes)
 1. **Complete GDPR Compliance**: Full anonymization on deletion with legal email confirmation
 2. **Experience-Based Access**: Progressive skill system (Green→Orange→Blue) with admin approvals
 3. **Flexible Time Management**: Configurable booking slots with holiday awareness
@@ -749,11 +894,21 @@ User registration with password • Email verification • JWT authentication �
 7. **Dog-Specific Blocking**: Block dates for individual dogs (vet visits, etc.)
 8. **Automated Lifecycle**: Auto-deactivation with warnings, reactivation workflow
 9. **Health Management**: Quick dog availability toggle with reasons
-10. **Comprehensive Admin Tools**: 10 admin pages with unified navigation
+10. **Comprehensive Admin Tools**: 10+ admin pages with unified navigation
 11. **Zero Frontend Dependencies**: Pure vanilla JavaScript, instant page loads
 12. **Standalone Deployment**: Single binary with embedded frontend
-13. **Email-First Communication**: 18 HTML email types for all actions
-14. **Production-Ready**: Complete deployment package with systemd, nginx, backups, CI/CD
+13. **Email-First Communication**: 18+ HTML email types for all actions
+14. **Production-Ready**: Complete deployment package with CI/CD
+
+### SaaS-Mode Advantages
+15. **True Multi-Tenancy**: Serve 500+ shelters from single deployment
+16. **Database-Enforced Isolation**: PostgreSQL RLS prevents cross-tenant access
+17. **Self-Service Onboarding**: Shelters register and configure independently
+18. **Scalable Storage**: S3 object storage organized by tenant
+19. **Subscription Billing**: Stripe integration with free/pro tiers
+20. **Platform Administration**: Central dashboard for managing all tenants
+21. **Customizable Branding**: 10 theme presets + custom colors per tenant
+22. **Wildcard SSL**: Automatic HTTPS for all subdomains via Caddy
 
 ## Contributing
 

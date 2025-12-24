@@ -4,14 +4,63 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Gassigeher is a **complete production-ready** dog walking booking system for animal shelters. Built with Go 1.24+ backend (supports SQLite, MySQL, PostgreSQL) and Vanilla JavaScript frontend. All 10 implementation phases complete.
+Gassigeher is a **complete production-ready** dog walking booking system for animal shelters. Built with Go 1.24+ backend and Vanilla JavaScript frontend. Available in two deployment modes:
 
-**Status**: ✅ Production ready | 71 API endpoints | 26 pages | 18 email types | 305+ tests | GDPR-compliant
+- **Simple-Mode**: Single-tenant for individual shelters (SQLite/MySQL/PostgreSQL)
+- **SaaS-Mode**: Multi-tenant platform for 500+ shelters (PostgreSQL with RLS)
+
+**Status**: ✅ Production ready | 85+ API endpoints | 30+ pages | 18+ email types | 350+ tests | GDPR-compliant
 
 > **Essential Reading**:
-> - [ImplementationPlan.md](docs/ImplementationPlan.md) - Complete architecture, all 10 phases
-> - [API.md](docs/API.md) - All 71 endpoints with request/response examples
-> - [DEPLOYMENT.md](docs/DEPLOYMENT.md) - Production deployment steps
+> - [ImplementationPlan.md](docs/ImplementationPlan.md) - Simple-Mode architecture, all 10 phases
+> - [SaaS_Implementation_Plan.md](docs/SaaS_Implementation_Plan.md) - SaaS architecture, all 12 phases
+> - [API.md](docs/API.md) - All 85+ endpoints with request/response examples
+> - [DEPLOYMENT.md](docs/DEPLOYMENT.md) - Production deployment steps (both modes)
+
+## Deployment Modes
+
+### Simple-Mode (Single-Tenant)
+
+Activated when `BASE_DOMAIN` is **not set** (empty string).
+
+```bash
+# Simple-Mode configuration
+BASE_URL=https://gassigeher.yourshelter.com
+# BASE_DOMAIN is NOT set
+```
+
+- Single organization deployment
+- All three databases supported (SQLite, MySQL, PostgreSQL)
+- Local filesystem storage
+- Global rate limiting
+
+### SaaS-Mode (Multi-Tenant)
+
+Activated when `BASE_DOMAIN` is **set**.
+
+```bash
+# SaaS-Mode configuration
+BASE_URL=https://gassigeher.org
+BASE_DOMAIN=gassigeher.org
+```
+
+- Multi-tenant via subdomains (e.g., `tierheim-goeppingen.gassigeher.org`)
+- PostgreSQL required (for Row-Level Security)
+- S3 object storage (Hetzner)
+- Per-tenant rate limiting
+- Stripe billing integration
+- Per-tenant theming (10 presets + custom colors)
+- Central admin dashboard
+
+### Mode Detection in Code
+
+```go
+// cmd/server/main.go
+saasMode := cfg.BaseDomain != ""
+if saasMode {
+    router.Use(middleware.TenantMiddleware(tenantRepo, cfg.BaseDomain))
+}
+```
 
 ---
 
@@ -76,18 +125,19 @@ go tool cover -html=coverage.out
 
 ### Three-Layer Backend Architecture
 
-**1. Handlers** (`internal/handlers/`) - 14 handler files
+**1. Handlers** (`internal/handlers/`) - 16 handler files
 - HTTP request/response handling
 - Input validation
 - Context extraction (user_id, is_admin)
 - Calls services/repositories
 - **Pattern**: Each handler owns its dependencies (repos, services, config)
 
-**2. Repositories** (`internal/repository/`) - 12 repository files
+**2. Repositories** (`internal/repository/`) - 14 repository files
 - Direct database operations
 - SQL query construction
 - No business logic
 - **Pattern**: One repository per model, returns models only
+- **SaaS-Mode**: All queries include `tenant_id` filtering
 
 **3. Services** (`internal/services/`)
 - Business logic (auth, email, holidays, booking times)
@@ -97,9 +147,20 @@ go tool cover -html=coverage.out
 - **EmailProvider Interface**: Pluggable email providers (Gmail, SMTP)
 - **HolidayService**: German public holiday API integration with caching
 - **BookingTimeService**: Configurable time slots, approval workflow
+- **S3Service** (SaaS): S3-compatible object storage for tenant files
+- **ProvisioningService** (SaaS): Tenant setup with default data
+
+**4. SaaS-Specific Components** (`internal/handlers/`, `internal/middleware/`)
+- **TenantHandler**: Tenant registration, settings, theme management
+- **BillingHandler**: Stripe subscription management
+- **CentralAdminHandler**: Platform-wide administration
+- **ThemeHandler**: Dynamic CSS generation per tenant
+- **TenantMiddleware**: Subdomain→tenant resolution
+- **TenantRateLimit**: Per-tenant rate limiting
 
 ### Request Flow
 
+**Simple-Mode:**
 ```
 HTTP Request
     ↓
@@ -108,6 +169,19 @@ Middleware (Logging → Security → CORS → Auth → Admin?)
 Handler (validate input, check auth)
     ↓
 Repository (database query)
+    ↓
+Response (JSON)
+```
+
+**SaaS-Mode:**
+```
+HTTP Request
+    ↓
+Middleware (Logging → Security → CORS → TenantMiddleware → TenantRateLimit → Auth → Admin?)
+    ↓
+Handler (validate input, extract tenant_id from context)
+    ↓
+Repository (database query WITH tenant_id filter)
     ↓
 Response (JSON)
 ```
@@ -363,17 +437,30 @@ Located in `internal/handlers/auth_handler.go` (bottom of file).
 
 Defined in `internal/middleware/middleware.go`:
 ```go
+// Core context keys (both modes)
 const UserIDKey contextKey = "userID"
 const EmailKey contextKey = "email"
 const IsAdminKey contextKey = "isAdmin"
 const IsSuperAdminKey contextKey = "isSuperAdmin"
+
+// SaaS-Mode context keys (from TenantMiddleware)
+const TenantIDKey contextKey = "tenantID"
+const TenantSlugKey contextKey = "tenantSlug"
+const IsDemoKey contextKey = "isDemo"
+const IsCentralAdminKey contextKey = "isCentralAdmin"
 ```
 
 Access in handlers:
 ```go
+// Core context (both modes)
 userID, _ := r.Context().Value(middleware.UserIDKey).(int)
 isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
 isSuperAdmin, _ := r.Context().Value(middleware.IsSuperAdminKey).(bool)
+
+// Tenant context (SaaS-Mode only)
+tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+tenantSlug, _ := r.Context().Value(middleware.TenantSlugKey).(string)
+isDemo, _ := r.Context().Value(middleware.IsDemoKey).(bool)
 ```
 
 ### Date/Time Formats
@@ -693,8 +780,8 @@ See **[Database_Selection_Guide.md](docs/Database_Selection_Guide.md)** for deta
 
 ## Database Schema Key Points
 
-### Tables (11 total)
-- `users` - User accounts with first_name, last_name, experience level
+### Core Tables (11 total - Both Modes)
+- `users` - User accounts with first_name, last_name, experience level, tenant_id
 - `dogs` - Dog info with is_featured, external_link, photo fields
 - `bookings` - Walk bookings with approval workflow
 - `blocked_dates` - Admin-blocked dates (global or per-dog)
@@ -706,6 +793,12 @@ See **[Database_Selection_Guide.md](docs/Database_Selection_Guide.md)** for deta
 - `feiertage_cache` - German holiday API cache
 - `schema_migrations` - Migration version tracking
 
+### SaaS-Mode Tables (4 additional)
+- `tenants` - Tenant organizations (slug, name, status, contact_email, address, federal_state)
+- `tenant_settings` - Per-tenant branding (theme_preset, custom colors, logo, favicon)
+- `subscriptions` - Stripe subscription tracking (status, plan, stripe_ids)
+- `feature_flags` - Platform and tenant-level feature toggles
+
 ### Users Table GDPR Fields
 - `is_deleted` - Flag for deleted accounts
 - `anonymous_id` - Generated on deletion (e.g., "anonymous_user_1234567890")
@@ -714,9 +807,16 @@ See **[Database_Selection_Guide.md](docs/Database_Selection_Guide.md)** for deta
 - `deactivated_at`, `deactivation_reason` - Audit trail
 
 ### Unique Constraints
-- `users.email` - UNIQUE (but can be NULL after deletion)
+- **Simple-Mode**: `users.email` - UNIQUE globally
+- **SaaS-Mode**: `(tenant_id, email)` - UNIQUE per tenant (same email can exist in different tenants)
 - `bookings(dog_id, date, walk_type)` - Prevents double-booking
 - `blocked_dates.date` - One block per date (global) or per dog_id
+- **SaaS-Mode**: `tenants.slug` - UNIQUE subdomain
+
+### Row-Level Security (SaaS-Mode PostgreSQL)
+- All tables with `tenant_id` have RLS policies enabled
+- Policy: `tenant_id = current_setting('app.tenant_id')::int`
+- Cannot bypass via application bugs - database enforced
 
 ## Frontend Structure
 
@@ -727,6 +827,18 @@ See **[Database_Selection_Guide.md](docs/Database_Selection_Guide.md)** for deta
 **Protected pages**: dogs.html, dashboard.html, profile.html
 
 **Admin pages** (10 pages): admin-dashboard.html, admin-dogs.html, admin-bookings.html, admin-blocked-dates.html, admin-experience-requests.html, admin-users.html, admin-reactivation-requests.html, admin-settings.html, admin-holidays.html, admin-booking-times.html
+
+**SaaS-Mode Landing Pages** (`internal/static/landing/`):
+- index.html - Marketing landing page
+- register.html - Tenant self-registration
+- features.html - Feature showcase
+- pricing.html - Subscription plans
+
+**SaaS-Mode Central Admin** (`internal/static/central/`):
+- index.html - Platform dashboard
+- tenants.html - Tenant management
+- users.html - Cross-tenant user search
+- billing.html - Revenue overview
 
 **Pattern**: All admin pages have unified navigation header.
 
@@ -871,11 +983,12 @@ ${getDogPhotoResponsive(dog)}  // Picture element with media queries
 **Storage**: Photos in `uploads/dogs/`, paths in database (nullable).
 
 Read these for context:
-- [ImplementationPlan.md](docs/ImplementationPlan.md) - Complete architecture, all 10 phases
-- [API.md](docs/API.md) - All 50+ endpoints with examples
+- [ImplementationPlan.md](docs/ImplementationPlan.md) - Simple-Mode architecture, all 10 phases
+- [SaaS_Implementation_Plan.md](docs/SaaS_Implementation_Plan.md) - SaaS architecture, all 12 phases
+- [API.md](docs/API.md) - All 85+ endpoints with examples
 - [USER_GUIDE.md](docs/USER_GUIDE.md) - User features and workflows
 - [ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md) - Admin operations and best practices
-- [DEPLOYMENT.md](docs/DEPLOYMENT.md) - Production deployment steps
+- [DEPLOYMENT.md](docs/DEPLOYMENT.md) - Production deployment steps (both modes)
 - [PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md) - Executive overview
 
 ## Testing Philosophy
@@ -893,23 +1006,39 @@ Tests are in `*_test.go` files co-located with code.
 
 **Entry point:** `cmd/server/main.go`
 - Initializes all handlers
-- Registers all routes (71 endpoints)
+- Registers all routes (85+ endpoints)
 - Starts cron service
 - Applies middleware chain
+- Detects Simple-Mode vs SaaS-Mode via `cfg.BaseDomain`
 
 **Database setup:** `internal/database/database.go`
-- Auto-migration on startup (21 migrations)
-- Creates 11 tables with indexes
+- Auto-migration on startup (25+ migrations)
+- Creates 15 tables with indexes (11 core + 4 SaaS)
+- PostgreSQL RLS policies for SaaS-Mode
 
 **Auth middleware:** `internal/middleware/middleware.go`
-- JWT validation
-- Admin checks
+- JWT validation (includes tenant_id claim in SaaS-Mode)
+- Admin checks (RequireAdmin, RequireSuperAdmin, RequireCentralAdmin)
 - Security headers (XSS, clickjacking protection)
+
+**Tenant middleware:** `internal/middleware/tenant.go` (SaaS-Mode)
+- Subdomain extraction from Host header
+- Tenant lookup and context injection
+- Demo tenant detection
 
 **API client:** `frontend/js/api.js`
 - Global `window.api` instance
 - All backend endpoints wrapped
 - Token management in localStorage
+- Tenant-aware in SaaS-Mode
+
+**SaaS-Mode Key Files:**
+- `internal/handlers/tenant_handler.go` - Tenant registration, settings
+- `internal/handlers/billing_handler.go` - Stripe subscription management
+- `internal/handlers/theme_handler.go` - Dynamic theming
+- `internal/handlers/central_admin_handler.go` - Platform administration
+- `internal/services/s3_service.go` - Object storage
+- `internal/services/provisioning_service.go` - Tenant setup
 
 ## Development Workflow
 
@@ -1018,36 +1147,47 @@ See **DEPLOYMENT.md** for step-by-step production deployment guide.
 ## Repository Organization
 
 ```
-cmd/server/main.go              # Entry point
+cmd/
+  server/main.go                # Entry point
+  migrate-to-saas/              # Migration tool (single→multi-tenant)
 internal/
   config/                        # Env var loading
-  cron/                         # Automated jobs (3 cron tasks)
-  database/                     # Migrations (21 migration files)
-  handlers/                     # HTTP handlers (14 files)
+  cron/                         # Automated jobs (4 cron tasks)
+  database/                     # Migrations (25+ migration files)
+  handlers/                     # HTTP handlers (16 files)
+    tenant_handler.go           # SaaS: Tenant management
+    billing_handler.go          # SaaS: Stripe billing
+    theme_handler.go            # SaaS: Dynamic theming
+    central_admin_handler.go    # SaaS: Platform admin
   logging/                      # Production logging with rotation
-  middleware/                   # Auth, security, logging
-  models/                       # Data structures
-  repository/                   # Database ops (12 files)
-  services/                     # Business logic (auth, email, holidays, booking times)
-  static/frontend/              # Embedded frontend files
+  middleware/                   # Auth, security, logging, tenant
+    tenant.go                   # SaaS: Subdomain→tenant resolution
+    ratelimit_tenant.go         # SaaS: Per-tenant rate limiting
+  models/                       # Data structures (12+ models)
+  repository/                   # Database ops (14 files)
+  services/                     # Business logic
+    s3_service.go               # SaaS: Object storage
+    provisioning_service.go     # SaaS: Tenant setup
+  static/
+    frontend/                   # Tenant application (embedded)
+    landing/                    # SaaS: Marketing site
+    central/                    # SaaS: Central admin dashboard
   version/                      # Build version information
-frontend/
-  assets/css/main.css           # All styles (compiled from SCSS)
-  i18n/de.json                  # German translations (400+ strings)
-  js/api.js                     # API client wrapper
-  js/i18n.js                    # Translation system
-  [26 HTML pages]               # Complete UI
-deploy/                         # Production configs
-docs/                           # 15 documentation files
-uploads/                        # User and dog photos
+docs/                           # 18+ documentation files
+deploy/                         # Simple-Mode production configs
+uploads/                        # User and dog photos (Simple-Mode)
+Dockerfile                      # SaaS: Docker build
+docker-compose.yml              # SaaS: Development stack
+docker-compose.prod.yml         # SaaS: Production stack
+Caddyfile                       # SaaS: Wildcard SSL reverse proxy
 ```
 
 ## Notes for Future Development
 
-**When adding features:**
+**When adding features (Both Modes):**
 - Keep German translations updated
 - Add to appropriate admin page if admin feature
-- Update ImplementationPlan.md's "Future Enhancements" section
+- Update ImplementationPlan.md or SaaS_Implementation_Plan.md
 - Consider email notifications
 - Update API.md if new endpoints
 - Test GDPR implications (data deletion)
@@ -1062,6 +1202,15 @@ uploads/                        # User and dog photos
 - All templates use inline CSS
 - German language for all emails
 - Include unsubscribe info if required by law
+
+**SaaS-Mode Specific:**
+- All repository methods MUST filter by tenant_id
+- All handlers MUST extract tenant_id from context
+- JWT tokens include tenant_id claim - validate against subdomain
+- New tables need tenant_id column + RLS policy
+- File uploads go to S3 with tenant path prefix
+- Consider subscription tier limits (free: 10 dogs max)
+- Test tenant isolation thoroughly - never leak data cross-tenant
 
 **Database schema changes:**
 - Add migration in `database.go`
@@ -1094,10 +1243,11 @@ This codebase follows clean architecture principles with clear separation of con
 ### Essential Context Files
 
 Before making changes, read:
-1. **[ImplementationPlan.md](docs/ImplementationPlan.md)** - See which phase the feature belongs to
-2. **[API.md](docs/API.md)** - Check existing endpoint patterns
-3. **[ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md)** - Understand admin workflows (if admin feature)
-4. **[USER_GUIDE.md](docs/USER_GUIDE.md)** - Understand user workflows (if user feature)
+1. **[ImplementationPlan.md](docs/ImplementationPlan.md)** - Simple-Mode architecture, all 10 phases
+2. **[SaaS_Implementation_Plan.md](docs/SaaS_Implementation_Plan.md)** - SaaS architecture, all 12 phases
+3. **[API.md](docs/API.md)** - Check existing endpoint patterns (85+ endpoints)
+4. **[ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md)** - Understand admin workflows (if admin feature)
+5. **[USER_GUIDE.md](docs/USER_GUIDE.md)** - Understand user workflows (if user feature)
 
 ---
 
@@ -1105,19 +1255,20 @@ Before making changes, read:
 
 | Document | Lines | Purpose |
 |----------|-------|---------|
-| [README.md](README.md) | 800+ | Project overview, setup, quick start |
-| [ImplementationPlan.md](docs/ImplementationPlan.md) | 1,500+ | Architecture, all 10 phases, database schema |
-| [API.md](docs/API.md) | 600+ | Complete REST API reference (71 endpoints) |
-| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | 600+ | Production deployment guide |
+| [README.md](README.md) | 900+ | Project overview, both modes, setup |
+| [ImplementationPlan.md](docs/ImplementationPlan.md) | 1,500+ | Simple-Mode architecture, all 10 phases |
+| [SaaS_Implementation_Plan.md](docs/SaaS_Implementation_Plan.md) | 2,400+ | SaaS architecture, all 12 phases |
+| [API.md](docs/API.md) | 800+ | Complete REST API reference (85+ endpoints) |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | 800+ | Production deployment guide (both modes) |
 | [USER_GUIDE.md](docs/USER_GUIDE.md) | 350+ | User manual (German) |
 | [ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md) | 500+ | Administrator handbook |
-| [PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md) | 500+ | Executive summary |
-| [CLAUDE.md](CLAUDE.md) | 1,000+ | This file - AI development guide |
+| [PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md) | 700+ | Executive summary |
+| [CLAUDE.md](CLAUDE.md) | 1,200+ | This file - AI development guide |
 
-**Total**: 9,500+ lines of documentation across 15 files
+**Total**: 12,000+ lines of documentation across 18+ files
 
 **Navigation**: See [DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md) for quick access guide
 
 ---
 
-**Status**: All 10 phases complete. Production-ready. Fully documented. Ready to deploy. 🚀
+**Status**: Production-ready. Simple-Mode (10 phases) + SaaS-Mode (12 phases). Fully documented. 🚀
