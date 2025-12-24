@@ -95,17 +95,30 @@ func (d *SQLiteDialect) GetAddColumnSyntax(tableName, columnName, columnType str
 
 // ApplySettings applies SQLite-specific settings
 // Enables foreign key constraints (disabled by default in SQLite)
+// Enables WAL mode and busy timeout for better concurrency
 func (d *SQLiteDialect) ApplySettings(db *sql.DB) error {
 	// Enable foreign keys (critical for referential integrity)
 	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
 		return fmt.Errorf("failed to enable foreign keys: %w", err)
 	}
 
-	// Optional: Set journal mode to WAL for better concurrency
-	// Uncomment if needed:
-	// if _, err := db.Exec("PRAGMA journal_mode = WAL"); err != nil {
-	//     return fmt.Errorf("failed to set journal mode: %w", err)
-	// }
+	// Enable WAL mode for better concurrent read/write performance
+	// WAL allows concurrent readers while writing
+	if _, err := db.Exec("PRAGMA journal_mode = WAL"); err != nil {
+		return fmt.Errorf("failed to set journal mode: %w", err)
+	}
+
+	// Set busy timeout to 5 seconds - wait instead of failing immediately on lock
+	// This helps prevent "database is locked" errors under concurrent load
+	if _, err := db.Exec("PRAGMA busy_timeout = 5000"); err != nil {
+		return fmt.Errorf("failed to set busy timeout: %w", err)
+	}
+
+	// Enable synchronous mode NORMAL for better performance with WAL
+	// FULL is safest but slower; NORMAL is good balance with WAL
+	if _, err := db.Exec("PRAGMA synchronous = NORMAL"); err != nil {
+		return fmt.Errorf("failed to set synchronous mode: %w", err)
+	}
 
 	return nil
 }

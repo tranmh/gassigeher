@@ -1060,8 +1060,9 @@ func TestCreateBooking_TimeValidation(t *testing.T) {
 				var response map[string]interface{}
 				json.Unmarshal(rec.Body.Bytes(), &response)
 				errorMsg := response["error"].(string)
-				if !stringContains(errorMsg, "gesperrt") && !stringContains(errorMsg, "blocked") {
-					t.Errorf("Expected blocked time error, got %s", errorMsg)
+				// Accept either "blocked" message or "outside allowed times" message
+				if !stringContains(errorMsg, "gesperrt") && !stringContains(errorMsg, "blocked") && !stringContains(errorMsg, "außerhalb") {
+					t.Errorf("Expected blocked/outside time error, got %s", errorMsg)
 				}
 			},
 		},

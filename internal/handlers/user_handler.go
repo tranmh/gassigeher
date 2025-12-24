@@ -486,6 +486,13 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SaaS SECURITY: Verify user belongs to the requesting tenant
+	if tenantID > 0 && user.TenantID != tenantID {
+		// Return 404 to prevent tenant enumeration
+		respondError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
 	// Don't return sensitive data
 	user.PasswordHash = nil
 	user.VerificationToken = nil
@@ -509,6 +516,9 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 
 // DeactivateUser deactivates a user account (admin only)
 func (h *UserHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
+	// SaaS SECURITY: Get tenant_id from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Get user ID from URL
 	vars := mux.Vars(r)
 	userID, err := strconv.Atoi(vars["id"])
@@ -542,6 +552,13 @@ func (h *UserHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SaaS SECURITY: Verify user belongs to the requesting tenant
+	if tenantID > 0 && user.TenantID != tenantID {
+		// Return 404 to prevent tenant enumeration
+		respondError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
 	// Deactivate
 	if err := h.userRepo.Deactivate(userID, req.Reason); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to deactivate user")
@@ -558,6 +575,9 @@ func (h *UserHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 
 // ActivateUser activates a user account (admin only)
 func (h *UserHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
+	// SaaS SECURITY: Get tenant_id from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Get user ID from URL
 	vars := mux.Vars(r)
 	userID, err := strconv.Atoi(vars["id"])
@@ -583,6 +603,13 @@ func (h *UserHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SaaS SECURITY: Verify user belongs to the requesting tenant
+	if tenantID > 0 && user.TenantID != tenantID {
+		// Return 404 to prevent tenant enumeration
+		respondError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
 	// Activate
 	if err := h.userRepo.Activate(userID); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to activate user")
@@ -600,6 +627,9 @@ func (h *UserHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
 // PromoteToAdmin promotes a user to admin role (Super Admin only)
 // DONE: Phase 4
 func (h *UserHandler) PromoteToAdmin(w http.ResponseWriter, r *http.Request) {
+	// SaaS SECURITY: Get tenant_id from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Extract super admin from context (middleware already verified)
 	isSuperAdmin, _ := r.Context().Value(middleware.IsSuperAdminKey).(bool)
 	if !isSuperAdmin {
@@ -623,6 +653,13 @@ func (h *UserHandler) PromoteToAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if targetUser == nil {
+		respondError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	// SaaS SECURITY: Verify user belongs to the requesting tenant
+	if tenantID > 0 && targetUser.TenantID != tenantID {
+		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "User not found")
 		return
 	}
@@ -661,6 +698,9 @@ func (h *UserHandler) PromoteToAdmin(w http.ResponseWriter, r *http.Request) {
 // DemoteAdmin revokes admin privileges (Super Admin only)
 // DONE: Phase 4
 func (h *UserHandler) DemoteAdmin(w http.ResponseWriter, r *http.Request) {
+	// SaaS SECURITY: Get tenant_id from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Extract super admin from context
 	isSuperAdmin, _ := r.Context().Value(middleware.IsSuperAdminKey).(bool)
 	if !isSuperAdmin {
@@ -684,6 +724,13 @@ func (h *UserHandler) DemoteAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if targetUser == nil {
+		respondError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	// SaaS SECURITY: Verify user belongs to the requesting tenant
+	if tenantID > 0 && targetUser.TenantID != tenantID {
+		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "User not found")
 		return
 	}
@@ -882,6 +929,9 @@ func (h *UserHandler) EndImpersonation(w http.ResponseWriter, r *http.Request) {
 
 // AdminUpdateUser allows admins to update user profiles (including names)
 func (h *UserHandler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
+	// SaaS SECURITY: Get tenant_id from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Get user ID from URL
 	vars := mux.Vars(r)
 	userIDStr := vars["id"]
@@ -911,6 +961,13 @@ func (h *UserHandler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if targetUser == nil {
+		respondError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	// SaaS SECURITY: Verify user belongs to the requesting tenant
+	if tenantID > 0 && targetUser.TenantID != tenantID {
+		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "User not found")
 		return
 	}
@@ -1069,6 +1126,9 @@ func (h *UserHandler) AdminCreateUser(w http.ResponseWriter, r *http.Request) {
 
 // AdminDeleteUser deletes a user account (super-admin only, GDPR anonymization)
 func (h *UserHandler) AdminDeleteUser(w http.ResponseWriter, r *http.Request) {
+	// SaaS SECURITY: Get tenant_id from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Check if current user is super admin
 	isSuperAdmin, _ := r.Context().Value(middleware.IsSuperAdminKey).(bool)
 	if !isSuperAdmin {
@@ -1101,6 +1161,13 @@ func (h *UserHandler) AdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if targetUser == nil {
+		respondError(w, http.StatusNotFound, "Benutzer nicht gefunden")
+		return
+	}
+
+	// SaaS SECURITY: Verify user belongs to the requesting tenant
+	if tenantID > 0 && targetUser.TenantID != tenantID {
+		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "Benutzer nicht gefunden")
 		return
 	}

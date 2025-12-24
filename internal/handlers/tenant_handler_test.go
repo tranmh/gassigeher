@@ -687,3 +687,163 @@ func TestTenantHandler_Register_CreatesSubscription(t *testing.T) {
 		t.Errorf("Expected Free plan (plan_id=1), got plan_id=%d", planID)
 	}
 }
+
+// =============================================================================
+// SECURITY TEST: XSS Sanitization in Tenant Registration (TDD RED Phase)
+// =============================================================================
+// BUG: Organization name with script tags is stored without sanitization
+// This could lead to XSS attacks when the name is displayed in the UI
+func TestTenantHandler_Register_XSSSanitization(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+		BaseDomain:         "gassigeher.org",
+	}
+	handler := NewTenantHandler(db, cfg)
+
+	t.Run("sanitizes script tags from organization_name", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"organization_name": "<script>alert('XSS')</script>Evil Shelter",
+			"slug":              "xss-test-1",
+			"contact_email":     "xss-test@example.com",
+			"city":              "Test City",
+			"postal_code":       "12345",
+			"federal_state":     "BW",
+			"admin_first_name":  "Admin",
+			"admin_last_name":   "User",
+			"admin_email":       "admin@xss-test.com",
+			"admin_password":    "SecurePass123!",
+		}
+		body, _ := json.Marshal(reqBody)
+
+		req := httptest.NewRequest("POST", "/api/tenants/register", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		rec := httptest.NewRecorder()
+		handler.Register(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		// Check that script tags are NOT stored in database
+		var storedName string
+		err := db.QueryRow("SELECT name FROM tenants WHERE slug = ?", "xss-test-1").Scan(&storedName)
+		if err != nil {
+			t.Fatalf("Failed to query tenant: %v", err)
+		}
+
+		// Name should NOT contain script tags
+		if containsHTML(storedName) {
+			t.Errorf("XSS VULNERABILITY: Script tags stored in organization_name! Got: %s", storedName)
+		}
+
+		// Verify the safe content is preserved
+		if storedName != "Evil Shelter" && storedName != "alertXSSEvil Shelter" {
+			t.Logf("Sanitized name: %s (original contained script tags)", storedName)
+		}
+	})
+
+	t.Run("sanitizes img onerror from organization_name", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"organization_name": `<img src=x onerror="alert('XSS')">Malicious Shelter`,
+			"slug":              "xss-test-2",
+			"contact_email":     "xss-test2@example.com",
+			"city":              "Test City",
+			"postal_code":       "12345",
+			"federal_state":     "BW",
+			"admin_first_name":  "Admin",
+			"admin_last_name":   "User",
+			"admin_email":       "admin@xss-test2.com",
+			"admin_password":    "SecurePass123!",
+		}
+		body, _ := json.Marshal(reqBody)
+
+		req := httptest.NewRequest("POST", "/api/tenants/register", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		rec := httptest.NewRecorder()
+		handler.Register(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var storedName string
+		err := db.QueryRow("SELECT name FROM tenants WHERE slug = ?", "xss-test-2").Scan(&storedName)
+		if err != nil {
+			t.Fatalf("Failed to query tenant: %v", err)
+		}
+
+		if containsHTML(storedName) {
+			t.Errorf("XSS VULNERABILITY: HTML stored in organization_name! Got: %s", storedName)
+		}
+	})
+
+	t.Run("sanitizes event handlers from admin names", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"organization_name": "Normal Shelter",
+			"slug":              "xss-test-3",
+			"contact_email":     "xss-test3@example.com",
+			"city":              "Test City",
+			"postal_code":       "12345",
+			"federal_state":     "BW",
+			"admin_first_name":  `<a href="javascript:alert('XSS')">Click</a>`,
+			"admin_last_name":   `<div onmouseover="alert('XSS')">Hover</div>`,
+			"admin_email":       "admin@xss-test3.com",
+			"admin_password":    "SecurePass123!",
+		}
+		body, _ := json.Marshal(reqBody)
+
+		req := httptest.NewRequest("POST", "/api/tenants/register", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		rec := httptest.NewRecorder()
+		handler.Register(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		// Check user names don't contain HTML
+		var firstName, lastName string
+		err := db.QueryRow(`
+			SELECT u.first_name, u.last_name FROM users u
+			JOIN tenants t ON u.tenant_id = t.id
+			WHERE t.slug = ?
+		`, "xss-test-3").Scan(&firstName, &lastName)
+		if err != nil {
+			t.Fatalf("Failed to query user: %v", err)
+		}
+
+		if containsHTML(firstName) {
+			t.Errorf("XSS VULNERABILITY: HTML stored in admin first_name! Got: %s", firstName)
+		}
+		if containsHTML(lastName) {
+			t.Errorf("XSS VULNERABILITY: HTML stored in admin last_name! Got: %s", lastName)
+		}
+	})
+}
+
+// containsHTML checks if a string contains HTML tags
+func containsHTML(s string) bool {
+	// Check for common XSS patterns
+	patterns := []string{
+		"<script", "</script>",
+		"<img", "<a ",
+		"<div", "</div>",
+		"onerror=", "onmouseover=", "onclick=",
+		"javascript:",
+	}
+	for _, p := range patterns {
+		if len(s) >= len(p) {
+			for i := 0; i <= len(s)-len(p); i++ {
+				if s[i:i+len(p)] == p {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
@@ -131,7 +132,7 @@ func TestMultiTenant_ListBookings_FilterByTenant(t *testing.T) {
 	dogID := testutil.SeedTestDog(t, db, "Buddy", "Labrador", "green")
 
 	// Create tenant 2 in the database
-	now := testutil.Now()
+	now := testutil.NowTime()
 	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
 		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, now, now)
 	if err != nil {
@@ -215,7 +216,7 @@ func TestMultiTenant_GetBooking_CrossTenantBlocked(t *testing.T) {
 	dogID := testutil.SeedTestDog(t, db, "Buddy", "Labrador", "green")
 
 	// Create tenant 2
-	now := testutil.Now()
+	now := testutil.NowTime()
 	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
 		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, now, now)
 	if err != nil {
@@ -271,7 +272,7 @@ func TestMultiTenant_CancelBooking_CrossTenantBlocked(t *testing.T) {
 	dogID := testutil.SeedTestDog(t, db, "Buddy", "Labrador", "green")
 
 	// Create tenant 2
-	now := testutil.Now()
+	now := testutil.NowTime()
 	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
 		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, now, now)
 	if err != nil {
@@ -337,7 +338,7 @@ func TestMultiTenant_ApproveBooking_CrossTenantBlocked(t *testing.T) {
 	dogID := testutil.SeedTestDog(t, db, "Buddy", "Labrador", "green")
 
 	// Create tenant 2
-	now := testutil.Now()
+	now := testutil.NowTime()
 	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
 		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, now, now)
 	if err != nil {
@@ -398,7 +399,7 @@ func TestMultiTenant_MoveBooking_CrossTenantBlocked(t *testing.T) {
 	dogID := testutil.SeedTestDog(t, db, "Buddy", "Labrador", "green")
 
 	// Create tenant 2
-	now := testutil.Now()
+	now := testutil.NowTime()
 	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
 		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, now, now)
 	if err != nil {
@@ -758,7 +759,7 @@ func TestMultiTenant_CreateBooking_CrossTenantDog_ReturnsNotFound(t *testing.T) 
 	userID := testutil.SeedTestUser(t, db, "user@tenant1.com", "Test User", "green")
 
 	// Create tenant 2
-	now := testutil.Now()
+	now := testutil.NowTime()
 	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
 		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, now, now)
 	if err != nil {
@@ -835,7 +836,7 @@ func TestMultiTenant_CreateBooking_CrossTenantDog_AdminAlsoBlocked(t *testing.T)
 	}
 
 	// Create tenant 2
-	now := testutil.Now()
+	now := testutil.NowTime()
 	_, err = db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
 		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, now, now)
 	if err != nil {
@@ -880,5 +881,456 @@ func TestMultiTenant_CreateBooking_CrossTenantDog_AdminAlsoBlocked(t *testing.T)
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("BUG: Admin from tenant 1 should not access dogs from tenant 2. Got %d: %s",
 			rec.Code, rec.Body.String())
+	}
+}
+
+// =============================================================================
+// USER HANDLER CROSS-TENANT SECURITY TESTS
+// =============================================================================
+
+// TestMultiTenant_GetUser_CrossTenantBlocked tests that admins can't read users from other tenants
+// TDD RED PHASE: This test should FAIL until we add tenant verification to GetUser
+func TestMultiTenant_GetUser_CrossTenantBlocked(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewUserHandler(db, cfg)
+
+	// Create tenant 2
+	nowStr := testutil.Now()
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
+		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, nowStr, nowStr)
+	if err != nil {
+		t.Fatalf("Failed to create tenant 2: %v", err)
+	}
+
+	// Create user in tenant 2
+	userRepo := repository.NewUserRepository(db)
+	email := "user@tenant2.com"
+	hash := "hashedpassword"
+	nowTime := time.Now()
+	tenant2User := &models.User{
+		TenantID:        2,
+		FirstName:       "Tenant2",
+		LastName:        "User",
+		Email:           &email,
+		PasswordHash:    &hash,
+		IsVerified:      true,
+		IsActive:        true,
+		TermsAcceptedAt: nowTime,
+		LastActivityAt:  nowTime,
+	}
+	if err := userRepo.Create(tenant2User); err != nil {
+		t.Fatalf("Failed to create tenant 2 user: %v", err)
+	}
+
+	// Try to access as admin from tenant 1
+	req := httptest.NewRequest("GET", fmt.Sprintf("/api/admin/users/%d", tenant2User.ID), nil)
+	req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", tenant2User.ID)})
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 1) // Tenant 1!
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	ctx = context.WithValue(ctx, middleware.EmailKey, "admin@tenant1.com")
+	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.GetUser(rec, req)
+
+	// BUG: Should return 404, but returns 200 with full user data
+	if rec.Code == http.StatusOK {
+		t.Error("BUG: GetUser allowed cross-tenant access - admin from tenant 1 accessed tenant 2's user")
+	}
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("Expected 404 Not Found, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestMultiTenant_AdminUpdateUser_CrossTenantBlocked tests that admins can't modify users from other tenants
+// TDD RED PHASE: This test should FAIL until we add tenant verification to AdminUpdateUser
+func TestMultiTenant_AdminUpdateUser_CrossTenantBlocked(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewUserHandler(db, cfg)
+
+	// Create tenant 2
+	nowStr := testutil.Now()
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
+		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, nowStr, nowStr)
+	if err != nil {
+		t.Fatalf("Failed to create tenant 2: %v", err)
+	}
+
+	// Create user in tenant 2
+	userRepo := repository.NewUserRepository(db)
+	email := "victim@tenant2.com"
+	hash := "hashedpassword"
+	nowTime := time.Now()
+	tenant2User := &models.User{
+		TenantID:        2,
+		FirstName:       "Original",
+		LastName:        "Name",
+		Email:           &email,
+		PasswordHash:    &hash,
+		IsVerified:      true,
+		IsActive:        true,
+		TermsAcceptedAt: nowTime,
+		LastActivityAt:  nowTime,
+	}
+	if err := userRepo.Create(tenant2User); err != nil {
+		t.Fatalf("Failed to create tenant 2 user: %v", err)
+	}
+
+	// Try to update as admin from tenant 1
+	newFirstName := "HACKED"
+	reqBody := map[string]interface{}{
+		"first_name": newFirstName,
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest("PUT", fmt.Sprintf("/api/admin/users/%d", tenant2User.ID), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", tenant2User.ID)})
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 1) // Tenant 1!
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	ctx = context.WithValue(ctx, middleware.EmailKey, "admin@tenant1.com")
+	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.AdminUpdateUser(rec, req)
+
+	// BUG: Should return 404, but returns 200 (success)
+	if rec.Code == http.StatusOK {
+		t.Error("BUG: AdminUpdateUser allowed cross-tenant modification - admin from tenant 1 modified tenant 2's user")
+	}
+
+	// Verify user was NOT modified
+	savedUser, _ := userRepo.FindByID(tenant2User.ID)
+	if savedUser != nil && savedUser.FirstName == newFirstName {
+		t.Error("BUG: Cross-tenant update actually modified the user!")
+	}
+}
+
+// TestMultiTenant_DeactivateUser_CrossTenantBlocked tests that admins can't deactivate users from other tenants
+// TDD RED PHASE: This test should FAIL until we add tenant verification to DeactivateUser
+func TestMultiTenant_DeactivateUser_CrossTenantBlocked(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewUserHandler(db, cfg)
+
+	// Create tenant 2
+	nowStr := testutil.Now()
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
+		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, nowStr, nowStr)
+	if err != nil {
+		t.Fatalf("Failed to create tenant 2: %v", err)
+	}
+
+	// Create user in tenant 2
+	userRepo := repository.NewUserRepository(db)
+	email := "active@tenant2.com"
+	hash := "hashedpassword"
+	nowTime := time.Now()
+	tenant2User := &models.User{
+		TenantID:        2,
+		FirstName:       "Active",
+		LastName:        "User",
+		Email:           &email,
+		PasswordHash:    &hash,
+		IsVerified:      true,
+		IsActive:        true,
+		TermsAcceptedAt: nowTime,
+		LastActivityAt:  nowTime,
+	}
+	if err := userRepo.Create(tenant2User); err != nil {
+		t.Fatalf("Failed to create tenant 2 user: %v", err)
+	}
+
+	// Try to deactivate as admin from tenant 1
+	reqBody := map[string]interface{}{
+		"reason": "Cross-tenant attack test",
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest("POST", fmt.Sprintf("/api/admin/users/%d/deactivate", tenant2User.ID), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", tenant2User.ID)})
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 1) // Tenant 1!
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	ctx = context.WithValue(ctx, middleware.EmailKey, "admin@tenant1.com")
+	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.DeactivateUser(rec, req)
+
+	// BUG: Should return 404, but likely returns 200 (success)
+	if rec.Code == http.StatusOK {
+		t.Error("BUG: DeactivateUser allowed cross-tenant deactivation - admin from tenant 1 deactivated tenant 2's user")
+	}
+
+	// Verify user was NOT deactivated
+	savedUser, _ := userRepo.FindByID(tenant2User.ID)
+	if savedUser != nil && !savedUser.IsActive {
+		t.Error("BUG: Cross-tenant deactivation actually deactivated the user!")
+	}
+}
+
+// TestMultiTenant_ActivateUser_CrossTenantBlocked tests that admins can't activate users from other tenants
+// TDD RED PHASE: This test should FAIL until we add tenant verification to ActivateUser
+func TestMultiTenant_ActivateUser_CrossTenantBlocked(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewUserHandler(db, cfg)
+
+	// Create tenant 2
+	nowStr := testutil.Now()
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
+		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, nowStr, nowStr)
+	if err != nil {
+		t.Fatalf("Failed to create tenant 2: %v", err)
+	}
+
+	// Create inactive user in tenant 2
+	userRepo := repository.NewUserRepository(db)
+	email := "inactive@tenant2.com"
+	hash := "hashedpassword"
+	nowTime := time.Now()
+	tenant2User := &models.User{
+		TenantID:        2,
+		FirstName:       "Inactive",
+		LastName:        "User",
+		Email:           &email,
+		PasswordHash:    &hash,
+		IsVerified:      true,
+		IsActive:        false, // Inactive
+		TermsAcceptedAt: nowTime,
+		LastActivityAt:  nowTime,
+	}
+	if err := userRepo.Create(tenant2User); err != nil {
+		t.Fatalf("Failed to create tenant 2 user: %v", err)
+	}
+
+	// Try to activate as admin from tenant 1
+	req := httptest.NewRequest("POST", fmt.Sprintf("/api/admin/users/%d/activate", tenant2User.ID), nil)
+	req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", tenant2User.ID)})
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 1) // Tenant 1!
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	ctx = context.WithValue(ctx, middleware.EmailKey, "admin@tenant1.com")
+	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.ActivateUser(rec, req)
+
+	// BUG: Should return 404, but likely returns 200 (success)
+	if rec.Code == http.StatusOK {
+		t.Error("BUG: ActivateUser allowed cross-tenant activation - admin from tenant 1 activated tenant 2's user")
+	}
+
+	// Verify user was NOT activated
+	savedUser, _ := userRepo.FindByID(tenant2User.ID)
+	if savedUser != nil && savedUser.IsActive {
+		t.Error("BUG: Cross-tenant activation actually activated the user!")
+	}
+}
+
+// TestMultiTenant_AdminDeleteUser_CrossTenantBlocked tests that admins can't delete users from other tenants
+// TDD RED PHASE: This test should FAIL until we add tenant verification to AdminDeleteUser
+func TestMultiTenant_AdminDeleteUser_CrossTenantBlocked(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewUserHandler(db, cfg)
+
+	// Create tenant 2
+	now := testutil.NowTime()
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
+		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create tenant 2: %v", err)
+	}
+
+	// Create user in tenant 2
+	userRepo := repository.NewUserRepository(db)
+	email := "delete@tenant2.com"
+	hash := "hashedpassword"
+	tenant2User := &models.User{
+		TenantID:        2,
+		FirstName:       "Delete",
+		LastName:        "Me",
+		Email:           &email,
+		PasswordHash:    &hash,
+		IsVerified:      true,
+		IsActive:        true,
+		TermsAcceptedAt: time.Now(),
+		LastActivityAt:  time.Now(),
+	}
+	if err := userRepo.Create(tenant2User); err != nil {
+		t.Fatalf("Failed to create tenant 2 user: %v", err)
+	}
+
+	// Try to delete as admin from tenant 1
+	req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/admin/users/%d", tenant2User.ID), nil)
+	req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", tenant2User.ID)})
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 1) // Tenant 1!
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	ctx = context.WithValue(ctx, middleware.EmailKey, "admin@tenant1.com")
+	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.IsSuperAdminKey, true) // Even super admin
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.AdminDeleteUser(rec, req)
+
+	// BUG: Should return 404, but may return 200 (success) or leak info
+	if rec.Code == http.StatusOK {
+		t.Error("BUG: AdminDeleteUser allowed cross-tenant deletion - admin from tenant 1 deleted tenant 2's user")
+	}
+
+	// Verify user still exists and is not deleted
+	savedUser, _ := userRepo.FindByID(tenant2User.ID)
+	if savedUser == nil || savedUser.IsDeleted {
+		t.Error("BUG: Cross-tenant deletion actually deleted the user!")
+	}
+}
+
+// TestMultiTenant_PromoteToAdmin_CrossTenantBlocked tests that super admins can't promote users from other tenants
+// TDD RED PHASE: This test should FAIL until we add tenant verification to PromoteToAdmin
+func TestMultiTenant_PromoteToAdmin_CrossTenantBlocked(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewUserHandler(db, cfg)
+
+	// Create tenant 2
+	now := testutil.NowTime()
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
+		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create tenant 2: %v", err)
+	}
+
+	// Create regular user in tenant 2
+	userRepo := repository.NewUserRepository(db)
+	email := "regular@tenant2.com"
+	hash := "hashedpassword"
+	tenant2User := &models.User{
+		TenantID:        2,
+		FirstName:       "Regular",
+		LastName:        "User",
+		Email:           &email,
+		PasswordHash:    &hash,
+		IsVerified:      true,
+		IsActive:        true,
+		IsAdmin:         false, // Not an admin
+		TermsAcceptedAt: time.Now(),
+		LastActivityAt:  time.Now(),
+	}
+	if err := userRepo.Create(tenant2User); err != nil {
+		t.Fatalf("Failed to create tenant 2 user: %v", err)
+	}
+
+	// Try to promote as super admin from tenant 1
+	req := httptest.NewRequest("POST", fmt.Sprintf("/api/admin/users/%d/promote", tenant2User.ID), nil)
+	req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", tenant2User.ID)})
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 1) // Tenant 1!
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	ctx = context.WithValue(ctx, middleware.EmailKey, "superadmin@tenant1.com")
+	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.IsSuperAdminKey, true)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.PromoteToAdmin(rec, req)
+
+	// BUG: Should return 404, but may return 200 (success)
+	if rec.Code == http.StatusOK {
+		t.Error("BUG: PromoteToAdmin allowed cross-tenant promotion - super admin from tenant 1 promoted tenant 2's user")
+	}
+
+	// Verify user was NOT promoted
+	savedUser, _ := userRepo.FindByID(tenant2User.ID)
+	if savedUser != nil && savedUser.IsAdmin {
+		t.Error("BUG: Cross-tenant promotion actually promoted the user!")
+	}
+}
+
+// TestMultiTenant_DemoteAdmin_CrossTenantBlocked tests that super admins can't demote admins from other tenants
+// TDD RED PHASE: This test should FAIL until we add tenant verification to DemoteAdmin
+func TestMultiTenant_DemoteAdmin_CrossTenantBlocked(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewUserHandler(db, cfg)
+
+	// Create tenant 2
+	now := testutil.NowTime()
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
+		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create tenant 2: %v", err)
+	}
+
+	// Create admin user in tenant 2
+	userRepo := repository.NewUserRepository(db)
+	email := "admin@tenant2.com"
+	hash := "hashedpassword"
+	tenant2Admin := &models.User{
+		TenantID:        2,
+		FirstName:       "Admin",
+		LastName:        "User",
+		Email:           &email,
+		PasswordHash:    &hash,
+		IsVerified:      true,
+		IsActive:        true,
+		IsAdmin:         true, // Is an admin
+		TermsAcceptedAt: time.Now(),
+		LastActivityAt:  time.Now(),
+	}
+	if err := userRepo.Create(tenant2Admin); err != nil {
+		t.Fatalf("Failed to create tenant 2 admin: %v", err)
+	}
+
+	// Try to demote as super admin from tenant 1
+	req := httptest.NewRequest("POST", fmt.Sprintf("/api/admin/users/%d/demote", tenant2Admin.ID), nil)
+	req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", tenant2Admin.ID)})
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 1) // Tenant 1!
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	ctx = context.WithValue(ctx, middleware.EmailKey, "superadmin@tenant1.com")
+	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.IsSuperAdminKey, true)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.DemoteAdmin(rec, req)
+
+	// BUG: Should return 404, but may return 200 (success)
+	if rec.Code == http.StatusOK {
+		t.Error("BUG: DemoteAdmin allowed cross-tenant demotion - super admin from tenant 1 demoted tenant 2's admin")
+	}
+
+	// Verify admin was NOT demoted
+	savedUser, _ := userRepo.FindByID(tenant2Admin.ID)
+	if savedUser != nil && !savedUser.IsAdmin {
+		t.Error("BUG: Cross-tenant demotion actually demoted the admin!")
 	}
 }

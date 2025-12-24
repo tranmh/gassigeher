@@ -67,11 +67,30 @@ func (h *TenantHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate required fields
-	if req.OrganizationName == "" {
-		respondError(w, http.StatusBadRequest, "Organisationsname ist erforderlich")
+	// Validate and sanitize organization name (XSS prevention)
+	sanitizedOrgName, valErr := ValidateOrganizationName(req.OrganizationName)
+	if valErr != nil {
+		respondError(w, http.StatusBadRequest, valErr.Message)
 		return
 	}
+	req.OrganizationName = sanitizedOrgName
+
+	// Validate and sanitize admin names (XSS prevention)
+	sanitizedFirstName, valErr := ValidatePersonName(req.AdminFirstName, "Vorname")
+	if valErr != nil {
+		respondError(w, http.StatusBadRequest, valErr.Message)
+		return
+	}
+	req.AdminFirstName = sanitizedFirstName
+
+	sanitizedLastName, valErr := ValidatePersonName(req.AdminLastName, "Nachname")
+	if valErr != nil {
+		respondError(w, http.StatusBadRequest, valErr.Message)
+		return
+	}
+	req.AdminLastName = sanitizedLastName
+
+	// Validate other required fields
 	if req.Slug == "" {
 		respondError(w, http.StatusBadRequest, "Subdomain ist erforderlich")
 		return
@@ -90,10 +109,6 @@ func (h *TenantHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.FederalState == "" {
 		respondError(w, http.StatusBadRequest, "Bundesland ist erforderlich")
-		return
-	}
-	if req.AdminFirstName == "" || req.AdminLastName == "" {
-		respondError(w, http.StatusBadRequest, "Admin-Name ist erforderlich")
 		return
 	}
 	if req.AdminEmail == "" {

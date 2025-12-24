@@ -1063,6 +1063,434 @@ func TestCreateDog_ProTierUnlimited(t *testing.T) {
 	}
 }
 
+// CRITICAL SECURITY TEST: Cross-tenant dog isolation (TDD RED Phase)
+// BUG: Admin from tenant 2 can read/update/delete dogs belonging to tenant 3
+// This is a critical security vulnerability that allows cross-tenant data access
+func TestDogHandler_CrossTenantIsolation(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewDogHandler(db, cfg)
+
+	// Create tenant 2
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
+		VALUES (2, 'tenant-2', 'Tenant 2', 'active', 'tenant2@example.com', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
+	if err != nil {
+		t.Fatalf("Failed to create tenant 2: %v", err)
+	}
+
+	// Create a dog belonging to tenant 1 (original test tenant)
+	dogID := testutil.SeedTestDog(t, db, "Tenant1Dog", "Labrador", "green")
+
+	// Verify dog belongs to tenant 1
+	var tenantID int
+	err = db.QueryRow("SELECT tenant_id FROM dogs WHERE id = ?", dogID).Scan(&tenantID)
+	if err != nil {
+		t.Fatalf("Failed to verify dog tenant_id: %v", err)
+	}
+	if tenantID != 1 {
+		t.Fatalf("Expected dog to belong to tenant 1, got %d", tenantID)
+	}
+
+	t.Run("SECURITY: tenant 2 admin cannot GET tenant 1's dog", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/dogs/"+fmt.Sprintf("%d", dogID), nil)
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dogID)})
+		// Context for tenant 2 admin
+		ctx := contextWithTenantAndUser(req.Context(), 2, 100)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.GetDog(rec, req)
+
+		// SECURITY: Should return 404 (Not Found) or 403 (Forbidden), NOT 200
+		if rec.Code == http.StatusOK {
+			t.Errorf("SECURITY VULNERABILITY: Tenant 2 admin could access tenant 1's dog! Expected 404/403, got 200")
+			t.Errorf("Response body: %s", rec.Body.String())
+		}
+	})
+
+	t.Run("SECURITY: tenant 2 admin cannot UPDATE tenant 1's dog", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"name": "HACKED BY TENANT 2",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/dogs/"+fmt.Sprintf("%d", dogID), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dogID)})
+		// Context for tenant 2 admin
+		ctx := contextWithTenantAndUser(req.Context(), 2, 100)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UpdateDog(rec, req)
+
+		// SECURITY: Should return 404 (Not Found) or 403 (Forbidden), NOT 200
+		if rec.Code == http.StatusOK {
+			t.Errorf("SECURITY VULNERABILITY: Tenant 2 admin could update tenant 1's dog! Expected 404/403, got 200")
+		}
+
+		// Verify dog name was NOT changed
+		var name string
+		db.QueryRow("SELECT name FROM dogs WHERE id = ?", dogID).Scan(&name)
+		if name == "HACKED BY TENANT 2" {
+			t.Errorf("CRITICAL: Dog was modified by unauthorized tenant! Name changed to: %s", name)
+		}
+	})
+
+	t.Run("SECURITY: tenant 2 admin cannot DELETE tenant 1's dog", func(t *testing.T) {
+		// Create another dog for delete test (so we don't affect other tests)
+		deleteDogID := testutil.SeedTestDog(t, db, "DeleteTestDog", "Beagle", "blue")
+
+		req := httptest.NewRequest("DELETE", "/api/dogs/"+fmt.Sprintf("%d", deleteDogID), nil)
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", deleteDogID)})
+		// Context for tenant 2 admin
+		ctx := contextWithTenantAndUser(req.Context(), 2, 100)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.DeleteDog(rec, req)
+
+		// SECURITY: Should return 404 (Not Found) or 403 (Forbidden), NOT 200
+		if rec.Code == http.StatusOK {
+			t.Errorf("SECURITY VULNERABILITY: Tenant 2 admin could delete tenant 1's dog! Expected 404/403, got 200")
+		}
+
+		// Verify dog still exists
+		var count int
+		db.QueryRow("SELECT COUNT(*) FROM dogs WHERE id = ?", deleteDogID).Scan(&count)
+		if count == 0 {
+			t.Errorf("CRITICAL: Dog was deleted by unauthorized tenant!")
+		}
+	})
+
+	t.Run("SECURITY: tenant 2 admin cannot TOGGLE AVAILABILITY of tenant 1's dog", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"is_available":       false,
+			"unavailable_reason": "HACKED",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/dogs/"+fmt.Sprintf("%d", dogID)+"/availability", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dogID)})
+		// Context for tenant 2 admin
+		ctx := contextWithTenantAndUser(req.Context(), 2, 100)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ToggleAvailability(rec, req)
+
+		// SECURITY: Should return 404 (Not Found) or 403 (Forbidden), NOT 200
+		if rec.Code == http.StatusOK {
+			t.Errorf("SECURITY VULNERABILITY: Tenant 2 admin could change tenant 1's dog availability! Expected 404/403, got 200")
+		}
+
+		// Verify availability was NOT changed
+		var isAvailable bool
+		db.QueryRow("SELECT is_available FROM dogs WHERE id = ?", dogID).Scan(&isAvailable)
+		if !isAvailable {
+			t.Errorf("CRITICAL: Dog availability was changed by unauthorized tenant!")
+		}
+	})
+
+	t.Run("SECURITY: tenant 2 admin cannot SET FEATURED on tenant 1's dog", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"is_featured": true,
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/dogs/"+fmt.Sprintf("%d", dogID)+"/featured", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dogID)})
+		// Context for tenant 2 admin
+		ctx := contextWithTenantAndUser(req.Context(), 2, 100)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.SetFeatured(rec, req)
+
+		// SECURITY: Should return 404 (Not Found) or 403 (Forbidden), NOT 200
+		if rec.Code == http.StatusOK {
+			t.Errorf("SECURITY VULNERABILITY: Tenant 2 admin could set featured on tenant 1's dog! Expected 404/403, got 200")
+		}
+	})
+
+	t.Run("POSITIVE: same tenant admin CAN access own dogs", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/dogs/"+fmt.Sprintf("%d", dogID), nil)
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dogID)})
+		// Context for tenant 1 admin (same tenant as dog)
+		ctx := contextWithTenantAndUser(req.Context(), 1, 1)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.GetDog(rec, req)
+
+		// Should succeed - same tenant
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected tenant 1 admin to access own dog, got status %d", rec.Code)
+		}
+	})
+}
+
+// =============================================================================
+// BUG FIX TESTS - TDD RED PHASE
+// =============================================================================
+
+// TestDogHandler_CreateDog_InputLengthValidation tests that excessively long inputs are rejected
+// BUG: Dog names up to 100,000 characters are accepted without validation
+// This could cause database bloat and DoS attacks
+func TestDogHandler_CreateDog_InputLengthValidation(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewDogHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "blue")
+
+	t.Run("rejects name longer than 100 characters", func(t *testing.T) {
+		longName := strings.Repeat("A", 101) // 101 characters
+		reqBody := fmt.Sprintf(`{"name":"%s","breed":"Labrador","size":"medium","age":3,"category":"green"}`, longName)
+		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateDog(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("BUG: Should reject name > 100 chars. Expected 400, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("accepts name exactly 100 characters", func(t *testing.T) {
+		exactName := strings.Repeat("A", 100) // Exactly 100 characters
+		reqBody := fmt.Sprintf(`{"name":"%s","breed":"Labrador","size":"medium","age":3,"category":"green"}`, exactName)
+		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateDog(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Errorf("Should accept name = 100 chars. Expected 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("rejects breed longer than 100 characters", func(t *testing.T) {
+		longBreed := strings.Repeat("B", 101)
+		reqBody := fmt.Sprintf(`{"name":"TestDog","breed":"%s","size":"medium","age":3,"category":"green"}`, longBreed)
+		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateDog(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("BUG: Should reject breed > 100 chars. Expected 400, got %d", rec.Code)
+		}
+	})
+
+	t.Run("rejects special_needs longer than 1000 characters", func(t *testing.T) {
+		longNeeds := strings.Repeat("N", 1001)
+		reqBody := fmt.Sprintf(`{"name":"TestDog","breed":"Lab","size":"medium","age":3,"category":"green","special_needs":"%s"}`, longNeeds)
+		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateDog(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("BUG: Should reject special_needs > 1000 chars. Expected 400, got %d", rec.Code)
+		}
+	})
+
+	t.Run("rejects pickup_location longer than 500 characters", func(t *testing.T) {
+		longLocation := strings.Repeat("L", 501)
+		reqBody := fmt.Sprintf(`{"name":"TestDog","breed":"Lab","size":"medium","age":3,"category":"green","pickup_location":"%s"}`, longLocation)
+		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateDog(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("BUG: Should reject pickup_location > 500 chars. Expected 400, got %d", rec.Code)
+		}
+	})
+}
+
+// TestDogHandler_UpdateDog_InputLengthValidation tests length validation on update
+func TestDogHandler_UpdateDog_InputLengthValidation(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewDogHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "blue")
+	dogID := testutil.SeedTestDog(t, db, "Bella", "Labrador", "green")
+
+	t.Run("rejects name longer than 100 characters on update", func(t *testing.T) {
+		longName := strings.Repeat("A", 101)
+		reqBody := fmt.Sprintf(`{"name":"%s"}`, longName)
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/dogs/%d", dogID), strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dogID)})
+		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UpdateDog(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("BUG: Should reject name > 100 chars on update. Expected 400, got %d", rec.Code)
+		}
+
+		// Verify original name unchanged
+		var name string
+		db.QueryRow("SELECT name FROM dogs WHERE id = ?", dogID).Scan(&name)
+		if name != "Bella" {
+			t.Errorf("Dog name should be unchanged after rejected update, got %s", name)
+		}
+	})
+}
+
+// TestDogHandler_CreateDog_XSSSanitization tests that HTML/script tags are sanitized
+// BUG: XSS payloads are stored in database without sanitization
+func TestDogHandler_CreateDog_XSSSanitization(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewDogHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "blue")
+
+	t.Run("strips HTML script tags from name", func(t *testing.T) {
+		reqBody := `{"name":"<script>alert('XSS')</script>Bella","breed":"Labrador","size":"medium","age":3,"category":"green"}`
+		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateDog(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("Expected 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		name := response["name"].(string)
+		if strings.Contains(name, "<script>") || strings.Contains(name, "</script>") {
+			t.Errorf("BUG: XSS payload should be sanitized. Got: %s", name)
+		}
+		if !strings.Contains(name, "Bella") {
+			t.Errorf("Legitimate text should be preserved. Got: %s", name)
+		}
+	})
+
+	t.Run("strips HTML tags from breed", func(t *testing.T) {
+		reqBody := `{"name":"TestDog","breed":"<img src=x onerror=alert('XSS')>Labrador","size":"medium","age":3,"category":"green"}`
+		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateDog(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("Expected 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		breed := response["breed"].(string)
+		if strings.Contains(breed, "<img") || strings.Contains(breed, "onerror") {
+			t.Errorf("BUG: XSS payload should be sanitized from breed. Got: %s", breed)
+		}
+	})
+
+	t.Run("strips HTML from special_needs", func(t *testing.T) {
+		reqBody := `{"name":"TestDog","breed":"Lab","size":"medium","age":3,"category":"green","special_needs":"<b>Bold</b> and <script>evil()</script>"}`
+		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateDog(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("Expected 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		specialNeeds := response["special_needs"].(string)
+		if strings.Contains(specialNeeds, "<script>") || strings.Contains(specialNeeds, "<b>") {
+			t.Errorf("BUG: HTML should be sanitized from special_needs. Got: %s", specialNeeds)
+		}
+		if !strings.Contains(specialNeeds, "Bold") || !strings.Contains(specialNeeds, "and") {
+			t.Errorf("Legitimate text should be preserved. Got: %s", specialNeeds)
+		}
+	})
+}
+
+// TestDogHandler_UpdateDog_XSSSanitization tests XSS sanitization on update
+func TestDogHandler_UpdateDog_XSSSanitization(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewDogHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "blue")
+	dogID := testutil.SeedTestDog(t, db, "Bella", "Labrador", "green")
+
+	t.Run("strips HTML from name on update", func(t *testing.T) {
+		reqBody := `{"name":"<script>alert('XSS')</script>Updated"}`
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/dogs/%d", dogID), strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dogID)})
+		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UpdateDog(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Expected 200, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		// Check database value
+		var name string
+		db.QueryRow("SELECT name FROM dogs WHERE id = ?", dogID).Scan(&name)
+		if strings.Contains(name, "<script>") {
+			t.Errorf("BUG: XSS payload stored in database. Got: %s", name)
+		}
+	})
+}
+
 // TestDogHandler_CreateDog_CategoryMapsToColorID tests that legacy category is mapped to color_id (TDD RED Phase)
 // BUG #1: When creating a dog with category="green" but no color_id, the color_id should be resolved
 func TestDogHandler_CreateDog_CategoryMapsToColorID(t *testing.T) {
@@ -1142,6 +1570,249 @@ func TestDogHandler_CreateDog_CategoryMapsToColorID(t *testing.T) {
 		colorID := response["color_id"]
 		if colorID == nil {
 			t.Error("BUG #1: color_id should be set when category='blue' is provided, got nil")
+		}
+	})
+}
+
+// =============================================================================
+// CRITICAL SECURITY TEST: Zero-tenant-ID Bypass Vulnerability (TDD RED Phase)
+// =============================================================================
+// BUG: When tenantID == 0 in context (missing tenant), handlers skip tenant check
+// The check `if tenantID > 0 && dog.TenantID != tenantID` is bypassed when tenantID == 0
+// This allows ANY user to access ALL dogs across ALL tenants
+func TestDogHandler_ZeroTenantID_Bypass(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewDogHandler(db, cfg)
+
+	// Create a dog belonging to tenant 1
+	dogID := testutil.SeedTestDog(t, db, "SecureDog", "Labrador", "green")
+
+	// Verify dog belongs to tenant 1
+	var tenantID int
+	err := db.QueryRow("SELECT tenant_id FROM dogs WHERE id = ?", dogID).Scan(&tenantID)
+	if err != nil {
+		t.Fatalf("Failed to verify dog tenant_id: %v", err)
+	}
+	if tenantID != 1 {
+		t.Fatalf("Expected dog to belong to tenant 1, got %d", tenantID)
+	}
+
+	t.Run("SECURITY: zero tenant_id in context should NOT allow GET", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/dogs/"+fmt.Sprintf("%d", dogID), nil)
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dogID)})
+		// Context with tenantID = 0 (simulating missing tenant resolution)
+		ctx := contextWithTenantAndUser(req.Context(), 0, 999)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.GetDog(rec, req)
+
+		// SECURITY: Should return 400 (Bad Request) or 403 (Forbidden), NOT 200
+		// Zero tenant means no tenant resolved - this should be blocked
+		if rec.Code == http.StatusOK {
+			t.Errorf("SECURITY VULNERABILITY: Zero tenantID bypass! Request with tenantID=0 accessed dog from tenant 1. Expected 400/403, got 200")
+			t.Errorf("Response body: %s", rec.Body.String())
+		}
+	})
+
+	t.Run("SECURITY: zero tenant_id should NOT allow UPDATE", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"name": "HACKED_VIA_ZERO_TENANT",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/dogs/"+fmt.Sprintf("%d", dogID), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dogID)})
+		// Context with tenantID = 0
+		ctx := contextWithTenantAndUser(req.Context(), 0, 999)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UpdateDog(rec, req)
+
+		// SECURITY: Should return 400/403/404, NOT 200
+		if rec.Code == http.StatusOK {
+			t.Errorf("SECURITY VULNERABILITY: Zero tenantID bypass allowed UPDATE! Expected 400/403/404, got 200")
+		}
+
+		// Verify dog name was NOT changed
+		var name string
+		db.QueryRow("SELECT name FROM dogs WHERE id = ?", dogID).Scan(&name)
+		if name == "HACKED_VIA_ZERO_TENANT" {
+			t.Errorf("CRITICAL: Dog was modified via zero-tenant bypass! Name changed to: %s", name)
+		}
+	})
+
+	t.Run("SECURITY: zero tenant_id should NOT allow DELETE", func(t *testing.T) {
+		// Create a dog specifically for this delete test
+		deleteDogID := testutil.SeedTestDog(t, db, "DeleteBypassTest", "Beagle", "blue")
+
+		req := httptest.NewRequest("DELETE", "/api/dogs/"+fmt.Sprintf("%d", deleteDogID), nil)
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", deleteDogID)})
+		// Context with tenantID = 0
+		ctx := contextWithTenantAndUser(req.Context(), 0, 999)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.DeleteDog(rec, req)
+
+		// SECURITY: Should return 400/403/404, NOT 200
+		if rec.Code == http.StatusOK {
+			t.Errorf("SECURITY VULNERABILITY: Zero tenantID bypass allowed DELETE! Expected 400/403/404, got 200")
+		}
+
+		// Verify dog still exists
+		var count int
+		db.QueryRow("SELECT COUNT(*) FROM dogs WHERE id = ?", deleteDogID).Scan(&count)
+		if count == 0 {
+			t.Errorf("CRITICAL: Dog was deleted via zero-tenant bypass!")
+		}
+	})
+
+	t.Run("SECURITY: zero tenant_id should NOT allow TOGGLE AVAILABILITY", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"is_available":       false,
+			"unavailable_reason": "HACKED_VIA_ZERO_TENANT",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/dogs/"+fmt.Sprintf("%d", dogID)+"/availability", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dogID)})
+		// Context with tenantID = 0
+		ctx := contextWithTenantAndUser(req.Context(), 0, 999)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ToggleAvailability(rec, req)
+
+		// SECURITY: Should return 400/403/404, NOT 200
+		if rec.Code == http.StatusOK {
+			t.Errorf("SECURITY VULNERABILITY: Zero tenantID bypass allowed ToggleAvailability! Expected 400/403/404, got 200")
+		}
+	})
+
+	t.Run("SECURITY: zero tenant_id should NOT allow SET FEATURED", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"is_featured": true,
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/dogs/"+fmt.Sprintf("%d", dogID)+"/featured", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dogID)})
+		// Context with tenantID = 0
+		ctx := contextWithTenantAndUser(req.Context(), 0, 999)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.SetFeatured(rec, req)
+
+		// SECURITY: Should return 400/403/404, NOT 200
+		if rec.Code == http.StatusOK {
+			t.Errorf("SECURITY VULNERABILITY: Zero tenantID bypass allowed SetFeatured! Expected 400/403/404, got 200")
+		}
+	})
+}
+
+// TestDogHandler_CreateDog_NegativeAgeValidation tests that negative age is rejected (TDD RED Phase)
+// BUG: Dogs can be created with negative age values like -5
+func TestDogHandler_CreateDog_NegativeAgeValidation(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewDogHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "blue")
+
+	t.Run("rejects negative age", func(t *testing.T) {
+		reqBody := `{"name":"Negative Age Dog","breed":"Labrador","size":"medium","age":-5,"color_id":1}`
+		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateDog(rec, req)
+
+		// Should return 400 Bad Request for negative age
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("BUG: Should reject negative age. Expected 400, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		// Verify error message mentions age
+		if !strings.Contains(rec.Body.String(), "age") && !strings.Contains(rec.Body.String(), "Age") {
+			t.Errorf("Error message should mention age, got: %s", rec.Body.String())
+		}
+	})
+
+	t.Run("allows zero age (newborn puppy)", func(t *testing.T) {
+		reqBody := `{"name":"Newborn Puppy","breed":"Labrador","size":"small","age":0,"color_id":1}`
+		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateDog(rec, req)
+
+		// Age 0 should be allowed for newborn puppies
+		if rec.Code != http.StatusCreated {
+			t.Errorf("Should allow age 0 for newborn puppies. Expected 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("allows positive age", func(t *testing.T) {
+		reqBody := `{"name":"Adult Dog","breed":"Labrador","size":"medium","age":5,"color_id":1}`
+		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateDog(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Errorf("Should allow positive age. Expected 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("rejects negative age in update", func(t *testing.T) {
+		// First create a valid dog
+		createBody := `{"name":"Update Test Dog","breed":"Labrador","size":"medium","age":3,"color_id":1}`
+		createReq := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(createBody))
+		createReq.Header.Set("Content-Type", "application/json")
+		ctx := contextWithTenantAndUser(createReq.Context(), 1, adminID)
+		createReq = createReq.WithContext(ctx)
+		createRec := httptest.NewRecorder()
+		handler.CreateDog(createRec, createReq)
+
+		if createRec.Code != http.StatusCreated {
+			t.Fatalf("Setup failed: couldn't create dog. Got %d", createRec.Code)
+		}
+
+		var createResp map[string]interface{}
+		json.Unmarshal(createRec.Body.Bytes(), &createResp)
+		dogID := int(createResp["id"].(float64))
+
+		// Try to update with negative age
+		updateBody := `{"age":-10}`
+		updateReq := httptest.NewRequest("PUT", fmt.Sprintf("/api/dogs/%d", dogID), strings.NewReader(updateBody))
+		updateReq.Header.Set("Content-Type", "application/json")
+		updateReq = mux.SetURLVars(updateReq, map[string]string{"id": fmt.Sprintf("%d", dogID)})
+		ctx = contextWithTenantAndUser(updateReq.Context(), 1, adminID)
+		updateReq = updateReq.WithContext(ctx)
+
+		updateRec := httptest.NewRecorder()
+		handler.UpdateDog(updateRec, updateReq)
+
+		// Should return 400 Bad Request for negative age
+		if updateRec.Code != http.StatusBadRequest {
+			t.Errorf("BUG: Should reject negative age in update. Expected 400, got %d. Body: %s", updateRec.Code, updateRec.Body.String())
 		}
 	})
 }

@@ -154,6 +154,15 @@ func (h *DogHandler) GetDog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SaaS SECURITY: Verify dog belongs to the requesting tenant
+	// SECURITY FIX: Always check tenant isolation - prevents bypass via tenantID=0
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	if dog.TenantID != tenantID {
+		// Return 404 to prevent tenant enumeration
+		respondError(w, http.StatusNotFound, "Dog not found")
+		return
+	}
+
 	respondJSON(w, http.StatusOK, dog)
 }
 
@@ -183,19 +192,58 @@ func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Validate required fields
-	if strings.TrimSpace(req.Name) == "" {
-		respondError(w, http.StatusBadRequest, "Name is required")
+	// Validate and sanitize required fields (prevents XSS and enforces length limits)
+	sanitizedName, valErr := ValidateDogName(req.Name)
+	if valErr != nil {
+		respondError(w, http.StatusBadRequest, valErr.Message)
 		return
 	}
 
-	if strings.TrimSpace(req.Breed) == "" {
-		respondError(w, http.StatusBadRequest, "Breed is required")
+	sanitizedBreed, valErr := ValidateDogBreed(req.Breed)
+	if valErr != nil {
+		respondError(w, http.StatusBadRequest, valErr.Message)
 		return
 	}
 
 	if req.Size != "small" && req.Size != "medium" && req.Size != "large" {
 		respondError(w, http.StatusBadRequest, "Size must be small, medium, or large")
+		return
+	}
+
+	// Validate age is not negative
+	if req.Age < 0 {
+		respondError(w, http.StatusBadRequest, "Age cannot be negative")
+		return
+	}
+
+	// Validate and sanitize optional fields
+	sanitizedSpecialNeeds, valErr := ValidateDogSpecialNeeds(req.SpecialNeeds)
+	if valErr != nil {
+		respondError(w, http.StatusBadRequest, valErr.Message)
+		return
+	}
+
+	sanitizedPickupLocation, valErr := ValidateDogPickupLocation(req.PickupLocation)
+	if valErr != nil {
+		respondError(w, http.StatusBadRequest, valErr.Message)
+		return
+	}
+
+	sanitizedWalkRoute, valErr := ValidateDogWalkRoute(req.WalkRoute)
+	if valErr != nil {
+		respondError(w, http.StatusBadRequest, valErr.Message)
+		return
+	}
+
+	sanitizedSpecialInstructions, valErr := ValidateDogSpecialInstructions(req.SpecialInstructions)
+	if valErr != nil {
+		respondError(w, http.StatusBadRequest, valErr.Message)
+		return
+	}
+
+	sanitizedExternalLink, valErr := ValidateDogExternalLink(req.ExternalLink)
+	if valErr != nil {
+		respondError(w, http.StatusBadRequest, valErr.Message)
 		return
 	}
 
@@ -232,23 +280,23 @@ func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) {
 		category = "green" // Default to satisfy CHECK constraint
 	}
 
-	// Create dog
+	// Create dog with sanitized values
 	dog := &models.Dog{
 		TenantID:            tenantID, // SaaS: Set tenant_id from context
-		Name:                req.Name,
-		Breed:               req.Breed,
+		Name:                sanitizedName,
+		Breed:               sanitizedBreed,
 		Size:                req.Size,
 		Age:                 req.Age,
 		Category:            category,
 		ColorID:             req.ColorID,
-		SpecialNeeds:        req.SpecialNeeds,
-		PickupLocation:      req.PickupLocation,
-		WalkRoute:           req.WalkRoute,
+		SpecialNeeds:        sanitizedSpecialNeeds,
+		PickupLocation:      sanitizedPickupLocation,
+		WalkRoute:           sanitizedWalkRoute,
 		WalkDuration:        req.WalkDuration,
-		SpecialInstructions: req.SpecialInstructions,
+		SpecialInstructions: sanitizedSpecialInstructions,
 		DefaultMorningTime:  req.DefaultMorningTime,
 		DefaultEveningTime:  req.DefaultEveningTime,
-		ExternalLink:        req.ExternalLink,
+		ExternalLink:        sanitizedExternalLink,
 		IsAvailable:         true, // Default to available
 	}
 
@@ -294,6 +342,15 @@ func (h *DogHandler) UpdateDog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SaaS SECURITY: Verify dog belongs to the requesting tenant
+	// SECURITY FIX: Always check tenant isolation - prevents bypass via tenantID=0
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	if dog.TenantID != tenantID {
+		// Return 404 to prevent tenant enumeration
+		respondError(w, http.StatusNotFound, "Dog not found")
+		return
+	}
+
 	// Parse update request
 	var req models.UpdateDogRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -301,22 +358,31 @@ func (h *DogHandler) UpdateDog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update fields if provided
+	// Update fields if provided (with validation and XSS sanitization)
 	if req.Name != nil {
-		// Validate name is not empty
-		if strings.TrimSpace(*req.Name) == "" {
-			respondError(w, http.StatusBadRequest, "Name is required")
+		sanitizedName, valErr := ValidateDogName(*req.Name)
+		if valErr != nil {
+			respondError(w, http.StatusBadRequest, valErr.Message)
 			return
 		}
-		dog.Name = *req.Name
+		dog.Name = sanitizedName
 	}
 	if req.Breed != nil {
-		dog.Breed = *req.Breed
+		sanitizedBreed, valErr := ValidateDogBreed(*req.Breed)
+		if valErr != nil {
+			respondError(w, http.StatusBadRequest, valErr.Message)
+			return
+		}
+		dog.Breed = sanitizedBreed
 	}
 	if req.Size != nil {
 		dog.Size = *req.Size
 	}
 	if req.Age != nil {
+		if *req.Age < 0 {
+			respondError(w, http.StatusBadRequest, "Age cannot be negative")
+			return
+		}
 		dog.Age = *req.Age
 	}
 	if req.Category != nil {
@@ -326,19 +392,39 @@ func (h *DogHandler) UpdateDog(w http.ResponseWriter, r *http.Request) {
 		dog.ColorID = req.ColorID
 	}
 	if req.SpecialNeeds != nil {
-		dog.SpecialNeeds = req.SpecialNeeds
+		sanitized, valErr := ValidateDogSpecialNeeds(req.SpecialNeeds)
+		if valErr != nil {
+			respondError(w, http.StatusBadRequest, valErr.Message)
+			return
+		}
+		dog.SpecialNeeds = sanitized
 	}
 	if req.PickupLocation != nil {
-		dog.PickupLocation = req.PickupLocation
+		sanitized, valErr := ValidateDogPickupLocation(req.PickupLocation)
+		if valErr != nil {
+			respondError(w, http.StatusBadRequest, valErr.Message)
+			return
+		}
+		dog.PickupLocation = sanitized
 	}
 	if req.WalkRoute != nil {
-		dog.WalkRoute = req.WalkRoute
+		sanitized, valErr := ValidateDogWalkRoute(req.WalkRoute)
+		if valErr != nil {
+			respondError(w, http.StatusBadRequest, valErr.Message)
+			return
+		}
+		dog.WalkRoute = sanitized
 	}
 	if req.WalkDuration != nil {
 		dog.WalkDuration = req.WalkDuration
 	}
 	if req.SpecialInstructions != nil {
-		dog.SpecialInstructions = req.SpecialInstructions
+		sanitized, valErr := ValidateDogSpecialInstructions(req.SpecialInstructions)
+		if valErr != nil {
+			respondError(w, http.StatusBadRequest, valErr.Message)
+			return
+		}
+		dog.SpecialInstructions = sanitized
 	}
 	if req.DefaultMorningTime != nil {
 		dog.DefaultMorningTime = req.DefaultMorningTime
@@ -347,7 +433,12 @@ func (h *DogHandler) UpdateDog(w http.ResponseWriter, r *http.Request) {
 		dog.DefaultEveningTime = req.DefaultEveningTime
 	}
 	if req.ExternalLink != nil {
-		dog.ExternalLink = req.ExternalLink
+		sanitized, valErr := ValidateDogExternalLink(req.ExternalLink)
+		if valErr != nil {
+			respondError(w, http.StatusBadRequest, valErr.Message)
+			return
+		}
+		dog.ExternalLink = sanitized
 	}
 
 	// Update in database
@@ -368,6 +459,9 @@ func (h *DogHandler) DeleteDog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SaaS SECURITY: Get tenant_id from context for cross-tenant check
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Check if force delete is requested
 	force := r.URL.Query().Get("force") == "true"
 
@@ -379,6 +473,14 @@ func (h *DogHandler) DeleteDog(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if dog == nil {
+			respondError(w, http.StatusNotFound, "Dog not found")
+			return
+		}
+
+		// SaaS SECURITY: Verify dog belongs to the requesting tenant
+		// SECURITY FIX: Always check tenant isolation - prevents bypass via tenantID=0
+		if dog.TenantID != tenantID {
+			// Return 404 to prevent tenant enumeration
 			respondError(w, http.StatusNotFound, "Dog not found")
 			return
 		}
@@ -426,6 +528,23 @@ func (h *DogHandler) DeleteDog(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Normal delete (will fail if future bookings exist)
+	// SaaS SECURITY: First verify dog belongs to the requesting tenant
+	dog, err := h.dogRepo.FindByID(id)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to fetch dog")
+		return
+	}
+	if dog == nil {
+		respondError(w, http.StatusNotFound, "Dog not found")
+		return
+	}
+	// SECURITY FIX: Always check tenant isolation - prevents bypass via tenantID=0
+	if dog.TenantID != tenantID {
+		// Return 404 to prevent tenant enumeration
+		respondError(w, http.StatusNotFound, "Dog not found")
+		return
+	}
+
 	err = h.dogRepo.Delete(id)
 	if err != nil {
 		if strings.Contains(err.Error(), "future bookings") {
@@ -469,6 +588,15 @@ func (h *DogHandler) UploadDogPhoto(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if dog == nil {
+		respondError(w, http.StatusNotFound, "Dog not found")
+		return
+	}
+
+	// SaaS SECURITY: Verify dog belongs to the requesting tenant
+	// SECURITY FIX: Always check tenant isolation - prevents bypass via tenantID=0
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	if dog.TenantID != tenantID {
+		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
@@ -588,6 +716,24 @@ func (h *DogHandler) ToggleAvailability(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// SaaS SECURITY: First fetch dog and verify it belongs to the requesting tenant
+	dog, err := h.dogRepo.FindByID(id)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Database error")
+		return
+	}
+	if dog == nil {
+		respondError(w, http.StatusNotFound, "Dog not found")
+		return
+	}
+	// SECURITY FIX: Always check tenant isolation - prevents bypass via tenantID=0
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	if dog.TenantID != tenantID {
+		// Return 404 to prevent tenant enumeration
+		respondError(w, http.StatusNotFound, "Dog not found")
+		return
+	}
+
 	var req models.ToggleAvailabilityRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid request body")
@@ -607,7 +753,7 @@ func (h *DogHandler) ToggleAvailability(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Get updated dog
-	dog, err := h.dogRepo.FindByID(id)
+	dog, err = h.dogRepo.FindByID(id)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to fetch updated dog")
 		return
@@ -669,6 +815,15 @@ func (h *DogHandler) SetFeatured(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if dog == nil {
+		respondError(w, http.StatusNotFound, "Dog not found")
+		return
+	}
+
+	// SaaS SECURITY: Verify dog belongs to the requesting tenant
+	// SECURITY FIX: Always check tenant isolation - prevents bypass via tenantID=0
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	if dog.TenantID != tenantID {
+		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}

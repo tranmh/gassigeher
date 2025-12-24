@@ -1317,3 +1317,157 @@ func TestUserHandler_AdminDeleteUser(t *testing.T) {
 		}
 	})
 }
+
+// CRITICAL SECURITY TEST: Cross-tenant user isolation (TDD RED Phase)
+// BUG: Admin from tenant 2 can read/update/delete users belonging to tenant 1
+// This is a critical security vulnerability that allows cross-tenant data access
+func TestUserHandler_CrossTenantIsolation(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewUserHandler(db, cfg)
+
+	// Create tenant 2
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
+		VALUES (2, 'tenant-2', 'Tenant 2', 'active', 'tenant2@example.com', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
+	if err != nil {
+		t.Fatalf("Failed to create tenant 2: %v", err)
+	}
+
+	// Create a user belonging to tenant 1
+	tenant1UserID := testutil.SeedTestUser(t, db, "tenant1user@example.com", "Tenant1 User", "green")
+
+	// Verify user belongs to tenant 1
+	var tenantID int
+	err = db.QueryRow("SELECT tenant_id FROM users WHERE id = ?", tenant1UserID).Scan(&tenantID)
+	if err != nil {
+		t.Fatalf("Failed to verify user tenant_id: %v", err)
+	}
+	if tenantID != 1 {
+		t.Fatalf("Expected user to belong to tenant 1, got %d", tenantID)
+	}
+
+	// Create an admin user in tenant 2
+	tenant2AdminID := testutil.SeedTestUser(t, db, "tenant2admin@example.com", "Tenant2 Admin", "blue")
+	db.Exec("UPDATE users SET tenant_id = 2, is_admin = 1, is_super_admin = 1 WHERE id = ?", tenant2AdminID)
+
+	t.Run("SECURITY: tenant 2 admin cannot GET tenant 1's user", func(t *testing.T) {
+		req := httptest.NewRequest("GET", fmt.Sprintf("/api/v1/users/%d", tenant1UserID), nil)
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", tenant1UserID)})
+		// Context for tenant 2 admin
+		ctx := contextWithTenantAndUser(req.Context(), 2, tenant2AdminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.GetUser(rec, req)
+
+		// SECURITY: Should return 404 (Not Found), NOT 200
+		if rec.Code == http.StatusOK {
+			t.Errorf("SECURITY VULNERABILITY: Tenant 2 admin could access tenant 1's user! Expected 404, got 200")
+			t.Errorf("Response body: %s", rec.Body.String())
+		}
+	})
+
+	t.Run("SECURITY: tenant 2 admin cannot UPDATE tenant 1's user", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"first_name": "HACKED BY TENANT 2",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/v1/users/%d", tenant1UserID), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", tenant1UserID)})
+		// Context for tenant 2 admin
+		ctx := contextWithTenantAndUser(req.Context(), 2, tenant2AdminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminUpdateUser(rec, req)
+
+		// SECURITY: Should return 404 (Not Found), NOT 200
+		if rec.Code == http.StatusOK {
+			t.Errorf("SECURITY VULNERABILITY: Tenant 2 admin could update tenant 1's user! Expected 404, got 200")
+		}
+
+		// Verify user name was NOT changed
+		var firstName string
+		db.QueryRow("SELECT first_name FROM users WHERE id = ?", tenant1UserID).Scan(&firstName)
+		if firstName == "HACKED BY TENANT 2" {
+			t.Errorf("CRITICAL: User was modified by unauthorized tenant! Name changed to: %s", firstName)
+		}
+	})
+
+	t.Run("SECURITY: tenant 2 admin cannot DEACTIVATE tenant 1's user", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"reason": "HACKED",
+		}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/v1/users/%d/deactivate", tenant1UserID), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", tenant1UserID)})
+		// Context for tenant 2 admin
+		ctx := contextWithTenantAndUser(req.Context(), 2, tenant2AdminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.DeactivateUser(rec, req)
+
+		// SECURITY: Should return 404 (Not Found), NOT 200
+		if rec.Code == http.StatusOK {
+			t.Errorf("SECURITY VULNERABILITY: Tenant 2 admin could deactivate tenant 1's user! Expected 404, got 200")
+		}
+
+		// Verify user is still active
+		var isActive bool
+		db.QueryRow("SELECT is_active FROM users WHERE id = ?", tenant1UserID).Scan(&isActive)
+		if !isActive {
+			t.Errorf("CRITICAL: User was deactivated by unauthorized tenant!")
+		}
+	})
+
+	t.Run("SECURITY: tenant 2 admin cannot DELETE tenant 1's user", func(t *testing.T) {
+		// Create another user for delete test
+		deleteUserID := testutil.SeedTestUser(t, db, "deletetest@example.com", "Delete Test", "green")
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/api/v1/users/%d", deleteUserID), nil)
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", deleteUserID)})
+		// Context for tenant 2 super admin
+		ctx := contextWithTenantAndUser(req.Context(), 2, tenant2AdminID)
+		ctx = context.WithValue(ctx, middleware.IsSuperAdminKey, true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.AdminDeleteUser(rec, req)
+
+		// SECURITY: Should return 404 (Not Found), NOT 200
+		if rec.Code == http.StatusOK {
+			t.Errorf("SECURITY VULNERABILITY: Tenant 2 admin could delete tenant 1's user! Expected 404, got 200")
+		}
+
+		// Verify user still exists and is not deleted
+		var isDeleted bool
+		err := db.QueryRow("SELECT is_deleted FROM users WHERE id = ?", deleteUserID).Scan(&isDeleted)
+		if err != nil || isDeleted {
+			t.Errorf("CRITICAL: User was deleted by unauthorized tenant!")
+		}
+	})
+
+	t.Run("POSITIVE: same tenant admin CAN access own users", func(t *testing.T) {
+		req := httptest.NewRequest("GET", fmt.Sprintf("/api/v1/users/%d", tenant1UserID), nil)
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", tenant1UserID)})
+		// Context for tenant 1 admin (same tenant as user)
+		adminID := testutil.SeedTestUser(t, db, "tenant1admin@example.com", "Tenant1 Admin", "blue")
+		db.Exec("UPDATE users SET is_admin = 1 WHERE id = ?", adminID)
+		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.GetUser(rec, req)
+
+		// Should succeed - same tenant
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected tenant 1 admin to access own user, got status %d: %s", rec.Code, rec.Body.String())
+		}
+	})
+}
