@@ -34,6 +34,16 @@ func validateS3Path(path string) error {
 		return errors.New("backslash not allowed in path")
 	}
 
+	// Defense-in-depth: Check for URL-encoded path traversal patterns
+	// These should be decoded by the HTTP layer, but check anyway
+	lowerPath := strings.ToLower(path)
+	if strings.Contains(lowerPath, "%2e") || // encoded dot
+		strings.Contains(lowerPath, "%2f") || // encoded slash
+		strings.Contains(lowerPath, "%5c") || // encoded backslash
+		strings.Contains(lowerPath, "%00") { // encoded null
+		return errors.New("URL-encoded characters not allowed in path")
+	}
+
 	// Clean the path and check for traversal
 	cleaned := filepath.Clean(path)
 	if strings.HasPrefix(cleaned, "..") || strings.Contains(cleaned, "/../") {

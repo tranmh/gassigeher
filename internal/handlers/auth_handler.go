@@ -262,6 +262,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if user == nil || user.PasswordHash == nil {
 		// Record failed attempt (user not found)
 		h.bruteForceService.RecordFailure(bruteForceKey)
+		middleware.RecordLogin(false)
 		respondError(w, http.StatusUnauthorized, "Ungültige Anmeldedaten")
 		return
 	}
@@ -269,6 +270,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// Check password
 	if !h.authService.CheckPassword(req.Password, *user.PasswordHash) {
 		// Record failed attempt (wrong password)
+		middleware.RecordLogin(false)
 		lockoutDuration := h.bruteForceService.RecordFailure(bruteForceKey)
 		if lockoutDuration > 0 {
 			w.Header().Set("Retry-After", fmt.Sprintf("%d", int(lockoutDuration.Seconds())))
@@ -302,6 +304,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Clear brute force failures on successful login
 	h.bruteForceService.ClearFailures(bruteForceKey)
+
+	// Record successful login for metrics
+	middleware.RecordLogin(true)
 
 	// Update last activity
 	if err := h.userRepo.UpdateLastActivity(user.ID); err != nil {

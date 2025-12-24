@@ -16,6 +16,7 @@
                     <li><a href="/central/">Dashboard</a></li>
                     <li><a href="/central/tenants.html">Tierheime</a></li>
                     <li><a href="/central/users.html" class="active">Benutzer</a></li>
+                    <li><a href="/central/marketing.html">Marketing</a></li>
                     <li><a href="#" onclick="logout()">Abmelden</a></li>
                 </ul>
             </nav>
@@ -130,6 +131,9 @@
                                     <td><span class="badge badge-${u.is_active ? 'success' : 'warning'}">${u.is_active ? 'Aktiv' : 'Inaktiv'}</span></td>
                                     <td>${formatDate(u.created_at)}</td>
                                     <td>
+                                        ${!u.is_super_admin && !u.is_central_admin && u.is_active ?
+                                            `<button class="btn btn-sm btn-primary" onclick="impersonateUser(${u.id}, '${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)}', '${escapeHtml(u.tenant_name || '')}')">Imitieren</button>` : ''
+                                        }
                                         <button class="btn btn-sm btn-secondary" onclick="promoteToAdmin(${u.id}, '${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)}')">Zum Central Admin</button>
                                     </td>
                                 </tr>
@@ -213,6 +217,45 @@
                 loadAdmins();
             } catch (err) {
                 showAlert('Fehler: ' + err.message, 'error');
+            }
+        }
+
+        async function impersonateUser(userId, userName, tenantName) {
+            const tenantInfo = tenantName ? ` (${tenantName})` : '';
+            if (!confirm(`Als ${userName}${tenantInfo} anmelden? Sie werden zur Tierheim-Anwendung weitergeleitet.`)) return;
+
+            try {
+                const result = await centralAPI.impersonateUser(userId);
+
+                // Store the new token
+                localStorage.setItem('gassigeher_token', result.token);
+
+                // Store info that we're impersonating (for banner display)
+                localStorage.setItem('gassigeher_impersonating', JSON.stringify({
+                    userName: userName,
+                    tenantName: tenantName || 'Unbekannt',
+                    tenantSlug: result.tenant?.slug || ''
+                }));
+
+                showAlert(`Sie sind jetzt als ${userName} angemeldet. Weiterleitung...`, 'success');
+
+                // Redirect to tenant dashboard
+                if (result.tenant?.slug) {
+                    // In SaaS mode, redirect to tenant subdomain
+                    const baseUrl = window.location.hostname.includes('localhost') ?
+                        window.location.origin :
+                        `https://${result.tenant.slug}.gassigeher.org`;
+                    setTimeout(() => {
+                        window.location.href = baseUrl + '/dashboard.html';
+                    }, 1000);
+                } else {
+                    // Fallback to main domain dashboard
+                    setTimeout(() => {
+                        window.location.href = '/dashboard.html';
+                    }, 1000);
+                }
+            } catch (err) {
+                showAlert('Fehler beim Imitieren: ' + err.message, 'error');
             }
         }
     </script>

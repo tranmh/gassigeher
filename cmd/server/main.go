@@ -99,6 +99,26 @@ func main() {
 		// Don't exit - allow server to start
 	}
 
+	// Initialize Sentry for error tracking (optional - enabled via SENTRY_DSN)
+	var sentryService *services.SentryService
+	if cfg.SentryDSN != "" {
+		sentryService, err = services.NewSentryService(&services.SentryConfig{
+			DSN:         cfg.SentryDSN,
+			Environment: cfg.SentryEnvironment,
+			Release:     cfg.SentryRelease,
+			ServerName:  "gassigeher",
+		})
+		if err != nil {
+			log.Printf("Warning: Failed to initialize Sentry: %v", err)
+			// Don't exit - Sentry is optional
+		} else {
+			defer sentryService.Flush(2 * time.Second)
+		}
+	}
+
+	// Initialize business metrics collection
+	middleware.InitBusinessMetrics(db)
+
 	// Demo tenant: Ensure demo tenant exists with sample data
 	demoSeedService := services.NewDemoSeedService(db)
 	if err := demoSeedService.EnsureDemoTenant(); err != nil {
@@ -143,6 +163,12 @@ func main() {
 	router := mux.NewRouter()
 
 	// Apply global middleware
+	// Sentry recovery middleware (captures panics and sends to Sentry)
+	if sentryService != nil && sentryService.IsEnabled() {
+		router.Use(sentryService.RecoveryMiddleware)
+		log.Println("Sentry panic recovery middleware enabled")
+	}
+
 	// SaaS Phase 5: Global rate limiter (100 requests/second burst 200 per IP)
 	router.Use(middleware.GlobalRateLimit(100, 200))
 	router.Use(middleware.MetricsMiddleware) // Collect request metrics
@@ -188,6 +214,8 @@ func main() {
 	metricsHandler := handlers.NewMetricsHandler()
 	consentHandler := handlers.NewConsentHandler(db)
 	featureFlagHandler := handlers.NewFeatureFlagHandler(db)
+	marketingHandler := handlers.NewMarketingHandler(db)
+	importHandler := handlers.NewImportHandler(db)
 
 	// Initialize global cache service
 	cacheService := services.NewDefaultCacheService()
@@ -295,8 +323,16 @@ func main() {
 	router.HandleFunc("/api/v1/theme/css", themeHandler.GetCSS).Methods("GET")
 	router.HandleFunc("/api/v1/theme/presets", themeHandler.GetPresets).Methods("GET")
 
+	// Tenant branding (public - for dynamic content on index.html)
+	router.HandleFunc("/api/v1/tenant/branding", tenantHandler.GetBranding).Methods("GET")
+
 	// Tenant registration (public - for self-service signup)
 	router.HandleFunc("/api/v1/tenants/register", tenantHandler.Register).Methods("POST")
+
+	// Marketing public routes
+	router.HandleFunc("/api/v1/marketing/fomo", marketingHandler.GetActiveFOMO).Methods("GET")
+	router.HandleFunc("/api/v1/marketing/referral/{code}", marketingHandler.ValidateReferralCode).Methods("GET")
+	router.HandleFunc("/api/v1/marketing/references", marketingHandler.ListReferenceEntries).Methods("GET")
 	router.HandleFunc("/api/v1/tenants/check-slug", tenantHandler.CheckSlug).Methods("GET")
 
 	// Contact form (public - for landing page inquiries)
@@ -471,6 +507,13 @@ func main() {
 	admin.HandleFunc("/admin/tenant", tenantHandler.GetCurrentTenant).Methods("GET")
 	admin.HandleFunc("/admin/tenant", tenantHandler.UpdateTenant).Methods("PUT")
 	admin.HandleFunc("/admin/tenant/stats", tenantHandler.GetTenantStats).Methods("GET")
+	admin.HandleFunc("/admin/tenant/branding", tenantHandler.UpdateBranding).Methods("PUT")
+	admin.HandleFunc("/admin/tenant/export", tenantHandler.ExportTenantData).Methods("GET")
+
+	// Import management (admin only)
+	admin.HandleFunc("/admin/import/dogs/preview", importHandler.PreviewImport).Methods("POST")
+	admin.HandleFunc("/admin/import/dogs", importHandler.ExecuteImport).Methods("POST")
+	admin.HandleFunc("/admin/import/dogs/template", importHandler.GetImportTemplate).Methods("GET")
 
 	// Booking approval management (admin only)
 	admin.HandleFunc("/bookings/pending-approvals", bookingHandler.GetPendingApprovals).Methods("GET")
@@ -499,17 +542,21 @@ func main() {
 	centralAdmin.Use(middleware.RequireCentralAdmin)
 	centralAdmin.HandleFunc("/stats", centralAdminHandler.GetPlatformStats).Methods("GET")
 	centralAdmin.HandleFunc("/tenants", centralAdminHandler.ListTenants).Methods("GET")
+	centralAdmin.HandleFunc("/tenants/inactive", centralAdminHandler.GetInactiveTenants).Methods("GET")
+	centralAdmin.HandleFunc("/tenants/activity", centralAdminHandler.GetTenantActivity).Methods("GET")
+	centralAdmin.HandleFunc("/impersonate/{userId}", centralAdminHandler.ImpersonateTenantUser).Methods("POST")
+	centralAdmin.HandleFunc("/end-impersonation", centralAdminHandler.EndCentralImpersonation).Methods("POST")
 	centralAdmin.HandleFunc("/tenants/{id}", centralAdminHandler.GetTenant).Methods("GET")
 	centralAdmin.HandleFunc("/tenants/{id}", centralAdminHandler.UpdateTenant).Methods("PUT")
 	centralAdmin.HandleFunc("/tenants/{id}/activate", centralAdminHandler.ActivateTenant).Methods("POST")
 	centralAdmin.HandleFunc("/tenants/{id}/deactivate", centralAdminHandler.DeactivateTenant).Methods("POST")
 	centralAdmin.HandleFunc("/tenants/{id}/users", centralAdminHandler.GetTenantUsers).Methods("GET")
 	centralAdmin.HandleFunc("/tenants/{id}/export", centralAdminHandler.ExportTenantData).Methods("GET")
+	centralAdmin.HandleFunc("/tenants/{id}/reset", centralAdminHandler.ResetLocalDevTenant).Methods("POST")
 	centralAdmin.HandleFunc("/admins", centralAdminHandler.ListCentralAdmins).Methods("GET")
 	centralAdmin.HandleFunc("/admins/{id}/promote", centralAdminHandler.PromoteToCentralAdmin).Methods("POST")
 	centralAdmin.HandleFunc("/admins/{id}/demote", centralAdminHandler.DemoteFromCentralAdmin).Methods("POST")
 	centralAdmin.HandleFunc("/users/search", centralAdminHandler.SearchUsers).Methods("GET")
-	centralAdmin.HandleFunc("/tenants/{id}/reset", centralAdminHandler.ResetLocalDevTenant).Methods("POST")
 
 	// Feature flags management (central admin only)
 	centralAdmin.HandleFunc("/feature-flags", featureFlagHandler.ListFlags).Methods("GET")
@@ -517,6 +564,24 @@ func main() {
 	centralAdmin.HandleFunc("/feature-flags/{id}", featureFlagHandler.GetFlag).Methods("GET")
 	centralAdmin.HandleFunc("/feature-flags/{id}", featureFlagHandler.UpdateFlag).Methods("PUT")
 	centralAdmin.HandleFunc("/feature-flags/{id}", featureFlagHandler.DeleteFlag).Methods("DELETE")
+
+	// Marketing management (central admin only)
+	centralAdmin.HandleFunc("/marketing/stats", marketingHandler.GetMarketingStats).Methods("GET")
+	centralAdmin.HandleFunc("/marketing/campaigns", marketingHandler.ListCampaigns).Methods("GET")
+	centralAdmin.HandleFunc("/marketing/campaigns", marketingHandler.CreateCampaign).Methods("POST")
+	centralAdmin.HandleFunc("/marketing/campaigns/{id}", marketingHandler.GetCampaign).Methods("GET")
+	centralAdmin.HandleFunc("/marketing/campaigns/{id}", marketingHandler.UpdateCampaign).Methods("PUT")
+	centralAdmin.HandleFunc("/marketing/campaigns/{id}", marketingHandler.DeleteCampaign).Methods("DELETE")
+	centralAdmin.HandleFunc("/marketing/referral-codes", marketingHandler.ListReferralCodes).Methods("GET")
+	centralAdmin.HandleFunc("/marketing/referral-codes", marketingHandler.CreateReferralCode).Methods("POST")
+	centralAdmin.HandleFunc("/marketing/referral-codes/{id}", marketingHandler.GetReferralCode).Methods("GET")
+	centralAdmin.HandleFunc("/marketing/referral-codes/{id}", marketingHandler.UpdateReferralCode).Methods("PUT")
+	centralAdmin.HandleFunc("/marketing/referral-codes/{id}/toggle", marketingHandler.ToggleReferralCode).Methods("PUT")
+	centralAdmin.HandleFunc("/marketing/referral-codes/{id}", marketingHandler.DeleteReferralCode).Methods("DELETE")
+	centralAdmin.HandleFunc("/marketing/references", marketingHandler.ListReferenceEntries).Methods("GET")
+	centralAdmin.HandleFunc("/marketing/references/{id}", marketingHandler.GetReferenceEntry).Methods("GET")
+	centralAdmin.HandleFunc("/marketing/references/{id}/approve", marketingHandler.ApproveReferenceEntry).Methods("PUT")
+	centralAdmin.HandleFunc("/marketing/references/{id}", marketingHandler.DeleteReferenceEntry).Methods("DELETE")
 
 	// Uploads directory (user photos, dog photos) - must remain on filesystem
 	// BUG FIX #4: Use SafeFileServer to prevent null byte injection and path traversal

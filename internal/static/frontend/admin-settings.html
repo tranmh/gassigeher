@@ -32,7 +32,13 @@
                             <a href="/admin-reactivation-requests.html">🔄 Reaktivierungen</a>
                         </div>
                     </li>
-                    <li><a href="/admin-settings.html" data-i18n="admin_dashboard.system_settings">Einstellungen</a></li>
+                    <li class="nav-dropdown">
+                        <a href="#">Einstellungen</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-settings.html">⚙️ System</a>
+                            <a href="/admin-branding.html">🎨 Branding</a>
+                        </div>
+                    </li>
                     <li id="super-admin-colors-link" style="display:none;"><a href="/admin-colors.html">🎨 Farben</a></li>
                     <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
                     <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
@@ -186,6 +192,29 @@
                         Standard-Logo verwenden
                     </button>
                 </div>
+            </div>
+
+            <!-- GDPR Data Export Section -->
+            <div class="card" style="margin-top: 30px;">
+                <h2>📦 DSGVO Datenexport</h2>
+                <p style="font-size: 0.85rem; color: #666; margin-bottom: 20px;">
+                    Exportieren Sie alle Daten Ihres Tierheims als JSON-Datei. Dies umfasst:
+                </p>
+                <ul style="font-size: 0.85rem; color: #666; margin-bottom: 20px; padding-left: 25px;">
+                    <li>Tierheim-Informationen</li>
+                    <li>Alle Benutzerkonten (ohne Passwörter)</li>
+                    <li>Alle Hunde</li>
+                    <li>Alle Buchungen</li>
+                    <li>Gesperrte Termine</li>
+                    <li>Einstellungen</li>
+                </ul>
+                <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 15px; margin-bottom: 20px;">
+                    <strong>Hinweis:</strong> Der Export enthält personenbezogene Daten. Gehen Sie verantwortungsvoll damit um und löschen Sie die Datei nach Gebrauch.
+                </div>
+                <button class="btn" onclick="exportAllData()">
+                    📥 Alle Daten exportieren
+                </button>
+                <div id="export-status" style="margin-top: 15px;"></div>
             </div>
         </div>
     </main>
@@ -437,6 +466,47 @@
                 showAlert('success', 'WhatsApp-Einstellungen gespeichert');
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Speichern der WhatsApp-Einstellungen');
+            }
+        }
+
+        async function exportAllData() {
+            const statusDiv = document.getElementById('export-status');
+            statusDiv.innerHTML = '<p style="color: #666;">Export wird vorbereitet...</p>';
+
+            try {
+                const data = await api.exportTenantData();
+
+                // Create downloadable JSON file
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+
+                // Generate filename with date
+                const date = new Date().toISOString().split('T')[0];
+                const filename = `gdpr-export-${date}.json`;
+
+                // Trigger download
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                statusDiv.innerHTML = `
+                    <p style="color: #155724; background: #d4edda; padding: 10px; border-radius: 6px;">
+                        ✓ Export erfolgreich! Datei wurde heruntergeladen.
+                    </p>
+                `;
+
+                showAlert('success', 'Datenexport erfolgreich heruntergeladen');
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <p style="color: #721c24; background: #f8d7da; padding: 10px; border-radius: 6px;">
+                        ✗ Fehler beim Export: ${error.message || 'Unbekannter Fehler'}
+                    </p>
+                `;
+                showAlert('error', error.message || 'Fehler beim Exportieren der Daten');
             }
         }
     </script>

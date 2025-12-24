@@ -1,0 +1,364 @@
+package repository
+
+import (
+	"database/sql"
+	"time"
+
+	"github.com/tranmh/gassigeher/internal/models"
+)
+
+// MarketingRepository handles marketing data operations
+type MarketingRepository struct {
+	db *sql.DB
+}
+
+// NewMarketingRepository creates a new marketing repository
+func NewMarketingRepository(db *sql.DB) *MarketingRepository {
+	return &MarketingRepository{db: db}
+}
+
+// ========== Campaigns ==========
+
+// ListCampaigns returns all marketing campaigns
+func (r *MarketingRepository) ListCampaigns() ([]*models.MarketingCampaign, error) {
+	query := `SELECT id, type, name, description, config, is_active, start_date, end_date, created_at, updated_at
+			  FROM marketing_campaigns ORDER BY created_at DESC`
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var campaigns []*models.MarketingCampaign
+	for rows.Next() {
+		c := &models.MarketingCampaign{}
+		if err := rows.Scan(&c.ID, &c.Type, &c.Name, &c.Description, &c.Config, &c.IsActive, &c.StartDate, &c.EndDate, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, err
+		}
+		campaigns = append(campaigns, c)
+	}
+	return campaigns, nil
+}
+
+// GetCampaign returns a campaign by ID
+func (r *MarketingRepository) GetCampaign(id int) (*models.MarketingCampaign, error) {
+	query := `SELECT id, type, name, description, config, is_active, start_date, end_date, created_at, updated_at
+			  FROM marketing_campaigns WHERE id = ?`
+	c := &models.MarketingCampaign{}
+	err := r.db.QueryRow(query, id).Scan(&c.ID, &c.Type, &c.Name, &c.Description, &c.Config, &c.IsActive, &c.StartDate, &c.EndDate, &c.CreatedAt, &c.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// GetActiveCampaignByType returns the active campaign of a specific type
+func (r *MarketingRepository) GetActiveCampaignByType(campaignType string) (*models.MarketingCampaign, error) {
+	now := time.Now()
+	query := `SELECT id, type, name, description, config, is_active, start_date, end_date, created_at, updated_at
+			  FROM marketing_campaigns
+			  WHERE type = ? AND is_active = 1
+			  AND (start_date IS NULL OR start_date <= ?)
+			  AND (end_date IS NULL OR end_date >= ?)
+			  LIMIT 1`
+	c := &models.MarketingCampaign{}
+	err := r.db.QueryRow(query, campaignType, now, now).Scan(&c.ID, &c.Type, &c.Name, &c.Description, &c.Config, &c.IsActive, &c.StartDate, &c.EndDate, &c.CreatedAt, &c.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// CreateCampaign creates a new campaign
+func (r *MarketingRepository) CreateCampaign(c *models.MarketingCampaign) error {
+	query := `INSERT INTO marketing_campaigns (type, name, description, config, is_active, start_date, end_date, created_at, updated_at)
+			  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	result, err := r.db.Exec(query, c.Type, c.Name, c.Description, c.Config, c.IsActive, c.StartDate, c.EndDate, time.Now(), time.Now())
+	if err != nil {
+		return err
+	}
+	id, _ := result.LastInsertId()
+	c.ID = int(id)
+	return nil
+}
+
+// UpdateCampaign updates a campaign
+func (r *MarketingRepository) UpdateCampaign(c *models.MarketingCampaign) error {
+	query := `UPDATE marketing_campaigns SET name = ?, description = ?, config = ?, is_active = ?, start_date = ?, end_date = ?, updated_at = ?
+			  WHERE id = ?`
+	_, err := r.db.Exec(query, c.Name, c.Description, c.Config, c.IsActive, c.StartDate, c.EndDate, time.Now(), c.ID)
+	return err
+}
+
+// DeleteCampaign deletes a campaign
+func (r *MarketingRepository) DeleteCampaign(id int) error {
+	_, err := r.db.Exec("DELETE FROM marketing_campaigns WHERE id = ?", id)
+	return err
+}
+
+// ========== Referral Codes ==========
+
+// ListReferralCodes returns all referral codes
+func (r *MarketingRepository) ListReferralCodes() ([]*models.ReferralCode, error) {
+	query := `SELECT rc.id, rc.code, rc.referrer_tenant_id, rc.referrer_email,
+			  rc.discount_months_referrer, rc.discount_months_referee, rc.uses_count, rc.max_uses,
+			  rc.is_active, rc.expires_at, rc.created_at, rc.updated_at, t.name
+			  FROM referral_codes rc
+			  LEFT JOIN tenants t ON rc.referrer_tenant_id = t.id
+			  ORDER BY rc.created_at DESC`
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var codes []*models.ReferralCode
+	for rows.Next() {
+		c := &models.ReferralCode{}
+		if err := rows.Scan(&c.ID, &c.Code, &c.ReferrerTenantID, &c.ReferrerEmail,
+			&c.DiscountMonthsReferrer, &c.DiscountMonthsReferee, &c.UsesCount, &c.MaxUses,
+			&c.IsActive, &c.ExpiresAt, &c.CreatedAt, &c.UpdatedAt, &c.ReferrerTenantName); err != nil {
+			return nil, err
+		}
+		codes = append(codes, c)
+	}
+	return codes, nil
+}
+
+// GetReferralCode returns a referral code by ID
+func (r *MarketingRepository) GetReferralCode(id int) (*models.ReferralCode, error) {
+	query := `SELECT id, code, referrer_tenant_id, referrer_email, discount_months_referrer, discount_months_referee,
+			  uses_count, max_uses, is_active, expires_at, created_at, updated_at
+			  FROM referral_codes WHERE id = ?`
+	c := &models.ReferralCode{}
+	err := r.db.QueryRow(query, id).Scan(&c.ID, &c.Code, &c.ReferrerTenantID, &c.ReferrerEmail,
+		&c.DiscountMonthsReferrer, &c.DiscountMonthsReferee, &c.UsesCount, &c.MaxUses,
+		&c.IsActive, &c.ExpiresAt, &c.CreatedAt, &c.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// GetReferralCodeByCode returns a referral code by its code string
+func (r *MarketingRepository) GetReferralCodeByCode(code string) (*models.ReferralCode, error) {
+	query := `SELECT id, code, referrer_tenant_id, referrer_email, discount_months_referrer, discount_months_referee,
+			  uses_count, max_uses, is_active, expires_at, created_at, updated_at
+			  FROM referral_codes WHERE code = ?`
+	c := &models.ReferralCode{}
+	err := r.db.QueryRow(query, code).Scan(&c.ID, &c.Code, &c.ReferrerTenantID, &c.ReferrerEmail,
+		&c.DiscountMonthsReferrer, &c.DiscountMonthsReferee, &c.UsesCount, &c.MaxUses,
+		&c.IsActive, &c.ExpiresAt, &c.CreatedAt, &c.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// CreateReferralCode creates a new referral code
+func (r *MarketingRepository) CreateReferralCode(c *models.ReferralCode) error {
+	query := `INSERT INTO referral_codes (code, referrer_tenant_id, referrer_email, discount_months_referrer,
+			  discount_months_referee, max_uses, is_active, expires_at, created_at, updated_at)
+			  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	result, err := r.db.Exec(query, c.Code, c.ReferrerTenantID, c.ReferrerEmail, c.DiscountMonthsReferrer,
+		c.DiscountMonthsReferee, c.MaxUses, c.IsActive, c.ExpiresAt, time.Now(), time.Now())
+	if err != nil {
+		return err
+	}
+	id, _ := result.LastInsertId()
+	c.ID = int(id)
+	return nil
+}
+
+// UpdateReferralCode updates a referral code
+func (r *MarketingRepository) UpdateReferralCode(c *models.ReferralCode) error {
+	query := `UPDATE referral_codes SET code = ?, referrer_email = ?, discount_months_referrer = ?,
+			  discount_months_referee = ?, max_uses = ?, is_active = ?, expires_at = ?, updated_at = ?
+			  WHERE id = ?`
+	_, err := r.db.Exec(query, c.Code, c.ReferrerEmail, c.DiscountMonthsReferrer, c.DiscountMonthsReferee,
+		c.MaxUses, c.IsActive, c.ExpiresAt, time.Now(), c.ID)
+	return err
+}
+
+// IncrementReferralCodeUses increments the use count
+func (r *MarketingRepository) IncrementReferralCodeUses(id int) error {
+	_, err := r.db.Exec("UPDATE referral_codes SET uses_count = uses_count + 1, updated_at = ? WHERE id = ?", time.Now(), id)
+	return err
+}
+
+// DeleteReferralCode deletes a referral code
+func (r *MarketingRepository) DeleteReferralCode(id int) error {
+	_, err := r.db.Exec("DELETE FROM referral_codes WHERE id = ?", id)
+	return err
+}
+
+// ========== Referral Uses ==========
+
+// RecordReferralUse records the use of a referral code
+func (r *MarketingRepository) RecordReferralUse(codeID, refereeTenantID int) error {
+	query := `INSERT INTO referral_uses (code_id, referee_tenant_id, applied_at) VALUES (?, ?, ?)`
+	_, err := r.db.Exec(query, codeID, refereeTenantID, time.Now())
+	return err
+}
+
+// GetReferralUses returns all uses for a referral code
+func (r *MarketingRepository) GetReferralUses(codeID int) ([]*models.ReferralUse, error) {
+	query := `SELECT ru.id, ru.code_id, ru.referee_tenant_id, ru.applied_at, rc.code, t.name
+			  FROM referral_uses ru
+			  JOIN referral_codes rc ON ru.code_id = rc.id
+			  JOIN tenants t ON ru.referee_tenant_id = t.id
+			  WHERE ru.code_id = ?
+			  ORDER BY ru.applied_at DESC`
+	rows, err := r.db.Query(query, codeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var uses []*models.ReferralUse
+	for rows.Next() {
+		u := &models.ReferralUse{}
+		if err := rows.Scan(&u.ID, &u.CodeID, &u.RefereeTenantID, &u.AppliedAt, &u.Code, &u.RefereeTenantName); err != nil {
+			return nil, err
+		}
+		uses = append(uses, u)
+	}
+	return uses, nil
+}
+
+// HasTenantUsedReferral checks if a tenant has already used a referral code
+func (r *MarketingRepository) HasTenantUsedReferral(tenantID int) (bool, error) {
+	var count int
+	err := r.db.QueryRow("SELECT COUNT(*) FROM referral_uses WHERE referee_tenant_id = ?", tenantID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// ========== Reference Entries ==========
+
+// ListReferenceEntries returns reference entries (optionally filtered by approval status)
+func (r *MarketingRepository) ListReferenceEntries(approvedOnly bool) ([]*models.ReferenceEntry, error) {
+	query := `SELECT id, tenant_id, display_name, city, federal_state, website_url, testimonial, logo_url, is_approved, display_order, created_at, updated_at
+			  FROM reference_entries`
+	if approvedOnly {
+		query += " WHERE is_approved = 1"
+	}
+	query += " ORDER BY display_order ASC, display_name ASC"
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []*models.ReferenceEntry
+	for rows.Next() {
+		e := &models.ReferenceEntry{}
+		if err := rows.Scan(&e.ID, &e.TenantID, &e.DisplayName, &e.City, &e.FederalState, &e.WebsiteURL, &e.Testimonial, &e.LogoURL, &e.IsApproved, &e.DisplayOrder, &e.CreatedAt, &e.UpdatedAt); err != nil {
+			return nil, err
+		}
+		entries = append(entries, e)
+	}
+	return entries, nil
+}
+
+// GetReferenceEntry returns a reference entry by ID
+func (r *MarketingRepository) GetReferenceEntry(id int) (*models.ReferenceEntry, error) {
+	query := `SELECT id, tenant_id, display_name, city, federal_state, website_url, testimonial, logo_url, is_approved, display_order, created_at, updated_at
+			  FROM reference_entries WHERE id = ?`
+	e := &models.ReferenceEntry{}
+	err := r.db.QueryRow(query, id).Scan(&e.ID, &e.TenantID, &e.DisplayName, &e.City, &e.FederalState, &e.WebsiteURL, &e.Testimonial, &e.LogoURL, &e.IsApproved, &e.DisplayOrder, &e.CreatedAt, &e.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return e, nil
+}
+
+// GetReferenceEntryByTenant returns a reference entry by tenant ID
+func (r *MarketingRepository) GetReferenceEntryByTenant(tenantID int) (*models.ReferenceEntry, error) {
+	query := `SELECT id, tenant_id, display_name, city, federal_state, website_url, testimonial, logo_url, is_approved, display_order, created_at, updated_at
+			  FROM reference_entries WHERE tenant_id = ?`
+	e := &models.ReferenceEntry{}
+	err := r.db.QueryRow(query, tenantID).Scan(&e.ID, &e.TenantID, &e.DisplayName, &e.City, &e.FederalState, &e.WebsiteURL, &e.Testimonial, &e.LogoURL, &e.IsApproved, &e.DisplayOrder, &e.CreatedAt, &e.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return e, nil
+}
+
+// CreateReferenceEntry creates a new reference entry
+func (r *MarketingRepository) CreateReferenceEntry(e *models.ReferenceEntry) error {
+	query := `INSERT INTO reference_entries (tenant_id, display_name, city, federal_state, website_url, testimonial, logo_url, is_approved, display_order, created_at, updated_at)
+			  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	result, err := r.db.Exec(query, e.TenantID, e.DisplayName, e.City, e.FederalState, e.WebsiteURL, e.Testimonial, e.LogoURL, e.IsApproved, e.DisplayOrder, time.Now(), time.Now())
+	if err != nil {
+		return err
+	}
+	id, _ := result.LastInsertId()
+	e.ID = int(id)
+	return nil
+}
+
+// UpdateReferenceEntry updates a reference entry
+func (r *MarketingRepository) UpdateReferenceEntry(e *models.ReferenceEntry) error {
+	query := `UPDATE reference_entries SET display_name = ?, city = ?, federal_state = ?, website_url = ?, testimonial = ?, logo_url = ?, is_approved = ?, display_order = ?, updated_at = ?
+			  WHERE id = ?`
+	_, err := r.db.Exec(query, e.DisplayName, e.City, e.FederalState, e.WebsiteURL, e.Testimonial, e.LogoURL, e.IsApproved, e.DisplayOrder, time.Now(), e.ID)
+	return err
+}
+
+// ApproveReferenceEntry approves a reference entry
+func (r *MarketingRepository) ApproveReferenceEntry(id int) error {
+	_, err := r.db.Exec("UPDATE reference_entries SET is_approved = 1, updated_at = ? WHERE id = ?", time.Now(), id)
+	return err
+}
+
+// DeleteReferenceEntry deletes a reference entry
+func (r *MarketingRepository) DeleteReferenceEntry(id int) error {
+	_, err := r.db.Exec("DELETE FROM reference_entries WHERE id = ?", id)
+	return err
+}
+
+// ========== Stats ==========
+
+// GetMarketingStats returns marketing statistics
+func (r *MarketingRepository) GetMarketingStats() (*models.MarketingStatsResponse, error) {
+	stats := &models.MarketingStatsResponse{}
+
+	// Active campaigns
+	r.db.QueryRow("SELECT COUNT(*) FROM marketing_campaigns WHERE is_active = 1").Scan(&stats.ActiveCampaigns)
+
+	// Total referral codes
+	r.db.QueryRow("SELECT COUNT(*) FROM referral_codes").Scan(&stats.TotalReferralCodes)
+
+	// Total referral uses
+	r.db.QueryRow("SELECT COUNT(*) FROM referral_uses").Scan(&stats.TotalReferralUses)
+
+	// Approved references
+	r.db.QueryRow("SELECT COUNT(*) FROM reference_entries WHERE is_approved = 1").Scan(&stats.ApprovedReferences)
+
+	// Pending references
+	r.db.QueryRow("SELECT COUNT(*) FROM reference_entries WHERE is_approved = 0").Scan(&stats.PendingReferences)
+
+	return stats, nil
+}

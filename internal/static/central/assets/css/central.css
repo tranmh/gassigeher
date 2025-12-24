@@ -484,6 +484,59 @@
     background: #fff3cd;
 }
 
+/* Form Select */
+.form-select {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    background: #fff;
+}
+
+.form-select:focus {
+    outline: none;
+    border-color: #82b965;
+}
+
+/* Warning Row */
+.row-warning {
+    background: #fff8e6 !important;
+}
+
+.row-warning:hover {
+    background: #fff3cd !important;
+}
+
+/* Loading Small */
+.loading-sm {
+    color: #999;
+    font-size: 0.8rem;
+}
+
+/* Activity Section */
+.activity-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.activity-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.activity-item label {
+    font-size: 0.75rem;
+    color: #666;
+    text-transform: uppercase;
+}
+
+.activity-item span {
+    font-weight: 500;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .central-header .container {

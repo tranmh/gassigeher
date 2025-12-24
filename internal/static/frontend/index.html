@@ -10,7 +10,7 @@
     <header>
         <div class="container">
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
-            <a href="/" class="logo">🐕 Gassigeher</a>
+            <a href="/" class="logo" id="site-logo">🐕 Gassigeher</a>
 
             <!-- Public Navigation (for non-authenticated users) -->
             <nav id="public-nav" style="display: none;">
@@ -41,9 +41,9 @@
     <main>
         <section class="hero">
             <div class="container">
-                <h1 data-i18n="home.welcome">Willkommen im Gassigeher-Team des Tierheim Göppingen</h1>
-                <p data-i18n="home.subtitle">Deine Plattform für Spaziergänge mit unseren Tierheimhunden</p>
-                <p data-i18n="home.description">Registriere dich, um unsere Hunde beim Spazierengehen zu begleiten. Erlebe mit dem passenden Hund eine wertvolle gemeinsame Zeit in der Natur.</p>
+                <h1 id="hero-welcome" data-i18n="home.welcome">Willkommen bei Gassigeher</h1>
+                <p id="hero-subtitle" data-i18n="home.subtitle">Deine Plattform für Spaziergänge mit unseren Tierheimhunden</p>
+                <p id="hero-description" data-i18n="home.description">Registriere dich, um unsere Hunde beim Spazierengehen zu begleiten. Erlebe mit dem passenden Hund eine wertvolle gemeinsame Zeit in der Natur.</p>
                 <div>
                     <a href="/register.html" class="btn" data-i18n="home.get_started">Jetzt starten</a>
                     <a href="#features" class="btn btn-secondary" data-i18n="home.learn_more">Mehr erfahren</a>
@@ -89,7 +89,13 @@
 
     <footer>
         <div class="container">
-            <p>&copy; 2025 Gassigeher. Alle Rechte vorbehalten. | <a href="/terms.html">AGB</a> | <a href="/privacy.html">Datenschutz</a></p>
+            <p id="footer-copyright">&copy; 2025 Gassigeher. Alle Rechte vorbehalten. | <a href="/terms.html">AGB</a> | <a href="/privacy.html">Datenschutz</a></p>
+            <p id="footer-custom" style="display: none; margin-top: 8px;"></p>
+            <p style="margin-top: 8px;">
+                <a href="https://gassigeher.org" target="_blank" rel="noopener" style="color: var(--text-gray); text-decoration: none; font-size: 0.85rem;">
+                    🐕 Powered by Gassigeher
+                </a>
+            </p>
             <p id="version-info" style="font-size: 0.8rem; color: var(--text-gray); margin-top: 8px;"></p>
         </div>
     </footer>
@@ -314,9 +320,76 @@
             }
         }
 
+        // Load and apply tenant branding
+        async function loadBranding() {
+            try {
+                const branding = await api.getBranding();
+                if (!branding) return;
+
+                // Update page title with tenant name
+                if (branding.tenant_name) {
+                    document.title = `${branding.tenant_name} - Gassigeher`;
+                }
+
+                // Update logo/header
+                const logo = document.getElementById('site-logo');
+                if (logo && branding.tenant_name) {
+                    logo.textContent = `🐕 ${branding.tenant_name}`;
+                }
+
+                // Update hero section
+                const heroWelcome = document.getElementById('hero-welcome');
+                if (heroWelcome) {
+                    if (branding.welcome_message) {
+                        heroWelcome.textContent = branding.welcome_message;
+                    } else if (branding.tenant_name) {
+                        heroWelcome.textContent = `Willkommen beim Gassigeher-Team ${branding.tenant_name}`;
+                    }
+                }
+
+                const heroSubtitle = document.getElementById('hero-subtitle');
+                if (heroSubtitle && branding.tagline) {
+                    heroSubtitle.textContent = branding.tagline;
+                }
+
+                const heroDescription = document.getElementById('hero-description');
+                if (heroDescription && branding.description) {
+                    heroDescription.textContent = branding.description;
+                }
+
+                // Update footer
+                const footerCopyright = document.getElementById('footer-copyright');
+                if (footerCopyright && branding.tenant_name) {
+                    const year = new Date().getFullYear();
+                    footerCopyright.innerHTML = `&copy; ${year} ${sanitizeHTML(branding.tenant_name)}. Alle Rechte vorbehalten. | <a href="/terms.html">AGB</a> | <a href="/privacy.html">Datenschutz</a>`;
+                }
+
+                // Show custom footer text if available
+                const footerCustom = document.getElementById('footer-custom');
+                if (footerCustom && branding.footer_text) {
+                    footerCustom.textContent = branding.footer_text;
+                    footerCustom.style.display = 'block';
+                }
+
+                // Update favicon if custom one is set
+                if (branding.favicon_url) {
+                    let link = document.querySelector("link[rel*='icon']") || document.createElement('link');
+                    link.type = 'image/x-icon';
+                    link.rel = 'shortcut icon';
+                    link.href = branding.favicon_url;
+                    document.getElementsByTagName('head')[0].appendChild(link);
+                }
+
+            } catch (error) {
+                console.error('Error loading branding:', error);
+                // Fallback: keep default text
+            }
+        }
+
         // Load translations and setup navigation
         document.addEventListener('DOMContentLoaded', async () => {
             await window.i18n.load();
+            await loadBranding();
             await setupNavigation();
             await loadFeaturedDogs();
             await loadVersionInfo();

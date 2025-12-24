@@ -1,14 +1,26 @@
 // Internationalization (i18n) system
 class I18n {
-    constructor(locale = 'de') {
-        this.locale = locale;
+    constructor(locale = null) {
+        // Load from localStorage or default to 'de'
+        this.locale = locale || localStorage.getItem('gassigeher_language') || 'de';
         this.translations = {};
+        this.availableLocales = ['de', 'en'];
+        this.localeNames = {
+            'de': 'Deutsch',
+            'en': 'English'
+        };
     }
 
     async load() {
         try {
             const response = await fetch(`/i18n/${this.locale}.json`);
             if (!response.ok) {
+                // Fallback to German if translation not found
+                if (this.locale !== 'de') {
+                    console.warn(`Translation for ${this.locale} not found, falling back to German`);
+                    this.locale = 'de';
+                    return this.load();
+                }
                 throw new Error(`Failed to load translations: ${response.status}`);
             }
             this.translations = await response.json();
@@ -83,9 +95,28 @@ class I18n {
     // Change locale and reload
     async changeLocale(locale) {
         this.locale = locale;
+        localStorage.setItem('gassigeher_language', locale);
         await this.load();
+    }
+
+    // Get current locale
+    getLocale() {
+        return this.locale;
+    }
+
+    // Get available locales
+    getAvailableLocales() {
+        return this.availableLocales.map(code => ({
+            code,
+            name: this.localeNames[code] || code
+        }));
+    }
+
+    // Get locale display name
+    getLocaleName(code) {
+        return this.localeNames[code] || code;
     }
 }
 
 // Global instance
-window.i18n = new I18n('de');
+window.i18n = new I18n();

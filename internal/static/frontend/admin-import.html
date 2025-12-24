@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hunde importieren - Gassigeher Admin</title>
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <style>
+        .import-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .upload-zone {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            background: #f9f9f9;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .upload-zone:hover,
+        .upload-zone.dragover {
+            border-color: #82b965;
+            background: #f0f8eb;
+        }
+        .upload-zone.has-file {
+            border-color: #82b965;
+            background: #f0f8eb;
+        }
+        .upload-zone input[type="file"] {
+            display: none;
+        }
+        .upload-icon {
+            font-size: 48px;
+            color: #999;
+            margin-bottom: 16px;
+        }
+        .upload-text {
+            color: #666;
+            margin-bottom: 8px;
+        }
+        .upload-hint {
+            font-size: 0.85rem;
+            color: #999;
+        }
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: #fff;
+            border-radius: 6px;
+            margin-top: 16px;
+        }
+        .file-info .file-icon {
+            font-size: 24px;
+        }
+        .file-info .file-name {
+            flex: 1;
+            font-weight: 500;
+        }
+        .file-info .file-remove {
+            color: #dc3545;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        .preview-section {
+            margin-top: 30px;
+        }
+        .preview-table {
+            overflow-x: auto;
+        }
+        .preview-table table {
+            min-width: 100%;
+            border-collapse: collapse;
+        }
+        .preview-table th,
+        .preview-table td {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+        .preview-table th {
+            background: #f5f5f5;
+            font-weight: 600;
+        }
+        .preview-table tr:nth-child(even) td {
+            background: #fafafa;
+        }
+        .mapping-section {
+            margin-top: 30px;
+        }
+        .mapping-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 16px;
+        }
+        .mapping-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .mapping-item label {
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        .mapping-item select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .mapping-item .required {
+            color: #dc3545;
+        }
+        .import-actions {
+            margin-top: 30px;
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        .import-result {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .import-result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+        .import-result.has-errors {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+        }
+        .import-result h3 {
+            margin-bottom: 16px;
+        }
+        .import-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .import-stat {
+            text-align: center;
+            padding: 12px;
+            background: rgba(255,255,255,0.7);
+            border-radius: 6px;
+        }
+        .import-stat .number {
+            font-size: 24px;
+            font-weight: 600;
+            display: block;
+        }
+        .import-stat .label {
+            font-size: 0.85rem;
+            color: #666;
+        }
+        .error-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #fff;
+            border-radius: 4px;
+            padding: 12px;
+        }
+        .error-list li {
+            font-size: 0.85rem;
+            color: #856404;
+            margin-bottom: 4px;
+        }
+        .step-indicator {
+            display: flex;
+            margin-bottom: 30px;
+            gap: 0;
+        }
+        .step {
+            flex: 1;
+            text-align: center;
+            padding: 12px;
+            background: #f0f0f0;
+            color: #999;
+            font-weight: 500;
+            position: relative;
+        }
+        .step.active {
+            background: #82b965;
+            color: #fff;
+        }
+        .step.completed {
+            background: #5a8a42;
+            color: #fff;
+        }
+        .step:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            right: -10px;
+            top: 50%;
+            transform: translateY(-50%);
+            border: 10px solid transparent;
+            border-left-color: inherit;
+            z-index: 1;
+        }
+        .step:first-child {
+            border-radius: 4px 0 0 4px;
+        }
+        .step:last-child {
+            border-radius: 0 4px 4px 0;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <a href="/" class="logo">🐕 Gassigeher Admin</a>
+            <nav id="main-nav">
+                <ul>
+                    <li><a href="/admin-dashboard.html">Dashboard</a></li>
+                    <li><a href="/admin-dogs.html">Hunde</a></li>
+                    <li class="nav-dropdown">
+                        <a href="#">Buchungen</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-bookings.html">📅 Alle Buchungen</a>
+                            <a href="/admin-booking-approvals.html">✓ Genehmigungen</a>
+                            <a href="/admin-booking-times.html">⏰ Buchungszeiten</a>
+                            <a href="/admin-blocked-dates.html">🚫 Gesperrte Tage</a>
+                        </div>
+                    </li>
+                    <li class="nav-dropdown">
+                        <a href="#">Benutzer</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-users.html">👥 Alle Benutzer</a>
+                            <a href="/admin-color-requests.html">🎨 Farb-Anfragen</a>
+                            <a href="/admin-reactivation-requests.html">🔄 Reaktivierungen</a>
+                        </div>
+                    </li>
+                    <li class="nav-dropdown">
+                        <a href="#">Einstellungen</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-settings.html">⚙️ System</a>
+                            <a href="/admin-branding.html">🎨 Branding</a>
+                        </div>
+                    </li>
+                    <li><a href="/dashboard.html" class="area-switcher">👤 Benutzer-Bereich</a></li>
+                    <li><a href="#" onclick="api.logout()">Abmelden</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+
+    <main style="padding: 40px 0;">
+        <div class="container import-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h1>📥 Hunde importieren</h1>
+                <a href="#" id="download-template" class="btn btn-secondary">📄 Vorlage herunterladen</a>
+            </div>
+
+            <div id="alert-container"></div>
+
+            <!-- Step Indicator -->
+            <div class="step-indicator">
+                <div class="step active" id="step-1">1. Datei hochladen</div>
+                <div class="step" id="step-2">2. Spalten zuordnen</div>
+                <div class="step" id="step-3">3. Importieren</div>
+            </div>
+
+            <!-- Step 1: File Upload -->
+            <div class="card" id="upload-section">
+                <h3>CSV-Datei hochladen</h3>
+                <p style="color: #666; margin-bottom: 20px;">
+                    Laden Sie eine CSV-Datei mit Hunde-Daten hoch. Unterstutzt werden Komma- und Semikolon-getrennte Dateien.
+                </p>
+
+                <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click();">
+                    <input type="file" id="file-input" accept=".csv" onchange="handleFileSelect(event)">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">Datei hier ablegen oder klicken zum Auswahlen</div>
+                    <div class="upload-hint">Unterstutzt: CSV (max. 10MB)</div>
+                </div>
+
+                <div id="file-info" class="file-info" style="display: none;">
+                    <span class="file-icon">📄</span>
+                    <span class="file-name" id="file-name"></span>
+                    <span class="file-remove" onclick="removeFile()">×</span>
+                </div>
+            </div>
+
+            <!-- Step 2: Preview & Mapping -->
+            <div class="card preview-section" id="preview-section" style="display: none;">
+                <h3>Vorschau & Spaltenzuordnung</h3>
+                <p style="color: #666; margin-bottom: 20px;">
+                    <span id="total-rows-info">0</span> Zeilen gefunden. Ordnen Sie die CSV-Spalten den Hunde-Feldern zu.
+                </p>
+
+                <h4 style="margin-bottom: 12px;">Vorschau (erste 5 Zeilen)</h4>
+                <div class="preview-table" id="preview-table"></div>
+
+                <div class="mapping-section">
+                    <h4 style="margin-bottom: 12px;">Spaltenzuordnung</h4>
+                    <div class="mapping-grid" id="mapping-grid"></div>
+                </div>
+
+                <div class="import-actions">
+                    <button type="button" class="btn btn-secondary" onclick="resetImport()">Abbrechen</button>
+                    <button type="button" class="btn" onclick="executeImport()">📥 Importieren</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Results -->
+            <div id="result-section" style="display: none;"></div>
+
+            <!-- Help Section -->
+            <div class="card" style="margin-top: 30px; background: #f8f9fa;">
+                <h3>💡 Tipps zum Import</h3>
+                <ul style="margin: 0; padding-left: 20px; color: #666; line-height: 1.8;">
+                    <li>Laden Sie zuerst die <strong>Vorlage</strong> herunter, um das erwartete Format zu sehen</li>
+                    <li>Die <strong>Name</strong>-Spalte ist erforderlich</li>
+                    <li>Grossen werden automatisch erkannt: klein/small, mittel/medium, gross/large</li>
+                    <li>Farben mussen den konfigurierten Farbkategorien entsprechen (z.B. Grun, Orange, Blau)</li>
+                    <li>Verfugbarkeit wird automatisch erkannt: ja/yes/true/1 = verfugbar</li>
+                    <li>TEO-Exporte konnen direkt importiert werden</li>
+                </ul>
+            </div>
+        </div>
+    </main>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/i18n.js"></script>
+    <script src="/js/menu.js"></script>
+    <script>
+        let currentFile = null;
+        let previewData = null;
+        let currentMapping = {};
+
+        const fieldOptions = [
+            { key: 'name', label: 'Name', required: true },
+            { key: 'breed', label: 'Rasse', required: false },
+            { key: 'age', label: 'Alter', required: false },
+            { key: 'size', label: 'Grosse', required: false },
+            { key: 'color', label: 'Farbe', required: false },
+            { key: 'special_instructions', label: 'Spezialhinweise', required: false },
+            { key: 'pickup_location', label: 'Abholort', required: false },
+            { key: 'is_available', label: 'Verfugbar', required: false }
+        ];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check authentication
+            const token = localStorage.getItem('gassigeher_token');
+            if (!token) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // Check admin status
+            try {
+                const user = await api.getMe();
+                if (!user.is_admin && !user.is_super_admin) {
+                    window.location.href = '/dashboard.html';
+                    return;
+                }
+            } catch (err) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // Set up template download link
+            document.getElementById('download-template').href = api.getImportTemplateUrl();
+
+            // Set up drag and drop
+            const uploadZone = document.getElementById('upload-zone');
+
+            uploadZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadZone.classList.add('dragover');
+            });
+
+            uploadZone.addEventListener('dragleave', () => {
+                uploadZone.classList.remove('dragover');
+            });
+
+            uploadZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadZone.classList.remove('dragover');
+
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFile(files[0]);
+                }
+            });
+        });
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+
+        function handleFile(file) {
+            // Validate file type
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                showAlert('Nur CSV-Dateien werden unterstutzt', 'error');
+                return;
+            }
+
+            // Validate file size (10MB max)
+            if (file.size > 10 * 1024 * 1024) {
+                showAlert('Datei zu gross (max. 10MB)', 'error');
+                return;
+            }
+
+            currentFile = file;
+
+            // Update UI
+            document.getElementById('upload-zone').classList.add('has-file');
+            document.getElementById('file-info').style.display = 'flex';
+            document.getElementById('file-name').textContent = file.name;
+
+            // Upload and preview
+            uploadForPreview();
+        }
+
+        function removeFile() {
+            currentFile = null;
+            previewData = null;
+
+            document.getElementById('upload-zone').classList.remove('has-file');
+            document.getElementById('file-info').style.display = 'none';
+            document.getElementById('file-input').value = '';
+            document.getElementById('preview-section').style.display = 'none';
+            document.getElementById('result-section').style.display = 'none';
+
+            updateSteps(1);
+        }
+
+        async function uploadForPreview() {
+            try {
+                showAlert('Datei wird analysiert...', 'info');
+
+                previewData = await api.previewImport(currentFile);
+
+                document.getElementById('total-rows-info').textContent = previewData.total_rows;
+
+                // Build preview table
+                buildPreviewTable();
+
+                // Build mapping grid
+                buildMappingGrid();
+
+                // Show preview section
+                document.getElementById('preview-section').style.display = 'block';
+
+                updateSteps(2);
+                hideAlert();
+
+            } catch (err) {
+                showAlert('Fehler beim Analysieren: ' + err.message, 'error');
+            }
+        }
+
+        function buildPreviewTable() {
+            const container = document.getElementById('preview-table');
+
+            if (!previewData.headers || previewData.headers.length === 0) {
+                container.innerHTML = '<p>Keine Daten gefunden</p>';
+                return;
+            }
+
+            let html = '<table><thead><tr>';
+            html += '<th>#</th>';
+            previewData.headers.forEach((h, i) => {
+                html += `<th>${escapeHtml(h)} <small style="color:#999">[${i}]</small></th>`;
+            });
+            html += '</tr></thead><tbody>';
+
+            if (previewData.sample_rows) {
+                previewData.sample_rows.forEach((row, i) => {
+                    html += '<tr>';
+                    html += `<td>${i + 1}</td>`;
+                    row.forEach(cell => {
+                        html += `<td>${escapeHtml(cell || '')}</td>`;
+                    });
+                    html += '</tr>';
+                });
+            }
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function buildMappingGrid() {
+            const container = document.getElementById('mapping-grid');
+            currentMapping = {};
+
+            // Build header options
+            const headerOptions = previewData.headers.map((h, i) =>
+                `<option value="${i}">${escapeHtml(h)}</option>`
+            ).join('');
+
+            let html = '';
+            fieldOptions.forEach(field => {
+                const suggestedIndex = previewData.suggestions && previewData.suggestions[field.key];
+                currentMapping[field.key] = suggestedIndex || '';
+
+                html += `
+                    <div class="mapping-item">
+                        <label>
+                            ${field.label}
+                            ${field.required ? '<span class="required">*</span>' : ''}
+                        </label>
+                        <select id="mapping-${field.key}" onchange="updateMapping('${field.key}', this.value)">
+                            <option value="">-- Nicht zuordnen --</option>
+                            ${headerOptions}
+                        </select>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+
+            // Set suggested values
+            Object.keys(previewData.suggestions || {}).forEach(key => {
+                const select = document.getElementById(`mapping-${key}`);
+                if (select) {
+                    select.value = previewData.suggestions[key];
+                }
+            });
+        }
+
+        function updateMapping(field, value) {
+            currentMapping[field] = value;
+        }
+
+        async function executeImport() {
+            // Validate required mapping
+            if (!currentMapping.name) {
+                showAlert('Bitte ordnen Sie die Name-Spalte zu', 'error');
+                return;
+            }
+
+            try {
+                showAlert('Import wird durchgefuhrt...', 'info');
+                updateSteps(3);
+
+                const result = await api.executeImport(currentFile, currentMapping);
+
+                // Show results
+                showResults(result);
+                hideAlert();
+
+            } catch (err) {
+                showAlert('Fehler beim Import: ' + err.message, 'error');
+            }
+        }
+
+        function showResults(result) {
+            const container = document.getElementById('result-section');
+            const hasErrors = result.errors && result.errors.length > 0;
+
+            let html = `
+                <div class="import-result ${hasErrors ? 'has-errors' : 'success'}">
+                    <h3>${hasErrors ? '⚠️' : '✅'} Import abgeschlossen</h3>
+
+                    <div class="import-stats">
+                        <div class="import-stat">
+                            <span class="number">${result.total_rows}</span>
+                            <span class="label">Gesamt</span>
+                        </div>
+                        <div class="import-stat">
+                            <span class="number" style="color: #28a745;">${result.imported}</span>
+                            <span class="label">Importiert</span>
+                        </div>
+                        <div class="import-stat">
+                            <span class="number" style="color: ${result.skipped > 0 ? '#dc3545' : '#666'};">${result.skipped}</span>
+                            <span class="label">Ubersprungen</span>
+                        </div>
+                    </div>
+            `;
+
+            if (hasErrors) {
+                html += `
+                    <h4 style="margin-bottom: 8px;">Fehler:</h4>
+                    <ul class="error-list">
+                        ${result.errors.map(e => `<li>${escapeHtml(e)}</li>`).join('')}
+                    </ul>
+                `;
+            }
+
+            html += `
+                    <div style="margin-top: 20px; text-align: center;">
+                        <a href="/admin-dogs.html" class="btn">Zur Hunde-Verwaltung</a>
+                        <button class="btn btn-secondary" onclick="resetImport()" style="margin-left: 10px;">Neuer Import</button>
+                    </div>
+                </div>
+            `;
+
+            container.innerHTML = html;
+            container.style.display = 'block';
+        }
+
+        function resetImport() {
+            removeFile();
+            document.getElementById('result-section').style.display = 'none';
+            document.getElementById('result-section').innerHTML = '';
+            updateSteps(1);
+        }
+
+        function updateSteps(activeStep) {
+            for (let i = 1; i <= 3; i++) {
+                const step = document.getElementById(`step-${i}`);
+                step.classList.remove('active', 'completed');
+
+                if (i < activeStep) {
+                    step.classList.add('completed');
+                } else if (i === activeStep) {
+                    step.classList.add('active');
+                }
+            }
+        }
+
+        function showAlert(message, type) {
+            const container = document.getElementById('alert-container');
+            const alertClass = type === 'error' ? 'alert-error' :
+                              type === 'success' ? 'alert-success' : 'alert-info';
+
+            container.innerHTML = `<div class="alert ${alertClass}">${escapeHtml(message)}</div>`;
+        }
+
+        function hideAlert() {
+            document.getElementById('alert-container').innerHTML = '';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

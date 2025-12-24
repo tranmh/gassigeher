@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Branding - Gassigeher Admin</title>
+    <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <a href="/" class="logo">🐕 Gassigeher Admin</a>
+            <nav id="main-nav">
+                <ul>
+                    <li><a href="/admin-dashboard.html" data-i18n="admin_dashboard.title">Dashboard</a></li>
+                    <li><a href="/admin-dogs.html" data-i18n="dogs.manage_dogs">Hunde</a></li>
+                    <li class="nav-dropdown">
+                        <a href="#">Buchungen</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-bookings.html">Alle Buchungen</a>
+                            <a href="/admin-booking-approvals.html">Genehmigungen</a>
+                            <a href="/admin-booking-times.html">Buchungszeiten</a>
+                            <a href="/admin-blocked-dates.html">Gesperrte Tage</a>
+                        </div>
+                    </li>
+                    <li class="nav-dropdown">
+                        <a href="#">Benutzer</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-users.html">Alle Benutzer</a>
+                            <a href="/admin-color-requests.html">Farb-Anfragen</a>
+                            <a href="/admin-reactivation-requests.html">Reaktivierungen</a>
+                        </div>
+                    </li>
+                    <li class="nav-dropdown">
+                        <a href="#">Einstellungen</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-settings.html">⚙️ System</a>
+                            <a href="/admin-branding.html">🎨 Branding</a>
+                        </div>
+                    </li>
+                    <li id="super-admin-colors-link" style="display:none;"><a href="/admin-colors.html">Farben</a></li>
+                    <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">Benutzer-Bereich</a></li>
+                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+
+    <main style="padding: 40px 0;">
+        <div class="container-narrow">
+            <h1>Branding & Erscheinungsbild</h1>
+            <p style="color: var(--text-gray); margin-bottom: 30px;">
+                Passe das Erscheinungsbild deiner Gassigeher-Seite an.
+            </p>
+
+            <div id="alert-container"></div>
+
+            <!-- Hero Section Branding -->
+            <div class="card">
+                <h2>Startseite (Hero-Bereich)</h2>
+                <p style="font-size: 0.85rem; color: #666; margin-bottom: 20px;">
+                    Diese Texte werden auf der Startseite angezeigt.
+                </p>
+
+                <div class="form-group">
+                    <label for="welcome-message">Willkommensnachricht</label>
+                    <input type="text" id="welcome-message" maxlength="100"
+                           placeholder="z.B. Willkommen beim Gassigeher-Team Tierheim Musterstadt">
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        Die Hauptüberschrift auf der Startseite (max. 100 Zeichen)
+                    </p>
+                </div>
+
+                <div class="form-group">
+                    <label for="tagline">Tagline / Untertitel</label>
+                    <input type="text" id="tagline" maxlength="150"
+                           placeholder="z.B. Deine Plattform für Spaziergänge mit unseren Tierheimhunden">
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        Der Untertitel unter der Willkommensnachricht (max. 150 Zeichen)
+                    </p>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Beschreibung</label>
+                    <textarea id="description" rows="3" maxlength="300"
+                              placeholder="z.B. Registriere dich, um unsere Hunde beim Spazierengehen zu begleiten."></textarea>
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        Ausführlichere Beschreibung (max. 300 Zeichen)
+                    </p>
+                </div>
+            </div>
+
+            <!-- Footer Branding -->
+            <div class="card" style="margin-top: 30px;">
+                <h2>Footer</h2>
+
+                <div class="form-group">
+                    <label for="footer-text">Zusätzlicher Footer-Text</label>
+                    <input type="text" id="footer-text" maxlength="200"
+                           placeholder="z.B. Ein Projekt des Tierschutzvereins Musterstadt e.V.">
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        Optionaler Text, der im Footer angezeigt wird
+                    </p>
+                </div>
+            </div>
+
+            <!-- Links -->
+            <div class="card" style="margin-top: 30px;">
+                <h2>Links</h2>
+
+                <div class="form-group">
+                    <label for="website-url">Website-URL</label>
+                    <input type="url" id="website-url"
+                           placeholder="https://www.tierheim-musterstadt.de">
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        Link zur Hauptwebsite eures Tierheims
+                    </p>
+                </div>
+
+                <div class="form-group">
+                    <label for="donation-url">Spenden-URL</label>
+                    <input type="url" id="donation-url"
+                           placeholder="https://www.tierheim-musterstadt.de/spenden">
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        Link zu eurer Spendenseite
+                    </p>
+                </div>
+            </div>
+
+            <!-- Theme Selection -->
+            <div class="card" style="margin-top: 30px;">
+                <h2>Farbschema</h2>
+                <p style="font-size: 0.85rem; color: #666; margin-bottom: 20px;">
+                    Wähle ein vorgefertigtes Farbschema oder passe die Farben individuell an.
+                </p>
+
+                <div class="form-group">
+                    <label for="theme-preset">Theme-Vorlage</label>
+                    <select id="theme-preset">
+                        <option value="classic">Classic (Grün)</option>
+                        <option value="ocean">Ocean (Blau)</option>
+                        <option value="forest">Forest (Dunkelgrün)</option>
+                        <option value="sunset">Sunset (Orange)</option>
+                        <option value="lavender">Lavender (Lila)</option>
+                        <option value="coral">Coral (Rot)</option>
+                        <option value="midnight">Midnight (Dunkelblau)</option>
+                        <option value="emerald">Emerald (Smaragd)</option>
+                        <option value="rose">Rose (Pink)</option>
+                        <option value="slate">Slate (Grau)</option>
+                    </select>
+                </div>
+
+                <div id="custom-colors" style="margin-top: 20px;">
+                    <h3 style="font-size: 1rem; margin-bottom: 15px;">Individuelle Farben (optional)</h3>
+                    <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">
+                        Überschreibe die Theme-Farben mit eigenen Werten. Leer lassen für Theme-Standardwerte.
+                    </p>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                        <div class="form-group">
+                            <label for="color-primary">Primärfarbe</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="color" id="color-primary-picker" style="width: 50px; height: 35px; padding: 0; border: 1px solid #ddd;">
+                                <input type="text" id="color-primary" placeholder="#82b965" maxlength="7" style="flex: 1;">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="color-secondary">Sekundärfarbe</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="color" id="color-secondary-picker" style="width: 50px; height: 35px; padding: 0; border: 1px solid #ddd;">
+                                <input type="text" id="color-secondary" placeholder="#26272b" maxlength="7" style="flex: 1;">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="color-accent">Akzentfarbe</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="color" id="color-accent-picker" style="width: 50px; height: 35px; padding: 0; border: 1px solid #ddd;">
+                                <input type="text" id="color-accent" placeholder="#4a90e2" maxlength="7" style="flex: 1;">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="color-background">Hintergrund</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="color" id="color-background-picker" style="width: 50px; height: 35px; padding: 0; border: 1px solid #ddd;">
+                                <input type="text" id="color-background" placeholder="#fef9f3" maxlength="7" style="flex: 1;">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="color-text">Textfarbe</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="color" id="color-text-picker" style="width: 50px; height: 35px; padding: 0; border: 1px solid #ddd;">
+                                <input type="text" id="color-text" placeholder="#2c3e34" maxlength="7" style="flex: 1;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-secondary" onclick="clearCustomColors()" style="margin-top: 15px;">
+                        Individuelle Farben zurücksetzen
+                    </button>
+                </div>
+            </div>
+
+            <!-- Preview Section -->
+            <div class="card" style="margin-top: 30px;">
+                <h2>Vorschau</h2>
+                <div id="preview-container" style="border: 2px solid #ddd; border-radius: 8px; overflow: hidden; margin-top: 15px;">
+                    <div id="preview-hero" style="padding: 40px 20px; text-align: center; background: linear-gradient(135deg, var(--primary-green) 0%, var(--secondary-dark) 100%);">
+                        <h1 id="preview-welcome" style="color: white; font-size: 1.5rem; margin-bottom: 10px;">Willkommen bei Gassigeher</h1>
+                        <p id="preview-tagline" style="color: rgba(255,255,255,0.9); margin-bottom: 10px;">Deine Plattform für Spaziergänge</p>
+                        <p id="preview-description" style="color: rgba(255,255,255,0.8); font-size: 0.9rem;">Registriere dich jetzt!</p>
+                    </div>
+                    <div id="preview-footer" style="padding: 15px; background: #f5f5f5; text-align: center; font-size: 0.85rem; color: #666;">
+                        <span id="preview-footer-text"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Save Button -->
+            <div style="margin-top: 30px; text-align: center;">
+                <button class="btn" onclick="saveBranding()" style="padding: 15px 40px; font-size: 1.1rem;">
+                    Alle Änderungen speichern
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Gassigeher Admin. | <a href="/terms.html">AGB</a> | <a href="/privacy.html">Datenschutz</a></p>
+            <p style="margin-top: 8px;">
+                <a href="https://gassigeher.org" target="_blank" rel="noopener" style="color: var(--text-gray); text-decoration: none; font-size: 0.85rem;">
+                    Powered by Gassigeher
+                </a>
+            </p>
+        </div>
+    </footer>
+
+    <script src="/js/nav-menu.js"></script>
+    <script src="/js/i18n.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/sanitize.js"></script>
+    <script>
+        // Check admin access
+        async function checkAccess() {
+            try {
+                const user = await api.getMe();
+                if (!user.is_admin) {
+                    window.location.href = '/dashboard.html';
+                    return;
+                }
+                // Show super admin link if applicable
+                if (user.is_super_admin) {
+                    const link = document.getElementById('super-admin-colors-link');
+                    if (link) link.style.display = 'list-item';
+                }
+            } catch (error) {
+                window.location.href = '/login.html';
+            }
+        }
+
+        // Load current branding settings
+        async function loadBranding() {
+            try {
+                const branding = await api.getBranding();
+                if (!branding) return;
+
+                // Populate form fields
+                document.getElementById('welcome-message').value = branding.welcome_message || '';
+                document.getElementById('tagline').value = branding.tagline || '';
+                document.getElementById('description').value = branding.description || '';
+                document.getElementById('footer-text').value = branding.footer_text || '';
+                document.getElementById('website-url').value = branding.website_url || '';
+                document.getElementById('donation-url').value = branding.donation_url || '';
+                document.getElementById('theme-preset').value = branding.theme_preset || 'classic';
+
+                // Populate color fields
+                if (branding.color_primary) {
+                    document.getElementById('color-primary').value = branding.color_primary;
+                    document.getElementById('color-primary-picker').value = branding.color_primary;
+                }
+                if (branding.color_secondary) {
+                    document.getElementById('color-secondary').value = branding.color_secondary;
+                    document.getElementById('color-secondary-picker').value = branding.color_secondary;
+                }
+                if (branding.color_accent) {
+                    document.getElementById('color-accent').value = branding.color_accent;
+                    document.getElementById('color-accent-picker').value = branding.color_accent;
+                }
+                if (branding.color_background) {
+                    document.getElementById('color-background').value = branding.color_background;
+                    document.getElementById('color-background-picker').value = branding.color_background;
+                }
+                if (branding.color_text) {
+                    document.getElementById('color-text').value = branding.color_text;
+                    document.getElementById('color-text-picker').value = branding.color_text;
+                }
+
+                updatePreview();
+            } catch (error) {
+                console.error('Error loading branding:', error);
+                showAlert('Fehler beim Laden der Branding-Einstellungen', 'error');
+            }
+        }
+
+        // Save branding settings
+        async function saveBranding() {
+            const branding = {
+                welcome_message: document.getElementById('welcome-message').value || null,
+                tagline: document.getElementById('tagline').value || null,
+                description: document.getElementById('description').value || null,
+                footer_text: document.getElementById('footer-text').value || null,
+                website_url: document.getElementById('website-url').value || null,
+                donation_url: document.getElementById('donation-url').value || null,
+                theme_preset: document.getElementById('theme-preset').value,
+                color_primary: document.getElementById('color-primary').value || null,
+                color_secondary: document.getElementById('color-secondary').value || null,
+                color_accent: document.getElementById('color-accent').value || null,
+                color_background: document.getElementById('color-background').value || null,
+                color_text: document.getElementById('color-text').value || null
+            };
+
+            try {
+                await api.updateBranding(branding);
+                showAlert('Branding-Einstellungen gespeichert!', 'success');
+            } catch (error) {
+                console.error('Error saving branding:', error);
+                showAlert('Fehler beim Speichern: ' + (error.message || 'Unbekannter Fehler'), 'error');
+            }
+        }
+
+        // Update preview based on form inputs
+        function updatePreview() {
+            const welcomeMessage = document.getElementById('welcome-message').value || 'Willkommen bei Gassigeher';
+            const tagline = document.getElementById('tagline').value || 'Deine Plattform für Spaziergänge';
+            const description = document.getElementById('description').value || 'Registriere dich jetzt!';
+            const footerText = document.getElementById('footer-text').value;
+
+            document.getElementById('preview-welcome').textContent = welcomeMessage;
+            document.getElementById('preview-tagline').textContent = tagline;
+            document.getElementById('preview-description').textContent = description;
+            document.getElementById('preview-footer-text').textContent = footerText || 'Alle Rechte vorbehalten.';
+
+            // Update preview colors
+            const primaryColor = document.getElementById('color-primary').value || '#82b965';
+            const secondaryColor = document.getElementById('color-secondary').value || '#26272b';
+            const heroEl = document.getElementById('preview-hero');
+            heroEl.style.background = `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`;
+        }
+
+        // Sync color picker with text input
+        function syncColorInputs() {
+            const colorFields = ['primary', 'secondary', 'accent', 'background', 'text'];
+            colorFields.forEach(field => {
+                const picker = document.getElementById(`color-${field}-picker`);
+                const input = document.getElementById(`color-${field}`);
+
+                picker.addEventListener('input', () => {
+                    input.value = picker.value;
+                    updatePreview();
+                });
+
+                input.addEventListener('input', () => {
+                    if (/^#[0-9A-Fa-f]{6}$/.test(input.value)) {
+                        picker.value = input.value;
+                    }
+                    updatePreview();
+                });
+            });
+        }
+
+        // Clear custom colors
+        function clearCustomColors() {
+            const colorFields = ['primary', 'secondary', 'accent', 'background', 'text'];
+            colorFields.forEach(field => {
+                document.getElementById(`color-${field}`).value = '';
+                document.getElementById(`color-${field}-picker`).value = '#808080';
+            });
+            updatePreview();
+        }
+
+        // Show alert message
+        function showAlert(message, type) {
+            const container = document.getElementById('alert-container');
+            const alertClass = type === 'success' ? 'alert-success' : 'alert-error';
+            container.innerHTML = `<div class="alert ${alertClass}">${sanitizeHTML(message)}</div>`;
+            setTimeout(() => {
+                container.innerHTML = '';
+            }, 5000);
+        }
+
+        // Add input listeners for live preview
+        function setupLivePreview() {
+            const fields = ['welcome-message', 'tagline', 'description', 'footer-text'];
+            fields.forEach(id => {
+                document.getElementById(id).addEventListener('input', updatePreview);
+            });
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            await window.i18n.load();
+            await checkAccess();
+            await loadBranding();
+            syncColorInputs();
+            setupLivePreview();
+        });
+    </script>
+</body>
+</html>

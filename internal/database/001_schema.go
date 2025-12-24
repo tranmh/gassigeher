@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS tenant_settings (
   logo_url TEXT,
   favicon_url TEXT,
   welcome_message TEXT,
+  tagline TEXT,
+  description TEXT,
   footer_text TEXT,
   website_url TEXT,
   donation_url TEXT,
@@ -350,6 +352,65 @@ CREATE TABLE IF NOT EXISTS tenant_subscriptions (
 );
 CREATE INDEX IF NOT EXISTS idx_tenant_subscriptions_tenant ON tenant_subscriptions(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_tenant_subscriptions_status ON tenant_subscriptions(status);
+
+-- Marketing campaigns (FOMO countdown, referral promotions, etc.)
+CREATE TABLE IF NOT EXISTS marketing_campaigns (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  type TEXT NOT NULL CHECK(type IN ('fomo_countdown', 'referral', 'reference_page', 'custom')),
+  name TEXT NOT NULL,
+  description TEXT,
+  config TEXT,
+  is_active INTEGER DEFAULT 0,
+  start_date TIMESTAMP,
+  end_date TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Referral codes for tenant referrals
+CREATE TABLE IF NOT EXISTS referral_codes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT NOT NULL UNIQUE,
+  referrer_tenant_id INTEGER REFERENCES tenants(id) ON DELETE SET NULL,
+  referrer_email TEXT,
+  discount_months_referrer INTEGER DEFAULT 3,
+  discount_months_referee INTEGER DEFAULT 1,
+  uses_count INTEGER DEFAULT 0,
+  max_uses INTEGER,
+  is_active INTEGER DEFAULT 1,
+  expires_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_referral_codes_code ON referral_codes(code);
+CREATE INDEX IF NOT EXISTS idx_referral_codes_referrer ON referral_codes(referrer_tenant_id);
+
+-- Referral code usage tracking
+CREATE TABLE IF NOT EXISTS referral_uses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code_id INTEGER NOT NULL REFERENCES referral_codes(id) ON DELETE CASCADE,
+  referee_tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_referral_uses_code ON referral_uses(code_id);
+CREATE INDEX IF NOT EXISTS idx_referral_uses_referee ON referral_uses(referee_tenant_id);
+
+-- Reference page entries (shelters displayed publicly)
+CREATE TABLE IF NOT EXISTS reference_entries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id INTEGER NOT NULL UNIQUE REFERENCES tenants(id) ON DELETE CASCADE,
+  display_name TEXT NOT NULL,
+  city TEXT,
+  federal_state TEXT,
+  website_url TEXT,
+  testimonial TEXT,
+  logo_url TEXT,
+  is_approved INTEGER DEFAULT 0,
+  display_order INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_reference_entries_approved ON reference_entries(is_approved, display_order);
 
 -- Insert default pricing plans
 INSERT INTO pricing_plans (name, slug, max_dogs, price_monthly, price_yearly, is_active) VALUES

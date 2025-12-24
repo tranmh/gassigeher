@@ -96,6 +96,15 @@ type Config struct {
 
 	// Contact Form
 	ContactEmail string // Email address for contact form submissions
+
+	// Monitoring - Sentry
+	SentryDSN         string // Sentry DSN for error tracking (leave empty to disable)
+	SentryEnvironment string // Environment name (production, staging, development)
+	SentryRelease     string // Release version
+
+	// Monitoring - Prometheus
+	PrometheusEnabled bool   // Enable Prometheus metrics endpoint
+	PrometheusPath    string // Path for metrics endpoint (default: /metrics)
 }
 
 // Load loads configuration from environment variables
@@ -185,6 +194,15 @@ func Load() *Config {
 
 		// Contact Form
 		ContactEmail: getEnv("CONTACT_EMAIL", "kontakt@gassigeher.org"),
+
+		// Monitoring - Sentry
+		SentryDSN:         getEnv("SENTRY_DSN", ""),
+		SentryEnvironment: getEnv("SENTRY_ENVIRONMENT", "development"),
+		SentryRelease:     getEnv("SENTRY_RELEASE", ""),
+
+		// Monitoring - Prometheus
+		PrometheusEnabled: getEnvAsBool("PROMETHEUS_ENABLED", false),
+		PrometheusPath:    getEnv("PROMETHEUS_PATH", "/metrics"),
 	}
 }
 

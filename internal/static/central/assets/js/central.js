@@ -108,6 +108,28 @@ const centralAPI = {
         return apiRequest(`/central-admin/tenants/${id}/export`);
     },
 
+    // Tenant Activity
+    async getInactiveTenants(days = 30) {
+        return apiRequest(`/central-admin/tenants/inactive?days=${days}`);
+    },
+
+    async getTenantActivity() {
+        return apiRequest('/central-admin/tenants/activity');
+    },
+
+    // Impersonation
+    async impersonateUser(userId) {
+        return apiRequest(`/central-admin/impersonate/${userId}`, {
+            method: 'POST'
+        });
+    },
+
+    async endImpersonation() {
+        return apiRequest('/central-admin/end-impersonation', {
+            method: 'POST'
+        });
+    },
+
     // Users
     async searchUsers(query) {
         return apiRequest(`/central-admin/users/search?q=${encodeURIComponent(query)}`);
@@ -169,4 +191,87 @@ function showAlert(message, type = 'success') {
     setTimeout(() => {
         alert.remove();
     }, 5000);
+}
+
+// Marketing API
+async function getMarketingStats() {
+    return apiRequest('/central-admin/marketing/stats');
+}
+
+async function getCampaigns() {
+    return apiRequest('/central-admin/marketing/campaigns');
+}
+
+async function getCampaign(id) {
+    return apiRequest(`/central-admin/marketing/campaigns/${id}`);
+}
+
+async function createCampaign(campaign) {
+    return apiRequest('/central-admin/marketing/campaigns', {
+        method: 'POST',
+        body: JSON.stringify(campaign)
+    });
+}
+
+async function updateCampaign(id, campaign) {
+    return apiRequest(`/central-admin/marketing/campaigns/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(campaign)
+    });
+}
+
+async function deleteCampaign(id) {
+    return apiRequest(`/central-admin/marketing/campaigns/${id}`, {
+        method: 'DELETE'
+    });
+}
+
+async function getReferralCodes() {
+    return apiRequest('/central-admin/marketing/referral-codes');
+}
+
+async function getReferralCode(id) {
+    return apiRequest(`/central-admin/marketing/referral-codes/${id}`);
+}
+
+async function createReferralCode(code) {
+    return apiRequest('/central-admin/marketing/referral-codes', {
+        method: 'POST',
+        body: JSON.stringify(code)
+    });
+}
+
+async function updateReferralCode(id, code) {
+    return apiRequest(`/central-admin/marketing/referral-codes/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(code)
+    });
+}
+
+async function toggleReferralCode(id) {
+    return apiRequest(`/central-admin/marketing/referral-codes/${id}/toggle`, {
+        method: 'PUT'
+    });
+}
+
+async function deleteReferralCode(id) {
+    return apiRequest(`/central-admin/marketing/referral-codes/${id}`, {
+        method: 'DELETE'
+    });
+}
+
+async function getReferenceEntries() {
+    return apiRequest('/central-admin/marketing/references');
+}
+
+async function approveReferenceEntry(id) {
+    return apiRequest(`/central-admin/marketing/references/${id}/approve`, {
+        method: 'PUT'
+    });
+}
+
+async function deleteReferenceEntry(id) {
+    return apiRequest(`/central-admin/marketing/references/${id}`, {
+        method: 'DELETE'
+    });
 }

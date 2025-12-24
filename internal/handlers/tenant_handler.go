@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -446,6 +447,180 @@ func (h *TenantHandler) UpdateTenant(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// BrandingResponse represents the branding information for a tenant
+type BrandingResponse struct {
+	TenantName      string  `json:"tenant_name"`
+	TenantSlug      string  `json:"tenant_slug"`
+	WelcomeMessage  *string `json:"welcome_message,omitempty"`
+	Tagline         *string `json:"tagline,omitempty"`
+	Description     *string `json:"description,omitempty"`
+	FooterText      *string `json:"footer_text,omitempty"`
+	WebsiteURL      *string `json:"website_url,omitempty"`
+	DonationURL     *string `json:"donation_url,omitempty"`
+	LogoURL         *string `json:"logo_url,omitempty"`
+	FaviconURL      *string `json:"favicon_url,omitempty"`
+	ThemePreset     string  `json:"theme_preset"`
+	ColorPrimary    *string `json:"color_primary,omitempty"`
+	ColorSecondary  *string `json:"color_secondary,omitempty"`
+	ColorAccent     *string `json:"color_accent,omitempty"`
+	ColorBackground *string `json:"color_background,omitempty"`
+	ColorText       *string `json:"color_text,omitempty"`
+}
+
+// GetBranding returns the branding information for the current tenant (public endpoint)
+func (h *TenantHandler) GetBranding(w http.ResponseWriter, r *http.Request) {
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	tenantSlug, _ := r.Context().Value(middleware.TenantSlugKey).(string)
+
+	if tenantID == 0 {
+		respondError(w, http.StatusBadRequest, "Kein Tenant gefunden")
+		return
+	}
+
+	// Get tenant info
+	tenant, err := h.tenantRepo.FindByID(tenantID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Fehler beim Laden des Tierheims")
+		return
+	}
+	if tenant == nil {
+		respondError(w, http.StatusNotFound, "Tierheim nicht gefunden")
+		return
+	}
+
+	// Get tenant settings
+	settings, err := h.tenantRepo.GetSettings(tenantID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Fehler beim Laden der Einstellungen")
+		return
+	}
+
+	// Build response
+	response := BrandingResponse{
+		TenantName:  tenant.Name,
+		TenantSlug:  tenantSlug,
+		ThemePreset: "classic", // Default
+	}
+
+	if settings != nil {
+		response.WelcomeMessage = settings.WelcomeMessage
+		response.Tagline = settings.Tagline
+		response.Description = settings.Description
+		response.FooterText = settings.FooterText
+		response.WebsiteURL = settings.WebsiteURL
+		response.DonationURL = settings.DonationURL
+		response.LogoURL = settings.LogoURL
+		response.FaviconURL = settings.FaviconURL
+		response.ThemePreset = settings.ThemePreset
+		response.ColorPrimary = settings.ColorPrimary
+		response.ColorSecondary = settings.ColorSecondary
+		response.ColorAccent = settings.ColorAccent
+		response.ColorBackground = settings.ColorBackground
+		response.ColorText = settings.ColorText
+	}
+
+	respondJSON(w, http.StatusOK, response)
+}
+
+// UpdateBrandingRequest represents a request to update tenant branding
+type UpdateBrandingRequest struct {
+	WelcomeMessage  *string `json:"welcome_message"`
+	Tagline         *string `json:"tagline"`
+	Description     *string `json:"description"`
+	FooterText      *string `json:"footer_text"`
+	WebsiteURL      *string `json:"website_url"`
+	DonationURL     *string `json:"donation_url"`
+	ThemePreset     string  `json:"theme_preset"`
+	ColorPrimary    *string `json:"color_primary"`
+	ColorSecondary  *string `json:"color_secondary"`
+	ColorAccent     *string `json:"color_accent"`
+	ColorBackground *string `json:"color_background"`
+	ColorText       *string `json:"color_text"`
+}
+
+// UpdateBranding updates the branding settings for the current tenant (admin only)
+func (h *TenantHandler) UpdateBranding(w http.ResponseWriter, r *http.Request) {
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	if tenantID == 0 {
+		respondError(w, http.StatusBadRequest, "Kein Tenant gefunden")
+		return
+	}
+
+	var req UpdateBrandingRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "Ungültige Anfrage")
+		return
+	}
+
+	// Validate theme preset if provided
+	if req.ThemePreset != "" && !models.ValidateThemePreset(req.ThemePreset) {
+		respondError(w, http.StatusBadRequest, "Ungültiges Theme-Preset")
+		return
+	}
+
+	// Validate color formats if provided
+	colorFields := []*string{req.ColorPrimary, req.ColorSecondary, req.ColorAccent, req.ColorBackground, req.ColorText}
+	for _, color := range colorFields {
+		if color != nil && *color != "" && !models.ValidateHexColor(*color) {
+			respondError(w, http.StatusBadRequest, "Ungültiges Farbformat (erwartet: #RRGGBB)")
+			return
+		}
+	}
+
+	// Validate URLs if provided (basic check)
+	if req.WebsiteURL != nil && *req.WebsiteURL != "" {
+		if !strings.HasPrefix(*req.WebsiteURL, "http://") && !strings.HasPrefix(*req.WebsiteURL, "https://") {
+			respondError(w, http.StatusBadRequest, "Website-URL muss mit http:// oder https:// beginnen")
+			return
+		}
+	}
+	if req.DonationURL != nil && *req.DonationURL != "" {
+		if !strings.HasPrefix(*req.DonationURL, "http://") && !strings.HasPrefix(*req.DonationURL, "https://") {
+			respondError(w, http.StatusBadRequest, "Spenden-URL muss mit http:// oder https:// beginnen")
+			return
+		}
+	}
+
+	// Get current settings
+	settings, err := h.tenantRepo.GetSettings(tenantID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Fehler beim Laden der Einstellungen")
+		return
+	}
+	if settings == nil {
+		respondError(w, http.StatusNotFound, "Einstellungen nicht gefunden")
+		return
+	}
+
+	// Update fields
+	settings.WelcomeMessage = req.WelcomeMessage
+	settings.Tagline = req.Tagline
+	settings.Description = req.Description
+	settings.FooterText = req.FooterText
+	settings.WebsiteURL = req.WebsiteURL
+	settings.DonationURL = req.DonationURL
+
+	if req.ThemePreset != "" {
+		settings.ThemePreset = req.ThemePreset
+	}
+
+	settings.ColorPrimary = req.ColorPrimary
+	settings.ColorSecondary = req.ColorSecondary
+	settings.ColorAccent = req.ColorAccent
+	settings.ColorBackground = req.ColorBackground
+	settings.ColorText = req.ColorText
+
+	// Save settings
+	if err := h.tenantRepo.UpdateSettings(settings); err != nil {
+		respondError(w, http.StatusInternalServerError, "Fehler beim Speichern")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{
+		"message": "Branding aktualisiert",
+	})
+}
+
 // GetTenantStats returns statistics for the current tenant
 func (h *TenantHandler) GetTenantStats(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
@@ -557,4 +732,229 @@ func (h *TenantHandler) sendTenantWelcomeEmail(contactEmail, orgName, slug, admi
 `, orgName, slug, adminEmail, loginURL)
 
 	h.emailService.SendEmail(contactEmail, subject, body)
+}
+
+// ExportTenantData exports all tenant data for GDPR compliance
+// GET /api/admin/tenant/export
+// Allows tenant admin to download all data for their tenant
+func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request) {
+	// Get tenant ID from context
+	tenantID := middleware.GetTenantID(r)
+	if tenantID == 0 {
+		respondError(w, http.StatusBadRequest, "Kein Tierheim ausgewählt")
+		return
+	}
+
+	// Verify admin access
+	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
+	if !isAdmin {
+		respondError(w, http.StatusForbidden, "Nur Administratoren können Daten exportieren")
+		return
+	}
+
+	// Get tenant info
+	tenant, err := h.tenantRepo.FindByID(tenantID)
+	if err != nil || tenant == nil {
+		respondError(w, http.StatusNotFound, "Tierheim nicht gefunden")
+		return
+	}
+
+	// Build export data
+	export := map[string]interface{}{
+		"tenant": map[string]interface{}{
+			"id":            tenant.ID,
+			"slug":          tenant.Slug,
+			"name":          tenant.Name,
+			"contact_email": tenant.ContactEmail,
+			"contact_phone": tenant.ContactPhone,
+			"address":       tenant.Address,
+			"city":          tenant.City,
+			"postal_code":   tenant.PostalCode,
+			"federal_state": tenant.FederalState,
+			"created_at":    tenant.CreatedAt,
+		},
+		"exported_at": time.Now().Format(time.RFC3339),
+		"gdpr_export": true,
+	}
+
+	// Get all users (sanitize sensitive data)
+	users, err := h.userRepo.FindAll(nil, tenantID)
+	if err == nil {
+		var sanitizedUsers []map[string]interface{}
+		for _, u := range users {
+			sanitizedUsers = append(sanitizedUsers, map[string]interface{}{
+				"id":               u.ID,
+				"first_name":       u.FirstName,
+				"last_name":        u.LastName,
+				"email":            u.Email,
+				"phone":            u.Phone,
+				"is_admin":         u.IsAdmin,
+				"is_active":        u.IsActive,
+				"is_verified":      u.IsVerified,
+				"profile_photo":    u.ProfilePhoto,
+				"last_activity_at": u.LastActivityAt,
+				"created_at":       u.CreatedAt,
+			})
+		}
+		export["users"] = sanitizedUsers
+		export["user_count"] = len(sanitizedUsers)
+	}
+
+	// Get all dogs
+	var dogs []map[string]interface{}
+	rows, err := h.db.Query(`
+		SELECT id, name, breed, size, age, category, is_featured, is_available,
+		       external_link, photo, special_instructions, pickup_location,
+		       created_at, updated_at
+		FROM dogs WHERE tenant_id = ?`, tenantID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var d struct {
+				ID                  int
+				Name                string
+				Breed               *string
+				Size                *string
+				Age                 *string
+				Category            string
+				IsFeatured          bool
+				IsAvailable         bool
+				ExternalLink        *string
+				Photo               *string
+				SpecialInstructions *string
+				PickupLocation      *string
+				CreatedAt           time.Time
+				UpdatedAt           time.Time
+			}
+			if rows.Scan(&d.ID, &d.Name, &d.Breed, &d.Size, &d.Age, &d.Category,
+				&d.IsFeatured, &d.IsAvailable, &d.ExternalLink, &d.Photo,
+				&d.SpecialInstructions, &d.PickupLocation, &d.CreatedAt, &d.UpdatedAt) == nil {
+				dogs = append(dogs, map[string]interface{}{
+					"id":                   d.ID,
+					"name":                 d.Name,
+					"breed":                d.Breed,
+					"size":                 d.Size,
+					"age":                  d.Age,
+					"category":             d.Category,
+					"is_featured":          d.IsFeatured,
+					"is_available":         d.IsAvailable,
+					"external_link":        d.ExternalLink,
+					"photo":                d.Photo,
+					"special_instructions": d.SpecialInstructions,
+					"pickup_location":      d.PickupLocation,
+					"created_at":           d.CreatedAt,
+					"updated_at":           d.UpdatedAt,
+				})
+			}
+		}
+	}
+	export["dogs"] = dogs
+	export["dog_count"] = len(dogs)
+
+	// Get all bookings with user and dog info
+	var bookings []map[string]interface{}
+	rows, err = h.db.Query(`
+		SELECT b.id, b.user_id, b.dog_id, b.date, b.walk_type, b.status,
+		       b.notes, b.created_at,
+		       u.first_name, u.last_name, u.email,
+		       d.name as dog_name
+		FROM bookings b
+		LEFT JOIN users u ON b.user_id = u.id
+		LEFT JOIN dogs d ON b.dog_id = d.id
+		WHERE b.tenant_id = ?
+		ORDER BY b.date DESC`, tenantID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var b struct {
+				ID        int
+				UserID    int
+				DogID     int
+				Date      string
+				WalkType  string
+				Status    string
+				Notes     *string
+				CreatedAt time.Time
+				FirstName *string
+				LastName  *string
+				Email     *string
+				DogName   *string
+			}
+			if rows.Scan(&b.ID, &b.UserID, &b.DogID, &b.Date, &b.WalkType, &b.Status,
+				&b.Notes, &b.CreatedAt, &b.FirstName, &b.LastName, &b.Email, &b.DogName) == nil {
+				bookings = append(bookings, map[string]interface{}{
+					"id":              b.ID,
+					"user_id":         b.UserID,
+					"dog_id":          b.DogID,
+					"date":            b.Date,
+					"walk_type":       b.WalkType,
+					"status":          b.Status,
+					"notes":           b.Notes,
+					"created_at":      b.CreatedAt,
+					"user_first_name": b.FirstName,
+					"user_last_name":  b.LastName,
+					"user_email":      b.Email,
+					"dog_name":        b.DogName,
+				})
+			}
+		}
+	}
+	export["bookings"] = bookings
+	export["booking_count"] = len(bookings)
+
+	// Get tenant settings
+	var tenantSettings map[string]interface{}
+	settingsRow := h.db.QueryRow(`
+		SELECT welcome_message, footer_text, website_url, donation_url,
+		       logo_url, favicon_url
+		FROM tenant_settings WHERE tenant_id = ?`, tenantID)
+	var welcomeMsg, footerText, websiteURL, donationURL, logoURL, faviconURL *string
+	if settingsRow.Scan(&welcomeMsg, &footerText, &websiteURL, &donationURL, &logoURL, &faviconURL) == nil {
+		tenantSettings = map[string]interface{}{
+			"welcome_message": welcomeMsg,
+			"footer_text":     footerText,
+			"website_url":     websiteURL,
+			"donation_url":    donationURL,
+			"logo_url":        logoURL,
+			"favicon_url":     faviconURL,
+		}
+		export["tenant_settings"] = tenantSettings
+	}
+
+	// Get blocked dates
+	var blockedDates []map[string]interface{}
+	rows, err = h.db.Query(`
+		SELECT id, date, reason, dog_id, created_at
+		FROM blocked_dates WHERE tenant_id = ?`, tenantID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var bd struct {
+				ID        int
+				Date      string
+				Reason    *string
+				DogID     *int
+				CreatedAt time.Time
+			}
+			if rows.Scan(&bd.ID, &bd.Date, &bd.Reason, &bd.DogID, &bd.CreatedAt) == nil {
+				blockedDates = append(blockedDates, map[string]interface{}{
+					"id":         bd.ID,
+					"date":       bd.Date,
+					"reason":     bd.Reason,
+					"dog_id":     bd.DogID,
+					"created_at": bd.CreatedAt,
+				})
+			}
+		}
+	}
+	export["blocked_dates"] = blockedDates
+
+	// Audit log
+	userID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	log.Printf("AUDIT: User %d exported GDPR data for tenant %d (%s)", userID, tenantID, tenant.Slug)
+
+	// Set headers for JSON download
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=gdpr-export-%s-%s.json",
+		tenant.Slug, time.Now().Format("2006-01-02")))
+	respondJSON(w, http.StatusOK, export)
 }

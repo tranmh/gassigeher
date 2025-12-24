@@ -32,7 +32,13 @@
                             <a href="/admin-reactivation-requests.html">🔄 Reaktivierungen</a>
                         </div>
                     </li>
-                    <li><a href="/admin-settings.html" data-i18n="admin_dashboard.system_settings">Einstellungen</a></li>
+                    <li class="nav-dropdown">
+                        <a href="#">Einstellungen</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-settings.html">⚙️ System</a>
+                            <a href="/admin-branding.html">🎨 Branding</a>
+                        </div>
+                    </li>
                     <li id="super-admin-colors-link" style="display:none;"><a href="/admin-colors.html">🎨 Farben</a></li>
                     <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
                     <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
@@ -46,7 +52,10 @@
         <div class="container">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h1 data-i18n="dogs.manage_dogs">Hunde verwalten</h1>
-                <button class="btn" onclick="showAddDogForm()" data-i18n="dogs.add_dog">Hund hinzufügen</button>
+                <div style="display: flex; gap: 10px;">
+                    <a href="/admin-import.html" class="btn btn-secondary">📥 Importieren</a>
+                    <button class="btn" onclick="showAddDogForm()" data-i18n="dogs.add_dog">Hund hinzufügen</button>
+                </div>
             </div>
 
             <div id="alert-container"></div>

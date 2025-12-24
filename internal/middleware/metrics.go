@@ -1,8 +1,11 @@
 package middleware
 
 import (
+	"database/sql"
+	"log"
 	"net/http"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -39,6 +42,16 @@ type MetricsCollector struct {
 
 	// Active requests per tenant
 	tenantActiveRequests map[int]int64
+
+	// Business metrics (refreshed periodically from database)
+	db              *sql.DB
+	totalBookings   int64
+	totalDogs       int64
+	totalTenants    int64
+	activeTenants   int64
+	activeUsers     int64 // users active in last 30 days
+	successLogins   int64
+	failedLogins    int64
 }
 
 type durationStats struct {
@@ -311,5 +324,129 @@ func (m *MetricsCollector) GetPrometheusMetrics() string {
 		}
 	}
 
+	// Business metrics (from database)
+	sb.WriteString("\n# HELP gassigeher_bookings_total Total number of bookings\n")
+	sb.WriteString("# TYPE gassigeher_bookings_total gauge\n")
+	sb.WriteString("gassigeher_bookings_total " + strconv.FormatInt(m.totalBookings, 10) + "\n")
+
+	sb.WriteString("\n# HELP gassigeher_dogs_total Total number of dogs\n")
+	sb.WriteString("# TYPE gassigeher_dogs_total gauge\n")
+	sb.WriteString("gassigeher_dogs_total " + strconv.FormatInt(m.totalDogs, 10) + "\n")
+
+	sb.WriteString("\n# HELP gassigeher_tenants_total Total number of tenants\n")
+	sb.WriteString("# TYPE gassigeher_tenants_total gauge\n")
+	sb.WriteString("gassigeher_tenants_total " + strconv.FormatInt(m.totalTenants, 10) + "\n")
+
+	sb.WriteString("\n# HELP gassigeher_tenants_active Active tenants\n")
+	sb.WriteString("# TYPE gassigeher_tenants_active gauge\n")
+	sb.WriteString("gassigeher_tenants_active " + strconv.FormatInt(m.activeTenants, 10) + "\n")
+
+	sb.WriteString("\n# HELP gassigeher_users_active Users active in last 30 days\n")
+	sb.WriteString("# TYPE gassigeher_users_active gauge\n")
+	sb.WriteString("gassigeher_users_active " + strconv.FormatInt(m.activeUsers, 10) + "\n")
+
+	sb.WriteString("\n# HELP gassigeher_logins_success_total Successful login attempts\n")
+	sb.WriteString("# TYPE gassigeher_logins_success_total counter\n")
+	sb.WriteString("gassigeher_logins_success_total " + strconv.FormatInt(m.successLogins, 10) + "\n")
+
+	sb.WriteString("\n# HELP gassigeher_logins_failed_total Failed login attempts\n")
+	sb.WriteString("# TYPE gassigeher_logins_failed_total counter\n")
+	sb.WriteString("gassigeher_logins_failed_total " + strconv.FormatInt(m.failedLogins, 10) + "\n")
+
+	// Go runtime metrics
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	sb.WriteString("\n# HELP go_goroutines Number of goroutines\n")
+	sb.WriteString("# TYPE go_goroutines gauge\n")
+	sb.WriteString("go_goroutines " + strconv.Itoa(runtime.NumGoroutine()) + "\n")
+
+	sb.WriteString("\n# HELP go_memory_alloc_bytes Allocated memory in bytes\n")
+	sb.WriteString("# TYPE go_memory_alloc_bytes gauge\n")
+	sb.WriteString("go_memory_alloc_bytes " + strconv.FormatUint(memStats.Alloc, 10) + "\n")
+
+	sb.WriteString("\n# HELP go_memory_sys_bytes Total memory from OS in bytes\n")
+	sb.WriteString("# TYPE go_memory_sys_bytes gauge\n")
+	sb.WriteString("go_memory_sys_bytes " + strconv.FormatUint(memStats.Sys, 10) + "\n")
+
+	sb.WriteString("\n# HELP go_gc_runs_total Total garbage collection runs\n")
+	sb.WriteString("# TYPE go_gc_runs_total counter\n")
+	sb.WriteString("go_gc_runs_total " + strconv.FormatUint(uint64(memStats.NumGC), 10) + "\n")
+
 	return sb.String()
+}
+
+// InitBusinessMetrics initializes database-backed business metrics
+// and starts a background goroutine to refresh them periodically
+func InitBusinessMetrics(db *sql.DB) {
+	Metrics.mu.Lock()
+	Metrics.db = db
+	Metrics.mu.Unlock()
+
+	// Initial refresh
+	Metrics.refreshBusinessMetrics()
+
+	// Start periodic refresh (every 5 minutes)
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			Metrics.refreshBusinessMetrics()
+		}
+	}()
+
+	log.Println("Business metrics initialized (refresh every 5 minutes)")
+}
+
+// refreshBusinessMetrics fetches counts from the database
+func (m *MetricsCollector) refreshBusinessMetrics() {
+	if m.db == nil {
+		return
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Total bookings
+	var bookings int64
+	if err := m.db.QueryRow("SELECT COUNT(*) FROM bookings").Scan(&bookings); err == nil {
+		m.totalBookings = bookings
+	}
+
+	// Total dogs
+	var dogs int64
+	if err := m.db.QueryRow("SELECT COUNT(*) FROM dogs").Scan(&dogs); err == nil {
+		m.totalDogs = dogs
+	}
+
+	// Total tenants (if SaaS mode - table may not exist in simple mode)
+	var tenants int64
+	if err := m.db.QueryRow("SELECT COUNT(*) FROM tenants").Scan(&tenants); err == nil {
+		m.totalTenants = tenants
+	}
+
+	// Active tenants (status = 'active')
+	var activeTenants int64
+	if err := m.db.QueryRow("SELECT COUNT(*) FROM tenants WHERE status = 'active'").Scan(&activeTenants); err == nil {
+		m.activeTenants = activeTenants
+	}
+
+	// Active users (logged in last 30 days)
+	var activeUsers int64
+	thirtyDaysAgo := time.Now().AddDate(0, 0, -30).Format("2006-01-02 15:04:05")
+	if err := m.db.QueryRow("SELECT COUNT(*) FROM users WHERE last_activity_at > ?", thirtyDaysAgo).Scan(&activeUsers); err == nil {
+		m.activeUsers = activeUsers
+	}
+}
+
+// RecordLogin records a login attempt (success or failure)
+func RecordLogin(success bool) {
+	Metrics.mu.Lock()
+	defer Metrics.mu.Unlock()
+
+	if success {
+		Metrics.successLogins++
+	} else {
+		Metrics.failedLogins++
+	}
 }

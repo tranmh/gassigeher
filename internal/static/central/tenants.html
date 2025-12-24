@@ -16,6 +16,7 @@
                     <li><a href="/central/">Dashboard</a></li>
                     <li><a href="/central/tenants.html" class="active">Tierheime</a></li>
                     <li><a href="/central/users.html">Benutzer</a></li>
+                    <li><a href="/central/marketing.html">Marketing</a></li>
                     <li><a href="#" onclick="logout()">Abmelden</a></li>
                 </ul>
             </nav>
@@ -41,6 +42,22 @@
                             <input type="checkbox" id="active-only-checkbox">
                             Nur aktive anzeigen
                         </label>
+                    </div>
+                    <div class="filter-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="inactive-only-checkbox">
+                            Nur inaktive anzeigen
+                        </label>
+                    </div>
+                    <div class="filter-group">
+                        <label for="inactivity-days">Inaktivitätstage:</label>
+                        <select id="inactivity-days" class="form-select">
+                            <option value="7">7 Tage</option>
+                            <option value="14">14 Tage</option>
+                            <option value="30" selected>30 Tage</option>
+                            <option value="60">60 Tage</option>
+                            <option value="90">90 Tage</option>
+                        </select>
                     </div>
                     <button onclick="loadTenants()" class="btn btn-primary">Suchen</button>
                 </div>
@@ -100,15 +117,47 @@
             });
         });
 
+        let tenantActivityData = {}; // Cache for activity data
+
         async function loadTenants() {
             const search = document.getElementById('search-input').value;
             const activeOnly = document.getElementById('active-only-checkbox').checked;
+            const inactiveOnly = document.getElementById('inactive-only-checkbox').checked;
+            const inactivityDays = document.getElementById('inactivity-days').value;
             const container = document.getElementById('tenants-container');
 
             container.innerHTML = '<p class="loading">Laden...</p>';
 
             try {
-                const tenants = await centralAPI.getTenants(search, activeOnly);
+                let tenants;
+
+                if (inactiveOnly) {
+                    // Load inactive tenants specifically
+                    const inactiveData = await centralAPI.getInactiveTenants(inactivityDays);
+                    tenants = inactiveData.map(a => ({
+                        id: a.tenant_id,
+                        name: a.tenant_name,
+                        slug: a.tenant_slug,
+                        contact_email: '',
+                        status: 'active',
+                        user_count: a.active_users,
+                        dog_count: 0,
+                        created_at: null,
+                        days_inactive: a.days_inactive,
+                        last_booking_date: a.last_booking_date,
+                        last_user_login: a.last_user_login,
+                        total_bookings: a.total_bookings,
+                        is_inactive: a.is_inactive
+                    }));
+                    // Store activity data
+                    inactiveData.forEach(a => {
+                        tenantActivityData[a.tenant_id] = a;
+                    });
+                } else {
+                    tenants = await centralAPI.getTenants(search, activeOnly);
+                    // Load activity data in background
+                    loadActivityData();
+                }
 
                 if (tenants.length === 0) {
                     container.innerHTML = '<p class="empty-state">Keine Tierheime gefunden</p>';
@@ -124,25 +173,29 @@
                                 <th>Subdomain</th>
                                 <th>Kontakt</th>
                                 <th>Status</th>
+                                <th>Aktivität</th>
                                 <th>Benutzer</th>
-                                <th>Hunde</th>
+                                <th>Buchungen</th>
                                 <th>Erstellt</th>
                                 <th>Aktionen</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${tenants.map(t => `
-                                <tr>
+                                <tr class="${t.is_inactive ? 'row-warning' : ''}">
                                     <td>${t.id}</td>
                                     <td><strong>${escapeHtml(t.name)}</strong></td>
                                     <td>
                                         <code>${escapeHtml(t.slug)}</code>
                                         <a href="https://${escapeHtml(t.slug)}.gassigeher.org" target="_blank" class="external-link" title="Besuchen">↗</a>
                                     </td>
-                                    <td>${escapeHtml(t.contact_email)}</td>
+                                    <td>${escapeHtml(t.contact_email || '-')}</td>
                                     <td><span class="badge badge-${getStatusBadge(t.status)}">${t.status}</span></td>
+                                    <td id="activity-${t.id}">
+                                        ${t.days_inactive !== undefined ? getActivityBadge(t.days_inactive, t.is_inactive) : '<span class="loading-sm">...</span>'}
+                                    </td>
                                     <td>${t.user_count}</td>
-                                    <td>${t.dog_count}</td>
+                                    <td>${t.total_bookings !== undefined ? t.total_bookings : t.dog_count}</td>
                                     <td>${formatDate(t.created_at)}</td>
                                     <td>
                                         <button class="btn btn-sm btn-secondary" onclick="openTenantModal(${t.id})">Details</button>
@@ -159,6 +212,34 @@
                 container.innerHTML = '<p class="error">Fehler beim Laden der Tierheime</p>';
                 showAlert('Fehler: ' + err.message, 'error');
             }
+        }
+
+        async function loadActivityData() {
+            try {
+                const activityData = await centralAPI.getTenantActivity();
+                activityData.forEach(a => {
+                    tenantActivityData[a.tenant_id] = a;
+                    const cell = document.getElementById(`activity-${a.tenant_id}`);
+                    if (cell) {
+                        cell.innerHTML = getActivityBadge(a.days_inactive, a.is_inactive);
+                    }
+                });
+            } catch (err) {
+                console.error('Failed to load activity data:', err);
+            }
+        }
+
+        function getActivityBadge(daysInactive, isInactive) {
+            if (daysInactive === 999) {
+                return '<span class="badge badge-danger" title="Keine Aktivität">Nie aktiv</span>';
+            }
+            if (isInactive) {
+                return `<span class="badge badge-warning" title="${daysInactive} Tage inaktiv">${daysInactive}d inaktiv</span>`;
+            }
+            if (daysInactive <= 7) {
+                return `<span class="badge badge-success" title="Vor ${daysInactive} Tagen aktiv">Aktiv</span>`;
+            }
+            return `<span class="badge badge-secondary" title="Vor ${daysInactive} Tagen aktiv">${daysInactive}d</span>`;
         }
 
         function getStatusBadge(status) {
@@ -219,6 +300,13 @@
                             </dl>
                         </div>
 
+                        <div class="detail-section" id="activity-section">
+                            <h4>Aktivität</h4>
+                            <div id="activity-details">
+                                <p class="loading">Laden...</p>
+                            </div>
+                        </div>
+
                         ${tenant.suspended_at ? `
                         <div class="detail-section detail-warning">
                             <h4>Suspendierung</h4>
@@ -238,12 +326,63 @@
                     </div>
                 `;
 
-                // Load tenant users
+                // Load tenant users and activity
                 loadTenantUsers(tenantId);
+                loadTenantActivityDetails(tenantId);
 
             } catch (err) {
                 document.getElementById('modal-body').innerHTML = '<p class="error">Fehler beim Laden der Details</p>';
             }
+        }
+
+        async function loadTenantActivityDetails(tenantId) {
+            const container = document.getElementById('activity-details');
+            const section = document.getElementById('activity-section');
+
+            // Check if we have cached activity data
+            if (tenantActivityData[tenantId]) {
+                renderActivityDetails(tenantActivityData[tenantId], container, section);
+                return;
+            }
+
+            // Fetch activity data
+            try {
+                const activityData = await centralAPI.getTenantActivity();
+                activityData.forEach(a => {
+                    tenantActivityData[a.tenant_id] = a;
+                });
+
+                if (tenantActivityData[tenantId]) {
+                    renderActivityDetails(tenantActivityData[tenantId], container, section);
+                } else {
+                    container.innerHTML = '<p class="text-muted">Keine Aktivitätsdaten verfügbar</p>';
+                }
+            } catch (err) {
+                container.innerHTML = '<p class="text-muted">Aktivitätsdaten konnten nicht geladen werden</p>';
+            }
+        }
+
+        function renderActivityDetails(activity, container, section) {
+            if (activity.is_inactive) {
+                section.classList.add('detail-warning');
+            }
+
+            container.innerHTML = `
+                <dl>
+                    <dt>Status</dt>
+                    <dd>${getActivityBadge(activity.days_inactive, activity.is_inactive)}</dd>
+                    <dt>Letzte Buchung</dt>
+                    <dd>${activity.last_booking_date ? formatDateTime(activity.last_booking_date) : 'Keine'}</dd>
+                    <dt>Letzter Login</dt>
+                    <dd>${activity.last_user_login ? formatDateTime(activity.last_user_login) : 'Keiner'}</dd>
+                    <dt>Tage inaktiv</dt>
+                    <dd>${activity.days_inactive === 999 ? 'Nie aktiv' : activity.days_inactive + ' Tage'}</dd>
+                    <dt>Gesamt Buchungen</dt>
+                    <dd>${activity.total_bookings}</dd>
+                    <dt>Aktive Benutzer</dt>
+                    <dd>${activity.active_users}</dd>
+                </dl>
+            `;
         }
 
         async function loadTenantUsers(tenantId) {

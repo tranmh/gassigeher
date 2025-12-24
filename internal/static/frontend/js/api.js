@@ -293,6 +293,20 @@ class API {
         return this.request('PUT', `/settings/${key}`, { value });
     }
 
+    // BRANDING ENDPOINTS (public get, admin update)
+
+    async getBranding() {
+        return this.request('GET', '/tenant/branding');
+    }
+
+    async updateBranding(branding) {
+        return this.request('PUT', '/admin/tenant/branding', branding);
+    }
+
+    async exportTenantData() {
+        return this.request('GET', '/admin/tenant/export');
+    }
+
     // LOGO ENDPOINTS
 
     async getLogo() {
@@ -570,6 +584,24 @@ class API {
 
     async deleteWalkReportPhoto(reportId, photoId) {
         return this.request('DELETE', `/walk-reports/${reportId}/photos/${photoId}`);
+    }
+
+    // Import API (admin only)
+    async previewImport(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        return this.uploadFile('/admin/import/dogs/preview', formData);
+    }
+
+    async executeImport(file, mapping) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('mapping', JSON.stringify(mapping));
+        return this.uploadFile('/admin/import/dogs', formData);
+    }
+
+    getImportTemplateUrl() {
+        return `${this.baseUrl}/admin/import/dogs/template`;
     }
 }
 

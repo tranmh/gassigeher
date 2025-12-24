@@ -461,8 +461,8 @@ func (r *TenantRepository) GetSettings(tenantID int) (*models.TenantSettings, er
 	query := `
 		SELECT id, tenant_id, theme_preset, color_primary, color_secondary,
 		       color_accent, color_background, color_text,
-		       logo_url, favicon_url, welcome_message, footer_text,
-		       website_url, donation_url, created_at, updated_at
+		       logo_url, favicon_url, welcome_message, tagline, description,
+		       footer_text, website_url, donation_url, created_at, updated_at
 		FROM tenant_settings
 		WHERE tenant_id = ?
 	`
@@ -480,6 +480,8 @@ func (r *TenantRepository) GetSettings(tenantID int) (*models.TenantSettings, er
 		&settings.LogoURL,
 		&settings.FaviconURL,
 		&settings.WelcomeMessage,
+		&settings.Tagline,
+		&settings.Description,
 		&settings.FooterText,
 		&settings.WebsiteURL,
 		&settings.DonationURL,
@@ -509,6 +511,8 @@ func (r *TenantRepository) UpdateSettings(settings *models.TenantSettings) error
 			logo_url = ?,
 			favicon_url = ?,
 			welcome_message = ?,
+			tagline = ?,
+			description = ?,
 			footer_text = ?,
 			website_url = ?,
 			donation_url = ?,
@@ -528,6 +532,8 @@ func (r *TenantRepository) UpdateSettings(settings *models.TenantSettings) error
 		settings.LogoURL,
 		settings.FaviconURL,
 		settings.WelcomeMessage,
+		settings.Tagline,
+		settings.Description,
 		settings.FooterText,
 		settings.WebsiteURL,
 		settings.DonationURL,

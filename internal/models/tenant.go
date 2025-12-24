@@ -43,6 +43,8 @@ type TenantSettings struct {
 	LogoURL         *string   `json:"logo_url,omitempty"`
 	FaviconURL      *string   `json:"favicon_url,omitempty"`
 	WelcomeMessage  *string   `json:"welcome_message,omitempty"`
+	Tagline         *string   `json:"tagline,omitempty"`         // Short subtitle for hero section
+	Description     *string   `json:"description,omitempty"`     // Longer description for hero section
 	FooterText      *string   `json:"footer_text,omitempty"`
 	WebsiteURL      *string   `json:"website_url,omitempty"`
 	DonationURL     *string   `json:"donation_url,omitempty"`

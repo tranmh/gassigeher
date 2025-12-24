@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marketing - Central Admin</title>
+    <link rel="stylesheet" href="/landing/assets/css/landing.css">
+    <link rel="stylesheet" href="/central/assets/css/central.css">
+</head>
+<body>
+    <header class="central-header">
+        <div class="container">
+            <a href="/central/" class="logo">Gassigeher Platform</a>
+            <nav>
+                <ul>
+                    <li><a href="/central/">Dashboard</a></li>
+                    <li><a href="/central/tenants.html">Tierheime</a></li>
+                    <li><a href="/central/users.html">Benutzer</a></li>
+                    <li><a href="/central/marketing.html" class="active">Marketing</a></li>
+                    <li><a href="#" onclick="logout()">Abmelden</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="central-main">
+        <div class="container">
+            <div class="page-header">
+                <h1>Marketing verwalten</h1>
+            </div>
+
+            <div id="alert-container"></div>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid" id="stats-container">
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-campaigns">-</div>
+                    <div class="stat-label">Aktive Kampagnen</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-referral-codes">-</div>
+                    <div class="stat-label">Empfehlungscodes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-referral-uses">-</div>
+                    <div class="stat-label">Eingelöste Codes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-references">-</div>
+                    <div class="stat-label">Referenzen</div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs-container">
+                <button class="tab-btn active" onclick="showTab('campaigns')">Kampagnen</button>
+                <button class="tab-btn" onclick="showTab('referrals')">Empfehlungscodes</button>
+                <button class="tab-btn" onclick="showTab('references')">Referenzseite</button>
+            </div>
+
+            <!-- Campaigns Tab -->
+            <div id="campaigns-tab" class="tab-content active">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Kampagnen</h2>
+                        <button onclick="showCampaignModal()" class="btn btn-primary">+ Neue Kampagne</button>
+                    </div>
+                    <div id="campaigns-container">
+                        <p class="loading">Laden...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Referral Codes Tab -->
+            <div id="referrals-tab" class="tab-content" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Empfehlungscodes</h2>
+                        <button onclick="showReferralModal()" class="btn btn-primary">+ Neuer Code</button>
+                    </div>
+                    <div id="referrals-container">
+                        <p class="loading">Laden...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- References Tab -->
+            <div id="references-tab" class="tab-content" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Referenzseite</h2>
+                    </div>
+                    <div id="references-container">
+                        <p class="loading">Laden...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Campaign Modal -->
+    <div id="campaign-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="campaign-modal-title">Neue Kampagne</h2>
+                <button class="modal-close" onclick="closeCampaignModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="campaign-form">
+                    <input type="hidden" id="campaign-id">
+                    <div class="form-group">
+                        <label>Typ</label>
+                        <select id="campaign-type" class="form-select" required>
+                            <option value="fomo_countdown">FOMO Countdown</option>
+                            <option value="referral">Empfehlung</option>
+                            <option value="reference_page">Referenzseite</option>
+                            <option value="custom">Benutzerdefiniert</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" id="campaign-name" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Beschreibung</label>
+                        <textarea id="campaign-description" class="form-textarea" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Konfiguration (JSON)</label>
+                        <textarea id="campaign-config" class="form-textarea" rows="4" placeholder='{"total_slots": 10, "remaining_slots": 10, "message": "Nur noch X Plätze!"}'></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Startdatum</label>
+                            <input type="date" id="campaign-start" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label>Enddatum</label>
+                            <input type="date" id="campaign-end" class="form-input">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="campaign-active">
+                            Aktiv
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeCampaignModal()" class="btn btn-secondary">Abbrechen</button>
+                <button onclick="saveCampaign()" class="btn btn-primary">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Referral Code Modal -->
+    <div id="referral-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="referral-modal-title">Neuer Empfehlungscode</h2>
+                <button class="modal-close" onclick="closeReferralModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="referral-form">
+                    <input type="hidden" id="referral-id">
+                    <div class="form-group">
+                        <label>Code (leer = automatisch generiert)</label>
+                        <input type="text" id="referral-code" class="form-input" placeholder="GH-XXXXXX">
+                    </div>
+                    <div class="form-group">
+                        <label>Empfehler E-Mail (optional)</label>
+                        <input type="email" id="referral-email" class="form-input">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Monate gratis (Empfehler)</label>
+                            <input type="number" id="referral-months-referrer" class="form-input" value="3" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Monate gratis (Neukunde)</label>
+                            <input type="number" id="referral-months-referee" class="form-input" value="1" min="0">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Max. Nutzungen (leer = unbegrenzt)</label>
+                            <input type="number" id="referral-max-uses" class="form-input" min="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Gültig bis</label>
+                            <input type="date" id="referral-expires" class="form-input">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeReferralModal()" class="btn btn-secondary">Abbrechen</button>
+                <button onclick="saveReferralCode()" class="btn btn-primary">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/central/assets/js/central.js"></script>
+    <script>
+        // State
+        let campaigns = [];
+        let referralCodes = [];
+        let references = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!isAuthenticated()) {
+                window.location.href = '/login.html';
+                return;
+            }
+            await loadAll();
+        });
+
+        async function loadAll() {
+            await Promise.all([
+                loadStats(),
+                loadCampaigns(),
+                loadReferralCodes(),
+                loadReferences()
+            ]);
+        }
+
+        async function loadStats() {
+            try {
+                const stats = await getMarketingStats();
+                document.getElementById('stat-campaigns').textContent = stats.active_campaigns;
+                document.getElementById('stat-referral-codes').textContent = stats.total_referral_codes;
+                document.getElementById('stat-referral-uses').textContent = stats.total_referral_uses;
+                document.getElementById('stat-references').textContent = `${stats.approved_references}/${stats.approved_references + stats.pending_references}`;
+            } catch (err) {
+                console.error('Failed to load stats:', err);
+            }
+        }
+
+        // Tabs
+        function showTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.style.display = 'none');
+
+            document.querySelector(`[onclick="showTab('${tab}')"]`).classList.add('active');
+            document.getElementById(`${tab}-tab`).style.display = 'block';
+        }
+
+        // Campaigns
+        async function loadCampaigns() {
+            try {
+                campaigns = await getCampaigns() || [];
+                renderCampaigns();
+            } catch (err) {
+                document.getElementById('campaigns-container').innerHTML = `<p class="error">Fehler: ${escapeHtml(err.message)}</p>`;
+            }
+        }
+
+        function renderCampaigns() {
+            const container = document.getElementById('campaigns-container');
+            if (!campaigns.length) {
+                container.innerHTML = '<p class="empty">Keine Kampagnen vorhanden</p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Typ</th>
+                            <th>Status</th>
+                            <th>Zeitraum</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${campaigns.map(c => `
+                            <tr>
+                                <td><strong>${escapeHtml(c.name)}</strong></td>
+                                <td>${getCampaignTypeLabel(c.type)}</td>
+                                <td>${c.is_active ? '<span class="badge badge-success">Aktiv</span>' : '<span class="badge badge-secondary">Inaktiv</span>'}</td>
+                                <td>${formatDate(c.start_date)} - ${formatDate(c.end_date)}</td>
+                                <td>
+                                    <button onclick="editCampaign(${c.id})" class="btn btn-sm btn-secondary">Bearbeiten</button>
+                                    <button onclick="deleteCampaignConfirm(${c.id})" class="btn btn-sm btn-danger">Löschen</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function getCampaignTypeLabel(type) {
+            const labels = {
+                'fomo_countdown': 'FOMO Countdown',
+                'referral': 'Empfehlung',
+                'reference_page': 'Referenzseite',
+                'custom': 'Benutzerdefiniert'
+            };
+            return labels[type] || type;
+        }
+
+        function showCampaignModal(campaign = null) {
+            document.getElementById('campaign-modal-title').textContent = campaign ? 'Kampagne bearbeiten' : 'Neue Kampagne';
+            document.getElementById('campaign-id').value = campaign?.id || '';
+            document.getElementById('campaign-type').value = campaign?.type || 'fomo_countdown';
+            document.getElementById('campaign-name').value = campaign?.name || '';
+            document.getElementById('campaign-description').value = campaign?.description || '';
+            document.getElementById('campaign-config').value = campaign?.config || '';
+            document.getElementById('campaign-start').value = campaign?.start_date?.split('T')[0] || '';
+            document.getElementById('campaign-end').value = campaign?.end_date?.split('T')[0] || '';
+            document.getElementById('campaign-active').checked = campaign?.is_active || false;
+            document.getElementById('campaign-modal').style.display = 'flex';
+        }
+
+        function closeCampaignModal() {
+            document.getElementById('campaign-modal').style.display = 'none';
+        }
+
+        async function editCampaign(id) {
+            const campaign = campaigns.find(c => c.id === id);
+            if (campaign) showCampaignModal(campaign);
+        }
+
+        async function saveCampaign() {
+            const id = document.getElementById('campaign-id').value;
+            const data = {
+                type: document.getElementById('campaign-type').value,
+                name: document.getElementById('campaign-name').value,
+                description: document.getElementById('campaign-description').value || null,
+                config: document.getElementById('campaign-config').value || null,
+                start_date: document.getElementById('campaign-start').value || null,
+                end_date: document.getElementById('campaign-end').value || null,
+                is_active: document.getElementById('campaign-active').checked
+            };
+
+            try {
+                if (id) {
+                    await updateCampaign(id, data);
+                } else {
+                    await createCampaign(data);
+                }
+                closeCampaignModal();
+                showAlert('Kampagne gespeichert');
+                await loadAll();
+            } catch (err) {
+                showAlert('Fehler: ' + err.message, 'error');
+            }
+        }
+
+        async function deleteCampaignConfirm(id) {
+            if (!confirm('Kampagne wirklich löschen?')) return;
+            try {
+                await deleteCampaign(id);
+                showAlert('Kampagne gelöscht');
+                await loadCampaigns();
+            } catch (err) {
+                showAlert('Fehler: ' + err.message, 'error');
+            }
+        }
+
+        // Referral Codes
+        async function loadReferralCodes() {
+            try {
+                referralCodes = await getReferralCodes() || [];
+                renderReferralCodes();
+            } catch (err) {
+                document.getElementById('referrals-container').innerHTML = `<p class="error">Fehler: ${escapeHtml(err.message)}</p>`;
+            }
+        }
+
+        function renderReferralCodes() {
+            const container = document.getElementById('referrals-container');
+            if (!referralCodes.length) {
+                container.innerHTML = '<p class="empty">Keine Empfehlungscodes vorhanden</p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Empfehler</th>
+                            <th>Rabatt</th>
+                            <th>Nutzungen</th>
+                            <th>Status</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${referralCodes.map(c => `
+                            <tr>
+                                <td><code>${escapeHtml(c.code)}</code></td>
+                                <td>${c.referrer_tenant_name || c.referrer_email || '-'}</td>
+                                <td>${c.discount_months_referrer}/${c.discount_months_referee} Mon.</td>
+                                <td>${c.uses_count}${c.max_uses ? '/' + c.max_uses : ''}</td>
+                                <td>${c.is_active ? '<span class="badge badge-success">Aktiv</span>' : '<span class="badge badge-secondary">Inaktiv</span>'}</td>
+                                <td>
+                                    <button onclick="toggleReferralCodeStatus(${c.id})" class="btn btn-sm btn-secondary">${c.is_active ? 'Deaktivieren' : 'Aktivieren'}</button>
+                                    <button onclick="deleteReferralCodeConfirm(${c.id})" class="btn btn-sm btn-danger">Löschen</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function showReferralModal(code = null) {
+            document.getElementById('referral-modal-title').textContent = code ? 'Code bearbeiten' : 'Neuer Empfehlungscode';
+            document.getElementById('referral-id').value = code?.id || '';
+            document.getElementById('referral-code').value = code?.code || '';
+            document.getElementById('referral-email').value = code?.referrer_email || '';
+            document.getElementById('referral-months-referrer').value = code?.discount_months_referrer || 3;
+            document.getElementById('referral-months-referee').value = code?.discount_months_referee || 1;
+            document.getElementById('referral-max-uses').value = code?.max_uses || '';
+            document.getElementById('referral-expires').value = code?.expires_at?.split('T')[0] || '';
+            document.getElementById('referral-modal').style.display = 'flex';
+        }
+
+        function closeReferralModal() {
+            document.getElementById('referral-modal').style.display = 'none';
+        }
+
+        async function saveReferralCode() {
+            const id = document.getElementById('referral-id').value;
+            const data = {
+                code: document.getElementById('referral-code').value,
+                referrer_email: document.getElementById('referral-email').value || null,
+                discount_months_referrer: parseInt(document.getElementById('referral-months-referrer').value) || 3,
+                discount_months_referee: parseInt(document.getElementById('referral-months-referee').value) || 1,
+                max_uses: document.getElementById('referral-max-uses').value ? parseInt(document.getElementById('referral-max-uses').value) : null,
+                expires_at: document.getElementById('referral-expires').value || null
+            };
+
+            try {
+                if (id) {
+                    await updateReferralCode(id, data);
+                } else {
+                    await createReferralCode(data);
+                }
+                closeReferralModal();
+                showAlert('Empfehlungscode gespeichert');
+                await loadAll();
+            } catch (err) {
+                showAlert('Fehler: ' + err.message, 'error');
+            }
+        }
+
+        async function toggleReferralCodeStatus(id) {
+            try {
+                await toggleReferralCode(id);
+                await loadReferralCodes();
+            } catch (err) {
+                showAlert('Fehler: ' + err.message, 'error');
+            }
+        }
+
+        async function deleteReferralCodeConfirm(id) {
+            if (!confirm('Empfehlungscode wirklich löschen?')) return;
+            try {
+                await deleteReferralCode(id);
+                showAlert('Empfehlungscode gelöscht');
+                await loadAll();
+            } catch (err) {
+                showAlert('Fehler: ' + err.message, 'error');
+            }
+        }
+
+        // References
+        async function loadReferences() {
+            try {
+                references = await getReferenceEntries() || [];
+                renderReferences();
+            } catch (err) {
+                document.getElementById('references-container').innerHTML = `<p class="error">Fehler: ${escapeHtml(err.message)}</p>`;
+            }
+        }
+
+        function renderReferences() {
+            const container = document.getElementById('references-container');
+            if (!references.length) {
+                container.innerHTML = '<p class="empty">Keine Referenzeinträge vorhanden</p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Stadt</th>
+                            <th>Website</th>
+                            <th>Status</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${references.map(r => `
+                            <tr>
+                                <td><strong>${escapeHtml(r.display_name)}</strong></td>
+                                <td>${r.city || '-'}</td>
+                                <td>${r.website_url ? `<a href="${escapeHtml(r.website_url)}" target="_blank">Link</a>` : '-'}</td>
+                                <td>${r.is_approved ? '<span class="badge badge-success">Genehmigt</span>' : '<span class="badge badge-warning">Ausstehend</span>'}</td>
+                                <td>
+                                    ${!r.is_approved ? `<button onclick="approveReference(${r.id})" class="btn btn-sm btn-primary">Genehmigen</button>` : ''}
+                                    <button onclick="deleteReferenceConfirm(${r.id})" class="btn btn-sm btn-danger">Löschen</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        async function approveReference(id) {
+            try {
+                await approveReferenceEntry(id);
+                showAlert('Referenz genehmigt');
+                await loadAll();
+            } catch (err) {
+                showAlert('Fehler: ' + err.message, 'error');
+            }
+        }
+
+        async function deleteReferenceConfirm(id) {
+            if (!confirm('Referenzeintrag wirklich löschen?')) return;
+            try {
+                await deleteReferenceEntry(id);
+                showAlert('Referenz gelöscht');
+                await loadAll();
+            } catch (err) {
+                showAlert('Fehler: ' + err.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

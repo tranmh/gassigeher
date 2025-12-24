@@ -10,6 +10,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/cron"
+	"github.com/tranmh/gassigeher/internal/logging"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -18,19 +20,21 @@ import (
 
 // CentralAdminHandler handles platform-wide administration
 type CentralAdminHandler struct {
-	db         *sql.DB
-	cfg        *config.Config
-	tenantRepo *repository.TenantRepository
-	userRepo   *repository.UserRepository
+	db          *sql.DB
+	cfg         *config.Config
+	tenantRepo  *repository.TenantRepository
+	userRepo    *repository.UserRepository
+	authService *services.AuthService
 }
 
 // NewCentralAdminHandler creates a new central admin handler
 func NewCentralAdminHandler(db *sql.DB, cfg *config.Config) *CentralAdminHandler {
 	return &CentralAdminHandler{
-		db:         db,
-		cfg:        cfg,
-		tenantRepo: repository.NewTenantRepository(db),
-		userRepo:   repository.NewUserRepository(db),
+		db:          db,
+		cfg:         cfg,
+		tenantRepo:  repository.NewTenantRepository(db),
+		userRepo:    repository.NewUserRepository(db),
+		authService: services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours),
 	}
 }
 
@@ -642,5 +646,247 @@ func (h *CentralAdminHandler) ResetLocalDevTenant(w http.ResponseWriter, r *http
 		"message":  "Tierheim erfolgreich zurückgesetzt",
 		"slug":     tenant.Slug,
 		"password": services.LocalDevPassword,
+	})
+}
+
+// GetInactiveTenants returns a list of tenants with no recent activity
+// GET /api/central-admin/tenants/inactive
+func (h *CentralAdminHandler) GetInactiveTenants(w http.ResponseWriter, r *http.Request) {
+	// Get inactivity days from query param (default: 30 days)
+	daysStr := r.URL.Query().Get("days")
+	days := 30
+	if daysStr != "" {
+		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 {
+			days = d
+		}
+	}
+
+	checker := cron.NewTenantActivityChecker(h.db, days)
+	tenants, err := checker.GetInactiveTenants()
+	if err != nil {
+		log.Printf("Error getting inactive tenants: %v", err)
+		respondError(w, http.StatusInternalServerError, "Fehler beim Laden der inaktiven Tierheime")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"inactive_tenants":   tenants,
+		"inactivity_days":    days,
+		"total_inactive":     len(tenants),
+	})
+}
+
+// GetTenantActivity returns activity information for all tenants
+// GET /api/central-admin/tenants/activity
+func (h *CentralAdminHandler) GetTenantActivity(w http.ResponseWriter, r *http.Request) {
+	// Get inactivity threshold from query param (default: 30 days)
+	daysStr := r.URL.Query().Get("days")
+	days := 30
+	if daysStr != "" {
+		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 {
+			days = d
+		}
+	}
+
+	checker := cron.NewTenantActivityChecker(h.db, days)
+	tenants, err := checker.GetAllTenantActivity()
+	if err != nil {
+		log.Printf("Error getting tenant activity: %v", err)
+		respondError(w, http.StatusInternalServerError, "Fehler beim Laden der Tierheim-Aktivitäten")
+		return
+	}
+
+	// Count inactive
+	inactiveCount := 0
+	for _, t := range tenants {
+		if t.IsInactive {
+			inactiveCount++
+		}
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"tenants":          tenants,
+		"inactivity_days":  days,
+		"total_tenants":    len(tenants),
+		"inactive_count":   inactiveCount,
+	})
+}
+
+// ImpersonateTenantUser allows central admin to impersonate a user in any tenant
+// POST /api/central-admin/impersonate/:userId
+func (h *CentralAdminHandler) ImpersonateTenantUser(w http.ResponseWriter, r *http.Request) {
+	// Get current central admin user ID
+	currentUserID, _ := r.Context().Value(middleware.UserIDKey).(int)
+	isCentralAdmin, _ := r.Context().Value(middleware.IsCentralAdminKey).(bool)
+
+	if !isCentralAdmin {
+		respondError(w, http.StatusForbidden, "Nur Central Admin kann Benutzer imitieren")
+		return
+	}
+
+	// Get target user ID from URL
+	vars := mux.Vars(r)
+	targetUserIDStr := vars["userId"]
+	targetUserID, err := strconv.Atoi(targetUserIDStr)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Ungültige Benutzer-ID")
+		return
+	}
+
+	// Cannot impersonate yourself
+	if targetUserID == currentUserID {
+		respondError(w, http.StatusBadRequest, "Sie können sich nicht selbst imitieren")
+		return
+	}
+
+	// Get target user (FindByID works cross-tenant as it doesn't filter by tenant)
+	targetUser, err := h.userRepo.FindByID(targetUserID)
+	if err != nil {
+		log.Printf("Error finding user %d: %v", targetUserID, err)
+		respondError(w, http.StatusInternalServerError, "Datenbankfehler")
+		return
+	}
+	if targetUser == nil {
+		respondError(w, http.StatusNotFound, "Benutzer nicht gefunden")
+		return
+	}
+
+	// Cannot impersonate deleted users
+	if targetUser.IsDeleted {
+		respondError(w, http.StatusBadRequest, "Gelöschte Benutzer können nicht imitiert werden")
+		return
+	}
+
+	// Cannot impersonate inactive users
+	if !targetUser.IsActive {
+		respondError(w, http.StatusBadRequest, "Inaktive Benutzer können nicht imitiert werden")
+		return
+	}
+
+	// Cannot impersonate central admins or super admins
+	if targetUser.IsCentralAdmin || targetUser.IsSuperAdmin {
+		respondError(w, http.StatusForbidden, "Central Admin und Super Admin können nicht imitiert werden")
+		return
+	}
+
+	// Get target user's tenant for context
+	tenant, err := h.tenantRepo.FindByID(targetUser.TenantID)
+	if err != nil || tenant == nil {
+		log.Printf("Error finding tenant %d: %v", targetUser.TenantID, err)
+		respondError(w, http.StatusInternalServerError, "Tierheim nicht gefunden")
+		return
+	}
+
+	// Get target user's email
+	targetEmail := ""
+	if targetUser.Email != nil {
+		targetEmail = *targetUser.Email
+	}
+
+	// Generate impersonation JWT with target user's tenant_id
+	token, err := h.authService.GenerateImpersonationJWT(
+		targetUserID,
+		targetEmail,
+		targetUser.IsAdmin,
+		targetUser.IsSuperAdmin,
+		targetUser.IsCentralAdmin,
+		currentUserID,
+		targetUser.TenantID,
+	)
+	if err != nil {
+		log.Printf("Error generating impersonation token: %v", err)
+		respondError(w, http.StatusInternalServerError, "Token-Generierung fehlgeschlagen")
+		return
+	}
+
+	// Audit log
+	clientIP := logging.GetClientIP(r)
+	log.Printf("AUDIT: Central admin %d started impersonating user %d (%s %s) in tenant %s from IP %s",
+		currentUserID, targetUserID, targetUser.FirstName, targetUser.LastName, tenant.Slug, clientIP)
+
+	// Don't return sensitive data
+	targetUser.PasswordHash = nil
+	targetUser.VerificationToken = nil
+	targetUser.PasswordResetToken = nil
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"token":  token,
+		"user":   targetUser,
+		"tenant": tenant,
+	})
+}
+
+// EndCentralImpersonation ends the impersonation session and returns to central admin
+// POST /api/central-admin/end-impersonation
+func (h *CentralAdminHandler) EndCentralImpersonation(w http.ResponseWriter, r *http.Request) {
+	// Check if currently impersonating
+	isImpersonating, _ := r.Context().Value(middleware.IsImpersonatingKey).(bool)
+	if !isImpersonating {
+		respondError(w, http.StatusBadRequest, "Keine aktive Imitation")
+		return
+	}
+
+	// Get original central admin user ID
+	originalUserID, ok := r.Context().Value(middleware.OriginalUserIDKey).(int)
+	if !ok || originalUserID == 0 {
+		respondError(w, http.StatusBadRequest, "Ungültige Imitation-Sitzung")
+		return
+	}
+
+	// Get impersonated user ID for audit log
+	impersonatedUserID, _ := r.Context().Value(middleware.UserIDKey).(int)
+
+	// Get original central admin user (FindByID works cross-tenant)
+	originalUser, err := h.userRepo.FindByID(originalUserID)
+	if err != nil {
+		log.Printf("Error finding original user %d: %v", originalUserID, err)
+		respondError(w, http.StatusInternalServerError, "Datenbankfehler")
+		return
+	}
+	if originalUser == nil {
+		respondError(w, http.StatusNotFound, "Ursprünglicher Benutzer nicht gefunden")
+		return
+	}
+
+	// Verify original user is still a central admin
+	if !originalUser.IsCentralAdmin {
+		respondError(w, http.StatusForbidden, "Ursprünglicher Benutzer ist kein Central Admin mehr")
+		return
+	}
+
+	// Get original user's email
+	originalEmail := ""
+	if originalUser.Email != nil {
+		originalEmail = *originalUser.Email
+	}
+
+	// Generate normal JWT for central admin (no impersonation claims)
+	token, err := h.authService.GenerateJWT(
+		originalUserID,
+		originalEmail,
+		originalUser.IsAdmin,
+		originalUser.IsSuperAdmin,
+		originalUser.IsCentralAdmin,
+		originalUser.TenantID,
+	)
+	if err != nil {
+		log.Printf("Error generating token: %v", err)
+		respondError(w, http.StatusInternalServerError, "Token-Generierung fehlgeschlagen")
+		return
+	}
+
+	// Audit log
+	clientIP := logging.GetClientIP(r)
+	log.Printf("AUDIT: Central admin %d ended impersonation of user %d from IP %s",
+		originalUserID, impersonatedUserID, clientIP)
+
+	// Don't return sensitive data
+	originalUser.PasswordHash = nil
+	originalUser.VerificationToken = nil
+	originalUser.PasswordResetToken = nil
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"token": token,
+		"user":  originalUser,
 	})
 }
