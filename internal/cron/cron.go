@@ -25,15 +25,16 @@ func getBerlinLocation() *time.Location {
 
 // CronService handles scheduled tasks
 type CronService struct {
-	db              *sql.DB
-	bookingRepo     *repository.BookingRepository
-	userRepo        *repository.UserRepository
-	settingsRepo    *repository.SettingsRepository
-	tenantRepo      *repository.TenantRepository
-	demoStateRepo   *repository.DemoTenantRepository
-	emailService    *services.EmailService
-	demoSeedService *services.DemoSeedService
-	stopChan        chan bool
+	db                     *sql.DB
+	bookingRepo            *repository.BookingRepository
+	userRepo               *repository.UserRepository
+	settingsRepo           *repository.SettingsRepository
+	tenantRepo             *repository.TenantRepository
+	demoStateRepo          *repository.DemoTenantRepository
+	emailService           *services.EmailService
+	demoSeedService        *services.DemoSeedService
+	tenantActivityChecker  *TenantActivityChecker
+	stopChan               chan bool
 }
 
 // NewCronService creates a new cron service
@@ -49,15 +50,16 @@ func NewCronService(db *sql.DB, cfg *config.Config) *CronService {
 	}
 
 	return &CronService{
-		db:              db,
-		bookingRepo:     repository.NewBookingRepository(db),
-		userRepo:        repository.NewUserRepository(db),
-		settingsRepo:    repository.NewSettingsRepository(db),
-		tenantRepo:      repository.NewTenantRepository(db),
-		demoStateRepo:   repository.NewDemoTenantRepository(db),
-		emailService:    emailService,
-		demoSeedService: services.NewDemoSeedService(db),
-		stopChan:        make(chan bool),
+		db:                    db,
+		bookingRepo:           repository.NewBookingRepository(db),
+		userRepo:              repository.NewUserRepository(db),
+		settingsRepo:          repository.NewSettingsRepository(db),
+		tenantRepo:            repository.NewTenantRepository(db),
+		demoStateRepo:         repository.NewDemoTenantRepository(db),
+		emailService:          emailService,
+		demoSeedService:       services.NewDemoSeedService(db),
+		tenantActivityChecker: NewTenantActivityChecker(db, 30), // Default 30 days inactivity
+		stopChan:              make(chan bool),
 	}
 }
 
@@ -76,6 +78,22 @@ func (s *CronService) Start() {
 
 	// Run demo reset job daily at midnight (Europe/Berlin time)
 	go s.runDaily("Demo tenant reset", 0, 0, s.resetDemoTenant)
+
+	// Run tenant activity check daily at 4am (Europe/Berlin time)
+	// This flags inactive tenants for admin review
+	go s.runDaily("Check tenant activity", 4, 0, s.checkTenantActivity)
+}
+
+// checkTenantActivity checks all tenants for inactivity
+func (s *CronService) checkTenantActivity() {
+	if s.tenantActivityChecker == nil {
+		log.Println("Tenant activity check: checker not initialized, skipping")
+		return
+	}
+
+	if err := s.tenantActivityChecker.CheckAndFlagInactiveTenants(); err != nil {
+		log.Printf("Error checking tenant activity: %v", err)
+	}
 }
 
 // Stop stops all cron jobs

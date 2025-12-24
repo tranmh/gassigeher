@@ -95,7 +95,10 @@ func (h *ImportHandler) PreviewImport(w http.ResponseWriter, r *http.Request) {
 	firstLine, err := reader.Read()
 	if err != nil {
 		// Try with semicolon
-		file.Seek(0, 0)
+		if _, seekErr := file.Seek(0, 0); seekErr != nil {
+			respondError(w, http.StatusInternalServerError, "Fehler beim Lesen der Datei")
+			return
+		}
 		reader = csv.NewReader(file)
 		reader.Comma = ';'
 		firstLine, err = reader.Read()
@@ -107,7 +110,10 @@ func (h *ImportHandler) PreviewImport(w http.ResponseWriter, r *http.Request) {
 
 	// If only one column, try semicolon
 	if len(firstLine) == 1 && strings.Contains(firstLine[0], ";") {
-		file.Seek(0, 0)
+		if _, seekErr := file.Seek(0, 0); seekErr != nil {
+			respondError(w, http.StatusInternalServerError, "Fehler beim Lesen der Datei")
+			return
+		}
 		reader = csv.NewReader(file)
 		reader.Comma = ';'
 		firstLine, _ = reader.Read()
@@ -169,54 +175,54 @@ func (h *ImportHandler) suggestMappings(headers []string, tenantID int) map[stri
 	availablePatterns := []string{"verfügbar", "available", "status", "aktiv"}
 
 	for i, header := range headers {
-		h := strings.ToLower(strings.TrimSpace(header))
+		headerLower := strings.ToLower(strings.TrimSpace(header))
 		idx := strconv.Itoa(i)
 
 		// Check each pattern
 		for _, p := range namePatterns {
-			if strings.Contains(h, p) {
+			if strings.Contains(headerLower, p) {
 				suggestions["name"] = idx
 				break
 			}
 		}
 		for _, p := range breedPatterns {
-			if strings.Contains(h, p) {
+			if strings.Contains(headerLower, p) {
 				suggestions["breed"] = idx
 				break
 			}
 		}
 		for _, p := range agePatterns {
-			if strings.Contains(h, p) {
+			if strings.Contains(headerLower, p) {
 				suggestions["age"] = idx
 				break
 			}
 		}
 		for _, p := range sizePatterns {
-			if strings.Contains(h, p) {
+			if strings.Contains(headerLower, p) {
 				suggestions["size"] = idx
 				break
 			}
 		}
 		for _, p := range colorPatterns {
-			if strings.Contains(h, p) {
+			if strings.Contains(headerLower, p) {
 				suggestions["color"] = idx
 				break
 			}
 		}
 		for _, p := range instructionPatterns {
-			if strings.Contains(h, p) {
+			if strings.Contains(headerLower, p) {
 				suggestions["special_instructions"] = idx
 				break
 			}
 		}
 		for _, p := range locationPatterns {
-			if strings.Contains(h, p) {
+			if strings.Contains(headerLower, p) {
 				suggestions["pickup_location"] = idx
 				break
 			}
 		}
 		for _, p := range availablePatterns {
-			if strings.Contains(h, p) {
+			if strings.Contains(headerLower, p) {
 				suggestions["is_available"] = idx
 				break
 			}
@@ -282,11 +288,25 @@ func (h *ImportHandler) ExecuteImport(w http.ResponseWriter, r *http.Request) {
 
 	// If only one column, try semicolon
 	if len(firstLine) == 1 && strings.Contains(firstLine[0], ";") {
-		file.Seek(0, 0)
+		if _, seekErr := file.Seek(0, 0); seekErr != nil {
+			respondError(w, http.StatusInternalServerError, "Fehler beim Lesen der Datei")
+			return
+		}
 		reader = csv.NewReader(file)
 		reader.Comma = ';'
 		reader.Read() // Skip header
 	}
+
+	// Start transaction for atomic import
+	tx, err := h.db.Begin()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Datenbankfehler beim Starten der Transaktion")
+		return
+	}
+	defer tx.Rollback() // Will be no-op if commit succeeds
+
+	// Create a transaction-aware dog repository
+	dogRepoTx := repository.NewDogRepositoryWithTx(h.db, tx)
 
 	// Import rows
 	result := ImportResult{
@@ -365,14 +385,22 @@ func (h *ImportHandler) ExecuteImport(w http.ResponseWriter, r *http.Request) {
 			dog.IsAvailable = parseAvailable(getColumnValue(row, mapping.IsAvailable))
 		}
 
-		// Create dog
-		if err := h.dogRepo.Create(dog); err != nil {
+		// Create dog within transaction
+		if err := dogRepoTx.CreateTx(tx, dog); err != nil {
 			result.Skipped++
 			result.Errors = append(result.Errors, fmt.Sprintf("Zeile %d: %s", rowNum, err.Error()))
 			continue
 		}
 
 		result.Imported++
+	}
+
+	// Commit the transaction if any dogs were imported
+	if result.Imported > 0 {
+		if err := tx.Commit(); err != nil {
+			respondError(w, http.StatusInternalServerError, "Fehler beim Speichern der importierten Hunde")
+			return
+		}
 	}
 
 	respondJSON(w, http.StatusOK, result)

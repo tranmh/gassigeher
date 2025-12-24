@@ -395,7 +395,96 @@ func InitBusinessMetrics(db *sql.DB) {
 		}
 	}()
 
-	log.Println("Business metrics initialized (refresh every 5 minutes)")
+	// Start periodic cleanup (every hour) to prevent unbounded memory growth
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			Metrics.cleanup()
+		}
+	}()
+
+	log.Println("Business metrics initialized (refresh every 5 minutes, cleanup every hour)")
+}
+
+// cleanup removes old entries from metrics maps to prevent unbounded memory growth
+// It keeps only the top 1000 entries by count for each map
+func (m *MetricsCollector) cleanup() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	const maxEntries = 1000
+
+	// Cleanup requestCounts - keep top entries by count
+	if len(m.requestCounts) > maxEntries {
+		m.requestCounts = trimMap(m.requestCounts, maxEntries)
+		log.Printf("Metrics cleanup: trimmed requestCounts to %d entries", len(m.requestCounts))
+	}
+
+	// Cleanup requestDurations
+	if len(m.requestDurations) > maxEntries {
+		// Keep entries that exist in requestCounts
+		newDurations := make(map[string]*durationStats)
+		for key, stats := range m.requestDurations {
+			if _, exists := m.requestCounts[key]; exists {
+				newDurations[key] = stats
+			}
+		}
+		m.requestDurations = newDurations
+		log.Printf("Metrics cleanup: trimmed requestDurations to %d entries", len(m.requestDurations))
+	}
+
+	// Cleanup tenantRequestCounts
+	if len(m.tenantRequestCounts) > maxEntries {
+		m.tenantRequestCounts = trimMap(m.tenantRequestCounts, maxEntries)
+		log.Printf("Metrics cleanup: trimmed tenantRequestCounts to %d entries", len(m.tenantRequestCounts))
+	}
+
+	// Cleanup tenantDurations
+	if len(m.tenantDurations) > maxEntries {
+		newDurations := make(map[string]*durationStats)
+		for key, stats := range m.tenantDurations {
+			if _, exists := m.tenantRequestCounts[key]; exists {
+				newDurations[key] = stats
+			}
+		}
+		m.tenantDurations = newDurations
+		log.Printf("Metrics cleanup: trimmed tenantDurations to %d entries", len(m.tenantDurations))
+	}
+}
+
+// trimMap keeps only the top N entries by value (count)
+func trimMap(m map[string]int64, maxEntries int) map[string]int64 {
+	if len(m) <= maxEntries {
+		return m
+	}
+
+	// Find min threshold to keep
+	counts := make([]int64, 0, len(m))
+	for _, count := range m {
+		counts = append(counts, count)
+	}
+
+	// Simple sort to find threshold (not efficient for large maps, but cleanup is infrequent)
+	for i := 0; i < len(counts); i++ {
+		for j := i + 1; j < len(counts); j++ {
+			if counts[i] < counts[j] {
+				counts[i], counts[j] = counts[j], counts[i]
+			}
+		}
+	}
+
+	threshold := counts[maxEntries-1]
+
+	// Keep entries above threshold
+	newMap := make(map[string]int64)
+	for key, count := range m {
+		if count >= threshold && len(newMap) < maxEntries {
+			newMap[key] = count
+		}
+	}
+
+	return newMap
 }
 
 // refreshBusinessMetrics fetches counts from the database

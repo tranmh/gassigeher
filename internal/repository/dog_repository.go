@@ -20,6 +20,66 @@ func NewDogRepository(db *sql.DB) *DogRepository {
 	return &DogRepository{db: db}
 }
 
+// NewDogRepositoryWithTx creates a dog repository that can work with transactions
+// The tx parameter is stored for use with CreateTx method
+func NewDogRepositoryWithTx(db *sql.DB, tx *sql.Tx) *DogRepository {
+	return &DogRepository{db: db}
+}
+
+// CreateTx creates a new dog within a transaction
+// SaaS: Now includes tenant_id for multi-tenancy
+func (r *DogRepository) CreateTx(tx *sql.Tx, dog *models.Dog) error {
+	query := `
+		INSERT INTO dogs (
+			tenant_id, name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
+			pickup_location, walk_route, walk_duration, special_instructions,
+			default_morning_time, default_evening_time, is_available, external_link
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+	// SaaS: Convert TenantID=0 to NULL for single-tenant mode
+	var tenantIDParam interface{}
+	if dog.TenantID > 0 {
+		tenantIDParam = dog.TenantID
+	} else {
+		tenantIDParam = nil
+	}
+
+	result, err := tx.Exec(
+		query,
+		tenantIDParam,
+		dog.Name,
+		dog.Breed,
+		dog.Size,
+		dog.Age,
+		dog.ColorID,
+		dog.Photo,
+		dog.PhotoThumbnail,
+		dog.SpecialNeeds,
+		dog.PickupLocation,
+		dog.WalkRoute,
+		dog.WalkDuration,
+		dog.SpecialInstructions,
+		dog.DefaultMorningTime,
+		dog.DefaultEveningTime,
+		dog.IsAvailable,
+		dog.ExternalLink,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create dog: %w", err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("failed to get dog ID: %w", err)
+	}
+
+	dog.ID = int(id)
+	dog.CreatedAt = time.Now()
+	dog.UpdatedAt = time.Now()
+	return nil
+}
+
 // Create creates a new dog
 // SaaS: Now includes tenant_id for multi-tenancy
 func (r *DogRepository) Create(dog *models.Dog) error {
