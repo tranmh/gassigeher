@@ -166,9 +166,6 @@ func (h *DogHandler) GetDog(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, dog)
 }
 
-// FreeTierDogLimit is the maximum number of dogs allowed for free tier tenants
-const FreeTierDogLimit = 10
-
 // CreateDog handles POST /api/dogs - create a new dog (admin only)
 func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) {
 	var req models.CreateDogRequest
