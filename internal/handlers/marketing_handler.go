@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +15,12 @@ import (
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
 )
+
+// MaxDiscountMonths is the maximum allowed discount months for referral codes
+const MaxDiscountMonths = 24
+
+// referralCodePattern validates referral codes - only alphanumeric and hyphens allowed
+var referralCodePattern = regexp.MustCompile(`^[A-Z0-9-]+$`)
 
 // MarketingHandler handles marketing-related requests
 type MarketingHandler struct {
@@ -256,8 +263,39 @@ func (h *MarketingHandler) CreateReferralCode(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Validate discount months - must be non-negative
+	if req.DiscountMonthsReferrer < 0 {
+		respondError(w, http.StatusBadRequest, "Rabattmonate für Empfehler darf nicht negativ sein")
+		return
+	}
+	if req.DiscountMonthsReferee < 0 {
+		respondError(w, http.StatusBadRequest, "Rabattmonate für Empfohlene darf nicht negativ sein")
+		return
+	}
+
+	// Validate discount months - max limit (prevent abuse)
+	if req.DiscountMonthsReferrer > MaxDiscountMonths {
+		respondError(w, http.StatusBadRequest, "Rabattmonate für Empfehler darf maximal 24 sein")
+		return
+	}
+	if req.DiscountMonthsReferee > MaxDiscountMonths {
+		respondError(w, http.StatusBadRequest, "Rabattmonate für Empfohlene darf maximal 24 sein")
+		return
+	}
+
+	// Sanitize and validate code - only alphanumeric and hyphens allowed
+	sanitizedCode := strings.ToUpper(strings.TrimSpace(req.Code))
+	if sanitizedCode != "" {
+		// Remove any HTML tags and dangerous characters
+		sanitizedCode = sanitizeReferralCode(sanitizedCode)
+		if sanitizedCode == "" || !referralCodePattern.MatchString(sanitizedCode) {
+			respondError(w, http.StatusBadRequest, "Ungültiger Empfehlungscode. Nur Buchstaben, Zahlen und Bindestriche erlaubt.")
+			return
+		}
+	}
+
 	code := &models.ReferralCode{
-		Code:                   strings.ToUpper(strings.TrimSpace(req.Code)),
+		Code:                   sanitizedCode,
 		ReferrerEmail:          req.ReferrerEmail,
 		DiscountMonthsReferrer: req.DiscountMonthsReferrer,
 		DiscountMonthsReferee:  req.DiscountMonthsReferee,
@@ -285,6 +323,13 @@ func (h *MarketingHandler) CreateReferralCode(w http.ResponseWriter, r *http.Req
 			respondError(w, http.StatusBadRequest, "Ungültiges Datumsformat für expires_at (erwartet: YYYY-MM-DD oder ISO 8601)")
 			return
 		}
+
+		// Validate expiry date is not in the past
+		if parsedTime.Before(time.Now()) {
+			respondError(w, http.StatusBadRequest, "Ablaufdatum darf nicht in der Vergangenheit liegen")
+			return
+		}
+
 		code.ExpiresAt = &parsedTime
 	}
 
@@ -300,6 +345,19 @@ func (h *MarketingHandler) CreateReferralCode(w http.ResponseWriter, r *http.Req
 		return
 	}
 	respondJSON(w, http.StatusCreated, code)
+}
+
+// sanitizeReferralCode removes HTML tags and dangerous characters from referral code
+func sanitizeReferralCode(code string) string {
+	// Remove HTML tags
+	tagPattern := regexp.MustCompile(`<[^>]*>`)
+	code = tagPattern.ReplaceAllString(code, "")
+
+	// Remove any remaining special characters except alphanumeric and hyphen
+	cleanPattern := regexp.MustCompile(`[^A-Z0-9-]`)
+	code = cleanPattern.ReplaceAllString(code, "")
+
+	return code
 }
 
 // UpdateReferralCode updates a referral code (Central Admin only)

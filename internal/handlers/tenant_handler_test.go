@@ -999,6 +999,121 @@ func TestTenantHandler_Register_AllowsDifferentEmails(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// BUG #5: Invalid Email Format Accepted in Registration (TDD RED Phase)
+// =============================================================================
+// The registration endpoint accepts invalid email formats like "notanemail"
+// This should be rejected with 400 Bad Request
+// =============================================================================
+
+func TestTenantHandler_Register_InvalidEmailFormat_ReturnsError(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+		BaseDomain:         "gassigeher.org",
+	}
+	handler := NewTenantHandler(db, cfg)
+
+	testCases := []struct {
+		name        string
+		slug        string
+		adminEmail  string
+		shouldFail  bool
+		description string
+	}{
+		{"missing-at", "email-test-missing-at", "notanemail", true, "Email without @ symbol"},
+		{"missing-domain", "email-test-missing-domain", "test@", true, "Email without domain"},
+		{"missing-local", "email-test-missing-local", "@example.com", true, "Email without local part"},
+		{"double-at", "email-test-double-at", "test@@example.com", true, "Email with double @"},
+		{"spaces", "email-test-spaces", "test @example.com", true, "Email with spaces"},
+		{"valid-email", "email-test-valid-email", "valid@example.com", false, "Valid email should pass"},
+		{"valid-plus", "email-test-valid-plus", "test+tag@example.com", false, "Valid email with plus addressing"},
+		{"valid-subdomain", "email-test-valid-subdomain", "test@sub.example.com", false, "Valid email with subdomain"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			reqBody := map[string]string{
+				"organization_name": "Email Test Org " + tc.name,
+				"slug":              tc.slug,
+				"contact_email":     "contact@example.com",
+				"city":              "Berlin",
+				"postal_code":       "10115",
+				"federal_state":     "BE",
+				"admin_first_name":  "Admin",
+				"admin_last_name":   "Test",
+				"admin_email":       tc.adminEmail,
+				"admin_password":    "SecurePass123!",
+			}
+			body, _ := json.Marshal(reqBody)
+
+			req := httptest.NewRequest("POST", "/api/tenants/register", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+
+			rec := httptest.NewRecorder()
+			handler.Register(rec, req)
+
+			if tc.shouldFail {
+				// BUG: Currently invalid emails return 201 (success)
+				// Should return 400 Bad Request
+				if rec.Code == http.StatusCreated {
+					t.Errorf("BUG #5: Invalid email '%s' was accepted! %s", tc.adminEmail, tc.description)
+				}
+				if rec.Code != http.StatusBadRequest {
+					t.Errorf("Expected status 400 for invalid email '%s', got %d. %s",
+						tc.adminEmail, rec.Code, tc.description)
+				}
+			} else {
+				if rec.Code != http.StatusCreated {
+					t.Errorf("Valid email '%s' should be accepted, got %d: %s",
+						tc.adminEmail, rec.Code, rec.Body.String())
+				}
+			}
+		})
+	}
+}
+
+// TestTenantHandler_Register_InvalidContactEmailFormat tests contact email validation
+func TestTenantHandler_Register_InvalidContactEmailFormat_ReturnsError(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+		BaseDomain:         "gassigeher.org",
+	}
+	handler := NewTenantHandler(db, cfg)
+
+	// Test with invalid contact email
+	reqBody := map[string]string{
+		"organization_name": "Contact Email Test",
+		"slug":              "contact-email-test",
+		"contact_email":     "invalid-contact-email", // Invalid!
+		"city":              "Berlin",
+		"postal_code":       "10115",
+		"federal_state":     "BE",
+		"admin_first_name":  "Admin",
+		"admin_last_name":   "Test",
+		"admin_email":       "valid-admin@example.com",
+		"admin_password":    "SecurePass123!",
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest("POST", "/api/tenants/register", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	handler.Register(rec, req)
+
+	// BUG: Currently invalid contact emails return 201 (success)
+	if rec.Code == http.StatusCreated {
+		t.Errorf("BUG #5: Invalid contact email was accepted!")
+	}
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for invalid contact email, got %d", rec.Code)
+	}
+}
+
 // TestTenantHandler_CheckSlug_RateLimiting tests rate limiting on slug enumeration
 // TDD RED PHASE: This test should FAIL until we add rate limiting to CheckSlug
 // BUG: Without rate limiting, attackers can enumerate all tenant slugs

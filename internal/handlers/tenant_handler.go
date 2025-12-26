@@ -174,6 +174,12 @@ func (h *TenantHandler) Register(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "Kontakt-E-Mail ist erforderlich")
 		return
 	}
+
+	// Validate contact email format
+	if err := models.ValidateEmail(req.ContactEmail); err != nil {
+		respondError(w, http.StatusBadRequest, "Ungültiges Kontakt-E-Mail-Format")
+		return
+	}
 	if req.City == "" {
 		respondError(w, http.StatusBadRequest, "Stadt ist erforderlich")
 		return
@@ -190,6 +196,13 @@ func (h *TenantHandler) Register(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "Admin-E-Mail ist erforderlich")
 		return
 	}
+
+	// Validate admin email format
+	if err := models.ValidateEmail(req.AdminEmail); err != nil {
+		respondError(w, http.StatusBadRequest, "Ungültiges Admin-E-Mail-Format")
+		return
+	}
+
 	if len(req.AdminPassword) < 8 {
 		respondError(w, http.StatusBadRequest, "Passwort muss mindestens 8 Zeichen haben")
 		return

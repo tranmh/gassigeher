@@ -154,12 +154,12 @@ func TestCreateReferralCode_ExpiresAt_DateOnlyFormat(t *testing.T) {
 
 	handler := NewMarketingHandler(db)
 
-	// Test with date-only format (YYYY-MM-DD)
+	// Test with date-only format (YYYY-MM-DD) - use future date
 	reqBody := `{
 		"code": "DATEONLYTEST",
 		"discount_months_referrer": 3,
 		"discount_months_referee": 1,
-		"expires_at": "2025-06-15"
+		"expires_at": "2026-06-15"
 	}`
 
 	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/referral-codes", bytes.NewBufferString(reqBody))
@@ -192,8 +192,8 @@ func TestCreateReferralCode_ExpiresAt_DateOnlyFormat(t *testing.T) {
 		t.Fatalf("Failed to parse expires_at: %v", err)
 	}
 
-	if parsedTime.Year() != 2025 {
-		t.Errorf("Expected year 2025, got %d", parsedTime.Year())
+	if parsedTime.Year() != 2026 {
+		t.Errorf("Expected year 2026, got %d", parsedTime.Year())
 	}
 	if parsedTime.Month() != 6 {
 		t.Errorf("Expected month 6, got %d", parsedTime.Month())
@@ -240,5 +240,188 @@ func TestCreateReferralCode_ExpiresAt_InvalidFormat_ReturnsError(t *testing.T) {
 	// Expected: should return 400 Bad Request for invalid date format
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("Expected status 400 for invalid date format, got %d", rec.Code)
+	}
+}
+
+// ========== BUG #1: Past expiry date should be rejected ==========
+
+func TestCreateReferralCode_PastExpiryDate_ReturnsError(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// Test with past expiry date
+	reqBody := `{
+		"code": "PASTEXPIRY",
+		"discount_months_referrer": 3,
+		"discount_months_referee": 1,
+		"expires_at": "2020-01-01T00:00:00Z"
+	}`
+
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/referral-codes", bytes.NewBufferString(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateReferralCode(rec, req)
+
+	// BUG: Currently accepts past expiry dates
+	// Should return 400 Bad Request
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for past expiry date, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ========== BUG #2: XSS should be sanitized in referral codes ==========
+
+func TestCreateReferralCode_XSSInCode_Sanitized(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// Test with XSS attempt in code
+	reqBody := `{
+		"code": "TEST<script>alert(1)</script>",
+		"discount_months_referrer": 3,
+		"discount_months_referee": 1
+	}`
+
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/referral-codes", bytes.NewBufferString(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateReferralCode(rec, req)
+
+	// Should either reject or sanitize the code
+	if rec.Code == http.StatusCreated {
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+		code := response["code"].(string)
+		// Code should not contain HTML tags
+		if code != "TESTALERT1" && code != "TEST" {
+			// If it contains any < or > characters, it's a bug
+			for _, c := range code {
+				if c == '<' || c == '>' {
+					t.Errorf("Code contains HTML characters which is a XSS risk: %s", code)
+					break
+				}
+			}
+		}
+	}
+}
+
+// ========== BUG #3: Negative discount months should be rejected ==========
+
+func TestCreateReferralCode_NegativeDiscount_ReturnsError(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// Test with negative discount months
+	reqBody := `{
+		"code": "NEGATIVEDISC",
+		"discount_months_referrer": -5,
+		"discount_months_referee": -10
+	}`
+
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/referral-codes", bytes.NewBufferString(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateReferralCode(rec, req)
+
+	// BUG: Currently accepts negative discount months
+	// Should return 400 Bad Request
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for negative discount months, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ========== BUG #4: Discount months should have a reasonable max limit ==========
+
+func TestCreateReferralCode_ExcessiveDiscount_ReturnsError(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// Test with excessively large discount months (more than 24 months / 2 years is unreasonable)
+	reqBody := `{
+		"code": "HUGEDISC",
+		"discount_months_referrer": 999999999,
+		"discount_months_referee": 999999999
+	}`
+
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/referral-codes", bytes.NewBufferString(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateReferralCode(rec, req)
+
+	// BUG: Currently accepts unreasonably large discount values
+	// Should return 400 Bad Request (max 24 months reasonable)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for excessive discount months, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ========== BUG #5: Referral code should only contain alphanumeric and limited special chars ==========
+
+func TestCreateReferralCode_InvalidCharacters_ReturnsError(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	testCases := []struct {
+		name string
+		code string
+	}{
+		{"SQL injection", "'; DROP TABLE referral_codes;--"},
+		{"HTML tags", "<script>alert(1)</script>"},
+		{"Spaces", "CODE WITH SPACES"},
+		{"Special chars", "CODE@#$%^&*()"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			reqBody := `{"code": "` + tc.code + `", "discount_months_referrer": 1, "discount_months_referee": 1}`
+
+			req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/referral-codes", bytes.NewBufferString(reqBody))
+			req.Header.Set("Content-Type", "application/json")
+			ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+			ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+			req = req.WithContext(ctx)
+
+			rec := httptest.NewRecorder()
+			handler.CreateReferralCode(rec, req)
+
+			// Should reject codes with invalid characters
+			if rec.Code == http.StatusCreated {
+				var response map[string]interface{}
+				json.Unmarshal(rec.Body.Bytes(), &response)
+				storedCode := response["code"].(string)
+				// Check if dangerous characters are present (hyphens are allowed)
+				for _, c := range storedCode {
+					if c == '<' || c == '>' || c == '\'' || c == ';' {
+						t.Errorf("Code '%s' contains potentially dangerous character '%c'", storedCode, c)
+					}
+				}
+			}
+		})
 	}
 }
