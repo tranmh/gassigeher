@@ -7,6 +7,8 @@ document.addEventListener('DOMContentLoaded', function() {
     initBillingCycleToggle();
     initRegistrationForm();
     initFAQ();
+    initFOMOBanner();
+    initReferralCodeValidation();
 
     // Check URL params for pre-selected plan
     const urlParams = new URLSearchParams(window.location.search);
@@ -204,6 +206,7 @@ function initRegistrationForm() {
             admin_last_name: formData.get('admin_last_name'),
             admin_email: formData.get('admin_email'),
             admin_password: formData.get('admin_password'),
+            referral_code: formData.get('referral_code') || '',
             plan: selectedPlan,
             billing_cycle: billingCycle
         };
@@ -436,3 +439,82 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
         }
     });
 });
+
+// FOMO Banner - Fetch and display countdown/urgency messaging
+function initFOMOBanner() {
+    const banner = document.getElementById('fomo-banner');
+    const messageEl = document.getElementById('fomo-message');
+    const ctaEl = document.getElementById('fomo-cta');
+
+    if (!banner || !messageEl || !ctaEl) return;
+
+    fetch('/api/v1/marketing/fomo')
+        .then(response => response.json())
+        .then(data => {
+            if (data.active && data.campaign) {
+                const config = data.campaign.config || {};
+                const remaining = config.remaining_slots || 0;
+                const total = config.total_slots || 0;
+
+                // Build message with slot info
+                let message = config.message || 'Begrenztes Angebot!';
+                message = message.replace('{remaining_slots}', remaining);
+                message = message.replace('{total_slots}', total);
+
+                messageEl.textContent = message;
+                ctaEl.textContent = config.cta_text || 'Jetzt registrieren';
+                if (config.cta_link) {
+                    ctaEl.href = config.cta_link;
+                }
+
+                banner.style.display = 'block';
+            }
+        })
+        .catch(err => {
+            console.log('FOMO banner not available:', err);
+        });
+}
+
+// Referral Code Validation - Real-time validation with feedback
+function initReferralCodeValidation() {
+    const referralInput = document.getElementById('referral_code');
+    const statusEl = document.getElementById('referral-status');
+
+    if (!referralInput || !statusEl) return;
+
+    let debounceTimer = null;
+
+    referralInput.addEventListener('input', function() {
+        const code = this.value.trim();
+
+        // Clear previous status
+        statusEl.textContent = '';
+        statusEl.className = '';
+
+        if (!code) return;
+
+        // Debounce to avoid too many API calls
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            validateReferralCode(code, statusEl);
+        }, 500);
+    });
+}
+
+async function validateReferralCode(code, statusEl) {
+    try {
+        const response = await fetch(`/api/v1/marketing/referral/${encodeURIComponent(code)}`);
+        const data = await response.json();
+
+        if (data.valid) {
+            statusEl.textContent = `Code gültig! ${data.discount_months} Monat(e) kostenlos`;
+            statusEl.className = 'referral-status valid';
+        } else {
+            statusEl.textContent = data.message || 'Code ungültig';
+            statusEl.className = 'referral-status invalid';
+        }
+    } catch (err) {
+        console.log('Referral validation error:', err);
+        statusEl.textContent = '';
+    }
+}

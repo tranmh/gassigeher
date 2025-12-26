@@ -272,3 +272,316 @@ func TestCreateReferralCode_TimestampsInRFC3339Format(t *testing.T) {
 func intPtr(i int) *int {
 	return &i
 }
+
+// ========== BUG FIX: GetActiveCampaignByType date comparison ==========
+
+func TestGetActiveCampaignByType_FindsActiveCampaign(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	repo := NewMarketingRepository(db)
+
+	// Create an active campaign with dates that include today
+	yesterday := time.Now().AddDate(0, 0, -1)
+	tomorrow := time.Now().AddDate(0, 0, 1)
+
+	campaign := &models.MarketingCampaign{
+		Type:      "fomo_countdown",
+		Name:      "Active FOMO Campaign",
+		IsActive:  true,
+		StartDate: &yesterday,
+		EndDate:   &tomorrow,
+	}
+
+	err := repo.CreateCampaign(campaign)
+	if err != nil {
+		t.Fatalf("CreateCampaign failed: %v", err)
+	}
+
+	// Get active campaign by type - this was broken due to date comparison bug
+	found, err := repo.GetActiveCampaignByType("fomo_countdown")
+	if err != nil {
+		t.Fatalf("GetActiveCampaignByType failed: %v", err)
+	}
+
+	if found == nil {
+		t.Fatal("GetActiveCampaignByType should find the active campaign, got nil")
+	}
+
+	if found.ID != campaign.ID {
+		t.Errorf("GetActiveCampaignByType returned wrong campaign. Expected ID %d, got %d", campaign.ID, found.ID)
+	}
+}
+
+func TestGetActiveCampaignByType_ReturnsNilForExpiredCampaign(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	repo := NewMarketingRepository(db)
+
+	// Create an expired campaign
+	twoDaysAgo := time.Now().AddDate(0, 0, -2)
+	yesterday := time.Now().AddDate(0, 0, -1)
+
+	campaign := &models.MarketingCampaign{
+		Type:      "fomo_countdown",
+		Name:      "Expired Campaign",
+		IsActive:  true,
+		StartDate: &twoDaysAgo,
+		EndDate:   &yesterday,
+	}
+
+	err := repo.CreateCampaign(campaign)
+	if err != nil {
+		t.Fatalf("CreateCampaign failed: %v", err)
+	}
+
+	// Should NOT find expired campaign
+	found, err := repo.GetActiveCampaignByType("fomo_countdown")
+	if err != nil {
+		t.Fatalf("GetActiveCampaignByType failed: %v", err)
+	}
+
+	if found != nil {
+		t.Error("GetActiveCampaignByType should return nil for expired campaign")
+	}
+}
+
+func TestGetActiveCampaignByType_ReturnsNilForFutureCampaign(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	repo := NewMarketingRepository(db)
+
+	// Create a future campaign
+	tomorrow := time.Now().AddDate(0, 0, 1)
+	nextWeek := time.Now().AddDate(0, 0, 7)
+
+	campaign := &models.MarketingCampaign{
+		Type:      "fomo_countdown",
+		Name:      "Future Campaign",
+		IsActive:  true,
+		StartDate: &tomorrow,
+		EndDate:   &nextWeek,
+	}
+
+	err := repo.CreateCampaign(campaign)
+	if err != nil {
+		t.Fatalf("CreateCampaign failed: %v", err)
+	}
+
+	// Should NOT find future campaign
+	found, err := repo.GetActiveCampaignByType("fomo_countdown")
+	if err != nil {
+		t.Fatalf("GetActiveCampaignByType failed: %v", err)
+	}
+
+	if found != nil {
+		t.Error("GetActiveCampaignByType should return nil for campaign that hasn't started yet")
+	}
+}
+
+func TestGetActiveCampaignByType_ReturnsNilForInactiveCampaign(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	repo := NewMarketingRepository(db)
+
+	// Create an inactive campaign with valid dates
+	yesterday := time.Now().AddDate(0, 0, -1)
+	tomorrow := time.Now().AddDate(0, 0, 1)
+
+	campaign := &models.MarketingCampaign{
+		Type:      "fomo_countdown",
+		Name:      "Inactive Campaign",
+		IsActive:  false, // Inactive
+		StartDate: &yesterday,
+		EndDate:   &tomorrow,
+	}
+
+	err := repo.CreateCampaign(campaign)
+	if err != nil {
+		t.Fatalf("CreateCampaign failed: %v", err)
+	}
+
+	// Should NOT find inactive campaign
+	found, err := repo.GetActiveCampaignByType("fomo_countdown")
+	if err != nil {
+		t.Fatalf("GetActiveCampaignByType failed: %v", err)
+	}
+
+	if found != nil {
+		t.Error("GetActiveCampaignByType should return nil for inactive campaign")
+	}
+}
+
+// ========== BUG FIX: IncrementReferralCodeUses and RecordReferralUse ==========
+
+func TestIncrementReferralCodeUses_IncrementsCount(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	repo := NewMarketingRepository(db)
+
+	// Create a referral code with 0 uses
+	code := &models.ReferralCode{
+		Code:                   "TESTINCREMENT",
+		DiscountMonthsReferrer: 3,
+		DiscountMonthsReferee:  1,
+		UsesCount:              0,
+		IsActive:               true,
+	}
+
+	err := repo.CreateReferralCode(code)
+	if err != nil {
+		t.Fatalf("CreateReferralCode failed: %v", err)
+	}
+
+	// Increment uses
+	err = repo.IncrementReferralCodeUses(code.ID)
+	if err != nil {
+		t.Fatalf("IncrementReferralCodeUses failed: %v", err)
+	}
+
+	// Fetch and verify count increased
+	fetched, err := repo.GetReferralCode(code.ID)
+	if err != nil {
+		t.Fatalf("GetReferralCode failed: %v", err)
+	}
+
+	if fetched.UsesCount != 1 {
+		t.Errorf("Expected uses_count to be 1, got %d", fetched.UsesCount)
+	}
+
+	// Increment again
+	err = repo.IncrementReferralCodeUses(code.ID)
+	if err != nil {
+		t.Fatalf("Second IncrementReferralCodeUses failed: %v", err)
+	}
+
+	fetched, _ = repo.GetReferralCode(code.ID)
+	if fetched.UsesCount != 2 {
+		t.Errorf("Expected uses_count to be 2 after second increment, got %d", fetched.UsesCount)
+	}
+}
+
+func TestRecordReferralUse_RecordsUse(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	repo := NewMarketingRepository(db)
+
+	// Create a tenant first
+	_, err := db.Exec(`INSERT INTO tenants (slug, name) VALUES ('test-tenant', 'Test Tenant')`)
+	if err != nil {
+		t.Fatalf("Failed to create tenant: %v", err)
+	}
+
+	// Get the tenant ID
+	var tenantID int
+	err = db.QueryRow(`SELECT id FROM tenants WHERE slug = 'test-tenant'`).Scan(&tenantID)
+	if err != nil {
+		t.Fatalf("Failed to get tenant ID: %v", err)
+	}
+
+	// Create a referral code
+	code := &models.ReferralCode{
+		Code:                   "TESTRECORD",
+		DiscountMonthsReferrer: 3,
+		DiscountMonthsReferee:  1,
+		IsActive:               true,
+	}
+
+	err = repo.CreateReferralCode(code)
+	if err != nil {
+		t.Fatalf("CreateReferralCode failed: %v", err)
+	}
+
+	// Record the referral use
+	err = repo.RecordReferralUse(code.ID, tenantID)
+	if err != nil {
+		t.Fatalf("RecordReferralUse failed: %v", err)
+	}
+
+	// Verify the use was recorded
+	uses, err := repo.GetReferralUses(code.ID)
+	if err != nil {
+		t.Fatalf("GetReferralUses failed: %v", err)
+	}
+
+	if len(uses) != 1 {
+		t.Fatalf("Expected 1 referral use, got %d", len(uses))
+	}
+
+	if uses[0].CodeID != code.ID {
+		t.Errorf("Expected code_id to be %d, got %d", code.ID, uses[0].CodeID)
+	}
+
+	if uses[0].RefereeTenantID != tenantID {
+		t.Errorf("Expected referee_tenant_id to be %d, got %d", tenantID, uses[0].RefereeTenantID)
+	}
+}
+
+func TestHasTenantUsedReferral_ReturnsFalseForNewTenant(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	repo := NewMarketingRepository(db)
+
+	// Create a tenant
+	_, err := db.Exec(`INSERT INTO tenants (slug, name) VALUES ('new-tenant', 'New Tenant')`)
+	if err != nil {
+		t.Fatalf("Failed to create tenant: %v", err)
+	}
+
+	var tenantID int
+	db.QueryRow(`SELECT id FROM tenants WHERE slug = 'new-tenant'`).Scan(&tenantID)
+
+	// Check if tenant has used a referral - should be false
+	hasUsed, err := repo.HasTenantUsedReferral(tenantID)
+	if err != nil {
+		t.Fatalf("HasTenantUsedReferral failed: %v", err)
+	}
+
+	if hasUsed {
+		t.Error("New tenant should not have used a referral")
+	}
+}
+
+func TestHasTenantUsedReferral_ReturnsTrueAfterUsing(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	repo := NewMarketingRepository(db)
+
+	// Create a tenant
+	_, err := db.Exec(`INSERT INTO tenants (slug, name) VALUES ('existing-tenant', 'Existing Tenant')`)
+	if err != nil {
+		t.Fatalf("Failed to create tenant: %v", err)
+	}
+
+	var tenantID int
+	db.QueryRow(`SELECT id FROM tenants WHERE slug = 'existing-tenant'`).Scan(&tenantID)
+
+	// Create a referral code
+	code := &models.ReferralCode{
+		Code:                   "TESTHASUSED",
+		DiscountMonthsReferrer: 3,
+		DiscountMonthsReferee:  1,
+		IsActive:               true,
+	}
+	repo.CreateReferralCode(code)
+
+	// Record the use
+	repo.RecordReferralUse(code.ID, tenantID)
+
+	// Check if tenant has used a referral - should be true now
+	hasUsed, err := repo.HasTenantUsedReferral(tenantID)
+	if err != nil {
+		t.Fatalf("HasTenantUsedReferral failed: %v", err)
+	}
+
+	if !hasUsed {
+		t.Error("Tenant should have used a referral after RecordReferralUse")
+	}
+}

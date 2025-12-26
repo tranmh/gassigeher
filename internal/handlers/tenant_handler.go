@@ -94,6 +94,7 @@ type TenantHandler struct {
 	cfg                 *config.Config
 	tenantRepo          *repository.TenantRepository
 	userRepo            *repository.UserRepository
+	marketingRepo       *repository.MarketingRepository
 	authService         *services.AuthService
 	provisioningService *services.ProvisioningService
 	emailService        *services.EmailService
@@ -108,6 +109,7 @@ func NewTenantHandler(db *sql.DB, cfg *config.Config) *TenantHandler {
 		cfg:                 cfg,
 		tenantRepo:          repository.NewTenantRepository(db),
 		userRepo:            repository.NewUserRepository(db),
+		marketingRepo:       repository.NewMarketingRepository(db),
 		authService:         services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours),
 		provisioningService: services.NewProvisioningService(db),
 		emailService:        emailService,
@@ -132,6 +134,9 @@ type TenantRegistrationRequest struct {
 	AdminLastName  string `json:"admin_last_name"`
 	AdminEmail     string `json:"admin_email"`
 	AdminPassword  string `json:"admin_password"`
+
+	// Marketing / Referral
+	ReferralCode string `json:"referral_code,omitempty"`
 }
 
 // Register handles tenant registration
@@ -309,6 +314,11 @@ func (h *TenantHandler) Register(w http.ResponseWriter, r *http.Request) {
 	if err := tx.Commit(); err != nil {
 		respondError(w, http.StatusInternalServerError, "Fehler beim Speichern")
 		return
+	}
+
+	// 5. Process referral code if provided (non-blocking, registration succeeds regardless)
+	if req.ReferralCode != "" {
+		go h.processReferralCode(req.ReferralCode, tenantID)
 	}
 
 	// Send welcome email (in background)
@@ -759,6 +769,58 @@ func (h *TenantHandler) sendTenantWelcomeEmail(contactEmail, orgName, slug, admi
 `, orgName, slug, adminEmail, loginURL)
 
 	h.emailService.SendEmail(contactEmail, subject, body)
+}
+
+// processReferralCode validates and applies a referral code during tenant registration
+// This is called in a goroutine and should not block registration
+func (h *TenantHandler) processReferralCode(code string, refereeTenantID int) {
+	// Look up the referral code (case-insensitive)
+	referralCode, err := h.marketingRepo.GetReferralCodeByCode(strings.ToUpper(code))
+	if err != nil {
+		log.Printf("Error looking up referral code '%s': %v", code, err)
+		return
+	}
+	if referralCode == nil {
+		log.Printf("Referral code '%s' not found", code)
+		return
+	}
+
+	// Check if code is active
+	if !referralCode.IsActive {
+		log.Printf("Referral code '%s' is not active", code)
+		return
+	}
+
+	// Check if code has expired
+	if referralCode.ExpiresAt != nil && time.Now().After(*referralCode.ExpiresAt) {
+		log.Printf("Referral code '%s' has expired", code)
+		return
+	}
+
+	// Check if max uses exceeded
+	if referralCode.MaxUses != nil && referralCode.UsesCount >= *referralCode.MaxUses {
+		log.Printf("Referral code '%s' has reached max uses (%d)", code, *referralCode.MaxUses)
+		return
+	}
+
+	// Check if same tenant is using their own code (prevent self-referral)
+	if referralCode.ReferrerTenantID != nil && *referralCode.ReferrerTenantID == refereeTenantID {
+		log.Printf("Tenant %d cannot use their own referral code", refereeTenantID)
+		return
+	}
+
+	// All checks passed - increment uses and record the referral
+	if err := h.marketingRepo.IncrementReferralCodeUses(referralCode.ID); err != nil {
+		log.Printf("Error incrementing referral code uses: %v", err)
+		return
+	}
+
+	if err := h.marketingRepo.RecordReferralUse(referralCode.ID, refereeTenantID); err != nil {
+		log.Printf("Error recording referral use: %v", err)
+		return
+	}
+
+	log.Printf("Successfully applied referral code '%s' for tenant %d", code, refereeTenantID)
 }
 
 // ExportTenantData exports all tenant data for GDPR compliance

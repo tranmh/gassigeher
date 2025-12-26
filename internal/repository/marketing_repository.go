@@ -57,7 +57,7 @@ func (r *MarketingRepository) GetCampaign(id int) (*models.MarketingCampaign, er
 
 // GetActiveCampaignByType returns the active campaign of a specific type
 func (r *MarketingRepository) GetActiveCampaignByType(campaignType string) (*models.MarketingCampaign, error) {
-	now := time.Now()
+	now := FormatTimestamp(time.Now())
 	query := `SELECT id, type, name, description, config, is_active, start_date, end_date, created_at, updated_at
 			  FROM marketing_campaigns
 			  WHERE type = ? AND is_active = 1
@@ -105,9 +105,19 @@ func (r *MarketingRepository) CreateCampaign(c *models.MarketingCampaign) error 
 
 // UpdateCampaign updates a campaign
 func (r *MarketingRepository) UpdateCampaign(c *models.MarketingCampaign) error {
+	var startDateFormatted, endDateFormatted *string
+	if c.StartDate != nil {
+		s := FormatTimestamp(*c.StartDate)
+		startDateFormatted = &s
+	}
+	if c.EndDate != nil {
+		e := FormatTimestamp(*c.EndDate)
+		endDateFormatted = &e
+	}
+
 	query := `UPDATE marketing_campaigns SET name = ?, description = ?, config = ?, is_active = ?, start_date = ?, end_date = ?, updated_at = ?
 			  WHERE id = ?`
-	_, err := r.db.Exec(query, c.Name, c.Description, c.Config, c.IsActive, c.StartDate, c.EndDate, time.Now(), c.ID)
+	_, err := r.db.Exec(query, c.Name, c.Description, c.Config, c.IsActive, startDateFormatted, endDateFormatted, FormatTimestamp(time.Now()), c.ID)
 	return err
 }
 
@@ -210,17 +220,23 @@ func (r *MarketingRepository) CreateReferralCode(c *models.ReferralCode) error {
 
 // UpdateReferralCode updates a referral code
 func (r *MarketingRepository) UpdateReferralCode(c *models.ReferralCode) error {
+	var expiresAtFormatted *string
+	if c.ExpiresAt != nil {
+		e := FormatTimestamp(*c.ExpiresAt)
+		expiresAtFormatted = &e
+	}
+
 	query := `UPDATE referral_codes SET code = ?, referrer_email = ?, discount_months_referrer = ?,
 			  discount_months_referee = ?, max_uses = ?, is_active = ?, expires_at = ?, updated_at = ?
 			  WHERE id = ?`
 	_, err := r.db.Exec(query, c.Code, c.ReferrerEmail, c.DiscountMonthsReferrer, c.DiscountMonthsReferee,
-		c.MaxUses, c.IsActive, c.ExpiresAt, time.Now(), c.ID)
+		c.MaxUses, c.IsActive, expiresAtFormatted, FormatTimestamp(time.Now()), c.ID)
 	return err
 }
 
 // IncrementReferralCodeUses increments the use count
 func (r *MarketingRepository) IncrementReferralCodeUses(id int) error {
-	_, err := r.db.Exec("UPDATE referral_codes SET uses_count = uses_count + 1, updated_at = ? WHERE id = ?", time.Now(), id)
+	_, err := r.db.Exec("UPDATE referral_codes SET uses_count = uses_count + 1, updated_at = ? WHERE id = ?", FormatTimestamp(time.Now()), id)
 	return err
 }
 
@@ -235,7 +251,7 @@ func (r *MarketingRepository) DeleteReferralCode(id int) error {
 // RecordReferralUse records the use of a referral code
 func (r *MarketingRepository) RecordReferralUse(codeID, refereeTenantID int) error {
 	query := `INSERT INTO referral_uses (code_id, referee_tenant_id, applied_at) VALUES (?, ?, ?)`
-	_, err := r.db.Exec(query, codeID, refereeTenantID, time.Now())
+	_, err := r.db.Exec(query, codeID, refereeTenantID, FormatTimestamp(time.Now()))
 	return err
 }
 
@@ -334,9 +350,10 @@ func (r *MarketingRepository) GetReferenceEntryByTenant(tenantID int) (*models.R
 
 // CreateReferenceEntry creates a new reference entry
 func (r *MarketingRepository) CreateReferenceEntry(e *models.ReferenceEntry) error {
+	now := FormatTimestamp(time.Now())
 	query := `INSERT INTO reference_entries (tenant_id, display_name, city, federal_state, website_url, testimonial, logo_url, is_approved, display_order, created_at, updated_at)
 			  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	result, err := r.db.Exec(query, e.TenantID, e.DisplayName, e.City, e.FederalState, e.WebsiteURL, e.Testimonial, e.LogoURL, e.IsApproved, e.DisplayOrder, time.Now(), time.Now())
+	result, err := r.db.Exec(query, e.TenantID, e.DisplayName, e.City, e.FederalState, e.WebsiteURL, e.Testimonial, e.LogoURL, e.IsApproved, e.DisplayOrder, now, now)
 	if err != nil {
 		return err
 	}
@@ -349,13 +366,13 @@ func (r *MarketingRepository) CreateReferenceEntry(e *models.ReferenceEntry) err
 func (r *MarketingRepository) UpdateReferenceEntry(e *models.ReferenceEntry) error {
 	query := `UPDATE reference_entries SET display_name = ?, city = ?, federal_state = ?, website_url = ?, testimonial = ?, logo_url = ?, is_approved = ?, display_order = ?, updated_at = ?
 			  WHERE id = ?`
-	_, err := r.db.Exec(query, e.DisplayName, e.City, e.FederalState, e.WebsiteURL, e.Testimonial, e.LogoURL, e.IsApproved, e.DisplayOrder, time.Now(), e.ID)
+	_, err := r.db.Exec(query, e.DisplayName, e.City, e.FederalState, e.WebsiteURL, e.Testimonial, e.LogoURL, e.IsApproved, e.DisplayOrder, FormatTimestamp(time.Now()), e.ID)
 	return err
 }
 
 // ApproveReferenceEntry approves a reference entry
 func (r *MarketingRepository) ApproveReferenceEntry(id int) error {
-	_, err := r.db.Exec("UPDATE reference_entries SET is_approved = 1, updated_at = ? WHERE id = ?", time.Now(), id)
+	_, err := r.db.Exec("UPDATE reference_entries SET is_approved = 1, updated_at = ? WHERE id = ?", FormatTimestamp(time.Now()), id)
 	return err
 }
 

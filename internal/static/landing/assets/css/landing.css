@@ -745,3 +745,65 @@ a:hover {
         width: 100%;
     }
 }
+
+/* ========== FOMO Countdown Banner ========== */
+.fomo-banner {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+    padding: 0.75rem 0;
+    text-align: center;
+    font-weight: 500;
+    animation: fomo-pulse 2s ease-in-out infinite;
+}
+
+@keyframes fomo-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.9; }
+}
+
+.fomo-banner .container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.fomo-banner #fomo-message {
+    font-size: 1rem;
+}
+
+.fomo-banner .btn-small {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    background: white;
+    color: #d97706;
+    border: none;
+}
+
+.fomo-banner .btn-small:hover {
+    background: #fef3c7;
+}
+
+@media (max-width: 768px) {
+    .fomo-banner .container {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}
+
+/* ========== Referral Code Validation ========== */
+.referral-status {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.referral-status.valid {
+    color: var(--color-success, #22c55e);
+}
+
+.referral-status.invalid {
+    color: var(--color-error, #ef4444);
+}

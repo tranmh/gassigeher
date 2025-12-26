@@ -205,10 +205,16 @@ func (h *MarketingHandler) GetActiveFOMO(w http.ResponseWriter, r *http.Request)
 
 	config, _ := campaign.GetFOMOConfig()
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"active":  true,
-		"name":    campaign.Name,
-		"config":  config,
-		"ends_at": campaign.EndDate,
+		"active": true,
+		"campaign": map[string]interface{}{
+			"id":          campaign.ID,
+			"type":        campaign.Type,
+			"name":        campaign.Name,
+			"description": campaign.Description,
+			"config":      config,
+			"start_date":  campaign.StartDate,
+			"end_date":    campaign.EndDate,
+		},
 	})
 }
 
