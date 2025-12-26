@@ -94,6 +94,9 @@ type Config struct {
 	StripePriceMonthly   string // price_xxx for monthly subscription
 	StripePriceYearly    string // price_xxx for yearly subscription
 
+	// Billing Test Mode (for development without Stripe)
+	BillingTestMode bool // Enable test upgrade/downgrade without Stripe
+
 	// Contact Form
 	ContactEmail string // Email address for contact form submissions
 
@@ -192,6 +195,9 @@ func Load() *Config {
 		StripePriceMonthly:   getEnv("STRIPE_PRICE_MONTHLY", ""),
 		StripePriceYearly:    getEnv("STRIPE_PRICE_YEARLY", ""),
 
+		// Billing Test Mode (auto-enabled for .local domains, or set BILLING_TEST_MODE=true)
+		BillingTestMode: getEnvAsBool("BILLING_TEST_MODE", false),
+
 		// Contact Form
 		ContactEmail: getEnv("CONTACT_EMAIL", "kontakt@gassigeher.org"),
 
@@ -259,6 +265,13 @@ func (c *Config) IsLocalDevelopment() bool {
 	return strings.HasSuffix(c.BaseDomain, ".local") ||
 		strings.HasSuffix(c.BaseDomain, ".localhost") ||
 		c.BaseDomain == "localhost"
+}
+
+// IsBillingTestModeEnabled returns true if billing test mode is enabled
+// This allows testing subscription upgrades without Stripe
+// Auto-enabled for local development (.local, .localhost domains) or via BILLING_TEST_MODE=true
+func (c *Config) IsBillingTestModeEnabled() bool {
+	return c.BillingTestMode || c.IsLocalDevelopment()
 }
 
 // DONE

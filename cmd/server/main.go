@@ -238,7 +238,7 @@ func main() {
 		}
 		log.Println("Stripe payment service initialized")
 	}
-	billingHandler := handlers.NewBillingHandler(db, stripeService)
+	billingHandler := handlers.NewBillingHandler(db, cfg, stripeService)
 
 	// Infrastructure endpoints (unversioned - for monitoring tools)
 	router.HandleFunc("/api/health", healthHandler.Health).Methods("GET")
@@ -412,6 +412,7 @@ func main() {
 	protected.HandleFunc("/billing/checkout", billingHandler.CreateCheckout).Methods("POST")
 	protected.HandleFunc("/billing/portal", billingHandler.CreateBillingPortal).Methods("POST")
 	protected.HandleFunc("/billing/cancel", billingHandler.CancelSubscription).Methods("POST")
+	protected.HandleFunc("/billing/test-upgrade", billingHandler.TestUpgrade).Methods("POST") // Test mode only
 
 	// Feature flags (authenticated users - check if flags are enabled)
 	protected.HandleFunc("/feature-flags/{key}/check", featureFlagHandler.CheckFlag).Methods("GET")

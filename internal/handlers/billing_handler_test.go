@@ -28,7 +28,7 @@ func contextWithTenantAndAdmin(ctx context.Context, tenantID int, isAdmin bool) 
 // TestBillingHandler_GetSubscription tests GET /api/billing/subscription (TDD RED Phase)
 func TestBillingHandler_GetSubscription(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	handler := NewBillingHandler(db, nil)
+	handler := NewBillingHandler(db, nil, nil)
 
 	t.Run("returns subscription for authenticated user", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/billing/subscription", nil)
@@ -67,7 +67,7 @@ func TestBillingHandler_GetSubscription(t *testing.T) {
 // TestBillingHandler_GetPlans tests GET /api/billing/plans
 func TestBillingHandler_GetPlans(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	handler := NewBillingHandler(db, nil)
+	handler := NewBillingHandler(db, nil, nil)
 
 	t.Run("returns all active plans", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/billing/plans", nil)
@@ -95,7 +95,7 @@ func TestBillingHandler_GetPlans(t *testing.T) {
 // TestBillingHandler_GetUsage tests GET /api/billing/usage
 func TestBillingHandler_GetUsage(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	handler := NewBillingHandler(db, nil)
+	handler := NewBillingHandler(db, nil, nil)
 
 	// Seed some dogs for tenant 1
 	testutil.SeedTestDog(t, db, "Max", "Labrador", "green")
@@ -148,7 +148,7 @@ func TestBillingHandler_GetUsage(t *testing.T) {
 func TestBillingHandler_CreateCheckout(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	// Create handler without Stripe (will return error)
-	handler := NewBillingHandler(db, nil)
+	handler := NewBillingHandler(db, nil, nil)
 
 	t.Run("returns error when Stripe not configured", func(t *testing.T) {
 		// Send valid request body to pass validation
@@ -181,7 +181,7 @@ func TestBillingHandler_CreateCheckout(t *testing.T) {
 // TestBillingHandler_CancelSubscription tests POST /api/billing/cancel
 func TestBillingHandler_CancelSubscription(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	handler := NewBillingHandler(db, nil)
+	handler := NewBillingHandler(db, nil, nil)
 
 	t.Run("cancels subscription when admin", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/billing/cancel", nil)
@@ -227,7 +227,7 @@ func TestBillingHandler_CancelSubscription(t *testing.T) {
 // TestBillingHandler_WebhookBodyLimit tests that webhook body size is limited (DoS protection)
 func TestBillingHandler_WebhookBodyLimit(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	handler := NewBillingHandler(db, nil)
+	handler := NewBillingHandler(db, nil, nil)
 
 	t.Run("SECURITY: rejects oversized webhook body", func(t *testing.T) {
 		// Create a 2MB body (should exceed reasonable limit)
@@ -253,7 +253,7 @@ func TestBillingHandler_WebhookBodyLimit(t *testing.T) {
 // TestBillingHandler_CreateCheckout_AdminRequired tests admin authorization for checkout
 func TestBillingHandler_CreateCheckout_AdminRequired(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	handler := NewBillingHandler(db, nil)
+	handler := NewBillingHandler(db, nil, nil)
 
 	// BUG 2: Non-admin users should NOT be able to initiate checkout (financial decision)
 	t.Run("SECURITY: non-admin cannot create checkout", func(t *testing.T) {
@@ -276,7 +276,7 @@ func TestBillingHandler_CreateCheckout_AdminRequired(t *testing.T) {
 // TestBillingHandler_CreateCheckout_BillingCycleValidation tests billing_cycle validation
 func TestBillingHandler_CreateCheckout_BillingCycleValidation(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	handler := NewBillingHandler(db, nil)
+	handler := NewBillingHandler(db, nil, nil)
 
 	// BUG 7: Invalid billing_cycle values should be rejected
 	t.Run("rejects invalid billing_cycle", func(t *testing.T) {
@@ -302,7 +302,7 @@ func TestBillingHandler_CreateCheckout_BillingCycleValidation(t *testing.T) {
 // TestBillingHandler_CreateBillingPortal tests POST /api/billing/portal
 func TestBillingHandler_CreateBillingPortal(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	handler := NewBillingHandler(db, nil)
+	handler := NewBillingHandler(db, nil, nil)
 
 	t.Run("returns error when tenant not in context", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/billing/portal", nil)
@@ -343,7 +343,7 @@ func TestBillingHandler_CreateBillingPortal(t *testing.T) {
 // TestBillingHandler_HandleWebhook tests POST /api/billing/webhook
 func TestBillingHandler_HandleWebhook(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	handler := NewBillingHandler(db, nil)
+	handler := NewBillingHandler(db, nil, nil)
 
 	t.Run("returns service unavailable when Stripe not configured", func(t *testing.T) {
 		body := `{"type": "checkout.session.completed"}`
@@ -379,7 +379,7 @@ func TestBillingHandler_HandleWebhook(t *testing.T) {
 // TestBillingHandler_CancelSubscription_NoSubscription tests cancellation without subscription
 func TestBillingHandler_CancelSubscription_NoSubscription(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	handler := NewBillingHandler(db, nil)
+	handler := NewBillingHandler(db, nil, nil)
 
 	// Create a new tenant without any subscription
 	_, err := db.Exec(`INSERT INTO tenants (slug, name, contact_email, status, created_at) VALUES ('no-sub', 'No Sub Tenant', 'test@example.com', 'active', datetime('now'))`)
@@ -407,7 +407,7 @@ func TestBillingHandler_CancelSubscription_NoSubscription(t *testing.T) {
 // TestBillingHandler_CreateCheckout_PlanSlugValidation tests plan slug validation
 func TestBillingHandler_CreateCheckout_PlanSlugValidation(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	handler := NewBillingHandler(db, nil)
+	handler := NewBillingHandler(db, nil, nil)
 
 	t.Run("rejects empty plan_slug", func(t *testing.T) {
 		body := `{"plan_slug": "", "billing_cycle": "monthly"}`
@@ -476,7 +476,7 @@ func TestBillingHandler_CreateCheckout_PlanSlugValidation(t *testing.T) {
 // Enhancement: Show visual indication when tenant is over their subscription limit
 func TestBillingHandler_GetUsage_ShowsOverLimitWarning(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	handler := NewBillingHandler(db, nil)
+	handler := NewBillingHandler(db, nil, nil)
 
 	// Create 15 dogs for tenant 1 (over the 10 dog limit for Free plan)
 	for i := 0; i < 15; i++ {

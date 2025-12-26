@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stripe/stripe-go/v76"
+	"github.com/tranmh/gassigeher/internal/config"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -17,19 +18,21 @@ import (
 
 // BillingHandler handles billing-related HTTP requests
 type BillingHandler struct {
-	db              *sql.DB
-	stripeService   *services.StripeService
+	db               *sql.DB
+	cfg              *config.Config
+	stripeService    *services.StripeService
 	subscriptionRepo *repository.SubscriptionRepository
-	dogRepo         *repository.DogRepository
+	dogRepo          *repository.DogRepository
 }
 
 // NewBillingHandler creates a new billing handler
-func NewBillingHandler(db *sql.DB, stripeService *services.StripeService) *BillingHandler {
+func NewBillingHandler(db *sql.DB, cfg *config.Config, stripeService *services.StripeService) *BillingHandler {
 	return &BillingHandler{
-		db:              db,
-		stripeService:   stripeService,
+		db:               db,
+		cfg:              cfg,
+		stripeService:    stripeService,
 		subscriptionRepo: repository.NewSubscriptionRepository(db),
-		dogRepo:         repository.NewDogRepository(db),
+		dogRepo:          repository.NewDogRepository(db),
 	}
 }
 
@@ -82,10 +85,14 @@ func (h *BillingHandler) GetPlans(w http.ResponseWriter, r *http.Request) {
 		publishableKey = h.stripeService.GetPublishableKey()
 	}
 
+	// Add test mode status
+	testModeEnabled := h.cfg != nil && h.cfg.IsBillingTestModeEnabled()
+
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"plans":            plans,
+		"plans":             plans,
 		"stripe_configured": stripeConfigured,
 		"publishable_key":   publishableKey,
+		"test_mode":         testModeEnabled,
 	})
 }
 
@@ -548,4 +555,105 @@ func (h *BillingHandler) handleSubscriptionDeleted(event *stripe.Event) {
 	}
 
 	log.Printf("Subscription %s deleted, downgraded to free", data.SubscriptionID)
+}
+
+// TestUpgradeRequest represents a test upgrade request
+type TestUpgradeRequest struct {
+	PlanSlug string `json:"plan_slug"` // "pro" or "free"
+}
+
+// TestUpgrade allows upgrading/downgrading subscriptions without Stripe (TEST MODE ONLY)
+// POST /api/billing/test-upgrade
+// This endpoint is only available in local development or when BILLING_TEST_MODE=true
+func (h *BillingHandler) TestUpgrade(w http.ResponseWriter, r *http.Request) {
+	// Security: Only allow in test mode
+	if h.cfg == nil || !h.cfg.IsBillingTestModeEnabled() {
+		respondError(w, http.StatusForbidden, "Test-Modus nicht aktiviert. Setzen Sie BILLING_TEST_MODE=true oder verwenden Sie eine .local Domain.")
+		return
+	}
+
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+	if !ok || tenantID == 0 {
+		respondError(w, http.StatusUnauthorized, "Nicht autorisiert")
+		return
+	}
+
+	// Security: Only admins can upgrade
+	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
+	if !isAdmin {
+		respondError(w, http.StatusForbidden, "Nur Administratoren können den Plan ändern")
+		return
+	}
+
+	var req TestUpgradeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "Ungültige Anfrage")
+		return
+	}
+
+	// Default to pro if not specified
+	if req.PlanSlug == "" {
+		req.PlanSlug = "pro"
+	}
+
+	// Validate plan slug
+	var planID int
+	var planName string
+	switch req.PlanSlug {
+	case "pro":
+		planID = 2
+		planName = "Pro"
+	case "free":
+		planID = 1
+		planName = "Free"
+	default:
+		respondError(w, http.StatusBadRequest, "Ungültiger Plan. Erlaubt: free, pro")
+		return
+	}
+
+	// Get or create subscription
+	subscription, err := h.subscriptionRepo.GetSubscriptionByTenant(tenantID)
+	if err != nil {
+		log.Printf("ERROR: Failed to get subscription for tenant %d: %v", tenantID, err)
+		respondError(w, http.StatusInternalServerError, "Fehler beim Laden der Subscription")
+		return
+	}
+
+	if subscription == nil {
+		// Create new subscription
+		subscription = &models.TenantSubscription{
+			TenantID:     tenantID,
+			PlanID:       planID,
+			Status:       models.SubscriptionStatusActive,
+			BillingCycle: models.BillingCycleMonthly,
+		}
+		err = h.subscriptionRepo.CreateSubscription(subscription)
+		if err != nil {
+			log.Printf("ERROR: Failed to create subscription for tenant %d: %v", tenantID, err)
+			respondError(w, http.StatusInternalServerError, "Fehler beim Erstellen der Subscription")
+			return
+		}
+	} else {
+		// Update existing subscription
+		subscription.PlanID = planID
+		subscription.Status = models.SubscriptionStatusActive
+		err = h.subscriptionRepo.UpdateSubscription(subscription)
+		if err != nil {
+			log.Printf("ERROR: Failed to update subscription for tenant %d: %v", tenantID, err)
+			respondError(w, http.StatusInternalServerError, "Fehler beim Aktualisieren der Subscription")
+			return
+		}
+	}
+
+	log.Printf("TEST MODE: Tenant %d upgraded to %s plan", tenantID, planName)
+
+	// Get updated subscription with plan details
+	subscription, _ = h.subscriptionRepo.GetSubscriptionByTenant(tenantID)
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"message":      "Plan erfolgreich geändert (Test-Modus)",
+		"plan":         planName,
+		"subscription": subscription,
+		"test_mode":    true,
+	})
 }
