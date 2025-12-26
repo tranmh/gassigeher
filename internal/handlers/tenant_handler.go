@@ -803,7 +803,7 @@ func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request)
 	// Get all dogs
 	var dogs []map[string]interface{}
 	rows, err := h.db.Query(`
-		SELECT id, name, breed, size, age, category, is_featured, is_available,
+		SELECT id, name, breed, size, age, color_id, is_featured, is_available,
 		       external_link, photo, special_instructions, pickup_location,
 		       created_at, updated_at
 		FROM dogs WHERE tenant_id = ?`, tenantID)
@@ -815,8 +815,8 @@ func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request)
 				Name                string
 				Breed               *string
 				Size                *string
-				Age                 *string
-				Category            string
+				Age                 *int
+				ColorID             *int
 				IsFeatured          bool
 				IsAvailable         bool
 				ExternalLink        *string
@@ -826,7 +826,7 @@ func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request)
 				CreatedAt           time.Time
 				UpdatedAt           time.Time
 			}
-			if rows.Scan(&d.ID, &d.Name, &d.Breed, &d.Size, &d.Age, &d.Category,
+			if rows.Scan(&d.ID, &d.Name, &d.Breed, &d.Size, &d.Age, &d.ColorID,
 				&d.IsFeatured, &d.IsAvailable, &d.ExternalLink, &d.Photo,
 				&d.SpecialInstructions, &d.PickupLocation, &d.CreatedAt, &d.UpdatedAt) == nil {
 				dogs = append(dogs, map[string]interface{}{
@@ -835,7 +835,7 @@ func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request)
 					"breed":                d.Breed,
 					"size":                 d.Size,
 					"age":                  d.Age,
-					"category":             d.Category,
+					"color_id":             d.ColorID,
 					"is_featured":          d.IsFeatured,
 					"is_available":         d.IsAvailable,
 					"external_link":        d.ExternalLink,

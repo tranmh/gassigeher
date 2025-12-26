@@ -566,14 +566,14 @@ func (h *CentralAdminHandler) ExportTenantData(w http.ResponseWriter, r *http.Re
 	// Get dogs
 	var dogs []models.Dog
 	rows, err := h.db.Query(`SELECT id, tenant_id, name, breed, size, age,
-		category, is_featured, is_available, external_link, photo, photo_thumbnail,
+		color_id, is_featured, is_available, external_link, photo, photo_thumbnail,
 		created_at, updated_at FROM dogs WHERE tenant_id = ?`, tenantID)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
 			var d models.Dog
 			rows.Scan(&d.ID, &d.TenantID, &d.Name, &d.Breed, &d.Size, &d.Age,
-				&d.Category, &d.IsFeatured, &d.IsAvailable, &d.ExternalLink, &d.Photo, &d.PhotoThumbnail,
+				&d.ColorID, &d.IsFeatured, &d.IsAvailable, &d.ExternalLink, &d.Photo, &d.PhotoThumbnail,
 				&d.CreatedAt, &d.UpdatedAt)
 			dogs = append(dogs, d)
 		}

@@ -77,14 +77,29 @@ func (r *MarketingRepository) GetActiveCampaignByType(campaignType string) (*mod
 
 // CreateCampaign creates a new campaign
 func (r *MarketingRepository) CreateCampaign(c *models.MarketingCampaign) error {
+	now := time.Now()
+	nowFormatted := FormatTimestamp(now)
+
+	var startDateFormatted, endDateFormatted *string
+	if c.StartDate != nil {
+		s := FormatTimestamp(*c.StartDate)
+		startDateFormatted = &s
+	}
+	if c.EndDate != nil {
+		e := FormatTimestamp(*c.EndDate)
+		endDateFormatted = &e
+	}
+
 	query := `INSERT INTO marketing_campaigns (type, name, description, config, is_active, start_date, end_date, created_at, updated_at)
 			  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	result, err := r.db.Exec(query, c.Type, c.Name, c.Description, c.Config, c.IsActive, c.StartDate, c.EndDate, time.Now(), time.Now())
+	result, err := r.db.Exec(query, c.Type, c.Name, c.Description, c.Config, c.IsActive, startDateFormatted, endDateFormatted, nowFormatted, nowFormatted)
 	if err != nil {
 		return err
 	}
 	id, _ := result.LastInsertId()
 	c.ID = int(id)
+	c.CreatedAt = now
+	c.UpdatedAt = now
 	return nil
 }
 
@@ -169,16 +184,27 @@ func (r *MarketingRepository) GetReferralCodeByCode(code string) (*models.Referr
 
 // CreateReferralCode creates a new referral code
 func (r *MarketingRepository) CreateReferralCode(c *models.ReferralCode) error {
+	now := time.Now()
+	nowFormatted := FormatTimestamp(now)
+
+	var expiresAtFormatted *string
+	if c.ExpiresAt != nil {
+		e := FormatTimestamp(*c.ExpiresAt)
+		expiresAtFormatted = &e
+	}
+
 	query := `INSERT INTO referral_codes (code, referrer_tenant_id, referrer_email, discount_months_referrer,
 			  discount_months_referee, max_uses, is_active, expires_at, created_at, updated_at)
 			  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	result, err := r.db.Exec(query, c.Code, c.ReferrerTenantID, c.ReferrerEmail, c.DiscountMonthsReferrer,
-		c.DiscountMonthsReferee, c.MaxUses, c.IsActive, c.ExpiresAt, time.Now(), time.Now())
+		c.DiscountMonthsReferee, c.MaxUses, c.IsActive, expiresAtFormatted, nowFormatted, nowFormatted)
 	if err != nil {
 		return err
 	}
 	id, _ := result.LastInsertId()
 	c.ID = int(id)
+	c.CreatedAt = now
+	c.UpdatedAt = now
 	return nil
 }
 
