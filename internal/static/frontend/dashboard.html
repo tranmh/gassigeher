@@ -17,7 +17,7 @@
 <body>
     <header>
         <div class="container">
-            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <button class="menu-toggle" data-action="toggle-menu" aria-label="Menu">☰</button>
             <a href="/" class="logo">🐕 Gassigeher</a>
             <nav id="main-nav">
                 <ul>
@@ -29,12 +29,12 @@
                         <span data-i18n="nav.profile">Profil</span>
                     </a></li>
                     <li id="admin-area-link" style="display: none;"><a href="/admin-dashboard.html" class="area-switcher" data-i18n="nav.admin_area">🔧 Admin-Bereich</a></li>
-                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                    <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
             </nav>
         </div>
     </header>
-    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+    <div class="nav-overlay" id="nav-overlay" data-action="toggle-menu"></div>
 
     <main style="padding: 40px 0;">
         <div class="container">
@@ -84,7 +84,7 @@
                 </div>
                 <div style="display: flex; gap: 10px;">
                     <button type="submit" class="btn" data-i18n="bookings.confirm_booking">Buchung bestätigen</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeBookingModal()" data-i18n="common.cancel">Abbrechen</button>
+                    <button type="button" class="btn btn-secondary" data-action="close-booking-modal" data-i18n="common.cancel">Abbrechen</button>
                 </div>
             </form>
         </div>
@@ -93,10 +93,10 @@
     <!-- Walk Report Modal -->
     <div id="walk-report-modal" class="modal hidden" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto;">
         <div class="card" style="max-width: 600px; margin: 20px auto; position: relative;">
-            <button type="button" onclick="closeWalkReportModal()" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
+            <button type="button" data-action="close-walk-report-modal" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
             <h3 data-i18n="walkReport.title">Spaziergang-Bericht</h3>
 
-            <form id="walk-report-form" onsubmit="submitWalkReport(event)">
+            <form id="walk-report-form" data-action-submit="submit-walk-report">
                 <input type="hidden" id="report-booking-id">
                 <input type="hidden" id="report-id">
 
@@ -105,11 +105,11 @@
                     <label data-i18n="walkReport.behaviorRating">Verhalten des Hundes</label>
                     <p style="font-size: 0.85rem; color: #666; margin: 5px 0;" data-i18n="walkReport.behaviorRatingHint">Wie hat sich der Hund während des Spaziergangs verhalten?</p>
                     <div id="star-rating" class="star-rating" style="display: flex; gap: 5px; font-size: 28px; cursor: pointer;">
-                        <span data-value="1" onclick="setRating(1)" title="Sehr schwierig">☆</span>
-                        <span data-value="2" onclick="setRating(2)" title="Schwierig">☆</span>
-                        <span data-value="3" onclick="setRating(3)" title="Normal">☆</span>
-                        <span data-value="4" onclick="setRating(4)" title="Gut">☆</span>
-                        <span data-value="5" onclick="setRating(5)" title="Sehr gut">☆</span>
+                        <span data-value="1" data-action="set-rating" data-rating="1" title="Sehr schwierig">☆</span>
+                        <span data-value="2" data-action="set-rating" data-rating="2" title="Schwierig">☆</span>
+                        <span data-value="3" data-action="set-rating" data-rating="3" title="Normal">☆</span>
+                        <span data-value="4" data-action="set-rating" data-rating="4" title="Gut">☆</span>
+                        <span data-value="5" data-action="set-rating" data-rating="5" title="Sehr gut">☆</span>
                     </div>
                     <input type="hidden" id="report-behavior-rating" required>
                 </div>
@@ -119,13 +119,13 @@
                     <label data-i18n="walkReport.energyLevel">Energielevel</label>
                     <p style="font-size: 0.85rem; color: #666; margin: 5px 0;" data-i18n="walkReport.energyLevelHint">Wie energiegeladen war der Hund?</p>
                     <div class="energy-selector" style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button type="button" class="btn btn-secondary energy-btn" data-value="low" onclick="setEnergyLevel('low')">
+                        <button type="button" class="btn btn-secondary energy-btn" data-value="low" data-action="set-energy-level" data-level="low">
                             😴 <span data-i18n="walkReport.energyLow">Niedrig</span>
                         </button>
-                        <button type="button" class="btn btn-secondary energy-btn" data-value="medium" onclick="setEnergyLevel('medium')">
+                        <button type="button" class="btn btn-secondary energy-btn" data-value="medium" data-action="set-energy-level" data-level="medium">
                             🐕 <span data-i18n="walkReport.energyMedium">Mittel</span>
                         </button>
-                        <button type="button" class="btn btn-secondary energy-btn" data-value="high" onclick="setEnergyLevel('high')">
+                        <button type="button" class="btn btn-secondary energy-btn" data-value="high" data-action="set-energy-level" data-level="high">
                             🔥 <span data-i18n="walkReport.energyHigh">Hoch</span>
                         </button>
                     </div>
@@ -145,19 +145,19 @@
                         <label data-i18n="walkReport.photos">Fotos vom Spaziergang</label>
                         <p style="font-size: 0.85rem; color: #666; margin: 5px 0;">Optional, max 3 Fotos (JPEG/PNG)</p>
                         <div id="report-photos-preview" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;"></div>
-                        <input type="file" id="report-photo-input" accept="image/jpeg,image/png" style="display: none;" onchange="uploadReportPhoto()">
+                        <input type="file" id="report-photo-input" accept="image/jpeg,image/png" style="display: none;" data-action-change="upload-report-photo">
                         <!-- Message shown before report is saved -->
                         <p id="photo-save-first-msg" style="color: #888; font-style: italic; margin: 10px 0;">
                             💡 Speichere zuerst den Bericht, um Fotos hinzuzufügen.
                         </p>
                         <!-- Button shown after report is saved -->
-                        <button type="button" id="add-photo-btn" class="btn btn-secondary" style="display: none;" onclick="document.getElementById('report-photo-input').click()">📷 Foto hinzufügen</button>
+                        <button type="button" id="add-photo-btn" class="btn btn-secondary" style="display: none;" data-action="trigger-photo-input">📷 Foto hinzufügen</button>
                     </div>
                 </div>
 
                 <div style="display: flex; gap: 10px; margin-top: 20px;">
                     <button type="submit" class="btn" id="report-submit-btn" data-i18n="walkReport.submit">Bericht speichern</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeWalkReportModal()" data-i18n="common.cancel">Abbrechen</button>
+                    <button type="button" class="btn btn-secondary" data-action="close-walk-report-modal" data-i18n="common.cancel">Abbrechen</button>
                 </div>
             </form>
         </div>
@@ -166,11 +166,11 @@
     <!-- View Report Modal (read-only) -->
     <div id="view-report-modal" class="modal hidden" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto;">
         <div class="card" style="max-width: 600px; margin: 20px auto; position: relative;">
-            <button type="button" onclick="closeViewReportModal()" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
+            <button type="button" data-action="close-view-report-modal" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
             <h3 data-i18n="walkReport.title">Spaziergang-Bericht</h3>
             <div id="view-report-content"></div>
             <div style="display: flex; gap: 10px; margin-top: 20px;">
-                <button type="button" class="btn btn-secondary" onclick="closeViewReportModal()" data-i18n="common.close">Schließen</button>
+                <button type="button" class="btn btn-secondary" data-action="close-view-report-modal" data-i18n="common.close">Schließen</button>
             </div>
         </div>
     </div>
@@ -183,8 +183,33 @@
     <script src="/js/sanitize.js"></script>
     <script src="/js/impersonation-banner.js"></script>
     <script src="/js/demo-banner.js"></script>
+    <script src="/js/event-handlers.js"></script>
     <script>
         let currentUser = null;
+
+        // Register page-specific action handlers
+        registerActions({
+            'close-booking-modal': function(e) { e.preventDefault(); closeBookingModal(); },
+            'close-walk-report-modal': function(e) { e.preventDefault(); closeWalkReportModal(); },
+            'close-view-report-modal': function(e) { e.preventDefault(); closeViewReportModal(); },
+            'set-rating': function(e, id, el) { e.preventDefault(); setRating(parseInt(el.dataset.rating)); },
+            'set-energy-level': function(e, id, el) { e.preventDefault(); setEnergyLevel(el.dataset.level); },
+            'trigger-photo-input': function(e) { e.preventDefault(); document.getElementById('report-photo-input').click(); },
+            'cancel-booking': function(e, id) { e.preventDefault(); cancelBooking(parseInt(id)); },
+            'open-walk-report-modal': function(e, id) { e.preventDefault(); openWalkReportModal(parseInt(id)); },
+            'view-walk-report': function(e, id) { e.preventDefault(); viewWalkReport(parseInt(id)); },
+            'delete-report-photo': function(e, id, el) { e.preventDefault(); deleteReportPhoto(parseInt(el.dataset.reportId), parseInt(el.dataset.photoId)); }
+        });
+
+        // Register change handlers
+        registerChangeActions({
+            'upload-report-photo': function(e) { uploadReportPhoto(); }
+        });
+
+        // Register submit handlers
+        registerSubmitActions({
+            'submit-walk-report': function(e) { e.preventDefault(); submitWalkReport(e); }
+        });
 
         document.addEventListener('DOMContentLoaded', async () => {
             if (!api.isAuthenticated()) {
@@ -291,7 +316,7 @@
                                     </div>
                                 ` : ''}
                             </div>
-                            <button class="btn btn-danger" onclick="cancelBooking(${booking.id})" data-i18n="bookings.cancel_booking">Stornieren</button>
+                            <button class="btn btn-danger" data-action="cancel-booking" data-id="${booking.id}" data-i18n="bookings.cancel_booking">Stornieren</button>
                         </div>
                     </div>
                 `;
@@ -355,7 +380,7 @@
                                         <span title="Energielevel: ${energyLabel}">${energyEmoji} ${energyLabel}</span>
                                         ${photoCount > 0 ? `<span title="${photoCount} Foto(s)">📷 ${photoCount}</span>` : ''}
                                     </div>
-                                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="viewWalkReport(${report.id})">Bericht ansehen</button>
+                                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem;" data-action="view-walk-report" data-id="${report.id}">Bericht ansehen</button>
                                 </div>
                                 ${notesPreview ? `<p style="margin: 8px 0 0 0; font-size: 0.9rem; color: #555;">${notesPreview}</p>` : ''}
                             </div>
@@ -371,7 +396,7 @@
 
                     // Show "Add report" button only if user can edit AND no report exists
                     const addReportButton = (!hasReport && !hasLegacyNotes && canEditReport)
-                        ? `<button class="btn" style="margin-top: 10px; padding: 8px 16px;" onclick="openWalkReportModal(${booking.id})">📝 Bericht hinzufügen</button>`
+                        ? `<button class="btn" style="margin-top: 10px; padding: 8px 16px;" data-action="open-walk-report-modal" data-id="${booking.id}">📝 Bericht hinzufügen</button>`
                         : '';
 
                     return `
@@ -520,7 +545,7 @@
             container.innerHTML = photos.map(photo => `
                 <div style="position: relative; width: 100px; height: 100px;">
                     <img src="/uploads/${photo.photo_thumbnail}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 6px;">
-                    <button type="button" onclick="deleteReportPhoto(${report.id}, ${photo.id})" style="position: absolute; top: -8px; right: -8px; background: #dc3545; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px;">&times;</button>
+                    <button type="button" data-action="delete-report-photo" data-report-id="${report.id}" data-photo-id="${photo.id}" style="position: absolute; top: -8px; right: -8px; background: #dc3545; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px;">&times;</button>
                 </div>
             `).join('');
 

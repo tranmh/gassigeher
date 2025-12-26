@@ -221,7 +221,7 @@
 <body>
     <header>
         <div class="container">
-            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <button class="menu-toggle" data-action="toggle-menu" aria-label="Menu">☰</button>
             <a href="/" class="logo">Gassigeher</a>
             <nav id="main-nav">
                 <ul>
@@ -230,12 +230,12 @@
                     <li><a href="/profile.html" data-i18n="profile.title">Profil</a></li>
                     <li><a href="/billing.html" data-i18n="billing.title" class="active">Abrechnung</a></li>
                     <li id="admin-link" style="display:none;"><a href="/admin-dashboard.html" data-i18n="nav.admin_area">Admin-Bereich</a></li>
-                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                    <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
             </nav>
         </div>
     </header>
-    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+    <div class="nav-overlay" id="nav-overlay" data-action="toggle-menu"></div>
 
     <main style="padding: 40px 0;">
         <div class="container">
@@ -296,7 +296,15 @@
 
     <script src="/js/api.js"></script>
     <script src="/js/i18n.js"></script>
+    <script src="/js/event-handlers.js"></script>
     <script>
+        // Register page-specific action handlers for CSP compliance (GASSI-2025-003)
+        registerActions({
+            'upgrade-to-pro': function(e) { e.preventDefault(); upgradeToPro(); },
+            'open-billing-portal': function(e) { e.preventDefault(); openBillingPortal(); },
+            'cancel-subscription': function(e) { e.preventDefault(); cancelSubscription(); }
+        });
+
         let currentBillingCycle = 'monthly';
         let plans = [];
         let currentSubscription = null;
@@ -432,7 +440,7 @@
                                 ${window.i18n.t('billing.current_plan')}
                             </button>
                         ` : isPro ? `
-                            <button class="upgrade-cta" onclick="upgradeToPro()">
+                            <button class="upgrade-cta" data-action="upgrade-to-pro">
                                 ${window.i18n.t('billing.upgrade_to_pro')}
                             </button>
                         ` : `
@@ -489,12 +497,12 @@
                 </div>
                 <div class="billing-actions">
                     ${currentSubscription.stripe_customer_id ? `
-                        <button class="btn btn-secondary" onclick="openBillingPortal()">
+                        <button class="btn btn-secondary" data-action="open-billing-portal">
                             ${window.i18n.t('billing.manage_payment')}
                         </button>
                     ` : ''}
                     ${currentSubscription.status === 'active' ? `
-                        <button class="btn btn-danger" onclick="cancelSubscription()">
+                        <button class="btn btn-danger" data-action="cancel-subscription">
                             ${window.i18n.t('billing.cancel_subscription')}
                         </button>
                     ` : ''}

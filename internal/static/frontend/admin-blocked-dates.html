@@ -9,7 +9,7 @@
 <body>
     <header>
         <div class="container">
-            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <button class="menu-toggle" data-action="toggle-menu" aria-label="Menu">☰</button>
             <a href="/" class="logo">🐕 Gassigeher Admin</a>
             <nav id="main-nav">
                 <ul>
@@ -41,18 +41,18 @@
                     </li>
                     <li id="super-admin-colors-link" style="display:none;"><a href="/admin-colors.html">🎨 Farben</a></li>
                     <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
-                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                    <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
             </nav>
         </div>
     </header>
-    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+    <div class="nav-overlay" id="nav-overlay" data-action="toggle-menu"></div>
 
     <main style="padding: 40px 0;">
         <div class="container">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h1 data-i18n="admin.manage_blocked_dates">Gesperrte Tage verwalten</h1>
-                <button class="btn" onclick="showBlockForm()" data-i18n="admin.block_date">Tag sperren</button>
+                <button class="btn" data-action="show-block-form" data-i18n="admin.block_date">Tag sperren</button>
             </div>
 
             <div id="alert-container"></div>
@@ -78,7 +78,7 @@
                     </div>
                     <div style="display: flex; gap: 10px;">
                         <button type="submit" class="btn" data-i18n="common.save">Speichern</button>
-                        <button type="button" class="btn btn-secondary" onclick="hideBlockForm()" data-i18n="common.cancel">Abbrechen</button>
+                        <button type="button" class="btn btn-secondary" data-action="hide-block-form" data-i18n="common.cancel">Abbrechen</button>
                     </div>
                 </form>
             </div>
@@ -95,9 +95,17 @@
     <script src="/js/sanitize.js"></script>
     <script src="/js/impersonation-banner.js"></script>
     <script src="/js/demo-banner.js"></script>
+    <script src="/js/event-handlers.js"></script>
     <script>
         let blockedDates = [];
         let allDogs = [];
+
+        // Register page-specific action handlers
+        registerActions({
+            'show-block-form': function(e) { e.preventDefault(); showBlockForm(); },
+            'hide-block-form': function(e) { e.preventDefault(); hideBlockForm(); },
+            'unblock-date': function(e, id) { e.preventDefault(); unblockDate(parseInt(id)); }
+        });
 
         document.addEventListener('DOMContentLoaded', async () => {
             if (!api.isAuthenticated()) {
@@ -182,7 +190,7 @@
                                 <p style="margin: 0 0 5px 0; font-weight: bold;">${dogDisplay}</p>
                                 <p style="margin: 0; color: #666;">${sanitizeHTML(blocked.reason)}</p>
                             </div>
-                            <button class="btn btn-danger" onclick="unblockDate(${blocked.id})" data-i18n="admin.unblock_date">Aufheben</button>
+                            <button class="btn btn-danger" data-action="unblock-date" data-id="${blocked.id}" data-i18n="admin.unblock_date">Aufheben</button>
                         </div>
                     </div>
                 `;

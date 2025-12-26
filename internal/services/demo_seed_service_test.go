@@ -1,6 +1,7 @@
 package services
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -478,6 +479,46 @@ func TestDemoSeedService_SeedDemoColors_Idempotent(t *testing.T) {
 
 		if count2 != count1 {
 			t.Errorf("Expected same color count after second call (%d), got %d", count1, count2)
+		}
+	})
+}
+
+// TestDemoSeedService_Security_NoPasswordInLogs tests that passwords are not logged
+// SECURITY: GASSI-2025-001 - Demo password should not be logged in plaintext
+func TestDemoSeedService_Security_NoPasswordInLogs(t *testing.T) {
+	t.Run("formatDemoResetLogMessage does not contain password", func(t *testing.T) {
+		password := "supersecretpassword123"
+		nextReset := time.Now().Add(24 * time.Hour)
+
+		message := formatDemoResetLogMessage(password, nextReset)
+
+		// SECURITY: The log message must NOT contain the password
+		if strings.Contains(message, password) {
+			t.Errorf("SECURITY VIOLATION: Log message contains password! Message: %s", message)
+		}
+
+		// Should still contain useful information
+		if !strings.Contains(message, "Demo tenant reset complete") {
+			t.Error("Log message should indicate demo reset completion")
+		}
+
+		if !strings.Contains(message, nextReset.Format("2006-01-02 15:04")) {
+			t.Error("Log message should contain next reset time")
+		}
+	})
+
+	t.Run("formatDemoResetLogMessage masks password indication", func(t *testing.T) {
+		password := "anothersecret456"
+		nextReset := time.Now().Add(24 * time.Hour)
+
+		message := formatDemoResetLogMessage(password, nextReset)
+
+		// Should indicate password was reset without revealing it
+		if !strings.Contains(message, "password reset") && !strings.Contains(message, "new password generated") {
+			// At minimum, should not contain the actual password
+			if strings.Contains(message, password) {
+				t.Errorf("SECURITY VIOLATION: Password leaked in log message")
+			}
 		}
 	})
 }

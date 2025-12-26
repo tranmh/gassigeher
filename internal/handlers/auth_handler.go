@@ -85,8 +85,14 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "Database error")
 		return
 	}
+	// SECURITY: GASSI-2025-006 - Don't reveal if email exists
+	// Return same response for existing and new emails to prevent user enumeration
 	if existing != nil {
-		respondError(w, http.StatusConflict, "Email already registered")
+		// Return same response as successful registration to prevent enumeration
+		// Don't send verification email since user already exists
+		respondJSON(w, http.StatusCreated, map[string]interface{}{
+			"message": "Registration successful. Please check your email to verify your account.",
+		})
 		return
 	}
 

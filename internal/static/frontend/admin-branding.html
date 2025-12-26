@@ -9,7 +9,7 @@
 <body>
     <header>
         <div class="container">
-            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <button class="menu-toggle" data-action="toggle-menu" aria-label="Menu">☰</button>
             <a href="/" class="logo">🐕 Gassigeher Admin</a>
             <nav id="main-nav">
                 <ul>
@@ -41,12 +41,12 @@
                     </li>
                     <li id="super-admin-colors-link" style="display:none;"><a href="/admin-colors.html">Farben</a></li>
                     <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">Benutzer-Bereich</a></li>
-                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                    <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
             </nav>
         </div>
     </header>
-    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+    <div class="nav-overlay" id="nav-overlay" data-action="toggle-menu"></div>
 
     <main style="padding: 40px 0;">
         <div class="container-narrow">
@@ -200,7 +200,7 @@
                         </div>
                     </div>
 
-                    <button class="btn btn-secondary" onclick="clearCustomColors()" style="margin-top: 15px;">
+                    <button class="btn btn-secondary" data-action="clear-custom-colors" style="margin-top: 15px;">
                         Individuelle Farben zurücksetzen
                     </button>
                 </div>
@@ -223,7 +223,7 @@
 
             <!-- Save Button -->
             <div style="margin-top: 30px; text-align: center;">
-                <button class="btn" onclick="saveBranding()" style="padding: 15px 40px; font-size: 1.1rem;">
+                <button class="btn" data-action="save-branding" style="padding: 15px 40px; font-size: 1.1rem;">
                     Alle Änderungen speichern
                 </button>
             </div>
@@ -245,7 +245,14 @@
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/sanitize.js"></script>
+    <script src="/js/event-handlers.js"></script>
     <script>
+        // Register page-specific action handlers
+        registerActions({
+            'save-branding': function(e) { e.preventDefault(); saveBranding(); },
+            'clear-custom-colors': function(e) { e.preventDefault(); clearCustomColors(); }
+        });
+
         // Check admin access
         async function checkAccess() {
             try {

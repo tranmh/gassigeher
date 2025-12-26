@@ -9,7 +9,7 @@
 <body>
     <header>
         <div class="container">
-            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <button class="menu-toggle" data-action="toggle-menu" aria-label="Menu">☰</button>
             <a href="/" class="logo">🐕 Gassigeher Admin</a>
             <nav id="main-nav">
                 <ul>
@@ -41,12 +41,12 @@
                     </li>
                     <li id="super-admin-colors-link" style="display:none;"><a href="/admin-colors.html">🎨 Farben</a></li>
                     <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
-                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                    <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
             </nav>
         </div>
     </header>
-    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+    <div class="nav-overlay" id="nav-overlay" data-action="toggle-menu"></div>
 
     <main style="padding: 40px 0;">
         <div class="container">
@@ -68,8 +68,8 @@
                     </div>
                 </div>
                 <div style="margin-top: 15px; display: flex; gap: 10px;">
-                    <button class="btn" onclick="applyFilters()" data-i18n="common.apply">Anwenden</button>
-                    <button class="btn btn-secondary" onclick="showCreateModal()">+ Benutzer erstellen</button>
+                    <button class="btn" data-action="apply-filters" data-i18n="common.apply">Anwenden</button>
+                    <button class="btn btn-secondary" data-action="show-create-modal">+ Benutzer erstellen</button>
                 </div>
             </div>
 
@@ -83,9 +83,9 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Benutzer bearbeiten</h3>
-                <button class="modal-close" onclick="closeEditModal()">&times;</button>
+                <button class="modal-close" data-action="close-edit-modal">&times;</button>
             </div>
-            <form id="edit-form" onsubmit="saveUser(event)">
+            <form id="edit-form" data-action-submit="save-user">
                 <input type="hidden" id="edit-user-id">
                 <div class="form-group">
                     <label for="edit-first-name">Vorname *</label>
@@ -110,7 +110,7 @@
                     </div>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Abbrechen</button>
+                    <button type="button" class="btn btn-secondary" data-action="close-edit-modal">Abbrechen</button>
                     <button type="submit" class="btn">Speichern</button>
                 </div>
             </form>
@@ -122,9 +122,9 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Benutzer erstellen</h3>
-                <button class="modal-close" onclick="closeCreateModal()">&times;</button>
+                <button class="modal-close" data-action="close-create-modal">&times;</button>
             </div>
-            <form id="create-form" onsubmit="createUser(event)">
+            <form id="create-form" data-action-submit="create-user">
                 <div class="form-group">
                     <label for="create-first-name">Vorname *</label>
                     <input type="text" id="create-first-name" required>
@@ -162,7 +162,7 @@
                     </p>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeCreateModal()">Abbrechen</button>
+                    <button type="button" class="btn btn-secondary" data-action="close-create-modal">Abbrechen</button>
                     <button type="submit" class="btn">Benutzer erstellen</button>
                 </div>
             </form>
@@ -174,7 +174,7 @@
         <div class="modal-content" style="max-width: 450px;">
             <div class="modal-header">
                 <h3>Benutzer löschen</h3>
-                <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+                <button class="modal-close" data-action="close-delete-modal">&times;</button>
             </div>
             <div style="padding: 20px;">
                 <input type="hidden" id="delete-user-id">
@@ -189,8 +189,8 @@
                     </p>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Abbrechen</button>
-                    <button type="button" class="btn btn-danger" onclick="confirmDeleteUser()">Endgültig löschen</button>
+                    <button type="button" class="btn btn-secondary" data-action="close-delete-modal">Abbrechen</button>
+                    <button type="button" class="btn btn-danger" data-action="confirm-delete-user">Endgültig löschen</button>
                 </div>
             </div>
         </div>
@@ -203,10 +203,30 @@
     <script src="/js/sanitize.js"></script>
     <script src="/js/impersonation-banner.js"></script>
     <script src="/js/demo-banner.js"></script>
+    <script src="/js/event-handlers.js"></script>
     <script>
         let users = [];
         let currentUser = null;
         let allColors = [];
+
+        // Register page-specific action handlers for CSP compliance
+        registerActions({
+            'apply-filters': function(e) { e.preventDefault(); applyFilters(); },
+            'show-create-modal': function(e) { e.preventDefault(); showCreateModal(); },
+            'close-edit-modal': function(e) { e.preventDefault(); closeEditModal(); },
+            'close-create-modal': function(e) { e.preventDefault(); closeCreateModal(); },
+            'close-delete-modal': function(e) { e.preventDefault(); closeDeleteModal(); },
+            'confirm-delete-user': function(e) { e.preventDefault(); confirmDeleteUser(); },
+            'save-user': function(e) { saveUser(e); },
+            'create-user': function(e) { createUser(e); },
+            'show-edit-modal': function(e, id) { e.preventDefault(); showEditModal(parseInt(id)); },
+            'deactivate-user': function(e, id) { e.preventDefault(); deactivateUser(parseInt(id)); },
+            'activate-user': function(e, id) { e.preventDefault(); activateUser(parseInt(id)); },
+            'promote-to-admin': function(e, id) { e.preventDefault(); promoteToAdmin(parseInt(id)); },
+            'demote-admin': function(e, id) { e.preventDefault(); demoteAdmin(parseInt(id)); },
+            'impersonate-user': function(e, id) { e.preventDefault(); impersonateUser(parseInt(id)); },
+            'show-delete-modal': function(e, id) { e.preventDefault(); showDeleteModal(parseInt(id)); }
+        });
 
         document.addEventListener('DOMContentLoaded', async () => {
             if (!api.isAuthenticated()) {
@@ -271,7 +291,7 @@
                     border: 2px solid ${color.hex_code}40;
                     cursor: pointer;
                     transition: all 0.2s;
-                " onmouseenter="this.style.background='${color.hex_code}15'" onmouseleave="this.style.background='transparent'">
+                " data-hover-bg="${color.hex_code}15">
                     <input type="checkbox" value="${color.id}" data-color-id="${color.id}" style="width: auto;">
                     <span class="color-swatch-mini" style="
                         width: 18px;
@@ -287,6 +307,17 @@
                     <span style="color: ${color.hex_code}; font-weight: 500;">${sanitizeHTML(color.name)}</span>
                 </label>
             `).join('');
+
+            // Add hover effects via JavaScript for CSP compliance
+            container.querySelectorAll('.color-checkbox-item').forEach(item => {
+                const hoverBg = item.getAttribute('data-hover-bg');
+                item.addEventListener('mouseenter', function() {
+                    this.style.background = hoverBg;
+                });
+                item.addEventListener('mouseleave', function() {
+                    this.style.background = 'transparent';
+                });
+            });
         }
 
         function getPatternIcon(pattern) {
@@ -416,27 +447,27 @@
                             </div>
                             <div style="display: flex; gap: 5px; flex-direction: column; min-width: 150px;">
                                 ${!user.is_deleted ? `
-                                    <button class="btn btn-secondary btn-sm" onclick="showEditModal(${user.id})">Bearbeiten</button>
+                                    <button class="btn btn-secondary btn-sm" data-action="show-edit-modal" data-id="${user.id}">Bearbeiten</button>
                                 ` : ''}
                                 ${!user.is_admin && !user.is_super_admin && user.is_active ? `
-                                    <button class="btn btn-danger btn-sm" onclick="deactivateUser(${user.id})">Deaktivieren</button>
+                                    <button class="btn btn-danger btn-sm" data-action="deactivate-user" data-id="${user.id}">Deaktivieren</button>
                                 ` : user.is_active && !user.is_super_admin ? `
-                                    <button class="btn btn-sm" onclick="activateUser(${user.id})">Aktivieren</button>
+                                    <button class="btn btn-sm" data-action="activate-user" data-id="${user.id}">Aktivieren</button>
                                 ` : !user.is_active ? `
-                                    <button class="btn btn-sm" onclick="activateUser(${user.id})">Aktivieren</button>
+                                    <button class="btn btn-sm" data-action="activate-user" data-id="${user.id}">Aktivieren</button>
                                 ` : ''}
 
                                 ${currentUser && currentUser.is_super_admin && !user.is_super_admin ? `
                                     ${user.is_admin ? `
-                                        <button class="btn btn-warning btn-sm" onclick="demoteAdmin(${user.id})">Admin entfernen</button>
+                                        <button class="btn btn-warning btn-sm" data-action="demote-admin" data-id="${user.id}">Admin entfernen</button>
                                     ` : `
-                                        <button class="btn btn-secondary btn-sm" onclick="promoteToAdmin(${user.id})">Zu Admin ernennen</button>
+                                        <button class="btn btn-secondary btn-sm" data-action="promote-to-admin" data-id="${user.id}">Zu Admin ernennen</button>
                                     `}
                                     ${!user.is_deleted && user.is_active ? `
-                                        <button class="btn btn-info btn-sm" onclick="impersonateUser(${user.id})">Impersonieren</button>
+                                        <button class="btn btn-info btn-sm" data-action="impersonate-user" data-id="${user.id}">Impersonieren</button>
                                     ` : ''}
                                     ${!user.is_deleted ? `
-                                        <button class="btn btn-danger btn-sm" onclick="showDeleteModal(${user.id})">Löschen</button>
+                                        <button class="btn btn-danger btn-sm" data-action="show-delete-modal" data-id="${user.id}">Löschen</button>
                                     ` : ''}
                                 ` : ''}
                             </div>

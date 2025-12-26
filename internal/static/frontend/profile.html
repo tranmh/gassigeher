@@ -60,7 +60,7 @@
 <body>
     <header>
         <div class="container">
-            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <button class="menu-toggle" data-action="toggle-menu" aria-label="Menu">☰</button>
             <a href="/" class="logo">🐕 Gassigeher</a>
             <nav id="main-nav">
                 <ul>
@@ -72,12 +72,12 @@
                         <span data-i18n="nav.profile">Profil</span>
                     </a></li>
                     <li id="admin-area-link" style="display: none;"><a href="/admin-dashboard.html" class="area-switcher" data-i18n="nav.admin_area">🔧 Admin-Bereich</a></li>
-                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                    <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
             </nav>
         </div>
     </header>
-    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+    <div class="nav-overlay" id="nav-overlay" data-action="toggle-menu"></div>
 
     <main style="padding: 40px 0;">
         <div class="container-narrow">
@@ -92,8 +92,8 @@
                     <div id="photo-preview" style="width: 150px; height: 150px; margin: 0 auto 20px; border-radius: 50%; overflow: hidden; background: #ddd; display: flex; align-items: center; justify-content: center;">
                         <span style="font-size: 3rem;">👤</span>
                     </div>
-                    <input type="file" id="photo-input" accept="image/jpeg,image/png" style="display: none;" onchange="uploadPhoto()">
-                    <button class="btn" onclick="document.getElementById('photo-input').click()">Foto hochladen</button>
+                    <input type="file" id="photo-input" accept="image/jpeg,image/png" style="display: none;" data-action-change="upload-photo">
+                    <button class="btn" data-action="trigger-photo-input">Foto hochladen</button>
                 </div>
             </div>
 
@@ -197,7 +197,7 @@
                     <p style="margin: 0; color: #721c24; font-weight: 600;" data-i18n="profile.delete_account_warning">WARNUNG: Diese Aktion kann nicht rückgängig gemacht werden!</p>
                 </div>
                 <p data-i18n="profile.delete_account_info">Deine persönlichen Daten werden gelöscht, aber deine Spaziergangshistorie wird anonymisiert aufbewahrt.</p>
-                <button class="btn btn-danger" onclick="confirmDeleteAccount()" data-i18n="profile.delete_account">Konto löschen</button>
+                <button class="btn btn-danger" data-action="delete-account" data-i18n="profile.delete_account">Konto löschen</button>
             </div>
         </div>
     </main>
@@ -209,11 +209,33 @@
     <script src="/js/sanitize.js"></script>
     <script src="/js/impersonation-banner.js"></script>
     <script src="/js/demo-banner.js"></script>
+    <script src="/js/event-handlers.js"></script>
     <script>
         let currentUser = null;
         let userColors = [];
         let allColors = [];
         let myRequests = [];
+
+        // Register page-specific action handlers
+        registerActions({
+            'trigger-photo-input': function(e) {
+                e.preventDefault();
+                document.getElementById('photo-input').click();
+            },
+            'upload-photo': function(e) {
+                uploadPhoto();
+            },
+            'delete-account': function(e) {
+                e.preventDefault();
+                confirmDeleteAccount();
+            },
+            'request-color': function(e, el) {
+                e.preventDefault();
+                const colorId = parseInt(el.dataset.colorId);
+                const colorName = el.dataset.colorName;
+                requestColor(colorId, colorName);
+            }
+        });
 
         document.addEventListener('DOMContentLoaded', async () => {
             if (!api.isAuthenticated()) {
@@ -337,7 +359,7 @@
 
             container.innerHTML = availableColors.map(color => `
                 <div class="color-option ${hasPendingRequest ? 'owned' : ''}"
-                     onclick="${hasPendingRequest ? '' : `requestColor(${color.id}, '${color.name}')`}"
+                     ${hasPendingRequest ? '' : `data-action="request-color" data-color-id="${color.id}" data-color-name="${color.name}"`}
                      style="${hasPendingRequest ? 'opacity: 0.5; cursor: not-allowed;' : ''}">
                     <span class="color-swatch" style="background-color: ${color.hex_code};"></span>
                     <span>${getColorLabel(color.name)}</span>

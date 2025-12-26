@@ -9,6 +9,7 @@ import (
 
 // SafeFileServer wraps http.FileServer with security checks
 // BUG FIX #4: Prevents null byte injection and path traversal attacks
+// SECURITY: GASSI-2025-005 - Prevents directory listing
 func SafeFileServer(root http.FileSystem) http.Handler {
 	fileServer := http.FileServer(root)
 
@@ -39,9 +40,37 @@ func SafeFileServer(root http.FileSystem) http.Handler {
 			return
 		}
 
+		// SECURITY: GASSI-2025-005 - Block directory listing
+		// Check if the path refers to a directory and block access
+		if isDirectoryRequest(root, cleanPath) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
 		// Serve the file
 		fileServer.ServeHTTP(w, r)
 	})
+}
+
+// isDirectoryRequest checks if the requested path is a directory
+// SECURITY: GASSI-2025-005 - Helper to prevent directory listing
+func isDirectoryRequest(root http.FileSystem, path string) bool {
+	// Open the file/directory
+	f, err := root.Open(path)
+	if err != nil {
+		// If we can't open it, let the file server handle the 404
+		return false
+	}
+	defer f.Close()
+
+	// Get file info
+	stat, err := f.Stat()
+	if err != nil {
+		return false
+	}
+
+	// If it's a directory, block it
+	return stat.IsDir()
 }
 
 // ValidateFilePath checks if a file path is safe (no null bytes, path traversal, etc.)

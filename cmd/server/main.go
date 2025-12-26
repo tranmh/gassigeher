@@ -173,6 +173,7 @@ func main() {
 	router.Use(middleware.GlobalRateLimit(100, 200))
 	router.Use(middleware.MetricsMiddleware) // Collect request metrics
 	router.Use(middleware.LoggingMiddleware)
+	router.Use(middleware.BlockDangerousMethods) // SECURITY: GASSI-2025-004 - Block TRACE/TRACK
 	router.Use(middleware.SecurityHeadersMiddleware)
 	router.Use(middleware.CORSMiddleware(cfg.BaseURL))
 

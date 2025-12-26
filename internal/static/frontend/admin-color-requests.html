@@ -9,7 +9,7 @@
 <body>
     <header>
         <div class="container">
-            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <button class="menu-toggle" data-action="toggle-menu" aria-label="Menu">☰</button>
             <a href="/" class="logo">🐕 Gassigeher Admin</a>
             <nav id="main-nav">
                 <ul>
@@ -41,12 +41,12 @@
                     </li>
                     <li id="super-admin-colors-link" style="display:none;"><a href="/admin-colors.html">🎨 Farben</a></li>
                     <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
-                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                    <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
             </nav>
         </div>
     </header>
-    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+    <div class="nav-overlay" id="nav-overlay" data-action="toggle-menu"></div>
 
     <main style="padding: 40px 0;">
         <div class="container">
@@ -66,7 +66,13 @@
     <script src="/js/sanitize.js"></script>
     <script src="/js/impersonation-banner.js"></script>
     <script src="/js/demo-banner.js"></script>
+    <script src="/js/event-handlers.js"></script>
     <script>
+        // Register page-specific action handlers for CSP compliance
+        registerActions({
+            'approve-request': function(e, id) { e.preventDefault(); approveRequest(parseInt(id)); },
+            'deny-request': function(e, id) { e.preventDefault(); denyRequest(parseInt(id)); }
+        });
         let requests = [];
         let allColors = [];
 
@@ -221,8 +227,8 @@
                             </div>
                             ${request.status === 'pending' ? `
                                 <div style="display: flex; gap: 5px; flex-direction: column; min-width: 120px;">
-                                    <button class="btn btn-sm" onclick="approveRequest(${request.id})">Genehmigen</button>
-                                    <button class="btn btn-danger btn-sm" onclick="denyRequest(${request.id})">Ablehnen</button>
+                                    <button class="btn btn-sm" data-action="approve-request" data-id="${request.id}">Genehmigen</button>
+                                    <button class="btn btn-danger btn-sm" data-action="deny-request" data-id="${request.id}">Ablehnen</button>
                                 </div>
                             ` : ''}
                         </div>

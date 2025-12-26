@@ -89,6 +89,38 @@ func TestTenantSettingsHasAllColumns(t *testing.T) {
 	}
 }
 
+// TestFeatureFlagsTablesExist verifies that feature_flags tables are created by migration
+// BUG: This test will fail because feature_flags table doesn't exist
+func TestFeatureFlagsTablesExist(t *testing.T) {
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to open database: %v", err)
+	}
+	defer db.Close()
+
+	if err := RunMigrations(db); err != nil {
+		t.Fatalf("Failed to run migrations: %v", err)
+	}
+
+	// Test that feature flag tables exist
+	requiredTables := []string{
+		"feature_flags",
+		"tenant_feature_flags",
+	}
+
+	for _, table := range requiredTables {
+		var count int
+		query := "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?"
+		if err := db.QueryRow(query, table).Scan(&count); err != nil {
+			t.Errorf("Error checking for table %s: %v", table, err)
+			continue
+		}
+		if count == 0 {
+			t.Errorf("BUG: Table %s does not exist - migration is missing", table)
+		}
+	}
+}
+
 // TestMigrationCreatesAllTablesAtomically verifies migration is atomic
 func TestMigrationCreatesAllTablesAtomically(t *testing.T) {
 	db, err := sql.Open("sqlite3", ":memory:")
@@ -122,6 +154,8 @@ func TestMigrationCreatesAllTablesAtomically(t *testing.T) {
 		"referral_codes",
 		"referral_uses",
 		"reference_entries",
+		"feature_flags",
+		"tenant_feature_flags",
 		"schema_migrations",
 	}
 

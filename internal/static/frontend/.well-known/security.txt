@@ -1,0 +1,30 @@
+# Gassigeher Security Policy
+# According to RFC 9116 (https://www.rfc-editor.org/rfc/rfc9116)
+
+# Contact for security issues
+Contact: mailto:security@gassigeher.org
+Contact: https://github.com/gassigeher/gassigeher-saas/security/advisories
+
+# Preferred languages for communication
+Preferred-Languages: de, en
+
+# Our security policy
+Policy: https://github.com/gassigeher/gassigeher-saas/security/policy
+
+# PGP key for encrypted communication (optional)
+# Encryption: https://gassigeher.org/.well-known/pgp-key.txt
+
+# Acknowledgments page for security researchers
+Acknowledgments: https://gassigeher.org/security/thanks
+
+# Canonical URL for this file
+Canonical: https://gassigeher.org/.well-known/security.txt
+
+# Expiration date (update annually)
+Expires: 2026-12-31T23:59:59.000Z
+
+# Hiring security professionals
+# Hiring: https://gassigeher.org/careers
+
+# CSAF (Common Security Advisory Framework) - optional
+# CSAF: https://gassigeher.org/.well-known/csaf/provider-metadata.json

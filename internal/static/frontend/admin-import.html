@@ -212,7 +212,7 @@
 <body>
     <header>
         <div class="container">
-            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <button class="menu-toggle" data-action="toggle-menu" aria-label="Menu">☰</button>
             <a href="/" class="logo">🐕 Gassigeher Admin</a>
             <nav id="main-nav">
                 <ul>
@@ -243,12 +243,12 @@
                         </div>
                     </li>
                     <li><a href="/dashboard.html" class="area-switcher">👤 Benutzer-Bereich</a></li>
-                    <li><a href="#" onclick="api.logout()">Abmelden</a></li>
+                    <li><a href="#" data-action="logout">Abmelden</a></li>
                 </ul>
             </nav>
         </div>
     </header>
-    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+    <div class="nav-overlay" id="nav-overlay" data-action="toggle-menu"></div>
 
     <main style="padding: 40px 0;">
         <div class="container import-container">
@@ -273,8 +273,8 @@
                     Laden Sie eine CSV-Datei mit Hunde-Daten hoch. Unterstutzt werden Komma- und Semikolon-getrennte Dateien.
                 </p>
 
-                <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click();">
-                    <input type="file" id="file-input" accept=".csv" onchange="handleFileSelect(event)">
+                <div class="upload-zone" id="upload-zone" data-action="trigger-file-input">
+                    <input type="file" id="file-input" accept=".csv" data-action-change="file-select">
                     <div class="upload-icon">📁</div>
                     <div class="upload-text">Datei hier ablegen oder klicken zum Auswahlen</div>
                     <div class="upload-hint">Unterstutzt: CSV (max. 10MB)</div>
@@ -283,7 +283,7 @@
                 <div id="file-info" class="file-info" style="display: none;">
                     <span class="file-icon">📄</span>
                     <span class="file-name" id="file-name"></span>
-                    <span class="file-remove" onclick="removeFile()">×</span>
+                    <span class="file-remove" data-action="remove-file">×</span>
                 </div>
             </div>
 
@@ -303,8 +303,8 @@
                 </div>
 
                 <div class="import-actions">
-                    <button type="button" class="btn btn-secondary" onclick="resetImport()">Abbrechen</button>
-                    <button type="button" class="btn" onclick="executeImport()">📥 Importieren</button>
+                    <button type="button" class="btn btn-secondary" data-action="reset-import">Abbrechen</button>
+                    <button type="button" class="btn" data-action="execute-import">📥 Importieren</button>
                 </div>
             </div>
 
@@ -329,7 +329,16 @@
     <script src="/js/api.js"></script>
     <script src="/js/i18n.js"></script>
     <script src="/js/menu.js"></script>
+    <script src="/js/event-handlers.js"></script>
     <script>
+        registerActions({
+            'trigger-file-input': function(e) { e.preventDefault(); document.getElementById('file-input').click(); },
+            'file-select': function(e) { handleFileSelect(e); },
+            'remove-file': function(e) { e.preventDefault(); removeFile(); },
+            'reset-import': function(e) { e.preventDefault(); resetImport(); },
+            'execute-import': function(e) { e.preventDefault(); executeImport(); },
+            'update-mapping': function(e, id) { updateMapping(id, e.target.value); }
+        });
         let currentFile = null;
         let previewData = null;
         let currentMapping = {};
@@ -510,7 +519,7 @@
                             ${field.label}
                             ${field.required ? '<span class="required">*</span>' : ''}
                         </label>
-                        <select id="mapping-${field.key}" onchange="updateMapping('${field.key}', this.value)">
+                        <select id="mapping-${field.key}" data-action-change="update-mapping" data-id="${field.key}">
                             <option value="">-- Nicht zuordnen --</option>
                             ${headerOptions}
                         </select>
@@ -591,7 +600,7 @@
             html += `
                     <div style="margin-top: 20px; text-align: center;">
                         <a href="/admin-dogs.html" class="btn">Zur Hunde-Verwaltung</a>
-                        <button class="btn btn-secondary" onclick="resetImport()" style="margin-left: 10px;">Neuer Import</button>
+                        <button class="btn btn-secondary" data-action="reset-import" style="margin-left: 10px;">Neuer Import</button>
                     </div>
                 </div>
             `;

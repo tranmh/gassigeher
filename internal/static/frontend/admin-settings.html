@@ -9,7 +9,7 @@
 <body>
     <header>
         <div class="container">
-            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <button class="menu-toggle" data-action="toggle-menu" aria-label="Menu">☰</button>
             <a href="/" class="logo">🐕 Gassigeher Admin</a>
             <nav id="main-nav">
                 <ul>
@@ -41,12 +41,12 @@
                     </li>
                     <li id="super-admin-colors-link" style="display:none;"><a href="/admin-colors.html">🎨 Farben</a></li>
                     <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
-                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                    <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
             </nav>
         </div>
     </header>
-    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+    <div class="nav-overlay" id="nav-overlay" data-action="toggle-menu"></div>
 
     <main style="padding: 40px 0;">
         <div class="container-narrow">
@@ -64,7 +64,7 @@
                     <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
                         Wie viele Tage im Voraus können Benutzer buchen?
                     </p>
-                    <button class="btn" onclick="updateSetting('booking_advance_days', 'booking-advance-days')" style="margin-top: 10px;">Speichern</button>
+                    <button class="btn" data-action="update-setting" data-key="booking_advance_days" data-element="booking-advance-days" style="margin-top: 10px;">Speichern</button>
                 </div>
 
                 <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;">
@@ -76,7 +76,7 @@
                     <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
                         Wie viele Stunden vor dem Spaziergang müssen Benutzer stornieren?
                     </p>
-                    <button class="btn" onclick="updateSetting('cancellation_notice_hours', 'cancellation-notice-hours')" style="margin-top: 10px;">Speichern</button>
+                    <button class="btn" data-action="update-setting" data-key="cancellation_notice_hours" data-element="cancellation-notice-hours" style="margin-top: 10px;">Speichern</button>
                 </div>
 
                 <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;">
@@ -88,7 +88,7 @@
                     <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
                         Nach wie vielen Tagen Inaktivität werden Benutzer automatisch deaktiviert?
                     </p>
-                    <button class="btn" onclick="updateSetting('auto_deactivation_days', 'auto-deactivation-days')" style="margin-top: 10px;">Speichern</button>
+                    <button class="btn" data-action="update-setting" data-key="auto_deactivation_days" data-element="auto-deactivation-days" style="margin-top: 10px;">Speichern</button>
                 </div>
             </div>
 
@@ -110,10 +110,10 @@
                         8 alphanumerische Zeichen (Groß-/Kleinbuchstaben und Zahlen)
                     </p>
                     <div style="margin-top: 10px;">
-                        <button class="btn" onclick="updateRegistrationPassword()">
+                        <button class="btn" data-action="update-registration-password">
                             Speichern
                         </button>
-                        <button class="btn btn-secondary" onclick="generateNewPassword()" style="margin-left: 10px;">
+                        <button class="btn btn-secondary" data-action="generate-new-password" style="margin-left: 10px;">
                             Neues Passwort generieren
                         </button>
                     </div>
@@ -148,7 +148,7 @@
                 </div>
 
                 <div style="margin-top: 15px;">
-                    <button class="btn" onclick="saveWhatsAppSettings()">
+                    <button class="btn" data-action="save-whatsapp-settings">
                         WhatsApp-Einstellungen speichern
                     </button>
                 </div>
@@ -188,7 +188,7 @@
 
                 <!-- Reset Button -->
                 <div style="margin-top: 20px;">
-                    <button class="btn btn-secondary" onclick="resetLogoToDefault()">
+                    <button class="btn btn-secondary" data-action="reset-logo-to-default">
                         Standard-Logo verwenden
                     </button>
                 </div>
@@ -211,8 +211,8 @@
                 <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 15px; margin-bottom: 20px;">
                     <strong>Hinweis:</strong> Der Export enthält personenbezogene Daten. Gehen Sie verantwortungsvoll damit um und löschen Sie die Datei nach Gebrauch.
                 </div>
-                <button class="btn" onclick="exportAllData()">
-                    📥 Alle Daten exportieren
+                <button class="btn" data-action="export-all-data">
+                    Alle Daten exportieren
                 </button>
                 <div id="export-status" style="margin-top: 15px;"></div>
             </div>
@@ -225,8 +225,39 @@
     <script src="/js/api.js"></script>
     <script src="/js/impersonation-banner.js"></script>
     <script src="/js/demo-banner.js"></script>
+    <script src="/js/event-handlers.js"></script>
     <script>
         let settings = {};
+
+        // Register page-specific action handlers
+        registerActions({
+            'update-setting': function(e) {
+                e.preventDefault();
+                const key = this.getAttribute('data-key');
+                const element = this.getAttribute('data-element');
+                updateSetting(key, element);
+            },
+            'update-registration-password': function(e) {
+                e.preventDefault();
+                updateRegistrationPassword();
+            },
+            'generate-new-password': function(e) {
+                e.preventDefault();
+                generateNewPassword();
+            },
+            'save-whatsapp-settings': function(e) {
+                e.preventDefault();
+                saveWhatsAppSettings();
+            },
+            'reset-logo-to-default': function(e) {
+                e.preventDefault();
+                resetLogoToDefault();
+            },
+            'export-all-data': function(e) {
+                e.preventDefault();
+                exportAllData();
+            }
+        });
 
         document.addEventListener('DOMContentLoaded', async () => {
             if (!api.isAuthenticated()) {

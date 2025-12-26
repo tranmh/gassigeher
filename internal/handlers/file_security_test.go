@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -118,6 +119,84 @@ func TestSafeFileServer_PathTraversal(t *testing.T) {
 
 			if rec.Code != tt.expectedStatus {
 				t.Errorf("SafeFileServer(%q) status = %d, want %d", tt.path, rec.Code, tt.expectedStatus)
+			}
+		})
+	}
+}
+
+// TestSafeFileServer_Security_NoDirectoryListing tests that directory listing is blocked
+// SECURITY: GASSI-2025-005 - Prevent information disclosure via directory listing
+func TestSafeFileServer_Security_NoDirectoryListing(t *testing.T) {
+	// Create a temp directory structure
+	tempDir := t.TempDir()
+
+	// Create a subdirectory with files
+	subDir := filepath.Join(tempDir, "dogs")
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatalf("Failed to create subdirectory: %v", err)
+	}
+
+	// Create test files in subdirectory
+	testFile1 := filepath.Join(subDir, "dog1.jpg")
+	testFile2 := filepath.Join(subDir, "dog2.jpg")
+	if err := os.WriteFile(testFile1, []byte("dog1 image"), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+	if err := os.WriteFile(testFile2, []byte("dog2 image"), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	handler := SafeFileServer(http.Dir(tempDir))
+
+	tests := []struct {
+		name           string
+		path           string
+		expectedStatus int
+		description    string
+	}{
+		{
+			name:           "directory_with_trailing_slash_blocked",
+			path:           "/dogs/",
+			expectedStatus: http.StatusForbidden,
+			description:    "Directory listing with trailing slash should be blocked",
+		},
+		{
+			name:           "directory_without_trailing_slash_blocked",
+			path:           "/dogs",
+			expectedStatus: http.StatusForbidden,
+			description:    "Directory listing without trailing slash should be blocked",
+		},
+		{
+			name:           "root_directory_blocked",
+			path:           "/",
+			expectedStatus: http.StatusForbidden,
+			description:    "Root directory listing should be blocked",
+		},
+		{
+			name:           "file_in_subdirectory_allowed",
+			path:           "/dogs/dog1.jpg",
+			expectedStatus: http.StatusOK,
+			description:    "Individual files should still be accessible",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tt.path, nil)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != tt.expectedStatus {
+				t.Errorf("SECURITY VIOLATION: %s\nSafeFileServer(%q) status = %d, want %d",
+					tt.description, tt.path, rec.Code, tt.expectedStatus)
+			}
+
+			// Extra check: ensure no file listing is returned for directory requests
+			if tt.expectedStatus == http.StatusForbidden {
+				body := rec.Body.String()
+				if strings.Contains(body, "dog1.jpg") || strings.Contains(body, "dog2.jpg") {
+					t.Errorf("SECURITY VIOLATION: Directory listing exposed file names in response body")
+				}
 			}
 		})
 	}

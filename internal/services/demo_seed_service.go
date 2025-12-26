@@ -22,6 +22,14 @@ const (
 	DefaultFederalState = "BW"
 )
 
+// formatDemoResetLogMessage creates a log message for demo tenant reset
+// SECURITY: GASSI-2025-001 - This function intentionally omits the password
+// to prevent sensitive data from being written to logs
+func formatDemoResetLogMessage(_ string, nextReset time.Time) string {
+	return fmt.Sprintf("Demo tenant reset complete (new password generated, next reset: %s)",
+		nextReset.Format("2006-01-02 15:04"))
+}
+
 // DemoSeedService handles demo tenant creation and reset
 type DemoSeedService struct {
 	db              *sql.DB
@@ -608,8 +616,8 @@ func (s *DemoSeedService) ResetDemoTenant() error {
 		return fmt.Errorf("failed to update demo state: %w", err)
 	}
 
-	log.Printf("Demo tenant reset complete (new password: %s, next reset: %s)",
-		newPassword, nextReset.Format("2006-01-02 15:04"))
+	// SECURITY: GASSI-2025-001 - Use secure log message that doesn't expose password
+	log.Print(formatDemoResetLogMessage(newPassword, nextReset))
 	return nil
 }
 

@@ -17,7 +17,7 @@
 <body>
     <header>
         <div class="container">
-            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <button class="menu-toggle" data-action="toggle-menu" aria-label="Menu">☰</button>
             <a href="/" class="logo">🐕 Gassigeher</a>
             <nav id="main-nav">
                 <ul>
@@ -29,12 +29,12 @@
                         <span data-i18n="nav.profile">Profil</span>
                     </a></li>
                     <li id="admin-area-link" style="display: none;"><a href="/admin-dashboard.html" class="area-switcher" data-i18n="nav.admin_area">🔧 Admin-Bereich</a></li>
-                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                    <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
             </nav>
         </div>
     </header>
-    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+    <div class="nav-overlay" id="nav-overlay" data-action="toggle-menu"></div>
 
     <main style="padding: 40px 0;">
         <div class="container">
@@ -85,8 +85,8 @@
                     </div>
                 </div>
                 <div style="margin-top: 15px;">
-                    <button class="btn" onclick="applyFilters()" data-i18n="common.apply">Anwenden</button>
-                    <button class="btn btn-secondary" onclick="resetFilters()" data-i18n="common.reset">Zurücksetzen</button>
+                    <button class="btn" data-action="apply-filters" data-i18n="common.apply">Anwenden</button>
+                    <button class="btn btn-secondary" data-action="reset-filters" data-i18n="common.reset">Zurücksetzen</button>
                 </div>
             </div>
 
@@ -98,7 +98,7 @@
     <!-- Dog Detail Modal (with Walk History) -->
     <div id="dog-detail-modal" class="modal" style="display: none;">
         <div class="modal-content" style="max-width: 700px;">
-            <span class="modal-close" onclick="closeDogDetailModal()">&times;</span>
+            <span class="modal-close" data-action="close-dog-detail-modal">&times;</span>
             <div id="dog-detail-content">
                 <p>Laden...</p>
             </div>
@@ -108,9 +108,9 @@
     <!-- Booking Modal -->
     <div id="booking-modal" class="modal" style="display: none;">
         <div class="modal-content">
-            <span class="modal-close" onclick="closeBookingModal()">&times;</span>
+            <span class="modal-close" data-action="close-booking-modal">&times;</span>
             <h2 id="modal-title">Spaziergang buchen</h2>
-            <form id="booking-form" onsubmit="submitBooking(event)">
+            <form id="booking-form" data-action-submit="submit-booking">
                 <div class="form-group">
                     <label for="booking-date">Datum *</label>
                     <input type="date" id="booking-date" required min="">
@@ -131,7 +131,7 @@
                 </div>
                 <input type="hidden" id="booking-dog-id">
                 <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeBookingModal()">Abbrechen</button>
+                    <button type="button" class="btn btn-secondary" data-action="close-booking-modal">Abbrechen</button>
                     <button type="submit" class="btn">Buchen</button>
                 </div>
             </form>
@@ -197,7 +197,25 @@
     <script src="/js/sanitize.js"></script>
     <script src="/js/impersonation-banner.js"></script>
     <script src="/js/demo-banner.js"></script>
+    <script src="/js/event-handlers.js"></script>
     <script>
+        // Register page-specific action handlers
+        registerActions({
+            'apply-filters': function(e) { e.preventDefault(); applyFilters(); },
+            'reset-filters': function(e) { e.preventDefault(); resetFilters(); },
+            'close-dog-detail-modal': function(e) { e.preventDefault(); closeDogDetailModal(); },
+            'close-booking-modal': function(e) { e.preventDefault(); closeBookingModal(); },
+            'submit-booking': function(e) { e.preventDefault(); submitBooking(e); },
+            'view-dog': function(e, id) { e.preventDefault(); viewDog(parseInt(id)); },
+            'book-dog': function(e, id) { e.preventDefault(); closeDogDetailModal(); showBookingModal(parseInt(id)); }
+        });
+
+        // Handle external link clicks to stop propagation (prevent dog card click)
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('dog-external-link')) {
+                e.stopPropagation();
+            }
+        });
         let currentDogs = [];
         let userColors = [];  // Array of color objects the user has
         let allColors = [];   // All available colors from API
@@ -430,12 +448,12 @@
                 const dogColor = dog.color || allColors.find(c => c.id === dog.color_id);
                 const colorBadgeHtml = getColorBadgeHtml(dogColor);
                 const externalLinkHtml = dog.external_link
-                    ? `<a href="${dog.external_link}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" style="display: inline-block; margin-top: 10px; color: var(--primary-green); text-decoration: none; font-weight: 500; font-size: 0.9rem;">mehr über mich &rarr;</a>`
+                    ? `<a href="${sanitizeHTML(dog.external_link)}" target="_blank" rel="noopener noreferrer" class="dog-external-link" style="display: inline-block; margin-top: 10px; color: var(--primary-green); text-decoration: none; font-weight: 500; font-size: 0.9rem;">mehr über mich &rarr;</a>`
                     : '';
 
                 return `
                     <div class="dog-card ${!canAccess ? 'locked' : ''} ${isUnavailable ? 'unavailable' : ''}"
-                         onclick="${canAccess && !isUnavailable ? `viewDog(${dog.id})` : ''}"
+                         ${canAccess && !isUnavailable ? `data-action="view-dog" data-id="${dog.id}"` : ''}
                          style="${!canAccess || isUnavailable ? 'cursor: not-allowed;' : 'cursor: pointer;'}">
                         ${isUnavailable ? `<div class="dog-unavailable-banner">${safeUnavailableReason}</div>` : ''}
                         ${!canAccess ? '<div class="dog-locked-banner">🔒 Farbe erforderlich</div>' : ''}
@@ -589,14 +607,14 @@
                             <h2 style="margin: 0 0 10px 0;">${safeDogName}</h2>
                             <p style="margin: 0 0 8px 0; color: #666;">${safeDogBreed} • ${getSizeLabel(dog.size)} • ${dog.age} Jahre</p>
                             ${safeSpecialNeeds ? `<p style="margin: 0 0 8px 0; color: var(--warning-orange); font-size: 0.9rem;">⚠️ ${safeSpecialNeeds}</p>` : ''}
-                            ${dog.external_link ? `<a href="${dog.external_link}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 10px; color: var(--primary-green);">mehr über mich &rarr;</a>` : ''}
+                            ${dog.external_link ? `<a href="${sanitizeHTML(dog.external_link)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 10px; color: var(--primary-green);">mehr über mich &rarr;</a>` : ''}
                         </div>
                     </div>
                     ${careInfoHtml}
                     ${walkHistoryHtml}
                     <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid var(--border-light); display: flex; gap: 10px;">
-                        <button class="btn" onclick="closeDogDetailModal(); showBookingModal(${dog.id});">🗓️ Spaziergang buchen</button>
-                        <button class="btn btn-secondary" onclick="closeDogDetailModal()">Schließen</button>
+                        <button class="btn" data-action="book-dog" data-id="${dog.id}">🗓️ Spaziergang buchen</button>
+                        <button class="btn btn-secondary" data-action="close-dog-detail-modal">Schließen</button>
                     </div>
                 `;
             } catch (error) {

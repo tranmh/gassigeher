@@ -9,7 +9,7 @@
 <body>
     <header>
         <div class="container">
-            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <button class="menu-toggle" data-action="toggle-menu" aria-label="Menu">☰</button>
             <a href="/" class="logo">🐕 Gassigeher Admin</a>
             <nav id="main-nav">
                 <ul>
@@ -41,12 +41,12 @@
                     </li>
                     <li id="super-admin-colors-link" style="display:none;"><a href="/admin-colors.html">🎨 Farben</a></li>
                     <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
-                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                    <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
             </nav>
         </div>
     </header>
-    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+    <div class="nav-overlay" id="nav-overlay" data-action="toggle-menu"></div>
 
     <main style="padding: 40px 0;">
         <div class="container">
@@ -97,8 +97,8 @@
                     </div>
                 </div>
                 <div style="margin-top: 15px;">
-                    <button class="btn" onclick="applyFilters()" data-i18n="common.apply">Anwenden</button>
-                    <button class="btn btn-secondary" onclick="resetFilters()" data-i18n="common.reset">Zurücksetzen</button>
+                    <button class="btn" data-action="apply-filters" data-i18n="common.apply">Anwenden</button>
+                    <button class="btn btn-secondary" data-action="reset-filters" data-i18n="common.reset">Zurücksetzen</button>
                 </div>
             </div>
 
@@ -114,10 +114,21 @@
     <script src="/js/sanitize.js"></script>
     <script src="/js/impersonation-banner.js"></script>
     <script src="/js/demo-banner.js"></script>
+    <script src="/js/event-handlers.js"></script>
     <script>
         let bookings = [];
         let dogs = {};
         let users = {};
+
+        // Register page-specific action handlers
+        registerActions({
+            'apply-filters': function(e) { e.preventDefault(); applyFilters(); },
+            'reset-filters': function(e) { e.preventDefault(); resetFilters(); },
+            'move-booking': function(e, id) { e.preventDefault(); moveBooking(parseInt(id)); },
+            'cancel-booking': function(e, id) { e.preventDefault(); cancelBooking(parseInt(id)); },
+            'approve-booking': function(e, id) { e.preventDefault(); approveBooking(parseInt(id)); },
+            'reject-booking': function(e, id) { e.preventDefault(); rejectBooking(parseInt(id)); }
+        });
 
         document.addEventListener('DOMContentLoaded', async () => {
             if (!api.isAuthenticated()) {
@@ -241,8 +252,8 @@
                             </div>
                             ${booking.status === 'scheduled' ? `
                                 <div style="display: flex; gap: 5px; flex-direction: column; min-width: 120px;">
-                                    <button class="btn btn-sm" onclick="moveBooking(${booking.id})">Verschieben</button>
-                                    <button class="btn btn-danger btn-sm" onclick="cancelBooking(${booking.id})">Stornieren</button>
+                                    <button class="btn btn-sm" data-action="move-booking" data-id="${booking.id}">Verschieben</button>
+                                    <button class="btn btn-danger btn-sm" data-action="cancel-booking" data-id="${booking.id}">Stornieren</button>
                                 </div>
                             ` : ''}
                         </div>
@@ -321,8 +332,8 @@
                         <td>User #${booking.user_id}</td>
                         <td>${safeDogName}</td>
                         <td>
-                            <button class="btn btn-sm" onclick="approveBooking(${booking.id})">✓ Genehmigen</button>
-                            <button class="btn btn-danger btn-sm" style="margin-left: 5px;" onclick="rejectBooking(${booking.id})">✗ Ablehnen</button>
+                            <button class="btn btn-sm" data-action="approve-booking" data-id="${booking.id}">&#10003; Genehmigen</button>
+                            <button class="btn btn-danger btn-sm" style="margin-left: 5px;" data-action="reject-booking" data-id="${booking.id}">&#10007; Ablehnen</button>
                         </td>
                     `;
                     table.appendChild(row);

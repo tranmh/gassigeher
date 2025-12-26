@@ -9,7 +9,7 @@
 <body>
     <header>
         <div class="container">
-            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <button class="menu-toggle" data-action="toggle-menu" aria-label="Menu">☰</button>
             <a href="/" class="logo">🐕 Gassigeher Admin</a>
             <nav id="main-nav">
                 <ul>
@@ -41,12 +41,12 @@
                     </li>
                     <li id="super-admin-colors-link" style="display:none;"><a href="/admin-colors.html">🎨 Farben</a></li>
                     <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
-                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                    <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
             </nav>
         </div>
     </header>
-    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+    <div class="nav-overlay" id="nav-overlay" data-action="toggle-menu"></div>
 
     <main style="padding: 40px 0;">
         <div class="container">
@@ -54,7 +54,7 @@
                 <h1 data-i18n="dogs.manage_dogs">Hunde verwalten</h1>
                 <div style="display: flex; gap: 10px;">
                     <a href="/admin-import.html" class="btn btn-secondary">📥 Importieren</a>
-                    <button class="btn" onclick="showAddDogForm()" data-i18n="dogs.add_dog">Hund hinzufügen</button>
+                    <button class="btn" data-action="show-add-dog-form" data-i18n="dogs.add_dog">Hund hinzufügen</button>
                 </div>
             </div>
 
@@ -123,7 +123,7 @@
                             </div>
                             <div id="photo-preview" class="photo-preview hidden">
                                 <img id="preview-img" src="" alt="Preview" style="display: none;">
-                                <button type="button" class="btn-remove-preview" onclick="dogPhotoManager.clearPreview()">&times;</button>
+                                <button type="button" class="btn-remove-preview" data-action="clear-photo-preview">&times;</button>
                             </div>
                         </div>
                     </div>
@@ -179,7 +179,7 @@
 
                     <div style="display: flex; gap: 10px;">
                         <button type="submit" class="btn" data-i18n="common.save">Speichern</button>
-                        <button type="button" class="btn btn-secondary" onclick="hideForm()" data-i18n="common.cancel">Abbrechen</button>
+                        <button type="button" class="btn btn-secondary" data-action="hide-form" data-i18n="common.cancel">Abbrechen</button>
                     </div>
                 </form>
             </div>
@@ -198,9 +198,21 @@
     <script src="/js/sanitize.js"></script>
     <script src="/js/impersonation-banner.js"></script>
     <script src="/js/demo-banner.js"></script>
+    <script src="/js/event-handlers.js"></script>
     <script>
         let currentDogs = [];
         let allColors = [];
+
+        // Register page-specific action handlers for CSP compliance (GASSI-2025-003)
+        registerActions({
+            'show-add-dog-form': function(e) { e.preventDefault(); showAddDogForm(); },
+            'hide-form': function(e) { e.preventDefault(); hideForm(); },
+            'clear-photo-preview': function(e) { e.preventDefault(); dogPhotoManager.clearPreview(); },
+            'edit-dog': function(e, id) { e.preventDefault(); editDog(parseInt(id)); },
+            'toggle-featured': function(e, id, value) { e.preventDefault(); toggleFeatured(parseInt(id), value === 'true'); },
+            'toggle-availability': function(e, id, value) { e.preventDefault(); toggleAvailability(parseInt(id), value === 'true'); },
+            'delete-dog': function(e, id) { e.preventDefault(); deleteDog(parseInt(id)); }
+        });
 
         document.addEventListener('DOMContentLoaded', async () => {
             if (!api.isAuthenticated()) {
@@ -412,14 +424,14 @@
                         <h3 class="dog-card-title">${safeDogName}</h3>
                         <p class="dog-card-info">${safeDogBreed} • ${getSizeLabel(dog.size)} • ${dog.age} Jahre</p>
                         <div style="display: flex; gap: 5px; margin-top: 10px;">
-                            <button class="btn" style="flex: 1; padding: 8px;" onclick="editDog(${dog.id})">✏️</button>
-                            <button class="btn ${dog.is_featured ? 'btn-warning' : 'btn-secondary'}" style="flex: 1; padding: 8px;" onclick="toggleFeatured(${dog.id}, ${!dog.is_featured})" title="${dog.is_featured ? 'Von Startseite entfernen' : 'Auf Startseite anzeigen'}">
+                            <button class="btn" style="flex: 1; padding: 8px;" data-action="edit-dog" data-id="${dog.id}">✏️</button>
+                            <button class="btn ${dog.is_featured ? 'btn-warning' : 'btn-secondary'}" style="flex: 1; padding: 8px;" data-action="toggle-featured" data-id="${dog.id}" data-value="${!dog.is_featured}" title="${dog.is_featured ? 'Von Startseite entfernen' : 'Auf Startseite anzeigen'}">
                                 ⭐
                             </button>
-                            <button class="btn btn-secondary" style="flex: 1; padding: 8px;" onclick="toggleAvailability(${dog.id}, ${!dog.is_available})">
+                            <button class="btn btn-secondary" style="flex: 1; padding: 8px;" data-action="toggle-availability" data-id="${dog.id}" data-value="${!dog.is_available}">
                                 ${dog.is_available ? '🚫' : '✅'}
                             </button>
-                            <button class="btn btn-danger" style="flex: 1; padding: 8px;" onclick="deleteDog(${dog.id})">🗑️</button>
+                            <button class="btn btn-danger" style="flex: 1; padding: 8px;" data-action="delete-dog" data-id="${dog.id}">🗑️</button>
                         </div>
                     </div>
                 </div>

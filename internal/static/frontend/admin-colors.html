@@ -9,7 +9,7 @@
 <body>
     <header>
         <div class="container">
-            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <button class="menu-toggle" data-action="toggle-menu" aria-label="Menu">☰</button>
             <a href="/" class="logo">🐕 Gassigeher Admin</a>
             <nav id="main-nav">
                 <ul>
@@ -41,18 +41,18 @@
                     </li>
                     <li id="super-admin-colors-link" style="display:none;"><a href="/admin-colors.html">🎨 Farben</a></li>
                     <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
-                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                    <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
             </nav>
         </div>
     </header>
-    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+    <div class="nav-overlay" id="nav-overlay" data-action="toggle-menu"></div>
 
     <main style="padding: 40px 0;">
         <div class="container">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h1 data-i18n="colors.manage_colors">Farbkategorien verwalten</h1>
-                <button class="btn" onclick="showAddColorForm()" data-i18n="colors.add_color">Farbe hinzufügen</button>
+                <button class="btn" data-action="show-add-color-form" data-i18n="colors.add_color">Farbe hinzufügen</button>
             </div>
 
             <div id="alert-container"></div>
@@ -127,7 +127,7 @@
 
                     <div style="display: flex; gap: 10px;">
                         <button type="submit" class="btn" data-i18n="common.save">Speichern</button>
-                        <button type="button" class="btn btn-secondary" onclick="hideForm()" data-i18n="common.cancel">Abbrechen</button>
+                        <button type="button" class="btn btn-secondary" data-action="hide-color-form" data-i18n="common.cancel">Abbrechen</button>
                     </div>
                 </form>
             </div>
@@ -215,6 +215,16 @@
     <script src="/js/sanitize.js"></script>
     <script src="/js/impersonation-banner.js"></script>
     <script src="/js/demo-banner.js"></script>
+    <script src="/js/event-handlers.js"></script>
+    <script>
+        // Register page-specific action handlers for CSP compliance (GASSI-2025-003)
+        registerActions({
+            'show-add-color-form': function(e) { e.preventDefault(); showAddColorForm(); },
+            'hide-color-form': function(e) { e.preventDefault(); hideForm(); },
+            'edit-color': function(e, id) { e.preventDefault(); editColor(parseInt(id)); },
+            'delete-color': function(e, id) { e.preventDefault(); deleteColor(parseInt(id)); }
+        });
+    </script>
     <script>
         let currentColors = [];
         const MIN_COLORS = 3;
@@ -360,8 +370,8 @@
                         </div>
                     </div>
                     <div class="color-actions">
-                        <button class="btn" onclick="editColor(${color.id})">✏️ Bearbeiten</button>
-                        <button class="btn btn-danger" onclick="deleteColor(${color.id})" ${!canDelete ? 'disabled title="Mindestens 3 Farben erforderlich"' : ''}>🗑️ Löschen</button>
+                        <button class="btn" data-action="edit-color" data-id="${color.id}">✏️ Bearbeiten</button>
+                        <button class="btn btn-danger" data-action="delete-color" data-id="${color.id}" ${!canDelete ? 'disabled title="Mindestens 3 Farben erforderlich"' : ''}>🗑️ Löschen</button>
                     </div>
                 </div>
                 `;

@@ -305,6 +305,21 @@ func AllowImpersonationEnd(next http.Handler) http.Handler {
 	})
 }
 
+// BlockDangerousMethods middleware blocks potentially dangerous HTTP methods
+// SECURITY: GASSI-2025-004 - Block TRACE and TRACK methods to prevent XST attacks
+func BlockDangerousMethods(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		method := strings.ToUpper(r.Method)
+		if method == "TRACE" || method == "TRACK" {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			w.Write([]byte("Method Not Allowed"))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // SecurityHeadersMiddleware adds security headers
 func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -321,11 +336,12 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 
 		// Content Security Policy (Enhanced for XSS protection)
+		// SECURITY: GASSI-2025-003 - Removed 'unsafe-inline' from script-src
 		// Note: img-src includes tierheim-goeppingen.de for the default site logo
-		// 'unsafe-inline' required for current architecture (inline scripts/styles)
+		// style-src still has 'unsafe-inline' for inline styles (lower risk than scripts)
 		csp := strings.Join([]string{
 			"default-src 'self'",
-			"script-src 'self' 'unsafe-inline'",
+			"script-src 'self'",
 			"style-src 'self' 'unsafe-inline'",
 			"img-src 'self' data: https://www.tierheim-goeppingen.de",
 			"font-src 'self' data:",

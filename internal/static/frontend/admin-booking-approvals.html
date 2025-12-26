@@ -129,7 +129,7 @@
 <body>
     <header>
         <div class="container">
-            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <button class="menu-toggle" data-action="toggle-menu" aria-label="Menu">☰</button>
             <a href="/" class="logo">Gassigeher Admin</a>
             <nav id="main-nav">
                 <ul>
@@ -161,12 +161,12 @@
                     </li>
                     <li id="super-admin-colors-link" style="display:none;"><a href="/admin-colors.html">🎨 Farben</a></li>
                     <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
-                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                    <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
             </nav>
         </div>
     </header>
-    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+    <div class="nav-overlay" id="nav-overlay" data-action="toggle-menu"></div>
 
     <main style="padding: 40px 0;">
         <div class="container">
@@ -179,16 +179,16 @@
 
             <!-- Filter Tabs -->
             <div class="filter-tabs">
-                <button class="filter-tab active" data-filter="pending" onclick="setFilter('pending')">
+                <button class="filter-tab active" data-filter="pending" data-action="set-filter" data-value="pending">
                     Ausstehend <span class="count" id="pending-count">0</span>
                 </button>
-                <button class="filter-tab" data-filter="approved" onclick="setFilter('approved')">
+                <button class="filter-tab" data-filter="approved" data-action="set-filter" data-value="approved">
                     Genehmigt <span class="count" id="approved-count">0</span>
                 </button>
-                <button class="filter-tab" data-filter="rejected" onclick="setFilter('rejected')">
+                <button class="filter-tab" data-filter="rejected" data-action="set-filter" data-value="rejected">
                     Abgelehnt <span class="count" id="rejected-count">0</span>
                 </button>
-                <button class="filter-tab" data-filter="all" onclick="setFilter('all')">
+                <button class="filter-tab" data-filter="all" data-action="set-filter" data-value="all">
                     Alle
                 </button>
             </div>
@@ -204,7 +204,7 @@
     </main>
 
     <!-- Rejection Reason Modal -->
-    <div id="reject-modal" class="modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div id="reject-modal" class="modal" data-action="close-reject-modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
         <div class="card" style="max-width: 500px; margin: 20px; padding: 30px;">
             <h3>Buchung ablehnen</h3>
             <p style="color: #666; margin-bottom: 20px;">Bitte gib einen Grund für die Ablehnung an:</p>
@@ -213,8 +213,8 @@
                 <textarea id="reject-reason" rows="3" required placeholder="z.B. Hund ist an diesem Tag nicht verfuegbar..."></textarea>
             </div>
             <div style="display: flex; gap: 10px; margin-top: 20px;">
-                <button class="btn btn-secondary" onclick="closeRejectModal()">Abbrechen</button>
-                <button class="btn btn-reject" onclick="confirmReject()">Ablehnen</button>
+                <button class="btn btn-secondary" data-action="close-reject-modal">Abbrechen</button>
+                <button class="btn btn-reject" data-action="confirm-reject">Ablehnen</button>
             </div>
         </div>
     </div>
@@ -226,10 +226,42 @@
     <script src="/js/sanitize.js"></script>
     <script src="/js/impersonation-banner.js"></script>
     <script src="/js/demo-banner.js"></script>
+    <script src="/js/event-handlers.js"></script>
     <script>
         let allBookings = [];
         let currentFilter = 'pending';
         let rejectingBookingId = null;
+
+        // Register page-specific action handlers for CSP compliance
+        registerActions({
+            'set-filter': function(e, id, value) {
+                e.preventDefault();
+                setFilter(value);
+            },
+            'approve-booking': function(e, id) {
+                e.preventDefault();
+                approveBooking(parseInt(id));
+            },
+            'open-reject-modal': function(e, id) {
+                e.preventDefault();
+                openRejectModal(parseInt(id));
+            },
+            'close-reject-modal': function(e) {
+                e.preventDefault();
+                closeRejectModal();
+            },
+            'close-reject-modal-overlay': function(e) {
+                // Only close if clicking directly on the overlay, not its children
+                if (e.target === this) {
+                    e.preventDefault();
+                    closeRejectModal();
+                }
+            },
+            'confirm-reject': function(e) {
+                e.preventDefault();
+                confirmReject();
+            }
+        });
 
         document.addEventListener('DOMContentLoaded', async () => {
             if (!api.isAuthenticated()) {
@@ -366,10 +398,10 @@
 
                         ${booking.approval_status === 'pending' ? `
                             <div class="approval-actions">
-                                <button class="btn-approve" onclick="approveBooking(${booking.id})">
+                                <button class="btn-approve" data-action="approve-booking" data-id="${booking.id}">
                                     Genehmigen
                                 </button>
-                                <button class="btn-reject" onclick="openRejectModal(${booking.id})">
+                                <button class="btn-reject" data-action="open-reject-modal" data-id="${booking.id}">
                                     Ablehnen
                                 </button>
                             </div>
@@ -465,14 +497,6 @@
             } catch (error) {
                 console.error('Failed to reject booking:', error);
                 showAlert('error', error.message || 'Fehler beim Ablehnen der Buchung');
-            }
-        }
-
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('reject-modal');
-            if (event.target === modal) {
-                closeRejectModal();
             }
         }
 

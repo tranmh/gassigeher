@@ -666,9 +666,23 @@ func isValidSlug(slug string) bool {
 // isReservedSlug checks if a slug is reserved
 func isReservedSlug(slug string) bool {
 	reserved := []string{
+		// Infrastructure subdomains
 		"www", "api", "admin", "app", "mail", "email", "smtp", "ftp",
 		"support", "help", "billing", "status", "dev", "staging", "test",
 		"demo", "blog", "news", "docs", "static", "assets", "cdn", "media",
+		// Application routes - these conflict with SaaS routes
+		"central",   // /central/ - Central admin dashboard
+		"landing",   // /landing/ - Marketing landing pages
+		"login",     // Common auth route
+		"logout",    // Common auth route
+		"register",  // Common auth route
+		"signup",    // Common auth route
+		"signin",    // Common auth route
+		"signout",   // Common auth route
+		"dashboard", // Common app route
+		"profile",   // Common app route
+		"account",   // Common app route
+		"settings",  // Common app route
 	}
 	slug = strings.ToLower(slug)
 	for _, r := range reserved {

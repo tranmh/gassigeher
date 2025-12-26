@@ -592,9 +592,13 @@ func TestIsValidSlug(t *testing.T) {
 // TestIsReservedSlug tests the reserved slug checking function
 func TestIsReservedSlug(t *testing.T) {
 	reserved := []string{
+		// Infrastructure subdomains
 		"www", "api", "admin", "app", "mail", "email", "smtp", "ftp",
 		"support", "help", "billing", "status", "dev", "staging", "test",
 		"demo", "blog", "news", "docs", "static", "assets", "cdn", "media",
+		// Application routes
+		"central", "landing", "login", "logout", "register", "signup",
+		"signin", "signout", "dashboard", "profile", "account", "settings",
 	}
 
 	for _, slug := range reserved {
@@ -612,6 +616,33 @@ func TestIsReservedSlug(t *testing.T) {
 	for _, slug := range notReserved {
 		if isReservedSlug(slug) {
 			t.Errorf("Expected '%s' to not be reserved", slug)
+		}
+	}
+}
+
+// TestIsReservedSlug_RouteSlugs tests that route-based slugs are reserved
+// FIXED: "central", "landing", "login", "dashboard", "profile" are now reserved
+// as they conflict with application routes
+func TestIsReservedSlug_RouteSlugs(t *testing.T) {
+	// These slugs conflict with application routes and MUST be reserved
+	routeSlugs := []string{
+		"central",   // /central/ - Central admin dashboard
+		"landing",   // /landing/ - Marketing landing pages
+		"login",     // Common auth route
+		"logout",    // Common auth route
+		"register",  // Common auth route
+		"signup",    // Common auth route
+		"signin",    // Common auth route
+		"signout",   // Common auth route
+		"dashboard", // Common app route
+		"profile",   // Common app route
+		"account",   // Common app route
+		"settings",  // Common app route
+	}
+
+	for _, slug := range routeSlugs {
+		if !isReservedSlug(slug) {
+			t.Errorf("BUG: Route-based slug '%s' should be reserved but is not", slug)
 		}
 	}
 }

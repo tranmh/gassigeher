@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -1220,4 +1221,90 @@ func TestRateLimitAuthEndpoint_TrustedProxy(t *testing.T) {
 	if rec.Code != http.StatusTooManyRequests {
 		t.Errorf("4th request should be rate limited, got status %d", rec.Code)
 	}
+}
+
+// TestBlockTraceMethod tests that TRACE and TRACK methods are blocked
+// SECURITY: GASSI-2025-004 - TRACE/TRACK methods should return 405
+func TestBlockTraceMethod(t *testing.T) {
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	handler := BlockDangerousMethods(testHandler)
+
+	tests := []struct {
+		method     string
+		wantStatus int
+	}{
+		{"TRACE", http.StatusMethodNotAllowed},
+		{"TRACK", http.StatusMethodNotAllowed},
+		{"GET", http.StatusOK},
+		{"POST", http.StatusOK},
+		{"PUT", http.StatusOK},
+		{"DELETE", http.StatusOK},
+		{"OPTIONS", http.StatusOK},
+		{"PATCH", http.StatusOK},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.method, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, "/api/test", nil)
+			rec := httptest.NewRecorder()
+
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Errorf("%s method: expected status %d, got %d", tt.method, tt.wantStatus, rec.Code)
+			}
+
+			// TRACE/TRACK should have specific error message
+			if tt.method == "TRACE" || tt.method == "TRACK" {
+				body := rec.Body.String()
+				if !strings.Contains(body, "Method Not Allowed") && !strings.Contains(body, "not allowed") {
+					t.Errorf("%s should return 'Method Not Allowed' message, got: %s", tt.method, body)
+				}
+			}
+		})
+	}
+}
+
+// TestSecurityHeadersMiddleware_Security_StrictCSP tests that CSP doesn't contain unsafe-inline for scripts
+// SECURITY: GASSI-2025-003 - Strict CSP without 'unsafe-inline' for script-src
+func TestSecurityHeadersMiddleware_Security_StrictCSP(t *testing.T) {
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := SecurityHeadersMiddleware(testHandler)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	csp := rec.Header().Get("Content-Security-Policy")
+
+	t.Run("CSP_header_exists", func(t *testing.T) {
+		if csp == "" {
+			t.Error("Content-Security-Policy header should be set")
+		}
+	})
+
+	t.Run("script-src_does_not_contain_unsafe-inline", func(t *testing.T) {
+		// Parse the CSP to find script-src directive
+		directives := strings.Split(csp, ";")
+		for _, directive := range directives {
+			directive = strings.TrimSpace(directive)
+			if strings.HasPrefix(directive, "script-src") {
+				if strings.Contains(directive, "'unsafe-inline'") {
+					t.Errorf("SECURITY VIOLATION: script-src contains 'unsafe-inline' which weakens XSS protection. Directive: %s", directive)
+				}
+			}
+		}
+	})
+
+	t.Run("style-src_can_have_unsafe-inline", func(t *testing.T) {
+		// Note: style-src with unsafe-inline is acceptable as it's lower risk than script-src
+		// This test documents the current acceptable state
+	})
 }

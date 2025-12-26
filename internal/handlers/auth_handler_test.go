@@ -239,8 +239,17 @@ func TestAuthHandler_Register(t *testing.T) {
 		rec := httptest.NewRecorder()
 		handler.Register(rec, req)
 
-		if rec.Code != http.StatusConflict {
-			t.Errorf("Expected status 409, got %d", rec.Code)
+		// SECURITY: GASSI-2025-006 - Registration with duplicate email should return
+		// same response as successful registration to prevent user enumeration
+		if rec.Code != http.StatusCreated {
+			t.Errorf("Expected status 201 (to prevent user enumeration), got %d", rec.Code)
+		}
+
+		// Verify the response message is generic (doesn't reveal email exists)
+		var resp map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &resp)
+		if msg, ok := resp["message"].(string); !ok || msg == "" {
+			t.Error("Expected success message in response")
 		}
 	})
 }
@@ -1211,6 +1220,133 @@ func TestAuthHandler_Login_CentralAdminRedirect(t *testing.T) {
 		}
 		if redirectTo != "/dashboard.html" {
 			t.Errorf("Expected redirect_to to be '/dashboard.html', got '%s'", redirectTo)
+		}
+	})
+}
+
+// TestAuthHandler_Security_NoUserEnumeration tests that registration doesn't reveal existing emails
+// SECURITY: GASSI-2025-006 - Registration should not reveal if email exists
+func TestAuthHandler_Security_NoUserEnumeration(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewAuthHandler(db, cfg)
+
+	// Create an existing user first
+	authService := services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours)
+	hashedPw, _ := authService.HashPassword("ExistingPass123!")
+	now := testutil.Now()
+
+	_, err := db.Exec(`
+		INSERT INTO users (
+			tenant_id, first_name, last_name, email, password_hash,
+			is_admin, is_super_admin, is_central_admin,
+			is_verified, is_active, terms_accepted_at, last_activity_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, 1, "Existing", "User", "existing@user.local", hashedPw, 0, 0, 0, 1, 1, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create existing user: %v", err)
+	}
+
+	// Set up registration password
+	const testRegPassword = "TEST1234"
+	db.Exec(`INSERT OR REPLACE INTO system_settings (tenant_id, key, value) VALUES (1, 'registration_password', ?)`, testRegPassword)
+
+	t.Run("registration with existing email returns success message not error", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"first_name":            "New",
+			"last_name":             "User",
+			"email":                 "existing@user.local", // Already exists!
+			"phone":                 "+49 123 456789",
+			"password":              "NewPass123!",
+			"confirm_password":      "NewPass123!",
+			"accept_terms":          true,
+			"accept_privacy":        true,
+			"registration_password": testRegPassword,
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/auth/register", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = req.WithContext(context.WithValue(req.Context(), middleware.TenantIDKey, 1))
+
+		rec := httptest.NewRecorder()
+		handler.Register(rec, req)
+
+		// SECURITY: Should NOT return 409 Conflict revealing email exists
+		// Should return 201 with a generic message (same as successful registration)
+		if rec.Code == http.StatusConflict {
+			t.Errorf("SECURITY VIOLATION: Registration reveals existing email via 409 Conflict status")
+		}
+
+		// Should return success status (201)
+		if rec.Code != http.StatusCreated {
+			t.Errorf("Expected status 201 for security (hide email existence), got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		// Should NOT have an error message revealing email exists
+		if errMsg, exists := response["error"]; exists {
+			errStr, _ := errMsg.(string)
+			if strings.Contains(strings.ToLower(errStr), "already") ||
+				strings.Contains(strings.ToLower(errStr), "exists") ||
+				strings.Contains(strings.ToLower(errStr), "registered") {
+				t.Errorf("SECURITY VIOLATION: Error message reveals email existence: %s", errStr)
+			}
+		}
+	})
+
+	t.Run("registration response is same for new and existing emails", func(t *testing.T) {
+		// Test with NEW email
+		reqBodyNew := map[string]interface{}{
+			"first_name":            "Brand",
+			"last_name":             "New",
+			"email":                 "brandnew@user.local",
+			"phone":                 "+49 123 456780",
+			"password":              "NewPass123!",
+			"confirm_password":      "NewPass123!",
+			"accept_terms":          true,
+			"accept_privacy":        true,
+			"registration_password": testRegPassword,
+		}
+
+		bodyNew, _ := json.Marshal(reqBodyNew)
+		reqNew := httptest.NewRequest("POST", "/api/auth/register", bytes.NewReader(bodyNew))
+		reqNew.Header.Set("Content-Type", "application/json")
+		reqNew = reqNew.WithContext(context.WithValue(reqNew.Context(), middleware.TenantIDKey, 1))
+
+		recNew := httptest.NewRecorder()
+		handler.Register(recNew, reqNew)
+
+		// Test with EXISTING email
+		reqBodyExisting := map[string]interface{}{
+			"first_name":            "Another",
+			"last_name":             "User",
+			"email":                 "existing@user.local",
+			"phone":                 "+49 123 456781",
+			"password":              "NewPass123!",
+			"confirm_password":      "NewPass123!",
+			"accept_terms":          true,
+			"accept_privacy":        true,
+			"registration_password": testRegPassword,
+		}
+
+		bodyExisting, _ := json.Marshal(reqBodyExisting)
+		reqExisting := httptest.NewRequest("POST", "/api/auth/register", bytes.NewReader(bodyExisting))
+		reqExisting.Header.Set("Content-Type", "application/json")
+		reqExisting = reqExisting.WithContext(context.WithValue(reqExisting.Context(), middleware.TenantIDKey, 1))
+
+		recExisting := httptest.NewRecorder()
+		handler.Register(recExisting, reqExisting)
+
+		// SECURITY: Both should return the same status code
+		if recNew.Code != recExisting.Code {
+			t.Errorf("SECURITY VIOLATION: Different status codes reveal email existence. New: %d, Existing: %d",
+				recNew.Code, recExisting.Code)
 		}
 	})
 }

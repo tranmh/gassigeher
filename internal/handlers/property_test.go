@@ -431,12 +431,17 @@ func TestProperty_ValidSlugAccepted(t *testing.T) {
 
 		// Filter out reserved slugs (matching actual isReservedSlug list)
 		reservedSlugs := map[string]bool{
+			// Infrastructure subdomains
 			"www": true, "api": true, "admin": true, "app": true,
 			"mail": true, "email": true, "smtp": true, "ftp": true,
 			"support": true, "help": true, "billing": true, "status": true,
 			"dev": true, "staging": true, "test": true, "demo": true,
 			"blog": true, "news": true, "docs": true, "static": true,
 			"assets": true, "cdn": true, "media": true,
+			// Application routes
+			"central": true, "landing": true, "login": true, "logout": true,
+			"register": true, "signup": true, "signin": true, "signout": true,
+			"dashboard": true, "profile": true, "account": true, "settings": true,
 		}
 		if reservedSlugs[slug] {
 			t.Skip("reserved slug")
@@ -491,9 +496,13 @@ func TestProperty_SlugValidationInvariants(t *testing.T) {
 func TestProperty_ReservedSlugRejected(t *testing.T) {
 	// These are the actual reserved slugs in isReservedSlug()
 	reservedSlugs := []string{
+		// Infrastructure subdomains
 		"www", "api", "admin", "app", "mail", "email", "smtp", "ftp",
 		"support", "help", "billing", "status", "dev", "staging", "test",
 		"demo", "blog", "news", "docs", "static", "assets", "cdn", "media",
+		// Application routes (added to prevent route conflicts)
+		"central", "landing", "login", "logout", "register", "signup",
+		"signin", "signout", "dashboard", "profile", "account", "settings",
 	}
 
 	for _, slug := range reservedSlugs {
@@ -501,10 +510,6 @@ func TestProperty_ReservedSlugRejected(t *testing.T) {
 			t.Fatalf("BUG: Reserved slug %q not detected as reserved", slug)
 		}
 	}
-
-	// NOTE: These common slugs are NOT reserved but probably should be:
-	// "dashboard", "login", "register", "signup", "signin", "logout", "account", "profile"
-	// This is flagged as a potential improvement, not a bug.
 }
 
 // ============================================================================

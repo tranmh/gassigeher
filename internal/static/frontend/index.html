@@ -9,7 +9,7 @@
 <body>
     <header>
         <div class="container">
-            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+            <button class="menu-toggle" data-action="toggle-menu" aria-label="Menu">☰</button>
             <a href="/" class="logo" id="site-logo">🐕 Gassigeher</a>
 
             <!-- Public Navigation (for non-authenticated users) -->
@@ -31,12 +31,12 @@
                         <span data-i18n="nav.profile">Profil</span>
                     </a></li>
                     <li id="admin-area-link" style="display: none;"><a href="/admin-dashboard.html" class="area-switcher" data-i18n="nav.admin_area">🔧 Admin-Bereich</a></li>
-                    <li><a href="#" onclick="api.logout()" data-i18n="nav.logout">Abmelden</a></li>
+                    <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
             </nav>
         </div>
     </header>
-    <div class="nav-overlay" id="nav-overlay" onclick="toggleMenu()"></div>
+    <div class="nav-overlay" id="nav-overlay" data-action="toggle-menu"></div>
 
     <main>
         <section class="hero">
@@ -104,9 +104,11 @@
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/sanitize.js"></script>
+    <script src="/js/event-handlers.js"></script>
     <script>
-        // Custom toggle menu function for index.html (handles both public and authenticated nav)
-        function toggleMenu() {
+        // Custom toggle menu for index.html (handles both public and authenticated nav)
+        // Override the default toggleMenu from event-handlers.js
+        window.toggleMenu = function() {
             const publicNav = document.getElementById('public-nav');
             const mainNav = document.getElementById('main-nav');
             const overlay = document.getElementById('nav-overlay');
@@ -118,25 +120,7 @@
                 activeNav.classList.toggle('active');
                 overlay.classList.toggle('active');
             }
-        }
-
-        // Close menu when clicking on a link
-        document.addEventListener('click', function(e) {
-            if (e.target.tagName === 'A' && e.target.getAttribute('href') !== '#') {
-                const publicNav = document.getElementById('public-nav');
-                const mainNav = document.getElementById('main-nav');
-                const overlay = document.getElementById('nav-overlay');
-
-                if (publicNav && publicNav.classList.contains('active')) {
-                    publicNav.classList.remove('active');
-                    overlay.classList.remove('active');
-                }
-                if (mainNav && mainNav.classList.contains('active')) {
-                    mainNav.classList.remove('active');
-                    overlay.classList.remove('active');
-                }
-            }
-        });
+        };
 
         // Show admin link if user is admin (reused from nav-menu.js)
         function showAdminLinkIfAdmin(user) {
@@ -288,7 +272,7 @@
                     return `
                         <div class="card" style="text-align: center; padding: 20px;">
                             <div style="width: 150px; height: 150px; margin: 0 auto 15px; border-radius: 50%; overflow: hidden; border: 4px solid ${borderColor};">
-                                <img src="${photoUrl}" alt="${safeDogName}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='/assets/images/placeholders/dog-placeholder.svg'">
+                                <img src="${photoUrl}" alt="${safeDogName}" style="width: 100%; height: 100%; object-fit: cover;" data-fallback="/assets/images/placeholders/dog-placeholder.svg">
                             </div>
                             <h3 style="margin: 0 0 10px 0; color: var(--text-dark);">${safeDogName}</h3>
                             <p style="margin: 0 0 10px 0; color: var(--text-gray);">${safeDogBreed} · ${dog.age} ${dog.age === 1 ? 'Jahr' : 'Jahre'}</p>
