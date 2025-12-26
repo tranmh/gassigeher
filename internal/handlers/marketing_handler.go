@@ -270,10 +270,22 @@ func (h *MarketingHandler) CreateReferralCode(w http.ResponseWriter, r *http.Req
 		code.Code = generateReferralCode()
 	}
 
-	// Parse expiry date
-	if req.ExpiresAt != nil {
-		t, _ := time.Parse("2006-01-02", *req.ExpiresAt)
-		code.ExpiresAt = &t
+	// Parse expiry date - try multiple formats
+	if req.ExpiresAt != nil && *req.ExpiresAt != "" {
+		var parsedTime time.Time
+		var err error
+
+		// Try RFC3339 first (e.g., "2025-12-31T23:59:59Z")
+		parsedTime, err = time.Parse(time.RFC3339, *req.ExpiresAt)
+		if err != nil {
+			// Try date-only format (e.g., "2025-12-31")
+			parsedTime, err = time.Parse("2006-01-02", *req.ExpiresAt)
+		}
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "Ungültiges Datumsformat für expires_at (erwartet: YYYY-MM-DD oder ISO 8601)")
+			return
+		}
+		code.ExpiresAt = &parsedTime
 	}
 
 	// Check for duplicate
@@ -322,9 +334,22 @@ func (h *MarketingHandler) UpdateReferralCode(w http.ResponseWriter, r *http.Req
 	code.DiscountMonthsReferee = req.DiscountMonthsReferee
 	code.MaxUses = req.MaxUses
 
-	if req.ExpiresAt != nil {
-		t, _ := time.Parse("2006-01-02", *req.ExpiresAt)
-		code.ExpiresAt = &t
+	// Parse expiry date - try multiple formats
+	if req.ExpiresAt != nil && *req.ExpiresAt != "" {
+		var parsedTime time.Time
+		var parseErr error
+
+		// Try RFC3339 first (e.g., "2025-12-31T23:59:59Z")
+		parsedTime, parseErr = time.Parse(time.RFC3339, *req.ExpiresAt)
+		if parseErr != nil {
+			// Try date-only format (e.g., "2025-12-31")
+			parsedTime, parseErr = time.Parse("2006-01-02", *req.ExpiresAt)
+		}
+		if parseErr != nil {
+			respondError(w, http.StatusBadRequest, "Ungültiges Datumsformat für expires_at (erwartet: YYYY-MM-DD oder ISO 8601)")
+			return
+		}
+		code.ExpiresAt = &parsedTime
 	}
 
 	if err := h.marketingRepo.UpdateReferralCode(code); err != nil {
