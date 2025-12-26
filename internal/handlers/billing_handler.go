@@ -591,25 +591,26 @@ func (h *BillingHandler) TestUpgrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Default to pro if not specified
+	// Require explicit plan_slug - don't silently default to pro
 	if req.PlanSlug == "" {
-		req.PlanSlug = "pro"
+		respondError(w, http.StatusBadRequest, "Plan-Slug ist erforderlich. Erlaubt: free, pro")
+		return
 	}
 
-	// Validate plan slug
-	var planID int
-	var planName string
-	switch req.PlanSlug {
-	case "pro":
-		planID = 2
-		planName = "Pro"
-	case "free":
-		planID = 1
-		planName = "Free"
-	default:
+	// Look up plan by slug from database instead of using hardcoded IDs
+	plan, err := h.subscriptionRepo.GetPlanBySlug(req.PlanSlug)
+	if err != nil {
+		log.Printf("ERROR: Failed to look up plan '%s': %v", req.PlanSlug, err)
+		respondError(w, http.StatusInternalServerError, "Fehler beim Laden des Plans")
+		return
+	}
+	if plan == nil {
 		respondError(w, http.StatusBadRequest, "Ungültiger Plan. Erlaubt: free, pro")
 		return
 	}
+
+	planID := plan.ID
+	planName := plan.Name
 
 	// Get or create subscription
 	subscription, err := h.subscriptionRepo.GetSubscriptionByTenant(tenantID)

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tranmh/gassigeher/internal/config"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/testutil"
 )
@@ -542,6 +543,150 @@ func TestBillingHandler_GetUsage_ShowsOverLimitWarning(t *testing.T) {
 		overLimit, ok := response["over_limit"].(bool)
 		if ok && overLimit {
 			t.Error("Expected over_limit=false when dogs_used <= dogs_limit")
+		}
+	})
+}
+
+// TestBillingHandler_TestUpgrade_EmptyPlanSlug tests that empty plan_slug is rejected
+// TDD RED PHASE: This test should FAIL because the handler currently defaults empty
+// plan_slug to "pro", which is unexpected behavior
+func TestBillingHandler_TestUpgrade_EmptyPlanSlug(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+
+	// Create test config with billing test mode enabled
+	cfg := &config.Config{
+		BillingTestMode: true,
+	}
+	handler := NewBillingHandler(db, cfg, nil)
+
+	// Create a tenant and subscription
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
+		VALUES (88, 'test-upgrade-tenant', 'Test Upgrade Tenant', 'active', 'test@upgrade.com', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
+	if err != nil {
+		t.Fatalf("Failed to create tenant: %v", err)
+	}
+
+	_, err = db.Exec(`INSERT INTO tenant_subscriptions (tenant_id, plan_id, status, billing_cycle, created_at, updated_at)
+		VALUES (88, 1, 'active', 'monthly', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
+	if err != nil {
+		t.Fatalf("Failed to create subscription: %v", err)
+	}
+
+	t.Run("should reject empty plan_slug", func(t *testing.T) {
+		// Send request with empty plan_slug
+		reqBody := `{}`
+		req := httptest.NewRequest(http.MethodPost, "/api/billing/test-upgrade", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithTenantAndAdmin(req.Context(), 88, true)
+		req = req.WithContext(ctx)
+
+		w := httptest.NewRecorder()
+		handler.TestUpgrade(w, req)
+
+		// BUG: Currently this returns 200 and upgrades to Pro
+		// It SHOULD return 400 Bad Request because plan_slug is required
+		if w.Code == http.StatusOK {
+			var response map[string]interface{}
+			json.Unmarshal(w.Body.Bytes(), &response)
+			if response["plan"] == "Pro" {
+				t.Errorf("BUG DETECTED: Empty plan_slug silently upgraded to Pro. " +
+					"Should return 400 Bad Request instead. Response: %s", w.Body.String())
+			}
+		}
+
+		// The correct behavior is to reject empty plan_slug
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400 Bad Request for empty plan_slug, got %d. Response: %s",
+				w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("should accept valid plan_slug", func(t *testing.T) {
+		// Send request with valid plan_slug
+		reqBody := `{"plan_slug":"pro"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/billing/test-upgrade", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithTenantAndAdmin(req.Context(), 88, true)
+		req = req.WithContext(ctx)
+
+		w := httptest.NewRecorder()
+		handler.TestUpgrade(w, req)
+
+		// Should succeed with valid plan_slug
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200 OK for valid plan_slug 'pro', got %d. Response: %s",
+				w.Code, w.Body.String())
+		}
+	})
+}
+
+// TestBillingHandler_TestUpgrade_UsesDBPlanLookup tests that plan IDs are looked up
+// from the database by slug, not hardcoded
+// TDD RED PHASE: This test should FAIL because the handler currently uses hardcoded
+// plan IDs (1=free, 2=pro) instead of looking them up by slug
+func TestBillingHandler_TestUpgrade_UsesDBPlanLookup(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+
+	// Create test config with billing test mode enabled
+	cfg := &config.Config{
+		BillingTestMode: true,
+	}
+	handler := NewBillingHandler(db, cfg, nil)
+
+	// Create a tenant
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
+		VALUES (77, 'custom-plan-tenant', 'Custom Plan Tenant', 'active', 'custom@plan.com', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
+	if err != nil {
+		t.Fatalf("Failed to create tenant: %v", err)
+	}
+
+	// Update existing plans to have different IDs to test that handler uses DB lookup
+	// The migrations create plans with id=1 (free) and id=2 (pro)
+	// We'll update the pro plan to have id=101 to verify the handler looks it up by slug
+	_, err = db.Exec(`UPDATE pricing_plans SET id = 101 WHERE slug = 'pro'`)
+	if err != nil {
+		t.Fatalf("Failed to update pro plan ID: %v", err)
+	}
+
+	// Create subscription with the Free plan ID (1)
+	_, err = db.Exec(`INSERT INTO tenant_subscriptions (tenant_id, plan_id, status, billing_cycle, created_at, updated_at)
+		VALUES (77, 1, 'active', 'monthly', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
+	if err != nil {
+		t.Fatalf("Failed to create subscription: %v", err)
+	}
+
+	t.Run("should use DB lookup for plan ID, not hardcoded value", func(t *testing.T) {
+		// Try to upgrade to Pro - should use plan_id=101 from DB, not hardcoded 2
+		reqBody := `{"plan_slug":"pro"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/billing/test-upgrade", strings.NewReader(reqBody))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithTenantAndAdmin(req.Context(), 77, true)
+		req = req.WithContext(ctx)
+
+		w := httptest.NewRecorder()
+		handler.TestUpgrade(w, req)
+
+		// Check if the upgrade succeeded
+		if w.Code != http.StatusOK {
+			t.Fatalf("Expected 200 OK, got %d. Response: %s", w.Code, w.Body.String())
+		}
+
+		// Verify the subscription was updated to plan_id=101, not 2
+		var planID int
+		err := db.QueryRow("SELECT plan_id FROM tenant_subscriptions WHERE tenant_id = 77").Scan(&planID)
+		if err != nil {
+			t.Fatalf("Failed to query subscription: %v", err)
+		}
+
+		// BUG: The handler uses hardcoded plan_id=2 for "pro"
+		// but the Pro plan in our DB has id=101
+		if planID == 2 {
+			t.Errorf("BUG DETECTED: Handler used hardcoded plan_id=2 instead of looking up 'pro' slug from DB. "+
+				"Pro plan in DB has id=101, but subscription was updated to plan_id=%d", planID)
+		}
+
+		if planID != 101 {
+			t.Errorf("Expected subscription to be updated to plan_id=101 (Pro from DB), got plan_id=%d", planID)
 		}
 	})
 }

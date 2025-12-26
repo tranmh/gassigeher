@@ -307,7 +307,7 @@ func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) {
 			currentCount, _ := h.dogRepo.CountByTenant(tenantID)
 			respondJSON(w, http.StatusConflict, map[string]interface{}{
 				"error":         "Hundelimit erreicht",
-				"message":       "Sie haben das Maximum von 10 Hunden für das kostenlose Konto erreicht. Bitte upgraden Sie auf Pro für unbegrenzte Hunde.",
+				"message":       fmt.Sprintf("Sie haben das Maximum von %d Hunden für Ihren Plan erreicht. Bitte upgraden Sie auf Pro für unbegrenzte Hunde.", dogLimit),
 				"current_count": currentCount,
 				"limit":         dogLimit,
 			})

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -1008,5 +1009,103 @@ func TestCanUserAccessDogByColor(t *testing.T) {
 					tt.userColorIDs, tt.dogColorID, result, tt.expectedAccess)
 			}
 		})
+	}
+}
+
+// TestDogRepository_CreateWithLimitCheck_RaceCondition tests that the dog limit
+// is properly enforced even under concurrent access.
+// TDD RED PHASE: This test should expose a race condition where concurrent requests
+// can exceed the dog limit because the current implementation doesn't use proper locking.
+func TestDogRepository_CreateWithLimitCheck_RaceCondition(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewDogRepository(db)
+
+	// Create a tenant
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
+		VALUES (77, 'race-test-tenant', 'Race Test Tenant', 'active', 'race@test.com', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
+	if err != nil {
+		t.Fatalf("Failed to create tenant: %v", err)
+	}
+
+	// Set a limit of 5 dogs
+	const dogLimit = 5
+	const numGoroutines = 10 // More goroutines than the limit
+
+	// Pre-create 4 dogs (one below limit)
+	for i := 1; i <= 4; i++ {
+		_, err := db.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, is_available, created_at, updated_at)
+			VALUES (77, ?, 'Labrador', 'medium', 3, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+			"PreExisting"+string(rune('A'+i-1)))
+		if err != nil {
+			t.Fatalf("Failed to create pre-existing dog %d: %v", i, err)
+		}
+	}
+
+	// Verify we have 4 dogs
+	var count int
+	db.QueryRow("SELECT COUNT(*) FROM dogs WHERE tenant_id = 77").Scan(&count)
+	if count != 4 {
+		t.Fatalf("Expected 4 pre-existing dogs, got %d", count)
+	}
+
+	// Now launch multiple goroutines trying to create dogs concurrently
+	// Only 1 should succeed (reaching the limit of 5)
+	var wg sync.WaitGroup
+	successCount := 0
+	failCount := 0
+	var mu sync.Mutex
+
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+
+			dog := &models.Dog{
+				TenantID:    77,
+				Name:        "ConcurrentDog" + string(rune('A'+idx)),
+				Breed:       "Poodle",
+				Size:        "small",
+				Age:         2,
+				IsAvailable: true,
+			}
+
+			err := repo.CreateWithLimitCheck(dog, dogLimit)
+
+			mu.Lock()
+			if err == nil {
+				successCount++
+			} else if err == ErrDogLimitExceeded {
+				failCount++
+			} else {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			mu.Unlock()
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Count final dogs
+	var finalCount int
+	db.QueryRow("SELECT COUNT(*) FROM dogs WHERE tenant_id = 77").Scan(&finalCount)
+
+	t.Logf("Results: success=%d, fail=%d, finalDogCount=%d", successCount, failCount, finalCount)
+
+	// BUG TEST: With proper locking, exactly 1 goroutine should succeed
+	// and we should have exactly 5 dogs (4 pre-existing + 1 new)
+	// Without proper locking, multiple might succeed, creating more than 5 dogs
+	if finalCount > dogLimit {
+		t.Errorf("RACE CONDITION BUG: Dog limit exceeded! Expected max %d dogs, but got %d. "+
+			"This indicates the CreateWithLimitCheck function has a race condition.", dogLimit, finalCount)
+	}
+
+	if successCount > 1 {
+		t.Errorf("RACE CONDITION BUG: %d goroutines succeeded in creating dogs when only 1 should have. "+
+			"This indicates the CreateWithLimitCheck function has a race condition.", successCount)
+	}
+
+	// Verify the limit was properly enforced
+	if finalCount != dogLimit {
+		t.Errorf("Expected exactly %d dogs after race condition test, got %d", dogLimit, finalCount)
 	}
 }

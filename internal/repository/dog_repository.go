@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"math/rand"
@@ -430,15 +431,19 @@ var ErrDogLimitExceeded = fmt.Errorf("dog limit exceeded")
 // CreateWithLimitCheck creates a dog atomically while checking the limit
 // This prevents race conditions where multiple requests could exceed the limit
 // SaaS: Used for enforcing dog limits in the freemium model
+// FIX: Uses SERIALIZABLE isolation to prevent concurrent transactions from
+// both reading the same count and then inserting, which would exceed the limit
 func (r *DogRepository) CreateWithLimitCheck(dog *models.Dog, limit int) error {
-	// Start transaction
-	tx, err := r.db.Begin()
+	// Start transaction with SERIALIZABLE isolation to prevent race conditions
+	// This ensures that concurrent transactions cannot both read count=9 and then insert
+	ctx := context.Background()
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback() // Will be no-op after commit
 
-	// Count dogs within transaction (serialized check)
+	// Count dogs within transaction (serialized by SERIALIZABLE isolation)
 	var count int
 	err = tx.QueryRow(`SELECT COUNT(*) FROM dogs WHERE tenant_id = ?`, dog.TenantID).Scan(&count)
 	if err != nil {

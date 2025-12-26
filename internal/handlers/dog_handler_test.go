@@ -1816,3 +1816,108 @@ func TestDogHandler_CreateDog_NegativeAgeValidation(t *testing.T) {
 		}
 	})
 }
+
+// TestDogHandler_CreateDog_ErrorMessageUsesActualLimit tests that the error message
+// uses the actual dog limit from the subscription, not a hardcoded "10"
+// TDD RED PHASE: This test should FAIL because the error message currently says
+// "Maximum von 10 Hunden" regardless of the actual limit
+func TestDogHandler_CreateDog_ErrorMessageUsesActualLimit(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewDogHandler(db, cfg)
+
+	// Create a tenant with a custom dog limit of 5 (not the default 10)
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
+		VALUES (99, 'custom-limit-tenant', 'Custom Limit Tenant', 'active', 'custom@example.com', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
+	if err != nil {
+		t.Fatalf("Failed to create tenant: %v", err)
+	}
+
+	// Create a custom pricing plan with 5 dog limit
+	_, err = db.Exec(`INSERT INTO pricing_plans (id, name, slug, max_dogs, price_monthly, price_yearly, is_active, created_at)
+		VALUES (99, 'Custom Plan', 'custom', 5, 1000, 10000, 1, CURRENT_TIMESTAMP)`)
+	if err != nil {
+		t.Fatalf("Failed to create pricing plan: %v", err)
+	}
+
+	// Create subscription for tenant 99 with the custom plan (5 dog limit)
+	_, err = db.Exec(`INSERT INTO tenant_subscriptions (tenant_id, plan_id, status, billing_cycle, created_at, updated_at)
+		VALUES (99, 99, 'active', 'monthly', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
+	if err != nil {
+		t.Fatalf("Failed to create subscription: %v", err)
+	}
+
+	// Create an admin user for tenant 99
+	_, err = db.Exec(`INSERT INTO users (tenant_id, email, password_hash, first_name, last_name, is_admin, is_active, is_verified, terms_accepted_at, created_at, updated_at)
+		VALUES (99, 'admin@custom.com', 'hash', 'Admin', 'User', 1, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
+	if err != nil {
+		t.Fatalf("Failed to create user: %v", err)
+	}
+	var adminID int
+	db.QueryRow("SELECT id FROM users WHERE email = 'admin@custom.com'").Scan(&adminID)
+
+	// First, create a color_category for this tenant since the handler needs it
+	_, err = db.Exec(`INSERT INTO color_categories (id, tenant_id, name, hex_code, sort_order, created_at, updated_at)
+		VALUES (99, 99, 'Green', '#00FF00', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
+	if err != nil {
+		t.Fatalf("Failed to create color category: %v", err)
+	}
+
+	// Create 5 dogs (reaching the custom limit)
+	for i := 1; i <= 5; i++ {
+		_, err = db.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at, updated_at)
+			VALUES (99, ?, 'Labrador', 'medium', 3, 99, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+			fmt.Sprintf("Dog %d", i))
+		if err != nil {
+			t.Fatalf("Failed to create dog %d: %v", i, err)
+		}
+	}
+
+	// Try to create 6th dog - should fail with limit error
+	reqBody := `{"name":"Dog 6 - Over Limit","breed":"Poodle","size":"medium","age":3,"color_id":99}`
+	req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := contextWithTenantAndUser(req.Context(), 99, adminID)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateDog(rec, req)
+
+	// Should return 409 Conflict
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("Expected status 409 (Conflict), got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+
+	// Parse response
+	var response map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to parse response: %v", err)
+	}
+
+	// BUG TEST: The error message should say "5" (the actual limit), not "10"
+	message, ok := response["message"].(string)
+	if !ok {
+		t.Fatal("Expected 'message' field in response")
+	}
+
+	// The message should contain the actual limit "5", not hardcoded "10"
+	if strings.Contains(message, "10 Hunden") {
+		t.Errorf("BUG DETECTED: Error message contains hardcoded '10 Hunden' instead of actual limit '5 Hunden'. Message: %s", message)
+	}
+
+	if !strings.Contains(message, "5 Hunden") {
+		t.Errorf("Error message should contain '5 Hunden' for the actual limit. Message: %s", message)
+	}
+
+	// Verify the 'limit' field in response is correct
+	limit, ok := response["limit"].(float64)
+	if !ok {
+		t.Fatal("Expected 'limit' field in response")
+	}
+	if int(limit) != 5 {
+		t.Errorf("Expected limit=5 in response, got %v", limit)
+	}
+}
