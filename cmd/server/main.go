@@ -545,7 +545,11 @@ func main() {
 	centralAdmin.HandleFunc("/tenants/inactive", centralAdminHandler.GetInactiveTenants).Methods("GET")
 	centralAdmin.HandleFunc("/tenants/activity", centralAdminHandler.GetTenantActivity).Methods("GET")
 	centralAdmin.HandleFunc("/impersonate/{userId}", centralAdminHandler.ImpersonateTenantUser).Methods("POST")
-	centralAdmin.HandleFunc("/end-impersonation", centralAdminHandler.EndCentralImpersonation).Methods("POST")
+
+	// End impersonation uses special middleware that allows impersonation tokens
+	// (not just central admin) to end their own session - BUG FIX #4
+	endImpersonationHandler := middleware.AllowImpersonationEnd(http.HandlerFunc(centralAdminHandler.EndCentralImpersonation))
+	protected.Handle("/central-admin/end-impersonation", endImpersonationHandler).Methods("POST")
 	centralAdmin.HandleFunc("/tenants/{id}", centralAdminHandler.GetTenant).Methods("GET")
 	centralAdmin.HandleFunc("/tenants/{id}", centralAdminHandler.UpdateTenant).Methods("PUT")
 	centralAdmin.HandleFunc("/tenants/{id}/activate", centralAdminHandler.ActivateTenant).Methods("POST")

@@ -4,8 +4,64 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 )
+
+// parseTimestampString parses a timestamp string from the database.
+// It handles multiple formats including the legacy Go format with monotonic clock suffix.
+func parseTimestampString(s string) (time.Time, error) {
+	if s == "" {
+		return time.Time{}, fmt.Errorf("empty timestamp")
+	}
+
+	// Try RFC3339 first (most common after fix)
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t, nil
+	}
+
+	// Try RFC3339Nano
+	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
+		return t, nil
+	}
+
+	// Handle legacy format with monotonic clock suffix
+	// Format: "2025-12-24 14:30:00.123456789 +0100 CET m=+123.456"
+	if strings.Contains(s, " m=") {
+		// Remove the monotonic clock suffix
+		parts := strings.Split(s, " m=")
+		cleaned := parts[0]
+
+		// Try parsing the cleaned string
+		layouts := []string{
+			"2006-01-02 15:04:05.999999999 -0700 MST",
+			"2006-01-02 15:04:05.999999999 -0700",
+			"2006-01-02 15:04:05 -0700 MST",
+			"2006-01-02 15:04:05 -0700",
+		}
+
+		for _, layout := range layouts {
+			if t, err := time.Parse(layout, cleaned); err == nil {
+				return t, nil
+			}
+		}
+	}
+
+	// Try some other common formats
+	additionalLayouts := []string{
+		"2006-01-02T15:04:05",
+		"2006-01-02 15:04:05",
+		"2006-01-02",
+	}
+
+	for _, layout := range additionalLayouts {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("unable to parse timestamp: %s", s)
+}
 
 // TenantActivityChecker handles checking tenant activity and flagging inactive tenants
 type TenantActivityChecker struct {
@@ -146,18 +202,32 @@ func (c *TenantActivityChecker) GetInactiveTenants() ([]TenantActivity, error) {
 
 	for rows.Next() {
 		var activity TenantActivity
-		var lastBooking, lastLogin *time.Time
+		// Scan timestamps as strings to handle legacy format with monotonic clock suffix
+		var lastBookingStr, lastLoginStr *string
 
 		if err := rows.Scan(
 			&activity.TenantID,
 			&activity.TenantSlug,
 			&activity.TenantName,
-			&lastBooking,
-			&lastLogin,
+			&lastBookingStr,
+			&lastLoginStr,
 			&activity.TotalBookings,
 			&activity.ActiveUsers,
 		); err != nil {
 			return nil, err
+		}
+
+		// Parse timestamps using helper that handles legacy format
+		var lastBooking, lastLogin *time.Time
+		if lastBookingStr != nil {
+			if t, err := parseTimestampString(*lastBookingStr); err == nil {
+				lastBooking = &t
+			}
+		}
+		if lastLoginStr != nil {
+			if t, err := parseTimestampString(*lastLoginStr); err == nil {
+				lastLogin = &t
+			}
 		}
 
 		activity.LastBookingDate = lastBooking
@@ -221,18 +291,32 @@ func (c *TenantActivityChecker) GetAllTenantActivity() ([]TenantActivity, error)
 
 	for rows.Next() {
 		var activity TenantActivity
-		var lastBooking, lastLogin *time.Time
+		// Scan timestamps as strings to handle legacy format with monotonic clock suffix
+		var lastBookingStr, lastLoginStr *string
 
 		if err := rows.Scan(
 			&activity.TenantID,
 			&activity.TenantSlug,
 			&activity.TenantName,
-			&lastBooking,
-			&lastLogin,
+			&lastBookingStr,
+			&lastLoginStr,
 			&activity.TotalBookings,
 			&activity.ActiveUsers,
 		); err != nil {
 			return nil, err
+		}
+
+		// Parse timestamps using helper that handles legacy format
+		var lastBooking, lastLogin *time.Time
+		if lastBookingStr != nil {
+			if t, err := parseTimestampString(*lastBookingStr); err == nil {
+				lastBooking = &t
+			}
+		}
+		if lastLoginStr != nil {
+			if t, err := parseTimestampString(*lastLoginStr); err == nil {
+				lastLogin = &t
+			}
 		}
 
 		activity.LastBookingDate = lastBooking

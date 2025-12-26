@@ -274,6 +274,37 @@ func RequireCentralAdmin(next http.Handler) http.Handler {
 	})
 }
 
+// AllowImpersonationEnd is a middleware that allows impersonation tokens to access
+// the end-impersonation endpoint. It checks if either:
+// 1. The user is a central admin, OR
+// 2. The request is from an impersonation session (has IsImpersonatingKey = true)
+// This solves the problem where impersonation tokens couldn't end their own session
+// because they don't have central admin privileges.
+func AllowImpersonationEnd(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check if user is central admin - always allowed
+		isCentralAdmin, _ := r.Context().Value(IsCentralAdminKey).(bool)
+		if isCentralAdmin {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Check if this is an impersonation session - allowed to end own session
+		isImpersonating, _ := r.Context().Value(IsImpersonatingKey).(bool)
+		if isImpersonating {
+			// Verify there's an original user ID (extra safety check)
+			originalUserID, ok := r.Context().Value(OriginalUserIDKey).(int)
+			if ok && originalUserID > 0 {
+				next.ServeHTTP(w, r)
+				return
+			}
+		}
+
+		// Neither central admin nor impersonating - deny access
+		http.Error(w, `{"error":"Access denied - requires central admin or active impersonation session"}`, http.StatusForbidden)
+	})
+}
+
 // SecurityHeadersMiddleware adds security headers
 func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
