@@ -24,7 +24,7 @@ const CENTRAL_ADMIN_URL = `http://${BASE_DOMAIN}:8080`;
 // Set via environment variables: CENTRAL_ADMIN_EMAIL and CENTRAL_ADMIN_PASSWORD
 const centralAdmin = {
   email: process.env.CENTRAL_ADMIN_EMAIL || 'admin@localhost',
-  password: process.env.CENTRAL_ADMIN_PASSWORD || 'admin123',
+  password: process.env.CENTRAL_ADMIN_PASSWORD || 'E404q%C#QnSNIMbaq!JY',
 };
 
 // Store tokens

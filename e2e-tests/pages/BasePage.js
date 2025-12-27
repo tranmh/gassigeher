@@ -1,19 +1,47 @@
+const { getConfigFromTestInfo, getTestConfig } = require('../fixtures/test-config');
+
 /**
  * Base Page Object
  * Contains common methods used across all pages
+ * Mode-aware: Uses baseURL from test configuration
  */
 class BasePage {
-  constructor(page) {
+  constructor(page, testInfo = null) {
     this.page = page;
-    this.baseURL = 'http://localhost:8080';
+    this.testInfo = testInfo;
+
+    // Get baseURL from test config or fall back to page's baseURL
+    if (testInfo) {
+      const config = getConfigFromTestInfo(testInfo);
+      this.baseURL = config.baseURL;
+      this.paths = config.paths;
+    } else {
+      // Fallback: try to get from page context or use default
+      this.baseURL = page.context()?.constructor?.name === 'BrowserContext'
+        ? 'http://localhost:8080'
+        : 'http://localhost:8080';
+      this.paths = getTestConfig().paths;
+    }
   }
 
   /**
    * Navigate to a path
    */
   async goto(path) {
-    await this.page.goto(`${this.baseURL}${path}`);
+    // Use page.goto with relative path when baseURL is set via config
+    await this.page.goto(path);
     await this.page.waitForLoadState('networkidle');
+  }
+
+  /**
+   * Navigate to a named path (e.g., 'login', 'dashboard')
+   */
+  async gotoPath(pathName) {
+    const path = this.paths[pathName];
+    if (!path) {
+      throw new Error(`Unknown path: ${pathName}`);
+    }
+    await this.goto(path);
   }
 
   /**
@@ -25,7 +53,7 @@ class BasePage {
 
   /**
    * Get alert message text
-   * @param {string} type - alert type (success, danger, warning, info)
+   * @param {string} type - alert type (success, error, warning, info)
    */
   async getAlertText(type = 'success') {
     const selector = `.alert-${type}`;
@@ -136,5 +164,3 @@ class BasePage {
 }
 
 module.exports = BasePage;
-
-// DONE: Base page object with common methods

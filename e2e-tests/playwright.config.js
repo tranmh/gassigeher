@@ -12,7 +12,7 @@ module.exports = defineConfig({
   fullyParallel: false,  // Run sequentially for easier debugging
   workers: 1,            // One worker = sequential execution
   retries: 0,            // No retries locally (fast feedback)
-  timeout: 30 * 1000,    // 30s per test
+  timeout: 90 * 1000,    // 90s per test (allows for rate limit waits)
 
   // Reporting
   reporter: [
@@ -25,8 +25,8 @@ module.exports = defineConfig({
     // Base URL for all tests
     baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:8080',
 
-    // Browser options
-    headless: process.env.CI ? true : false,  // See browser during local dev
+    // Browser options - always headless for stability
+    headless: true,
     viewport: { width: 1920, height: 1080 },
 
     // Screenshots and videos
@@ -42,25 +42,74 @@ module.exports = defineConfig({
     ignoreHTTPSErrors: true,
   },
 
-  // Test projects (browsers/devices)
+  // Test projects - All tests run against demo tenant in SaaS-Mode
+  // Server runs in SaaS mode with demo tenant at demo.gassigeher.local:8080
   projects: [
+    // Auth setup - runs first to create authenticated sessions
     {
-      name: 'chromium-desktop',
+      name: 'auth-setup',
+      testDir: '.', // Look in root, not tests/
+      testMatch: /auth\.setup\.js/,
+      // Longer timeout for auth setup due to potential rate limit waits
+      timeout: 240 * 1000, // 4 minutes per test (allows for rate limit retries)
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: process.env.SAAS_MODE_URL || 'http://demo.gassigeher.local:8080',
+      },
+    },
+    // Desktop Chrome - primary testing (uses admin auth)
+    {
+      name: 'simple-chromium',
+      dependencies: ['auth-setup'],
+      // Exclude marketing tests - they have their own config (playwright.marketing.config.js)
+      testIgnore: '**/11-marketing.spec.js',
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1920, height: 1080 },
+        baseURL: process.env.SAAS_MODE_URL || 'http://demo.gassigeher.local:8080',
+        // Use pre-authenticated admin session (saas mode)
+        storageState: './playwright/.auth/admin-saas.json',
       },
     },
+    // SaaS-Mode: Same as simple-chromium but explicit
     {
-      name: 'mobile-iphone',
+      name: 'saas-chromium',
+      dependencies: ['auth-setup'],
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1920, height: 1080 },
+        baseURL: process.env.SAAS_MODE_URL || 'http://demo.gassigeher.local:8080',
+        // Use pre-authenticated admin session
+        storageState: './playwright/.auth/admin-saas.json',
+      },
+    },
+    // Mobile projects (also use demo tenant, with admin auth)
+    {
+      name: 'simple-mobile-iphone',
+      dependencies: ['auth-setup'],
       use: {
         ...devices['iPhone 13'],
+        baseURL: process.env.SAAS_MODE_URL || 'http://demo.gassigeher.local:8080',
+        storageState: './playwright/.auth/admin-saas.json',
       },
     },
     {
-      name: 'mobile-android',
+      name: 'simple-mobile-android',
+      dependencies: ['auth-setup'],
       use: {
         ...devices['Pixel 5'],
+        baseURL: process.env.SAAS_MODE_URL || 'http://demo.gassigeher.local:8080',
+        storageState: './playwright/.auth/admin-saas.json',
+      },
+    },
+    // Billing tests - no auth-setup dependency, uses API authentication
+    {
+      name: 'billing-tests',
+      testMatch: /10-saas-billing\.spec\.js/,
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: 'http://gassigeher.local:8080',
+        // No storageState - billing tests manage their own auth
       },
     },
   ],

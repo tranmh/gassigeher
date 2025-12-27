@@ -95,6 +95,24 @@
     };
 
     /**
+     * Register change event handlers
+     * These are triggered when elements with data-action-change attribute change
+     * @param {Object} handlers - Map of action names to handler functions
+     */
+    window.registerChangeActions = function(handlers) {
+        Object.assign(actionHandlers, handlers);
+    };
+
+    /**
+     * Register submit event handlers
+     * These are triggered when forms with data-action-submit attribute are submitted
+     * @param {Object} handlers - Map of action names to handler functions
+     */
+    window.registerSubmitActions = function(handlers) {
+        Object.assign(actionHandlers, handlers);
+    };
+
+    /**
      * Main click event delegation handler
      */
     function handleDelegatedClick(e) {

@@ -66,6 +66,17 @@ class API {
             }
 
             if (!response.ok) {
+                // Handle 401 Unauthorized - clear token and redirect to login
+                // BUG FIX: Invalid/expired tokens should redirect to login
+                if (response.status === 401) {
+                    this.setToken(null);
+                    // Only redirect if we're not already on the login page
+                    if (!window.location.pathname.includes('login.html')) {
+                        window.location.href = '/login.html';
+                        return; // Stop execution
+                    }
+                }
+
                 // Create error with response data attached
                 const error = new Error((responseData && responseData.error) || 'Request failed');
                 error.status = response.status;
@@ -109,6 +120,14 @@ class API {
             }
 
             if (!response.ok) {
+                // Handle 401 Unauthorized - clear token and redirect to login
+                if (response.status === 401) {
+                    this.setToken(null);
+                    if (!window.location.pathname.includes('login.html')) {
+                        window.location.href = '/login.html';
+                        return;
+                    }
+                }
                 throw new Error((responseData && responseData.error) || 'Upload failed');
             }
 

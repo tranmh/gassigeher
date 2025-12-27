@@ -2,25 +2,26 @@ const BasePage = require('./BasePage');
 
 /**
  * Dashboard Page Object
+ * Mode-aware: Uses baseURL from test configuration
  */
 class DashboardPage extends BasePage {
-  constructor(page) {
-    super(page);
+  constructor(page, testInfo = null) {
+    super(page, testInfo);
 
     // Selectors
-    this.welcomeMessage = 'h1, h2';  // Could be either
-    this.upcomingBookings = '.booking-card';
-    this.noBookingsMessage = '.no-bookings';
-    this.cancelButton = 'button.cancel-booking, button:has-text("Stornieren")';
-    this.addNotesButton = 'button.add-notes, button:has-text("Notiz")';
-    this.bookingStatus = '.booking-status';
+    this.welcomeMessage = 'h1, h2';
+    this.upcomingBookingsContainer = '#upcoming-bookings';
+    this.upcomingBookings = '#upcoming-bookings .card';  // Bookings are rendered as .card elements
+    this.noBookingsMessage = '#upcoming-bookings p[data-i18n="dashboard.no_upcoming_walks"]';
+    this.cancelButton = 'button[data-action="cancel-booking"], button:has-text("Stornieren")';
+    this.addNotesButton = 'button[data-action="open-walk-report-modal"], button:has-text("Bericht")';
+    this.bookingStatus = '[data-status]';
 
     // Navigation
     this.dogsLink = 'a[href="/dogs.html"]';
     this.profileLink = 'a[href="/profile.html"]';
     this.calendarLink = 'a[href="/calendar.html"]';
     this.logoutLink = 'a:has-text("Abmelden")';
-    this.logoutButton = 'a[onclick*="logout"]';  // Logout uses onclick
   }
 
   /**
@@ -50,7 +51,9 @@ class DashboardPage extends BasePage {
    * Get welcome message text
    */
   async getWelcomeMessage() {
-    return await this.page.locator(this.welcomeMessage).first().textContent();
+    await this.page.waitForLoadState('networkidle');
+    const heading = this.page.locator(this.welcomeMessage).first();
+    return await heading.textContent().catch(() => '');
   }
 
   /**
@@ -63,10 +66,12 @@ class DashboardPage extends BasePage {
     await card.locator(this.cancelButton).click();
 
     // Fill cancellation reason in modal
-    await this.page.waitForSelector('#cancellation-reason', { timeout: 2000 });
-    await this.page.fill('#cancellation-reason', reason);
-    await this.page.click('button:has-text("Bestätigen"), button:has-text("Stornieren")');
+    const reasonInput = this.page.locator('#cancellation-reason, #cancel-reason, textarea');
+    if (await reasonInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await reasonInput.fill(reason);
+    }
 
+    await this.page.click('button:has-text("Bestätigen"), button:has-text("Stornieren")');
     await this.waitForNavigation();
   }
 
@@ -80,8 +85,8 @@ class DashboardPage extends BasePage {
     await card.locator(this.addNotesButton).click();
 
     // Fill notes modal
-    await this.page.waitForSelector('#booking-notes', { timeout: 2000 });
-    await this.page.fill('#booking-notes', notes);
+    await this.page.waitForSelector('#booking-notes, #notes, textarea', { timeout: 2000 });
+    await this.page.fill('#booking-notes, #notes, textarea', notes);
     await this.page.click('button:has-text("Speichern")');
 
     await this.waitForNavigation();
@@ -117,11 +122,9 @@ class DashboardPage extends BasePage {
   async logout() {
     // Logout uses onclick="api.logout()" which redirects to '/' (homepage)
     await this.page.click(this.logoutLink);
-    // Wait for redirect to root or login
+    // Wait for redirect to complete
     await this.page.waitForLoadState('networkidle', { timeout: 15000 });
   }
 }
 
 module.exports = DashboardPage;
-
-// DONE: Dashboard page object with booking management

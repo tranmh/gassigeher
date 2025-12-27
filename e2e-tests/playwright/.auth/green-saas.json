@@ -1,0 +1,14 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://demo.gassigeher.local:8080",
+      "localStorage": [
+        {
+          "name": "gassigeher_token",
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImFubmFAZGVtby5nYXNzaWdlaGVyLm9yZyIsImV4cCI6MTc2Njg3MjkwNCwiaXNfYWRtaW4iOmZhbHNlLCJpc19jZW50cmFsX2FkbWluIjpmYWxzZSwiaXNfc3VwZXJfYWRtaW4iOmZhbHNlLCJ0ZW5hbnRfaWQiOjEsInVzZXJfaWQiOjN9.nyhnSJSlHqc987F5HP15hV2yB0BV7txdRODbkmZQmWw"
+        }
+      ]
+    }
+  ]
+}

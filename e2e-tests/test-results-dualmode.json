@@ -1,0 +1,1502 @@
+{
+  "config": {
+    "configFile": "/home/tranmh/work/gassigeher-saas/e2e-tests/playwright.dualmode.config.js",
+    "rootDir": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "html",
+        {
+          "outputFolder": "playwright-report-dualmode"
+        }
+      ],
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results-dualmode.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "saas-chromium",
+        "name": "saas-chromium",
+        "testDir": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "/0[1-5]-.*\\.spec\\.js$/"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "saas-mobile",
+        "name": "saas-mobile",
+        "testDir": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "/0[1-5]-.*\\.spec\\.js$/"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "simple-chromium",
+        "name": "simple-chromium",
+        "testDir": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "/0[1-5]-.*\\.spec\\.js$/"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "simple-mobile",
+        "name": "simple-mobile",
+        "testDir": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "/0[1-5]-.*\\.spec\\.js$/"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "saas-only-chromium",
+        "name": "saas-only-chromium",
+        "testDir": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "/1[0-9]-.*\\.spec\\.js$/"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.57.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "03-user-profile.spec.js",
+      "file": "03-user-profile.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Profile - View Profile",
+          "file": "03-user-profile.spec.js",
+          "line": 13,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should access profile page from dashboard",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "location": {
+                        "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js",
+                        "line": 17,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "saas-chromium",
+                  "projectName": "saas-chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T16:43:04.927Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "location": {
+                            "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js",
+                            "line": 17,
+                            "column": 8
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "47f896e00e110b85ddab-2b38343fb4bd1117114a",
+              "file": "03-user-profile.spec.js",
+              "line": 26,
+              "column": 3
+            },
+            {
+              "title": "should display user information",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "location": {
+                        "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js",
+                        "line": 17,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "saas-chromium",
+                  "projectName": "saas-chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T16:43:04.929Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "location": {
+                            "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js",
+                            "line": 17,
+                            "column": 8
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "47f896e00e110b85ddab-e9706c13589adb65d155",
+              "file": "03-user-profile.spec.js",
+              "line": 33,
+              "column": 3
+            },
+            {
+              "title": "should show experience level",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "location": {
+                        "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js",
+                        "line": 17,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "saas-chromium",
+                  "projectName": "saas-chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T16:43:04.930Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "location": {
+                            "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js",
+                            "line": 17,
+                            "column": 8
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "47f896e00e110b85ddab-11941d81347c32fda409",
+              "file": "03-user-profile.spec.js",
+              "line": 51,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Profile - Update Information",
+          "file": "03-user-profile.spec.js",
+          "line": 70,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should update name successfully",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "saas-chromium",
+                  "projectName": "saas-chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 18113,
+                      "error": {
+                        "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================",
+                        "stack": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:75:5",
+                        "location": {
+                          "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                          "column": 21,
+                          "line": 43
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39m../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                            "column": 21,
+                            "line": 43
+                          },
+                          "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n\n   at ../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:75:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T16:43:04.931Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----f7d43-ld-update-name-successfully-saas-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----f7d43-ld-update-name-successfully-saas-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----f7d43-ld-update-name-successfully-saas-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----f7d43-ld-update-name-successfully-saas-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                        "column": 21,
+                        "line": 43
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "47f896e00e110b85ddab-5fb2280ca2a36bef8e81",
+              "file": "03-user-profile.spec.js",
+              "line": 78,
+              "column": 3
+            },
+            {
+              "title": "should update phone number successfully",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "saas-chromium",
+                  "projectName": "saas-chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 18103,
+                      "error": {
+                        "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================",
+                        "stack": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:75:5",
+                        "location": {
+                          "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                          "column": 21,
+                          "line": 43
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39m../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                            "column": 21,
+                            "line": 43
+                          },
+                          "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n\n   at ../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:75:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T16:43:25.565Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----01f8f-e-phone-number-successfully-saas-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----01f8f-e-phone-number-successfully-saas-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----01f8f-e-phone-number-successfully-saas-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----01f8f-e-phone-number-successfully-saas-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                        "column": 21,
+                        "line": 43
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "47f896e00e110b85ddab-f9f6cf758e902fe017e2",
+              "file": "03-user-profile.spec.js",
+              "line": 113,
+              "column": 3
+            },
+            {
+              "title": "should require re-verification when changing email",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "saas-chromium",
+                  "projectName": "saas-chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 18083,
+                      "error": {
+                        "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================",
+                        "stack": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:75:5",
+                        "location": {
+                          "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                          "column": 21,
+                          "line": 43
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39m../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                            "column": 21,
+                            "line": 43
+                          },
+                          "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n\n   at ../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:75:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T16:43:45.772Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----5b010-ication-when-changing-email-saas-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----5b010-ication-when-changing-email-saas-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----5b010-ication-when-changing-email-saas-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----5b010-ication-when-changing-email-saas-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                        "column": 21,
+                        "line": 43
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "47f896e00e110b85ddab-707b60ef13e0bad6d490",
+              "file": "03-user-profile.spec.js",
+              "line": 132,
+              "column": 3
+            },
+            {
+              "title": "should reject invalid email format",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "saas-chromium",
+                  "projectName": "saas-chromium",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 18176,
+                      "error": {
+                        "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================",
+                        "stack": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:75:5",
+                        "location": {
+                          "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                          "column": 21,
+                          "line": 43
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39m../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                            "column": 21,
+                            "line": 43
+                          },
+                          "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n\n   at ../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:75:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T16:44:06.045Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----a4320-reject-invalid-email-format-saas-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----a4320-reject-invalid-email-format-saas-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----a4320-reject-invalid-email-format-saas-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----a4320-reject-invalid-email-format-saas-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                        "column": 21,
+                        "line": 43
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "47f896e00e110b85ddab-effdbc6a474c498061db",
+              "file": "03-user-profile.spec.js",
+              "line": 158,
+              "column": 3
+            },
+            {
+              "title": "should reject empty name",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "saas-chromium",
+                  "projectName": "saas-chromium",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 18123,
+                      "error": {
+                        "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================",
+                        "stack": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:75:5",
+                        "location": {
+                          "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                          "column": 21,
+                          "line": 43
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39m../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                            "column": 21,
+                            "line": 43
+                          },
+                          "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n\n   at ../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:75:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T16:44:26.389Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----55843-on-should-reject-empty-name-saas-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----55843-on-should-reject-empty-name-saas-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----55843-on-should-reject-empty-name-saas-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----55843-on-should-reject-empty-name-saas-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                        "column": 21,
+                        "line": 43
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "47f896e00e110b85ddab-3503972c9bbfc6ba1987",
+              "file": "03-user-profile.spec.js",
+              "line": 174,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Profile - Photo Upload",
+          "file": "03-user-profile.spec.js",
+          "line": 192,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should show photo upload form",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "saas-chromium",
+                  "projectName": "saas-chromium",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 18113,
+                      "error": {
+                        "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================",
+                        "stack": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:197:5",
+                        "location": {
+                          "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                          "column": 21,
+                          "line": 43
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39m../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                            "column": 21,
+                            "line": 43
+                          },
+                          "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n\n   at ../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:197:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T16:44:46.633Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----2b63f-ould-show-photo-upload-form-saas-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----2b63f-ould-show-photo-upload-form-saas-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----2b63f-ould-show-photo-upload-form-saas-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----2b63f-ould-show-photo-upload-form-saas-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                        "column": 21,
+                        "line": 43
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "47f896e00e110b85ddab-f2c01efe89abb134f3c8",
+              "file": "03-user-profile.spec.js",
+              "line": 200,
+              "column": 3
+            },
+            {
+              "title": "should upload profile photo (JPEG)",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "saas-chromium",
+                  "projectName": "saas-chromium",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 18083,
+                      "error": {
+                        "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================",
+                        "stack": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:197:5",
+                        "location": {
+                          "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                          "column": 21,
+                          "line": 43
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39m../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                            "column": 21,
+                            "line": 43
+                          },
+                          "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n\n   at ../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:197:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T16:45:06.861Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----e70ef--upload-profile-photo-JPEG--saas-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----e70ef--upload-profile-photo-JPEG--saas-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----e70ef--upload-profile-photo-JPEG--saas-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----e70ef--upload-profile-photo-JPEG--saas-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                        "column": 21,
+                        "line": 43
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "47f896e00e110b85ddab-645381ef991e3c17c840",
+              "file": "03-user-profile.spec.js",
+              "line": 211,
+              "column": 3
+            },
+            {
+              "title": "should reject file that is too large",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "saas-chromium",
+                  "projectName": "saas-chromium",
+                  "results": [
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 18111,
+                      "error": {
+                        "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================",
+                        "stack": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:197:5",
+                        "location": {
+                          "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                          "column": 21,
+                          "line": 43
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39m../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                            "column": 21,
+                            "line": 43
+                          },
+                          "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n\n   at ../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:197:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T16:45:27.092Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----2f3c9-ject-file-that-is-too-large-saas-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----2f3c9-ject-file-that-is-too-large-saas-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----2f3c9-ject-file-that-is-too-large-saas-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----2f3c9-ject-file-that-is-too-large-saas-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                        "column": 21,
+                        "line": 43
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "47f896e00e110b85ddab-6bd062b85e8650b4fd9f",
+              "file": "03-user-profile.spec.js",
+              "line": 231,
+              "column": 3
+            },
+            {
+              "title": "should reject invalid file types (PDF, EXE)",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "saas-chromium",
+                  "projectName": "saas-chromium",
+                  "results": [
+                    {
+                      "workerIndex": 8,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 18132,
+                      "error": {
+                        "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================",
+                        "stack": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:197:5",
+                        "location": {
+                          "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                          "column": 21,
+                          "line": 43
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39m../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                            "column": 21,
+                            "line": 43
+                          },
+                          "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n\n   at ../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:197:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T16:45:47.398Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----f1927-invalid-file-types-PDF-EXE--saas-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----f1927-invalid-file-types-PDF-EXE--saas-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----f1927-invalid-file-types-PDF-EXE--saas-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----f1927-invalid-file-types-PDF-EXE--saas-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                        "column": 21,
+                        "line": 43
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "47f896e00e110b85ddab-450ab5ace90d3de7f079",
+              "file": "03-user-profile.spec.js",
+              "line": 239,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Profile - Password Change",
+          "file": "03-user-profile.spec.js",
+          "line": 249,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should show change password form",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "saas-chromium",
+                  "projectName": "saas-chromium",
+                  "results": [
+                    {
+                      "workerIndex": 9,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 18173,
+                      "error": {
+                        "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================",
+                        "stack": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:254:5",
+                        "location": {
+                          "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                          "column": 21,
+                          "line": 43
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39m../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                            "column": 21,
+                            "line": 43
+                          },
+                          "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n\n   at ../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:254:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T16:46:07.832Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----864e4-d-show-change-password-form-saas-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----864e4-d-show-change-password-form-saas-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----864e4-d-show-change-password-form-saas-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----864e4-d-show-change-password-form-saas-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                        "column": 21,
+                        "line": 43
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "47f896e00e110b85ddab-80d438d0682f6905d780",
+              "file": "03-user-profile.spec.js",
+              "line": 257,
+              "column": 3
+            },
+            {
+              "title": "should change password successfully",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "saas-chromium",
+                  "projectName": "saas-chromium",
+                  "results": [
+                    {
+                      "workerIndex": 10,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 18134,
+                      "error": {
+                        "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================",
+                        "stack": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:254:5",
+                        "location": {
+                          "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                          "column": 21,
+                          "line": 43
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39m../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                            "column": 21,
+                            "line": 43
+                          },
+                          "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n\n   at ../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:254:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T16:46:28.206Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----f8ace-hange-password-successfully-saas-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----f8ace-hange-password-successfully-saas-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----f8ace-hange-password-successfully-saas-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----f8ace-hange-password-successfully-saas-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                        "column": 21,
+                        "line": 43
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "47f896e00e110b85ddab-35eaa8f5da24b08f173e",
+              "file": "03-user-profile.spec.js",
+              "line": 269,
+              "column": 3
+            },
+            {
+              "title": "should reject password change with wrong current password",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "saas-chromium",
+                  "projectName": "saas-chromium",
+                  "results": [
+                    {
+                      "workerIndex": 11,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 18261,
+                      "error": {
+                        "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================",
+                        "stack": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:254:5",
+                        "location": {
+                          "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                          "column": 21,
+                          "line": 43
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39m../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                            "column": 21,
+                            "line": 43
+                          },
+                          "message": "TimeoutError: page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/dashboard.html\" until \"load\"\n============================================================\n\n   at ../pages/LoginPage.js:43\n\n  41 |     await this.login(email, password);\n  42 |     // Login has 1-second delay before redirect, so wait longer\n> 43 |     await this.page.waitForURL('**/dashboard.html', { timeout: 15000 });\n     |                     ^\n  44 |   }\n  45 |\n  46 |   /**\n    at LoginPage.loginAndWait (/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js:43:21)\n    at /home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js:254:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T16:46:48.520Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----8070b-with-wrong-current-password-saas-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----8070b-with-wrong-current-password-saas-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----8070b-with-wrong-current-password-saas-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/home/tranmh/work/gassigeher-saas/e2e-tests/test-results/03-user-profile-Profile----8070b-with-wrong-current-password-saas-chromium/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/pages/LoginPage.js",
+                        "column": 21,
+                        "line": 43
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "47f896e00e110b85ddab-09354be2c56c8fa4462d",
+              "file": "03-user-profile.spec.js",
+              "line": 323,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Profile - GDPR Account Deletion",
+          "file": "03-user-profile.spec.js",
+          "line": 348,
+          "column": 6,
+          "specs": [
+            {
+              "title": "should show account deletion option",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "location": {
+                        "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js",
+                        "line": 351,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "saas-chromium",
+                  "projectName": "saas-chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T16:47:07.280Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "location": {
+                            "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js",
+                            "line": 351,
+                            "column": 8
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "47f896e00e110b85ddab-3f1ac543e3e1fcb8e955",
+              "file": "03-user-profile.spec.js",
+              "line": 353,
+              "column": 3
+            },
+            {
+              "title": "should show confirmation modal before deletion",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "location": {
+                        "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js",
+                        "line": 351,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "saas-chromium",
+                  "projectName": "saas-chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T16:47:07.280Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "location": {
+                            "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js",
+                            "line": 351,
+                            "column": 8
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "47f896e00e110b85ddab-5d7ec5a777cd553a057a",
+              "file": "03-user-profile.spec.js",
+              "line": 373,
+              "column": 3
+            },
+            {
+              "title": "should delete account and anonymize data (GDPR)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "location": {
+                        "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js",
+                        "line": 351,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "saas-chromium",
+                  "projectName": "saas-chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T16:47:07.281Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "location": {
+                            "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js",
+                            "line": 351,
+                            "column": 8
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "47f896e00e110b85ddab-8dc6d337e1333de28448",
+              "file": "03-user-profile.spec.js",
+              "line": 401,
+              "column": 3
+            },
+            {
+              "title": "should not allow login after account deletion",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "location": {
+                        "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js",
+                        "line": 351,
+                        "column": 8
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "saas-chromium",
+                  "projectName": "saas-chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T16:47:07.281Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "location": {
+                            "file": "/home/tranmh/work/gassigeher-saas/e2e-tests/tests/03-user-profile.spec.js",
+                            "line": 351,
+                            "column": 8
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "47f896e00e110b85ddab-a1d03c9ce5df6f767898",
+              "file": "03-user-profile.spec.js",
+              "line": 484,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2025-12-26T16:43:03.096Z",
+    "duration": 244209.674,
+    "expected": 0,
+    "skipped": 7,
+    "unexpected": 12,
+    "flaky": 0
+  }
+}

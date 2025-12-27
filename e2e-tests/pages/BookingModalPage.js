@@ -9,15 +9,14 @@ class BookingModalPage extends BasePage {
     super(page);
 
     // Modal selectors
-    this.modal = '#booking-modal, [role="dialog"]';
-    this.modalTitle = '.modal-title, h2, h3';
-    this.closeButton = '.modal-close, button:has-text("Schließen"), .close';
+    this.modal = '#booking-modal';
+    this.modalTitle = '#modal-title';  // The booking modal title element
+    this.closeButton = '.modal-close, button[data-action="close-booking-modal"], button:has-text("Abbrechen")';
 
-    // Form fields
-    this.dateInput = '#booking-date, input[type="date"]';
-    this.walkTypeSelect = '#booking-walk-type, #walk-type, select[name="walk_type"]';
-    this.timeSelect = '#booking-time, #time, select[name="time"]';
-    this.submitButton = '#booking-form button[type="submit"], button:has-text("Buchen"), button:has-text("Bestätigen")';
+    // Form fields (booking form only has date and time, no walk type)
+    this.dateInput = '#booking-date';
+    this.timeSelect = '#booking-time';
+    this.submitButton = '#booking-form button[type="submit"]';
 
     // Validation
     this.errorMessage = '.error, .alert-error, .form-error';
@@ -49,31 +48,34 @@ class BookingModalPage extends BasePage {
 
   /**
    * Fill booking form
+   * Note: Booking form only has date and time fields (no walk type)
+   * @param {Object} options - { date, time }
    */
-  async fillBookingForm({ date, walkType, time }) {
+  async fillBookingForm({ date, time }) {
     await this.waitForModal();
 
     if (date) {
-      const dateField = this.page.locator(this.dateInput).first();
+      const dateField = this.page.locator(this.dateInput);
       await dateField.fill(date);
-    }
-
-    if (walkType) {
-      const walkTypeField = this.page.locator(this.walkTypeSelect).first();
-      await walkTypeField.selectOption(walkType);
+      // Trigger change event to load time slots
+      await this.page.waitForTimeout(500);
     }
 
     if (time) {
-      const timeField = this.page.locator(this.timeSelect).first();
+      // Wait for time options to load (populated dynamically based on date)
+      await this.page.waitForTimeout(1000);
+      const timeField = this.page.locator(this.timeSelect);
       await timeField.selectOption(time);
     }
   }
 
   /**
    * Create booking (fill form and submit)
+   * Note: walkType parameter is ignored (not used in booking form)
    */
-  async createBooking({ date, walkType, time }) {
-    await this.fillBookingForm({ date, walkType, time });
+  async createBooking({ date, time, walkType }) {
+    // walkType is ignored - booking form only has date and time
+    await this.fillBookingForm({ date, time });
     await this.submit();
   }
 
@@ -91,15 +93,28 @@ class BookingModalPage extends BasePage {
    * Close modal
    */
   async close() {
-    const closeBtn = this.page.locator(this.closeButton).first();
-    const btnExists = await closeBtn.count() > 0;
-    if (btnExists) {
+    // Try multiple close methods in order of preference
+    // 1. Try the Abbrechen button (most reliable)
+    const cancelBtn = this.page.locator('button:has-text("Abbrechen")').first();
+    const cancelExists = await cancelBtn.isVisible().catch(() => false);
+    if (cancelExists) {
+      await cancelBtn.click();
+      await this.page.waitForTimeout(500);
+      return;
+    }
+
+    // 2. Try the × close button
+    const closeBtn = this.page.locator('.modal-close, [data-action="close-booking-modal"]').first();
+    const closeExists = await closeBtn.isVisible().catch(() => false);
+    if (closeExists) {
       await closeBtn.click();
       await this.page.waitForTimeout(500);
-    } else {
-      // Try pressing Escape key
-      await this.page.keyboard.press('Escape');
+      return;
     }
+
+    // 3. Try Escape key
+    await this.page.keyboard.press('Escape');
+    await this.page.waitForTimeout(500);
   }
 
   /**

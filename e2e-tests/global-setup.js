@@ -1,12 +1,14 @@
 const fs = require('fs');
 const path = require('path');
-const { setupAdminAuth } = require('./fixtures/auth');
-const { setupTestData } = require('./setup-test-data');
+const http = require('http');
 
 /**
  * Global setup for E2E tests
  * Runs once before all tests
- * Uses setup-test-data.js for test data
+ *
+ * Now supports two modes:
+ * 1. Dedicated test database (test.db) - creates fresh test data
+ * 2. Existing server - uses running server with existing data
  */
 module.exports = async (config) => {
   console.log('');
@@ -16,30 +18,37 @@ module.exports = async (config) => {
   console.log('');
 
   try {
-    const testDbPath = path.resolve(__dirname, 'test.db');
+    // Check if server is already running
+    const serverRunning = await checkServerHealth('http://localhost:8080');
 
-    // Step 2: Wait for server to create database
-    console.log('⏳ Waiting for server to create database...');
+    if (serverRunning) {
+      console.log('   ✅ Server is running at localhost:8080');
+      console.log('   ℹ️  Using existing database and test data');
+      console.log('');
+      console.log('✅ Global setup complete!');
+      console.log('═══════════════════════════════════════════════════');
+      console.log('');
+      return;
+    }
+
+    // If server not running, check for test database
+    const testDbPath = path.resolve(__dirname, 'test.db');
+    const parentDbPath = path.resolve(__dirname, '..', 'gassigeher.db');
+
+    console.log('⏳ Waiting for server to start...');
     let waitCount = 0;
-    while (!fs.existsSync(testDbPath) && waitCount < 15) {
+    while (waitCount < 15) {
+      if (await checkServerHealth('http://localhost:8080')) {
+        console.log('   ✅ Server started successfully');
+        break;
+      }
       await new Promise(resolve => setTimeout(resolve, 1000));
       waitCount++;
     }
 
-    if (!fs.existsSync(testDbPath)) {
-      throw new Error('Server did not create test database after 15 seconds');
+    if (waitCount >= 15) {
+      throw new Error('Server did not start after 15 seconds. Please start the server manually.');
     }
-    console.log('   ✅ Database created by server');
-
-    // Step 3: Generate test data
-    console.log('🌱 Generating test data...');
-    console.log('');
-
-    setupTestData(testDbPath)
-
-    // Step 4: Pre-authenticate admin user
-    console.log('🔐 Pre-authenticating admin user...');
-    await setupAdminAuth();
 
     console.log('');
     console.log('✅ Global setup complete!');
@@ -54,5 +63,22 @@ module.exports = async (config) => {
     throw error;
   }
 };
+
+/**
+ * Check if server is running by calling health endpoint
+ */
+function checkServerHealth(baseUrl) {
+  return new Promise((resolve) => {
+    const url = new URL('/api/health', baseUrl);
+    const req = http.get(url, (res) => {
+      resolve(res.statusCode === 200);
+    });
+    req.on('error', () => resolve(false));
+    req.setTimeout(2000, () => {
+      req.destroy();
+      resolve(false);
+    });
+  });
+}
 
 // DONE: Global setup runs once before all tests

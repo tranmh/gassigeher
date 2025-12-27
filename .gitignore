@@ -33,7 +33,7 @@ e2e-tests/node_modules/
 e2e-tests/test.db
 e2e-tests/test-uploads/
 e2e-tests/test-results/
-e2e-tests/playwright-report/
+e2e-tests/playwright-report*/
 e2e-tests/*.log
 e2e-tests/admin-storage-state.json
 e2e-tests/test-results.json
