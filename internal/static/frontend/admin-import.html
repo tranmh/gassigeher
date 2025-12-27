@@ -255,7 +255,7 @@
         <div class="container import-container">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h1>📥 Hunde importieren</h1>
-                <a href="#" id="download-template" class="btn btn-secondary">📄 Vorlage herunterladen</a>
+                <button type="button" id="download-template" class="btn btn-secondary">📄 Vorlage herunterladen</button>
             </div>
 
             <div id="alert-container"></div>
@@ -274,8 +274,8 @@
                     Laden Sie eine CSV-Datei mit Hunde-Daten hoch. Unterstutzt werden Komma- und Semikolon-getrennte Dateien.
                 </p>
 
-                <div class="upload-zone" id="upload-zone" data-action="trigger-file-input">
-                    <input type="file" id="file-input" accept=".csv" data-action-change="file-select">
+                <div class="upload-zone" id="upload-zone">
+                    <input type="file" id="file-input" accept=".csv">
                     <div class="upload-icon">📁</div>
                     <div class="upload-text">Datei hier ablegen oder klicken zum Auswahlen</div>
                     <div class="upload-hint">Unterstutzt: CSV (max. 10MB)</div>
@@ -329,12 +329,10 @@
 
     <script src="/js/api.js"></script>
     <script src="/js/i18n.js"></script>
-    <script src="/js/menu.js"></script>
+    <script src="/js/nav-menu.js"></script>
     <script src="/js/event-handlers.js"></script>
     <script>
         registerActions({
-            'trigger-file-input': function(e) { e.preventDefault(); document.getElementById('file-input').click(); },
-            'file-select': function(e) { handleFileSelect(e); },
             'remove-file': function(e) { e.preventDefault(); removeFile(); },
             'reset-import': function(e) { e.preventDefault(); resetImport(); },
             'execute-import': function(e) { e.preventDefault(); executeImport(); },
@@ -375,12 +373,45 @@
                 return;
             }
 
-            // Set up template download link
-            document.getElementById('download-template').href = api.getImportTemplateUrl();
+            // Set up template download button (with auth)
+            document.getElementById('download-template').addEventListener('click', async (e) => {
+                e.preventDefault();
+                try {
+                    const response = await fetch(api.getImportTemplateUrl(), {
+                        headers: { 'Authorization': `Bearer ${api.getToken()}` }
+                    });
+                    if (!response.ok) throw new Error('Download fehlgeschlagen');
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'hunde-import-vorlage.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                } catch (err) {
+                    showAlert('Fehler beim Herunterladen: ' + err.message, 'error');
+                }
+            });
+
+            // Set up file upload zone click
+            const uploadZone = document.getElementById('upload-zone');
+            const fileInput = document.getElementById('file-input');
+
+            uploadZone.addEventListener('click', (e) => {
+                if (e.target !== fileInput) {
+                    fileInput.click();
+                }
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    handleFile(e.target.files[0]);
+                }
+            });
 
             // Set up drag and drop
-            const uploadZone = document.getElementById('upload-zone');
-
             uploadZone.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 uploadZone.classList.add('dragover');

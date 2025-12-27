@@ -646,7 +646,7 @@ class API {
     }
 
     getImportTemplateUrl() {
-        return `${this.baseUrl}/admin/import/dogs/template`;
+        return `${this.baseURL}/admin/import/dogs/template`;
     }
 }
 
