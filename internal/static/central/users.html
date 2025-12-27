@@ -38,16 +38,18 @@
                     <div class="filter-group filter-group-large">
                         <input type="text" id="search-input" placeholder="Name oder E-Mail-Adresse eingeben..." class="form-input">
                     </div>
-                    <button onclick="searchUsers()" class="btn btn-primary">Suchen</button>
+                    <button onclick="searchUsers(1)" class="btn btn-primary">Suchen</button>
+                    <button onclick="clearSearch()" class="btn btn-secondary">Zurucksetzen</button>
                 </div>
-                <p class="filter-hint">Mindestens 2 Zeichen eingeben. Sucht in Vorname, Nachname und E-Mail.</p>
+                <p class="filter-hint">Sucht in Vorname, Nachname und E-Mail. Leer lassen fur alle Benutzer.</p>
             </div>
 
             <!-- Results -->
             <div class="card">
                 <div id="results-container">
-                    <p class="empty-state">Geben Sie einen Suchbegriff ein, um Benutzer zu finden.</p>
+                    <p class="loading">Laden...</p>
                 </div>
+                <div id="pagination-container"></div>
             </div>
 
             <!-- Central Admins Management -->
@@ -64,33 +66,46 @@
 
     <script src="/central/assets/js/central.js"></script>
     <script>
+        let currentPage = 1;
+        let currentQuery = '';
+        const ITEMS_PER_PAGE = 25;
+
         document.addEventListener('DOMContentLoaded', async () => {
             if (!isAuthenticated()) {
                 window.location.href = '/login.html';
                 return;
             }
 
+            // Load all users on page load
+            await searchUsers(1);
             await loadAdmins();
 
             // Enable search on Enter
             document.getElementById('search-input').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') searchUsers();
+                if (e.key === 'Enter') searchUsers(1);
             });
         });
 
-        async function searchUsers() {
+        function clearSearch() {
+            document.getElementById('search-input').value = '';
+            currentQuery = '';
+            searchUsers(1);
+        }
+
+        async function searchUsers(page = 1) {
             const query = document.getElementById('search-input').value.trim();
             const container = document.getElementById('results-container');
+            const paginationContainer = document.getElementById('pagination-container');
 
-            if (query.length < 2) {
-                showAlert('Bitte mindestens 2 Zeichen eingeben', 'warning');
-                return;
-            }
+            currentPage = page;
+            currentQuery = query;
 
-            container.innerHTML = '<p class="loading">Suche...</p>';
+            container.innerHTML = '<p class="loading">Laden...</p>';
+            paginationContainer.innerHTML = '';
 
             try {
-                const users = await centralAPI.searchUsers(query);
+                const result = await centralAPI.searchUsers(query, page, ITEMS_PER_PAGE);
+                const users = result.users || [];
 
                 if (users.length === 0) {
                     container.innerHTML = '<p class="empty-state">Keine Benutzer gefunden</p>';
@@ -145,13 +160,54 @@
                         </tbody>
                     </table>
                     <div class="table-footer">
-                        <p>${users.length} Benutzer gefunden${users.length === 100 ? ' (Maximum erreicht)' : ''}</p>
+                        <p>${result.total} Benutzer insgesamt (Seite ${result.page} von ${result.total_pages})</p>
                     </div>
                 `;
+
+                // Render pagination
+                if (result.total_pages > 1) {
+                    paginationContainer.innerHTML = renderPagination(result.page, result.total_pages);
+                }
             } catch (err) {
                 container.innerHTML = '<p class="error">Fehler bei der Suche</p>';
                 showAlert('Fehler: ' + err.message, 'error');
             }
+        }
+
+        function renderPagination(currentPage, totalPages) {
+            let html = '<div class="pagination">';
+
+            // Previous button
+            if (currentPage > 1) {
+                html += `<button class="btn btn-sm btn-secondary" onclick="searchUsers(${currentPage - 1})">Zuruck</button>`;
+            }
+
+            // Page numbers
+            const startPage = Math.max(1, currentPage - 2);
+            const endPage = Math.min(totalPages, currentPage + 2);
+
+            if (startPage > 1) {
+                html += `<button class="btn btn-sm btn-secondary" onclick="searchUsers(1)">1</button>`;
+                if (startPage > 2) html += '<span class="pagination-ellipsis">...</span>';
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                const activeClass = i === currentPage ? 'btn-primary' : 'btn-secondary';
+                html += `<button class="btn btn-sm ${activeClass}" onclick="searchUsers(${i})">${i}</button>`;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) html += '<span class="pagination-ellipsis">...</span>';
+                html += `<button class="btn btn-sm btn-secondary" onclick="searchUsers(${totalPages})">${totalPages}</button>`;
+            }
+
+            // Next button
+            if (currentPage < totalPages) {
+                html += `<button class="btn btn-sm btn-secondary" onclick="searchUsers(${currentPage + 1})">Weiter</button>`;
+            }
+
+            html += '</div>';
+            return html;
         }
 
         async function loadAdmins() {

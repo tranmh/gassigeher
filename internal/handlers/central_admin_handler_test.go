@@ -652,16 +652,29 @@ func TestCentralAdminHandler_SearchUsers(t *testing.T) {
 			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
 		}
 
-		var users []map[string]interface{}
-		json.Unmarshal(rec.Body.Bytes(), &users)
+		var result map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &result)
+
+		users, ok := result["users"].([]interface{})
+		if !ok {
+			t.Fatal("Expected users array in response")
+		}
 
 		// Should find both John and Jane Doe
 		if len(users) < 2 {
 			t.Errorf("Expected at least 2 users matching 'Doe', got %d", len(users))
 		}
+
+		// Check pagination fields exist
+		if _, ok := result["total"]; !ok {
+			t.Error("Expected 'total' field in response")
+		}
+		if _, ok := result["page"]; !ok {
+			t.Error("Expected 'page' field in response")
+		}
 	})
 
-	t.Run("returns 400 without search term", func(t *testing.T) {
+	t.Run("returns all users without search term", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/central-admin/users/search", nil)
 		ctx := contextWithCentralAdmin(req.Context(), adminID, "central@example.com")
 		req = req.WithContext(ctx)
@@ -669,8 +682,61 @@ func TestCentralAdminHandler_SearchUsers(t *testing.T) {
 		rec := httptest.NewRecorder()
 		handler.SearchUsers(rec, req)
 
-		if rec.Code != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", rec.Code)
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var result map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &result)
+
+		users, ok := result["users"].([]interface{})
+		if !ok {
+			t.Fatal("Expected users array in response")
+		}
+
+		// Should find all 4 users (admin + 3 test users)
+		if len(users) < 4 {
+			t.Errorf("Expected at least 4 users, got %d", len(users))
+		}
+
+		// Check total count
+		total, ok := result["total"].(float64)
+		if !ok || total < 4 {
+			t.Errorf("Expected total >= 4, got %v", result["total"])
+		}
+	})
+
+	t.Run("supports pagination", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/central-admin/users/search?page=1&limit=2", nil)
+		ctx := contextWithCentralAdmin(req.Context(), adminID, "central@example.com")
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.SearchUsers(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var result map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &result)
+
+		users, ok := result["users"].([]interface{})
+		if !ok {
+			t.Fatal("Expected users array in response")
+		}
+
+		// Should have at most 2 users (limit)
+		if len(users) > 2 {
+			t.Errorf("Expected max 2 users due to limit, got %d", len(users))
+		}
+
+		// Check pagination values
+		if page, ok := result["page"].(float64); !ok || page != 1 {
+			t.Errorf("Expected page 1, got %v", result["page"])
+		}
+		if limit, ok := result["limit"].(float64); !ok || limit != 2 {
+			t.Errorf("Expected limit 2, got %v", result["limit"])
 		}
 	})
 }

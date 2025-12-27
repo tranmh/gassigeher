@@ -477,32 +477,25 @@ func (h *CentralAdminHandler) GetTenantUsers(w http.ResponseWriter, r *http.Requ
 	respondJSON(w, http.StatusOK, users)
 }
 
-// SearchUsers searches for users across all tenants
-// GET /api/central-admin/users/search?q=searchterm
+// SearchUsers searches for users across all tenants with pagination
+// GET /api/central-admin/users/search?q=searchterm&page=1&limit=25
 func (h *CentralAdminHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
 	searchTerm := r.URL.Query().Get("q")
-	if searchTerm == "" {
-		respondError(w, http.StatusBadRequest, "Suchbegriff erforderlich")
-		return
-	}
 
-	searchPattern := "%" + searchTerm + "%"
-	rows, err := h.db.Query(`
-		SELECT u.id, u.tenant_id, u.first_name, u.last_name, u.email, u.is_admin, u.is_super_admin,
-		       u.is_central_admin, u.is_active, u.created_at, t.name as tenant_name
-		FROM users u
-		LEFT JOIN tenants t ON u.tenant_id = t.id
-		WHERE u.is_deleted = 0
-		  AND (u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ?)
-		ORDER BY u.last_name, u.first_name
-		LIMIT 100
-	`, searchPattern, searchPattern, searchPattern)
-	if err != nil {
-		log.Printf("Error searching users: %v", err)
-		respondError(w, http.StatusInternalServerError, "Fehler bei der Suche")
-		return
+	// Parse pagination parameters
+	page := 1
+	limit := 25
+	if p := r.URL.Query().Get("page"); p != "" {
+		if parsed, err := strconv.Atoi(p); err == nil && parsed > 0 {
+			page = parsed
+		}
 	}
-	defer rows.Close()
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
+			limit = parsed
+		}
+	}
+	offset := (page - 1) * limit
 
 	type UserSearchResult struct {
 		ID             int       `json:"id"`
@@ -518,6 +511,61 @@ func (h *CentralAdminHandler) SearchUsers(w http.ResponseWriter, r *http.Request
 		TenantName     *string   `json:"tenant_name"`
 	}
 
+	var rows *sql.Rows
+	var err error
+	var totalCount int
+
+	if searchTerm == "" {
+		// No search term - return all users with pagination
+		err = h.db.QueryRow(`SELECT COUNT(*) FROM users WHERE is_deleted = 0`).Scan(&totalCount)
+		if err != nil {
+			log.Printf("Error counting users: %v", err)
+			respondError(w, http.StatusInternalServerError, "Fehler bei der Abfrage")
+			return
+		}
+
+		rows, err = h.db.Query(`
+			SELECT u.id, u.tenant_id, u.first_name, u.last_name, u.email, u.is_admin, u.is_super_admin,
+			       u.is_central_admin, u.is_active, u.created_at, t.name as tenant_name
+			FROM users u
+			LEFT JOIN tenants t ON u.tenant_id = t.id
+			WHERE u.is_deleted = 0
+			ORDER BY u.last_name, u.first_name
+			LIMIT ? OFFSET ?
+		`, limit, offset)
+	} else {
+		// Search with term
+		searchPattern := "%" + searchTerm + "%"
+		err = h.db.QueryRow(`
+			SELECT COUNT(*) FROM users u
+			WHERE u.is_deleted = 0
+			  AND (u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ?)
+		`, searchPattern, searchPattern, searchPattern).Scan(&totalCount)
+		if err != nil {
+			log.Printf("Error counting users: %v", err)
+			respondError(w, http.StatusInternalServerError, "Fehler bei der Abfrage")
+			return
+		}
+
+		rows, err = h.db.Query(`
+			SELECT u.id, u.tenant_id, u.first_name, u.last_name, u.email, u.is_admin, u.is_super_admin,
+			       u.is_central_admin, u.is_active, u.created_at, t.name as tenant_name
+			FROM users u
+			LEFT JOIN tenants t ON u.tenant_id = t.id
+			WHERE u.is_deleted = 0
+			  AND (u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ?)
+			ORDER BY u.last_name, u.first_name
+			LIMIT ? OFFSET ?
+		`, searchPattern, searchPattern, searchPattern, limit, offset)
+	}
+
+	if err != nil {
+		log.Printf("Error searching users: %v", err)
+		respondError(w, http.StatusInternalServerError, "Fehler bei der Suche")
+		return
+	}
+	defer rows.Close()
+
 	results := []UserSearchResult{}
 	for rows.Next() {
 		var u UserSearchResult
@@ -529,7 +577,15 @@ func (h *CentralAdminHandler) SearchUsers(w http.ResponseWriter, r *http.Request
 		results = append(results, u)
 	}
 
-	respondJSON(w, http.StatusOK, results)
+	// Return paginated response
+	totalPages := (totalCount + limit - 1) / limit
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"users":       results,
+		"total":       totalCount,
+		"page":        page,
+		"limit":       limit,
+		"total_pages": totalPages,
+	})
 }
 
 // ExportTenantData exports all data for a tenant (GDPR compliance)

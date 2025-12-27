@@ -131,8 +131,12 @@ const centralAPI = {
     },
 
     // Users
-    async searchUsers(query) {
-        return apiRequest(`/central-admin/users/search?q=${encodeURIComponent(query)}`);
+    async searchUsers(query = '', page = 1, limit = 25) {
+        const params = new URLSearchParams();
+        if (query) params.append('q', query);
+        params.append('page', page);
+        params.append('limit', limit);
+        return apiRequest(`/central-admin/users/search?${params}`);
     },
 
     // Admins
