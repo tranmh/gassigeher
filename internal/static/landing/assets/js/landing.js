@@ -327,7 +327,7 @@ async function initiateProCheckout(registrationResult) {
     try {
         // SECURITY FIX: Use checkout_token instead of password for authentication
         // The checkout_token is a short-lived JWT returned from registration
-        const baseUrl = checkoutData.login_url.replace(/\/login\/?$/, '');
+        const baseUrl = checkoutData.login_url.replace(/\/login\.html\/?$/, '');
 
         let token;
 

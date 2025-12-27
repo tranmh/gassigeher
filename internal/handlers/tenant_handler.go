@@ -327,9 +327,9 @@ func (h *TenantHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build login URL
-	loginURL := fmt.Sprintf("https://%s.%s/login", req.Slug, h.cfg.BaseDomain)
+	loginURL := fmt.Sprintf("https://%s.%s/login.html", req.Slug, h.cfg.BaseDomain)
 	if h.cfg.BaseDomain == "" {
-		loginURL = fmt.Sprintf("http://localhost:%s/login", h.cfg.Port)
+		loginURL = fmt.Sprintf("http://localhost:%s/login.html", h.cfg.Port)
 	}
 
 	respondJSON(w, http.StatusCreated, map[string]interface{}{
@@ -711,9 +711,9 @@ func (h *TenantHandler) sendTenantWelcomeEmail(contactEmail, orgName, slug, admi
 
 	subject := fmt.Sprintf("Willkommen bei Gassigeher, %s!", orgName)
 
-	loginURL := fmt.Sprintf("https://%s.%s/login", slug, h.cfg.BaseDomain)
+	loginURL := fmt.Sprintf("https://%s.%s/login.html", slug, h.cfg.BaseDomain)
 	if h.cfg.BaseDomain == "" {
-		loginURL = fmt.Sprintf("http://localhost:%s/login", h.cfg.Port)
+		loginURL = fmt.Sprintf("http://localhost:%s/login.html", h.cfg.Port)
 	}
 
 	body := fmt.Sprintf(`
