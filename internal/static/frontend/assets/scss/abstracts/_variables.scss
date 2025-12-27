@@ -3,20 +3,32 @@
 // ============================================================================
 // Single source of truth for all design tokens
 // Based on Tierheim Göppingen color scheme
+// Supports dynamic theming via CSS variables from /api/v1/theme/css
 
 // ----------------------------------------------------------------------------
 // Colors - Vibrant Dog-Friendly Palette
 // ----------------------------------------------------------------------------
-$primary-green: #82b965;
-$secondary-green: #6fa050;
-$accent-orange: #ff8c42;
-$accent-blue: #4a90e2;
-$warm-cream: #fef9f3;
-$header-bg: #4a7c59;
+// Fallback values (used when CSS variables not loaded)
+$primary-green-fallback: #82b965;
+$secondary-green-fallback: #6fa050;
+$accent-orange-fallback: #ff8c42;
+$accent-blue-fallback: #4a90e2;
+$warm-cream-fallback: #fef9f3;
+$header-bg-fallback: #4a7c59;
+
+// Theme-aware colors using CSS variables with fallbacks
+// These are used in SCSS and will be overridden by /api/v1/theme/css
+$primary-green: var(--color-primary, #{$primary-green-fallback});
+$secondary-green: var(--color-secondary, #{$secondary-green-fallback});
+$accent-orange: var(--color-accent, #{$accent-orange-fallback});
+$accent-blue: var(--color-accent, #{$accent-blue-fallback});
+$warm-cream: var(--color-background, #{$warm-cream-fallback});
+$header-bg: var(--color-secondary, #{$header-bg-fallback});
 
 // Text Colors
 $text-white: #ffffff;
-$text-dark: #2c3e34;
+$text-dark-fallback: #2c3e34;
+$text-dark: var(--color-text, #{$text-dark-fallback});
 $text-gray: #5a6c57;
 
 // Semantic Colors

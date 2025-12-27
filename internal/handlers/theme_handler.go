@@ -71,7 +71,7 @@ func (h *ThemeHandler) GetCSS(w http.ResponseWriter, r *http.Request) {
 }`, colors.Primary, colors.Secondary, colors.Accent, colors.Background, colors.Text)
 
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
-	w.Header().Set("Cache-Control", "public, max-age=3600") // Cache for 1 hour
+	w.Header().Set("Cache-Control", "public, max-age=60") // Cache for 1 minute (theme-loader.js busts cache on branding changes)
 	w.Write([]byte(css))
 }
 

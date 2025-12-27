@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Branding - Gassigeher Admin</title>
     <link rel="stylesheet" href="/assets/css/main.css">
+    <script src="/js/theme-loader.js"></script>
 </head>
 <body>
     <header>
@@ -348,7 +349,11 @@
 
             try {
                 await api.updateBranding(branding);
-                showAlert('Branding-Einstellungen gespeichert!', 'success');
+                showAlert('Branding-Einstellungen gespeichert! Die Änderungen werden auf allen Seiten sichtbar.', 'success');
+                // Reload theme CSS to apply changes immediately
+                if (typeof window.reloadThemeCSS === 'function') {
+                    window.reloadThemeCSS();
+                }
             } catch (error) {
                 console.error('Error saving branding:', error);
                 showAlert('Fehler beim Speichern: ' + (error.message || 'Unbekannter Fehler'), 'error');
