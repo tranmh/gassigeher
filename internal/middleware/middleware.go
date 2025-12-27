@@ -342,10 +342,11 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 		// TODO: Migrate all inline scripts to external .js files, then remove 'unsafe-inline'
 		// Note: img-src includes tierheim-goeppingen.de for the default site logo
 		// style-src still has 'unsafe-inline' for inline styles (lower risk than scripts)
+		// Note: cdn.jsdelivr.net is allowed for Shepherd.js guided tours library
 		csp := strings.Join([]string{
 			"default-src 'self'",
-			"script-src 'self' 'unsafe-inline'",
-			"style-src 'self' 'unsafe-inline'",
+			"script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+			"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
 			"img-src 'self' data: https://www.tierheim-goeppingen.de",
 			"font-src 'self' data:",
 			"connect-src 'self'",
