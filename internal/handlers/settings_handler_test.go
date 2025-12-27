@@ -314,10 +314,10 @@ func TestSettingsHandler_GetLogo(t *testing.T) {
 			t.Fatal("Expected logo_url in response")
 		}
 
-		// Should be the default Tierheim logo
-		expectedDefault := "https://www.tierheim-goeppingen.de/wp-content/uploads/2017/04/Logo_4c_homepagebanner3.png"
+		// SaaS-Mode (tenantID=1): Should be the placeholder logo
+		expectedDefault := "/assets/images/placeholders/logo-placeholder.svg"
 		if logoURL != expectedDefault {
-			t.Errorf("Expected default logo URL, got %s", logoURL)
+			t.Errorf("Expected placeholder logo URL %s, got %s", expectedDefault, logoURL)
 		}
 	})
 
@@ -515,14 +515,15 @@ func TestSettingsHandler_ResetLogo(t *testing.T) {
 			t.Fatal("Expected logo_url in response")
 		}
 
-		expectedDefault := "https://www.tierheim-goeppingen.de/wp-content/uploads/2017/04/Logo_4c_homepagebanner3.png"
+		// SaaS-Mode (tenantID=1): Should be the placeholder logo
+		expectedDefault := "/assets/images/placeholders/logo-placeholder.svg"
 		if logoURL != expectedDefault {
-			t.Errorf("Expected default URL, got %s", logoURL)
+			t.Errorf("Expected placeholder URL %s, got %s", expectedDefault, logoURL)
 		}
 
 		// Verify database updated
 		var dbValue string
-		db.QueryRow("SELECT value FROM system_settings WHERE key = ?", "site_logo").Scan(&dbValue)
+		db.QueryRow("SELECT value FROM system_settings WHERE key = ? AND tenant_id = 1", "site_logo").Scan(&dbValue)
 		if dbValue != expectedDefault {
 			t.Errorf("Database not reset to default, got value: %s", dbValue)
 		}
@@ -565,7 +566,8 @@ func TestSettingsHandler_LogoWorkflow(t *testing.T) {
 
 	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
 
-	defaultLogo := "https://www.tierheim-goeppingen.de/wp-content/uploads/2017/04/Logo_4c_homepagebanner3.png"
+	// SaaS-Mode (tenantID=1): default is placeholder logo
+	defaultLogo := "/assets/images/placeholders/logo-placeholder.svg"
 
 	// Step 1: Get default logo
 	t.Run("Step 1: Get default logo", func(t *testing.T) {
@@ -579,7 +581,7 @@ func TestSettingsHandler_LogoWorkflow(t *testing.T) {
 		json.Unmarshal(rec.Body.Bytes(), &response)
 
 		if response["logo_url"] != defaultLogo {
-			t.Errorf("Expected default logo, got %v", response["logo_url"])
+			t.Errorf("Expected default logo %s, got %v", defaultLogo, response["logo_url"])
 		}
 	})
 
