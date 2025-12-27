@@ -676,6 +676,10 @@ func (r *UserRepository) FindInactiveUsers(tenantID int, days int) ([]*models.Us
 		users = append(users, user)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating inactive users: %w", err)
+	}
+
 	return users, nil
 }
 
@@ -766,6 +770,10 @@ func (r *UserRepository) FindAll(activeOnly *bool, tenantID int) ([]*models.User
 			user.LastName = lastName.String
 		}
 		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating users: %w", err)
 	}
 
 	return users, nil

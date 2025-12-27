@@ -70,7 +70,10 @@ func (r *HolidayRepository) CreateHoliday(tenantID int, holiday *models.CustomHo
 		return err
 	}
 
-	id, _ := result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("failed to get inserted holiday ID: %w", err)
+	}
 	holiday.ID = int(id)
 	holiday.TenantID = tenantID
 	return nil

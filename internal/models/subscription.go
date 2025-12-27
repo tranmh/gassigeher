@@ -23,6 +23,10 @@ const (
 // Default dog limit for free tier
 const DefaultFreeTierDogLimit = 10
 
+// FreePlanID is the ID of the free plan in the pricing_plans table
+// This should match the ID seeded in database migrations
+const FreePlanID = 1
+
 // PricingPlan represents a subscription pricing plan
 type PricingPlan struct {
 	ID           int       `json:"id"`

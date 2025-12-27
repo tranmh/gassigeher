@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/tranmh/gassigeher/internal/models"
@@ -48,6 +49,10 @@ func (r *BookingTimeRepository) GetRulesByDayType(tenantID int, dayType string) 
 		rules = append(rules, rule)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating booking time rules: %w", err)
+	}
+
 	return rules, nil
 }
 
@@ -83,6 +88,10 @@ func (r *BookingTimeRepository) GetAllRules(tenantID int) (map[string][]models.B
 
 		rule.IsBlocked = isBlocked == 1
 		result[rule.DayType] = append(result[rule.DayType], rule)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating all booking time rules: %w", err)
 	}
 
 	return result, nil
@@ -122,7 +131,10 @@ func (r *BookingTimeRepository) CreateRule(tenantID int, rule *models.BookingTim
 		return err
 	}
 
-	id, _ := result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("failed to get inserted rule ID: %w", err)
+	}
 	rule.ID = int(id)
 	rule.TenantID = tenantID
 	return nil

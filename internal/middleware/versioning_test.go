@@ -138,3 +138,145 @@ func TestAPIVersionRedirect_SkipsUnversionedRoutes(t *testing.T) {
 		t.Errorf("Expected status 200, got %d", rec.Code)
 	}
 }
+
+// ============================================================================
+// APIVersionRedirect (deprecated middleware) Tests
+// ============================================================================
+
+func TestAPIVersionRedirect_Middleware(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Captured-Path", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	middleware := APIVersionRedirect(handler)
+
+	t.Run("rewrites legacy api path", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/dogs", nil)
+		rec := httptest.NewRecorder()
+		middleware.ServeHTTP(rec, req)
+
+		if capturedPath := rec.Header().Get("X-Captured-Path"); capturedPath != "/api/v1/dogs" {
+			t.Errorf("Expected path /api/v1/dogs, got %s", capturedPath)
+		}
+	})
+
+	t.Run("preserves query params in rewrite", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/search?q=test", nil)
+		rec := httptest.NewRecorder()
+		middleware.ServeHTTP(rec, req)
+
+		if capturedPath := rec.Header().Get("X-Captured-Path"); capturedPath != "/api/v1/search" {
+			t.Errorf("Expected path /api/v1/search, got %s", capturedPath)
+		}
+	})
+
+	t.Run("skips already versioned paths", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/v1/users", nil)
+		rec := httptest.NewRecorder()
+		middleware.ServeHTTP(rec, req)
+
+		if capturedPath := rec.Header().Get("X-Captured-Path"); capturedPath != "/api/v1/users" {
+			t.Errorf("Expected path /api/v1/users, got %s", capturedPath)
+		}
+	})
+
+	t.Run("skips health endpoint", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/health", nil)
+		rec := httptest.NewRecorder()
+		middleware.ServeHTTP(rec, req)
+
+		if capturedPath := rec.Header().Get("X-Captured-Path"); capturedPath != "/api/health" {
+			t.Errorf("Expected path /api/health, got %s", capturedPath)
+		}
+	})
+}
+
+// ============================================================================
+// AddVersionHeader Tests
+// ============================================================================
+
+func TestAddVersionHeader(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	middleware := AddVersionHeader(handler)
+
+	req := httptest.NewRequest("GET", "/api/v1/test", nil)
+	rec := httptest.NewRecorder()
+	middleware.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", rec.Code)
+	}
+
+	versionHeader := rec.Header().Get(APIVersionHeader)
+	if versionHeader != CurrentAPIVersion {
+		t.Errorf("Expected version header '%s', got '%s'", CurrentAPIVersion, versionHeader)
+	}
+}
+
+// ============================================================================
+// GetVersionInfo Tests
+// ============================================================================
+
+func TestGetVersionInfo(t *testing.T) {
+	info := GetVersionInfo()
+
+	if info.Current != CurrentAPIVersion {
+		t.Errorf("Current = %s, want %s", info.Current, CurrentAPIVersion)
+	}
+
+	if len(info.Supported) == 0 {
+		t.Error("Supported versions should not be empty")
+	}
+
+	// Check that current version is in supported list
+	found := false
+	for _, v := range info.Supported {
+		if v == info.Current {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Current version should be in supported versions list")
+	}
+}
+
+// ============================================================================
+// rewriteAPIPath Unit Tests
+// ============================================================================
+
+func TestRewriteAPIPath(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		wantPath    string
+		wantRewrite bool
+	}{
+		{"legacy api path", "/api/dogs", "/api/v1/dogs", true},
+		{"already versioned v1", "/api/v1/dogs", "/api/v1/dogs", false},
+		{"already versioned v2", "/api/v2/dogs", "/api/v2/dogs", false},
+		{"non-api path", "/users", "/users", false},
+		{"health endpoint", "/api/health", "/api/health", false},
+		{"ready endpoint", "/api/ready", "/api/ready", false},
+		{"version endpoint", "/api/version", "/api/version", false},
+		{"metrics endpoint", "/api/metrics", "/api/metrics", false},
+		{"root api path", "/api/", "/api/v1/", true},
+		{"nested path", "/api/users/123/bookings", "/api/v1/users/123/bookings", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotPath, gotRewrite := rewriteAPIPath(tt.input)
+			if gotPath != tt.wantPath {
+				t.Errorf("rewriteAPIPath(%q) path = %q, want %q", tt.input, gotPath, tt.wantPath)
+			}
+			if gotRewrite != tt.wantRewrite {
+				t.Errorf("rewriteAPIPath(%q) rewrite = %v, want %v", tt.input, gotRewrite, tt.wantRewrite)
+			}
+		})
+	}
+}

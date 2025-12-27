@@ -3,10 +3,15 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/tranmh/gassigeher/internal/repository"
 )
+
+// validSubdomainRegex validates that subdomains only contain safe characters
+// Allowed: lowercase letters, digits, and hyphens (no starting/ending with hyphen)
+var validSubdomainRegex = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
 
 // TenantMiddleware resolves the tenant from the subdomain and adds it to the request context.
 // Example: "tierheim-goeppingen.gassigeher.org" → tenant_id for "tierheim-goeppingen"
@@ -96,6 +101,13 @@ func extractSubdomain(host, baseDomain string) string {
 
 	// Validate subdomain (no dots allowed - only first-level subdomains)
 	if strings.Contains(subdomain, ".") {
+		return ""
+	}
+
+	// Security: Validate subdomain contains only safe characters
+	// This prevents SQL injection, null bytes, and other attacks
+	// Allowed: lowercase letters, digits, and hyphens (DNS-safe characters)
+	if !validSubdomainRegex.MatchString(subdomain) {
 		return ""
 	}
 

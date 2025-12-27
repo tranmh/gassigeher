@@ -300,7 +300,7 @@ func (r *SubscriptionRepository) GetTenantDogLimit(tenantID int) (int, error) {
 func (r *SubscriptionRepository) CancelSubscription(tenantID int, reason string) error {
 	query := `
 		UPDATE tenant_subscriptions SET
-			plan_id = 1,
+			plan_id = ?,
 			status = ?,
 			cancelled_at = ?,
 			updated_at = ?
@@ -308,7 +308,7 @@ func (r *SubscriptionRepository) CancelSubscription(tenantID int, reason string)
 	`
 
 	now := time.Now()
-	_, err := r.db.Exec(query, models.SubscriptionStatusCancelled, now, now, tenantID)
+	_, err := r.db.Exec(query, models.FreePlanID, models.SubscriptionStatusCancelled, now, now, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to cancel subscription: %w", err)
 	}

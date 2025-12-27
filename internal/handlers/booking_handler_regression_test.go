@@ -466,8 +466,8 @@ func TestRegression_BlockedDates(t *testing.T) {
 					t.Fatalf("Could not find blocked date: %v", err)
 				}
 
-				// Delete it
-				err = blockedDateRepo.Delete(blockedDateObj.ID)
+				// Delete it (tenantID = 1 for test)
+				err = blockedDateRepo.Delete(blockedDateObj.ID, 1)
 				if err != nil {
 					t.Errorf("Should be able to delete blocked date: %v", err)
 				}

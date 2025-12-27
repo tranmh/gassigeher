@@ -68,7 +68,7 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
-	// SaaS: Extract tenant ID from context
+	// SaaS: Extract tenant ID from context (0 is valid for simple mode)
 	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Parse request
@@ -253,7 +253,7 @@ func (h *BookingHandler) ListBookings(w http.ResponseWriter, r *http.Request) {
 	// Get user ID and admin status from context
 	userID, _ := r.Context().Value(middleware.UserIDKey).(int)
 	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
-	// SaaS: Extract tenant ID from context
+	// SaaS: Extract tenant ID from context (0 is valid for simple mode)
 	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Parse query parameters
@@ -263,7 +263,11 @@ func (h *BookingHandler) ListBookings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if dogIDStr := r.URL.Query().Get("dog_id"); dogIDStr != "" {
-		dogID, _ := strconv.Atoi(dogIDStr)
+		dogID, err := strconv.Atoi(dogIDStr)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "Invalid dog_id parameter")
+			return
+		}
 		filter.DogID = &dogID
 	}
 
@@ -287,7 +291,11 @@ func (h *BookingHandler) ListBookings(w http.ResponseWriter, r *http.Request) {
 		filter.UserID = &userID
 	} else if isAdmin && r.URL.Query().Get("user_id") != "" {
 		// Admin can filter by specific user
-		uid, _ := strconv.Atoi(r.URL.Query().Get("user_id"))
+		uid, err := strconv.Atoi(r.URL.Query().Get("user_id"))
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "Invalid user_id parameter")
+			return
+		}
 		filter.UserID = &uid
 	}
 
@@ -462,8 +470,8 @@ func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) {
 	// Update user last activity
 	h.userRepo.UpdateLastActivity(userID)
 
-	// Send cancellation email
-	if booking.User.Email != nil && h.emailService != nil {
+	// Send cancellation email (with nil safety checks)
+	if booking.User != nil && booking.User.Email != nil && booking.Dog != nil && h.emailService != nil {
 		if isAdmin && req.Reason != nil {
 			// Admin cancelled
 			go h.emailService.SendAdminCancellation(*booking.User.Email, booking.User.FirstName, booking.Dog.Name, booking.Date, booking.ScheduledTime, *req.Reason)
@@ -488,7 +496,7 @@ func (h *BookingHandler) AddNotes(w http.ResponseWriter, r *http.Request) {
 
 	// Get user ID
 	userID, _ := r.Context().Value(middleware.UserIDKey).(int)
-	// SaaS: Extract tenant ID from context
+	// SaaS: Extract tenant ID from context (0 is valid for simple mode)
 	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Parse request
@@ -629,8 +637,8 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 	// Update user last activity
 	h.userRepo.UpdateLastActivity(userID)
 
-	// Send email notification to user
-	if booking.User.Email != nil && h.emailService != nil {
+	// Send email notification to user (with nil safety checks)
+	if booking.User != nil && booking.User.Email != nil && booking.Dog != nil && h.emailService != nil {
 		go h.emailService.SendBookingMoved(
 			*booking.User.Email,
 			booking.User.FirstName,
@@ -811,10 +819,10 @@ func (h *BookingHandler) ApprovePendingBooking(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Send email notification to user
+	// Send email notification to user (with nil safety checks for User and Dog)
 	if h.emailService != nil {
 		booking, err := h.bookingRepo.FindByIDWithDetails(id)
-		if err == nil && booking != nil && booking.User != nil && booking.User.Email != nil && *booking.User.Email != "" {
+		if err == nil && booking != nil && booking.User != nil && booking.User.Email != nil && *booking.User.Email != "" && booking.Dog != nil {
 			go h.emailService.SendBookingApproved(
 				*booking.User.Email,
 				booking.User.FirstName,
@@ -879,7 +887,11 @@ func (h *BookingHandler) RejectPendingBooking(w http.ResponseWriter, r *http.Req
 	}
 
 	// Get booking details before rejecting (for email)
-	booking, _ := h.bookingRepo.FindByIDWithDetails(id)
+	booking, err := h.bookingRepo.FindByIDWithDetails(id)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to get booking details")
+		return
+	}
 
 	// SaaS: Verify booking belongs to current tenant before rejecting
 	if booking == nil {
@@ -896,8 +908,8 @@ func (h *BookingHandler) RejectPendingBooking(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Send email notification to user with reason
-	if h.emailService != nil && booking != nil && booking.User != nil && booking.User.Email != nil && *booking.User.Email != "" {
+	// Send email notification to user with reason (with nil safety checks for User and Dog)
+	if h.emailService != nil && booking != nil && booking.User != nil && booking.User.Email != nil && *booking.User.Email != "" && booking.Dog != nil {
 		go h.emailService.SendBookingRejected(
 			*booking.User.Email,
 			booking.User.FirstName,

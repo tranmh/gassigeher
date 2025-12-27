@@ -256,6 +256,10 @@ func (r *BookingRepository) FindAll(filter *models.BookingFilterRequest) ([]*mod
 		bookings = append(bookings, booking)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating bookings: %w", err)
+	}
+
 	return bookings, nil
 }
 
@@ -428,6 +432,10 @@ func (r *BookingRepository) GetUpcoming(userID int, limit int) ([]*models.Bookin
 		bookings = append(bookings, booking)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating upcoming bookings: %w", err)
+	}
+
 	return bookings, nil
 }
 
@@ -520,6 +528,10 @@ func (r *BookingRepository) GetForReminders() ([]*models.Booking, error) {
 		}
 
 		bookings = append(bookings, booking)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating reminder bookings: %w", err)
 	}
 
 	return bookings, nil
@@ -770,6 +782,10 @@ func (r *BookingRepository) GetPendingApprovalBookings(tenantID int) ([]*models.
 		}
 
 		bookings = append(bookings, booking)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating pending bookings: %w", err)
 	}
 
 	return bookings, nil

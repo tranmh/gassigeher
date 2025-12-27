@@ -195,15 +195,29 @@ func (s *StripeService) ParseCheckoutSessionEvent(event *stripe.Event) (*Checkou
 	}
 
 	data := &CheckoutSessionData{
-		CustomerID:     session.Customer.ID,
-		SubscriptionID: session.Subscription.ID,
-		CustomerEmail:  session.CustomerEmail,
+		CustomerEmail: session.CustomerEmail,
 	}
 
-	// Extract tenant_id from metadata
+	// Safely extract Customer ID (may be nil for guest checkout)
+	if session.Customer != nil {
+		data.CustomerID = session.Customer.ID
+	}
+
+	// Safely extract Subscription ID (may be nil for one-time payments)
+	if session.Subscription != nil {
+		data.SubscriptionID = session.Subscription.ID
+	}
+
+	// Extract tenant_id from metadata with proper error handling
 	if tenantIDStr, ok := session.Metadata["tenant_id"]; ok {
 		var tenantID int
-		fmt.Sscanf(tenantIDStr, "%d", &tenantID)
+		n, err := fmt.Sscanf(tenantIDStr, "%d", &tenantID)
+		if err != nil || n != 1 {
+			return nil, fmt.Errorf("invalid tenant_id in metadata: %s", tenantIDStr)
+		}
+		if tenantID <= 0 {
+			return nil, fmt.Errorf("tenant_id must be positive, got: %d", tenantID)
+		}
 		data.TenantID = tenantID
 	}
 

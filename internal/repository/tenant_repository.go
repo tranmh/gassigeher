@@ -225,6 +225,10 @@ func (r *TenantRepository) FindAll(status string) ([]*models.Tenant, error) {
 		tenants = append(tenants, tenant)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating tenants: %w", err)
+	}
+
 	return tenants, nil
 }
 

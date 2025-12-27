@@ -289,3 +289,270 @@ func TestFrontendFS_Security_NoInlineEventHandlers(t *testing.T) {
 		t.Errorf("Error walking filesystem: %v", err)
 	}
 }
+
+// ============================================================================
+// Landing Page Filesystem Tests
+// ============================================================================
+
+// TestLandingFS_ReturnsValidFilesystem tests that LandingFS returns a valid filesystem
+func TestLandingFS_ReturnsValidFilesystem(t *testing.T) {
+	fsys, err := LandingFS()
+	if err != nil {
+		t.Fatalf("LandingFS() returned error: %v", err)
+	}
+
+	if fsys == nil {
+		t.Fatal("LandingFS() returned nil filesystem")
+	}
+}
+
+// TestLandingFS_ContainsExpectedFiles tests that critical landing page files are embedded
+func TestLandingFS_ContainsExpectedFiles(t *testing.T) {
+	fsys, err := LandingFS()
+	if err != nil {
+		t.Fatalf("LandingFS() returned error: %v", err)
+	}
+
+	// List of critical files that must be embedded in landing pages
+	expectedFiles := []string{
+		"index.html",
+	}
+
+	for _, file := range expectedFiles {
+		t.Run(file, func(t *testing.T) {
+			_, err := fs.Stat(fsys, file)
+			if err != nil {
+				t.Errorf("Expected file %s not found in landing filesystem: %v", file, err)
+			}
+		})
+	}
+}
+
+// TestLandingFile_ReadsFileContent tests that LandingFile returns actual content
+func TestLandingFile_ReadsFileContent(t *testing.T) {
+	content, err := LandingFile("index.html")
+	if err != nil {
+		t.Fatalf("LandingFile(index.html) returned error: %v", err)
+	}
+
+	if len(content) == 0 {
+		t.Error("LandingFile(index.html) returned empty content")
+	}
+
+	// Verify it's actually HTML
+	contentStr := string(content)
+	if !strings.Contains(contentStr, "<html") && !strings.Contains(contentStr, "<!DOCTYPE") {
+		t.Error("landing/index.html does not appear to be valid HTML")
+	}
+}
+
+// TestLandingFile_ReturnsErrorForMissingFile tests error handling for missing files
+func TestLandingFile_ReturnsErrorForMissingFile(t *testing.T) {
+	_, err := LandingFile("nonexistent-file-12345.html")
+	if err == nil {
+		t.Error("LandingFile should return error for nonexistent file")
+	}
+}
+
+// TestLandingFS_CanReadFileContent tests reading file content through the filesystem
+func TestLandingFS_CanReadFileContent(t *testing.T) {
+	fsys, err := LandingFS()
+	if err != nil {
+		t.Fatalf("LandingFS() returned error: %v", err)
+	}
+
+	content, err := fs.ReadFile(fsys, "index.html")
+	if err != nil {
+		t.Fatalf("Failed to read landing index.html: %v", err)
+	}
+
+	if len(content) == 0 {
+		t.Error("Landing index.html is empty")
+	}
+
+	if !strings.Contains(string(content), "<html") {
+		t.Error("Landing index.html does not contain expected HTML tag")
+	}
+}
+
+// ============================================================================
+// Central Admin Filesystem Tests
+// ============================================================================
+
+// TestCentralFS_ReturnsValidFilesystem tests that CentralFS returns a valid filesystem
+func TestCentralFS_ReturnsValidFilesystem(t *testing.T) {
+	fsys, err := CentralFS()
+	if err != nil {
+		t.Fatalf("CentralFS() returned error: %v", err)
+	}
+
+	if fsys == nil {
+		t.Fatal("CentralFS() returned nil filesystem")
+	}
+}
+
+// TestCentralFS_ContainsExpectedFiles tests that critical central admin files are embedded
+func TestCentralFS_ContainsExpectedFiles(t *testing.T) {
+	fsys, err := CentralFS()
+	if err != nil {
+		t.Fatalf("CentralFS() returned error: %v", err)
+	}
+
+	// List of critical files that must be embedded in central admin
+	expectedFiles := []string{
+		"index.html",
+	}
+
+	for _, file := range expectedFiles {
+		t.Run(file, func(t *testing.T) {
+			_, err := fs.Stat(fsys, file)
+			if err != nil {
+				t.Errorf("Expected file %s not found in central filesystem: %v", file, err)
+			}
+		})
+	}
+}
+
+// TestCentralFile_ReadsFileContent tests that CentralFile returns actual content
+func TestCentralFile_ReadsFileContent(t *testing.T) {
+	content, err := CentralFile("index.html")
+	if err != nil {
+		t.Fatalf("CentralFile(index.html) returned error: %v", err)
+	}
+
+	if len(content) == 0 {
+		t.Error("CentralFile(index.html) returned empty content")
+	}
+
+	// Verify it's actually HTML
+	contentStr := string(content)
+	if !strings.Contains(contentStr, "<html") && !strings.Contains(contentStr, "<!DOCTYPE") {
+		t.Error("central/index.html does not appear to be valid HTML")
+	}
+}
+
+// TestCentralFile_ReturnsErrorForMissingFile tests error handling for missing files
+func TestCentralFile_ReturnsErrorForMissingFile(t *testing.T) {
+	_, err := CentralFile("nonexistent-file-12345.html")
+	if err == nil {
+		t.Error("CentralFile should return error for nonexistent file")
+	}
+}
+
+// TestCentralFS_CanReadFileContent tests reading file content through the filesystem
+func TestCentralFS_CanReadFileContent(t *testing.T) {
+	fsys, err := CentralFS()
+	if err != nil {
+		t.Fatalf("CentralFS() returned error: %v", err)
+	}
+
+	content, err := fs.ReadFile(fsys, "index.html")
+	if err != nil {
+		t.Fatalf("Failed to read central index.html: %v", err)
+	}
+
+	if len(content) == 0 {
+		t.Error("Central index.html is empty")
+	}
+
+	if !strings.Contains(string(content), "<html") {
+		t.Error("Central index.html does not contain expected HTML tag")
+	}
+}
+
+// ============================================================================
+// Cross-Filesystem Consistency Tests
+// ============================================================================
+
+// TestAllFilesystems_DoNotContainEmptyFiles tests that no embedded files are empty
+func TestAllFilesystems_DoNotContainEmptyFiles(t *testing.T) {
+	filesystems := map[string]func() (fs.FS, error){
+		"frontend": FrontendFS,
+		"landing":  LandingFS,
+		"central":  CentralFS,
+	}
+
+	for name, getFsys := range filesystems {
+		t.Run(name, func(t *testing.T) {
+			fsys, err := getFsys()
+			if err != nil {
+				t.Fatalf("%s FS returned error: %v", name, err)
+			}
+
+			err = fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+
+				if d.IsDir() {
+					return nil
+				}
+
+				info, err := d.Info()
+				if err != nil {
+					t.Errorf("Failed to get info for %s/%s: %v", name, path, err)
+					return nil
+				}
+
+				if info.Size() == 0 {
+					t.Errorf("File %s/%s is empty (0 bytes)", name, path)
+				}
+
+				return nil
+			})
+
+			if err != nil {
+				t.Errorf("Error walking %s filesystem: %v", name, err)
+			}
+		})
+	}
+}
+
+// TestAllFilesystems_HTMLFilesAreValid tests that all HTML files contain valid HTML markers
+func TestAllFilesystems_HTMLFilesAreValid(t *testing.T) {
+	filesystems := map[string]func() (fs.FS, error){
+		"frontend": FrontendFS,
+		"landing":  LandingFS,
+		"central":  CentralFS,
+	}
+
+	for name, getFsys := range filesystems {
+		t.Run(name, func(t *testing.T) {
+			fsys, err := getFsys()
+			if err != nil {
+				t.Fatalf("%s FS returned error: %v", name, err)
+			}
+
+			err = fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+
+				if d.IsDir() || !strings.HasSuffix(path, ".html") {
+					return nil
+				}
+
+				content, err := fs.ReadFile(fsys, path)
+				if err != nil {
+					t.Errorf("Failed to read %s/%s: %v", name, path, err)
+					return nil
+				}
+
+				contentStr := string(content)
+				hasHTML := strings.Contains(contentStr, "<html") ||
+					strings.Contains(contentStr, "<!DOCTYPE") ||
+					strings.Contains(contentStr, "<!doctype")
+
+				if !hasHTML {
+					t.Errorf("File %s/%s does not appear to be valid HTML", name, path)
+				}
+
+				return nil
+			})
+
+			if err != nil {
+				t.Errorf("Error walking %s filesystem: %v", name, err)
+			}
+		})
+	}
+}

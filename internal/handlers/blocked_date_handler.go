@@ -222,8 +222,8 @@ func (h *BlockedDateHandler) DeleteBlockedDate(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Delete blocked date
-	if err := h.blockedDateRepo.Delete(id); err != nil {
+	// Delete blocked date (with tenant isolation enforcement at DB level)
+	if err := h.blockedDateRepo.Delete(id, tenantID); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to delete blocked date")
 		return
 	}

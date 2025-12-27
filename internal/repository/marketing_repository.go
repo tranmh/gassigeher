@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/tranmh/gassigeher/internal/models"
@@ -96,7 +97,10 @@ func (r *MarketingRepository) CreateCampaign(c *models.MarketingCampaign) error 
 	if err != nil {
 		return err
 	}
-	id, _ := result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("failed to get inserted campaign ID: %w", err)
+	}
 	c.ID = int(id)
 	c.CreatedAt = now
 	c.UpdatedAt = now
@@ -211,7 +215,10 @@ func (r *MarketingRepository) CreateReferralCode(c *models.ReferralCode) error {
 	if err != nil {
 		return err
 	}
-	id, _ := result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("failed to get inserted referral code ID: %w", err)
+	}
 	c.ID = int(id)
 	c.CreatedAt = now
 	c.UpdatedAt = now
@@ -357,7 +364,10 @@ func (r *MarketingRepository) CreateReferenceEntry(e *models.ReferenceEntry) err
 	if err != nil {
 		return err
 	}
-	id, _ := result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("failed to get inserted reference entry ID: %w", err)
+	}
 	e.ID = int(id)
 	return nil
 }

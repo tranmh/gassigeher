@@ -324,6 +324,10 @@ func (r *DogRepository) FindAll(filter *models.DogFilterRequest, tenantID int) (
 		dogs = append(dogs, dog)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating dogs: %w", err)
+	}
+
 	return dogs, nil
 }
 
@@ -389,6 +393,10 @@ func (r *DogRepository) GetFeatured(tenantID int) ([]*models.Dog, error) {
 			dog.TenantID = int(tenantIDVal.Int64)
 		}
 		allFeatured = append(allFeatured, dog)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating featured dogs: %w", err)
 	}
 
 	// If 3 or fewer, return all
@@ -694,6 +702,10 @@ func (r *DogRepository) GetFutureBookings(dogID int) ([]*models.Booking, error) 
 		bookings = append(bookings, booking)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating future bookings: %w", err)
+	}
+
 	return bookings, nil
 }
 
@@ -752,6 +764,10 @@ func (r *DogRepository) GetBreeds() ([]string, error) {
 			return nil, fmt.Errorf("failed to scan breed: %w", err)
 		}
 		breeds = append(breeds, breed)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating breeds: %w", err)
 	}
 
 	return breeds, nil

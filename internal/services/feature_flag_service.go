@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"strconv"
 	"sync"
 	"time"
 
@@ -33,7 +34,7 @@ func NewFeatureFlagService(repo *repository.FeatureFlagRepository) *FeatureFlagS
 
 // cacheKey generates a cache key for tenant+flag combination
 func cacheKey(tenantID int, flagKey string) string {
-	return flagKey + ":" + string(rune(tenantID))
+	return flagKey + ":" + strconv.Itoa(tenantID)
 }
 
 // IsEnabled checks if a feature is enabled for a tenant (with caching)

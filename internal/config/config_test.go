@@ -335,3 +335,483 @@ func TestIsLocalDevelopment(t *testing.T) {
 		})
 	}
 }
+
+// TestIsBillingTestModeEnabled tests the IsBillingTestModeEnabled method
+func TestIsBillingTestModeEnabled(t *testing.T) {
+	tests := []struct {
+		name            string
+		billingTestMode bool
+		baseDomain      string
+		want            bool
+	}{
+		// Explicit billing test mode
+		{"explicit true", true, "example.com", true},
+		{"explicit true with local domain", true, "example.local", true},
+		{"explicit false production domain", false, "example.com", false},
+
+		// Auto-enabled for local development
+		{"auto-enabled for .local domain", false, "gassigeher.local", true},
+		{"auto-enabled for .localhost domain", false, "app.localhost", true},
+		{"auto-enabled for localhost", false, "localhost", true},
+
+		// Disabled for production
+		{"disabled for production .org", false, "gassigeher.org", false},
+		{"disabled for production .com", false, "example.com", false},
+		{"disabled for empty domain", false, "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{
+				BillingTestMode: tt.billingTestMode,
+				BaseDomain:      tt.baseDomain,
+			}
+			got := cfg.IsBillingTestModeEnabled()
+			if got != tt.want {
+				t.Errorf("IsBillingTestModeEnabled() = %v, want %v (BillingTestMode=%v, BaseDomain=%q)",
+					got, tt.want, tt.billingTestMode, tt.baseDomain)
+			}
+		})
+	}
+}
+
+// TestValidate tests the Validate method
+func TestValidate(t *testing.T) {
+	t.Run("valid default config", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:               "change-this-in-production-INSECURE",
+			JWTExpirationHours:      24,
+			BookingAdvanceDays:      14,
+			CancellationNoticeHours: 12,
+			AutoDeactivationDays:    365,
+			MaxUploadSizeMB:         5,
+			DBMaxOpenConns:          25,
+			DBMaxIdleConns:          5,
+			DBConnMaxLifetime:       5,
+			Port:                    "8080",
+			DBType:                  "sqlite",
+			EmailProvider:           "gmail",
+		}
+		err := cfg.Validate()
+		if err != nil {
+			t.Errorf("Expected no error for valid config, got: %v", err)
+		}
+	})
+
+	t.Run("invalid JWT secret in production SaaS mode", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:          "change-this-in-production-INSECURE",
+			BaseDomain:         "gassigeher.org", // Production domain
+			JWTExpirationHours: 24,
+			MaxUploadSizeMB:    5,
+			Port:               "8080",
+			DBType:             "sqlite",
+			EmailProvider:      "gmail",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for insecure JWT secret in production")
+		}
+	})
+
+	t.Run("short JWT secret in production", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:          "short", // Less than 32 chars
+			BaseDomain:         "gassigeher.org",
+			JWTExpirationHours: 24,
+			MaxUploadSizeMB:    5,
+			Port:               "8080",
+			DBType:             "sqlite",
+			EmailProvider:      "gmail",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for short JWT secret in production")
+		}
+	})
+
+	t.Run("invalid JWT expiration hours", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:          "change-this-in-production-INSECURE",
+			JWTExpirationHours: 0,
+			MaxUploadSizeMB:    5,
+			Port:               "8080",
+			DBType:             "sqlite",
+			EmailProvider:      "gmail",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for invalid JWT expiration hours")
+		}
+	})
+
+	t.Run("negative booking advance days", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:          "change-this-in-production-INSECURE",
+			JWTExpirationHours: 24,
+			BookingAdvanceDays: -1,
+			MaxUploadSizeMB:    5,
+			Port:               "8080",
+			DBType:             "sqlite",
+			EmailProvider:      "gmail",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for negative booking advance days")
+		}
+	})
+
+	t.Run("negative cancellation notice hours", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:               "change-this-in-production-INSECURE",
+			JWTExpirationHours:      24,
+			CancellationNoticeHours: -1,
+			MaxUploadSizeMB:         5,
+			Port:                    "8080",
+			DBType:                  "sqlite",
+			EmailProvider:           "gmail",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for negative cancellation notice hours")
+		}
+	})
+
+	t.Run("negative auto deactivation days", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:            "change-this-in-production-INSECURE",
+			JWTExpirationHours:   24,
+			AutoDeactivationDays: -1,
+			MaxUploadSizeMB:      5,
+			Port:                 "8080",
+			DBType:               "sqlite",
+			EmailProvider:        "gmail",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for negative auto deactivation days")
+		}
+	})
+
+	t.Run("invalid max upload size", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:          "change-this-in-production-INSECURE",
+			JWTExpirationHours: 24,
+			MaxUploadSizeMB:    0,
+			Port:               "8080",
+			DBType:             "sqlite",
+			EmailProvider:      "gmail",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for invalid max upload size")
+		}
+	})
+
+	t.Run("negative DB max open conns", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:          "change-this-in-production-INSECURE",
+			JWTExpirationHours: 24,
+			MaxUploadSizeMB:    5,
+			DBMaxOpenConns:     -1,
+			Port:               "8080",
+			DBType:             "sqlite",
+			EmailProvider:      "gmail",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for negative DB max open conns")
+		}
+	})
+
+	t.Run("negative DB max idle conns", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:          "change-this-in-production-INSECURE",
+			JWTExpirationHours: 24,
+			MaxUploadSizeMB:    5,
+			DBMaxIdleConns:     -1,
+			Port:               "8080",
+			DBType:             "sqlite",
+			EmailProvider:      "gmail",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for negative DB max idle conns")
+		}
+	})
+
+	t.Run("negative DB conn max lifetime", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:          "change-this-in-production-INSECURE",
+			JWTExpirationHours: 24,
+			MaxUploadSizeMB:    5,
+			DBConnMaxLifetime:  -1,
+			Port:               "8080",
+			DBType:             "sqlite",
+			EmailProvider:      "gmail",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for negative DB conn max lifetime")
+		}
+	})
+
+	t.Run("invalid port - not a number", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:          "change-this-in-production-INSECURE",
+			JWTExpirationHours: 24,
+			MaxUploadSizeMB:    5,
+			Port:               "invalid",
+			DBType:             "sqlite",
+			EmailProvider:      "gmail",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for invalid port")
+		}
+	})
+
+	t.Run("invalid port - out of range", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:          "change-this-in-production-INSECURE",
+			JWTExpirationHours: 24,
+			MaxUploadSizeMB:    5,
+			Port:               "70000",
+			DBType:             "sqlite",
+			EmailProvider:      "gmail",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for port out of range")
+		}
+	})
+
+	t.Run("invalid DB type", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:          "change-this-in-production-INSECURE",
+			JWTExpirationHours: 24,
+			MaxUploadSizeMB:    5,
+			Port:               "8080",
+			DBType:             "invalid",
+			EmailProvider:      "gmail",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for invalid DB type")
+		}
+	})
+
+	t.Run("invalid email provider", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:          "change-this-in-production-INSECURE",
+			JWTExpirationHours: 24,
+			MaxUploadSizeMB:    5,
+			Port:               "8080",
+			DBType:             "sqlite",
+			EmailProvider:      "invalid",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for invalid email provider")
+		}
+	})
+
+	t.Run("negative DB port for MySQL", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:          "change-this-in-production-INSECURE",
+			JWTExpirationHours: 24,
+			MaxUploadSizeMB:    5,
+			Port:               "8080",
+			DBType:             "mysql",
+			DBPort:             -1,
+			EmailProvider:      "gmail",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for negative DB port")
+		}
+	})
+
+	t.Run("invalid SMTP port", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:          "change-this-in-production-INSECURE",
+			JWTExpirationHours: 24,
+			MaxUploadSizeMB:    5,
+			Port:               "8080",
+			DBType:             "sqlite",
+			EmailProvider:      "smtp",
+			SMTPHost:           "smtp.example.com",
+			SMTPPort:           -1,
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for invalid SMTP port")
+		}
+	})
+
+	t.Run("S3 missing endpoint", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:          "change-this-in-production-INSECURE",
+			JWTExpirationHours: 24,
+			MaxUploadSizeMB:    5,
+			Port:               "8080",
+			DBType:             "sqlite",
+			EmailProvider:      "gmail",
+			UseS3:              true,
+			S3Endpoint:         "",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for missing S3 endpoint")
+		}
+	})
+
+	t.Run("S3 missing access key", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:          "change-this-in-production-INSECURE",
+			JWTExpirationHours: 24,
+			MaxUploadSizeMB:    5,
+			Port:               "8080",
+			DBType:             "sqlite",
+			EmailProvider:      "gmail",
+			UseS3:              true,
+			S3Endpoint:         "endpoint.example.com",
+			S3AccessKey:        "",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for missing S3 access key")
+		}
+	})
+
+	t.Run("S3 missing secret key", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:          "change-this-in-production-INSECURE",
+			JWTExpirationHours: 24,
+			MaxUploadSizeMB:    5,
+			Port:               "8080",
+			DBType:             "sqlite",
+			EmailProvider:      "gmail",
+			UseS3:              true,
+			S3Endpoint:         "endpoint.example.com",
+			S3AccessKey:        "access",
+			S3SecretKey:        "",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for missing S3 secret key")
+		}
+	})
+
+	t.Run("S3 missing bucket name", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:          "change-this-in-production-INSECURE",
+			JWTExpirationHours: 24,
+			MaxUploadSizeMB:    5,
+			Port:               "8080",
+			DBType:             "sqlite",
+			EmailProvider:      "gmail",
+			UseS3:              true,
+			S3Endpoint:         "endpoint.example.com",
+			S3AccessKey:        "access",
+			S3SecretKey:        "secret",
+			S3BucketName:       "",
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Error("Expected error for missing S3 bucket name")
+		}
+	})
+
+	t.Run("valid S3 config", func(t *testing.T) {
+		cfg := &Config{
+			JWTSecret:          "change-this-in-production-INSECURE",
+			JWTExpirationHours: 24,
+			MaxUploadSizeMB:    5,
+			Port:               "8080",
+			DBType:             "sqlite",
+			EmailProvider:      "gmail",
+			UseS3:              true,
+			S3Endpoint:         "endpoint.example.com",
+			S3AccessKey:        "access",
+			S3SecretKey:        "secret",
+			S3BucketName:       "bucket",
+		}
+		err := cfg.Validate()
+		if err != nil {
+			t.Errorf("Expected no error for valid S3 config, got: %v", err)
+		}
+	})
+}
+
+// TestGetDefaultDBPort tests the GetDefaultDBPort method
+func TestGetDefaultDBPort(t *testing.T) {
+	tests := []struct {
+		name   string
+		dbType string
+		want   int
+	}{
+		{"MySQL default port", "mysql", 3306},
+		{"PostgreSQL default port", "postgres", 5432},
+		{"SQLite no port", "sqlite", 0},
+		{"Unknown type no port", "unknown", 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{DBType: tt.dbType}
+			got := cfg.GetDefaultDBPort()
+			if got != tt.want {
+				t.Errorf("GetDefaultDBPort() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestGetEffectiveDBPort tests the GetEffectiveDBPort method
+func TestGetEffectiveDBPort(t *testing.T) {
+	tests := []struct {
+		name   string
+		dbType string
+		dbPort int
+		want   int
+	}{
+		{"explicit MySQL port", "mysql", 3307, 3307},
+		{"default MySQL port", "mysql", 0, 3306},
+		{"explicit PostgreSQL port", "postgres", 5433, 5433},
+		{"default PostgreSQL port", "postgres", 0, 5432},
+		{"SQLite no port", "sqlite", 0, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{DBType: tt.dbType, DBPort: tt.dbPort}
+			got := cfg.GetEffectiveDBPort()
+			if got != tt.want {
+				t.Errorf("GetEffectiveDBPort() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestGetEnvRequired tests the getEnvRequired helper function
+func TestGetEnvRequired(t *testing.T) {
+	t.Run("returns env value when set", func(t *testing.T) {
+		os.Setenv("TEST_REQUIRED_VAR", "secure-value")
+		defer os.Unsetenv("TEST_REQUIRED_VAR")
+
+		result := getEnvRequired("TEST_REQUIRED_VAR", "insecure-default")
+		if result != "secure-value" {
+			t.Errorf("Expected 'secure-value', got '%s'", result)
+		}
+	})
+
+	t.Run("returns insecure default when not set", func(t *testing.T) {
+		os.Unsetenv("TEST_UNSET_REQUIRED")
+
+		result := getEnvRequired("TEST_UNSET_REQUIRED", "insecure-default")
+		if result != "insecure-default" {
+			t.Errorf("Expected 'insecure-default', got '%s'", result)
+		}
+	})
+}

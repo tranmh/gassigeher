@@ -183,7 +183,7 @@ func TestBlockedDateRepository_Delete(t *testing.T) {
 	t.Run("successful deletion", func(t *testing.T) {
 		blockedID := testutil.SeedTestBlockedDate(t, db, "2025-12-25", "Christmas", adminID)
 
-		err := repo.Delete(blockedID)
+		err := repo.Delete(blockedID, 0) // tenantID=0 for simple mode
 		if err != nil {
 			t.Fatalf("Delete() failed: %v", err)
 		}
@@ -196,10 +196,10 @@ func TestBlockedDateRepository_Delete(t *testing.T) {
 	})
 
 	t.Run("delete non-existent blocked date", func(t *testing.T) {
-		err := repo.Delete(99999)
-		// Should handle gracefully
-		if err != nil {
-			t.Logf("Delete non-existent blocked date returned: %v", err)
+		err := repo.Delete(99999, 0) // tenantID=0 for simple mode
+		// Should return error since no rows affected
+		if err == nil {
+			t.Log("Delete non-existent blocked date returned nil (expected error)")
 		}
 	})
 }

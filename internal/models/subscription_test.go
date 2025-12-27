@@ -257,3 +257,77 @@ func TestSubscriptionRequest_Validate(t *testing.T) {
 		})
 	}
 }
+
+// TestGetDefaultFreePlan tests the GetDefaultFreePlan function
+func TestGetDefaultFreePlan(t *testing.T) {
+	plan := GetDefaultFreePlan()
+
+	if plan == nil {
+		t.Fatal("GetDefaultFreePlan() returned nil")
+	}
+
+	if plan.Slug != "free" {
+		t.Errorf("Slug = %s, want free", plan.Slug)
+	}
+
+	if plan.Name != "Free" {
+		t.Errorf("Name = %s, want Free", plan.Name)
+	}
+
+	if plan.PriceMonthly != 0 {
+		t.Errorf("PriceMonthly = %d, want 0", plan.PriceMonthly)
+	}
+
+	if plan.PriceYearly != 0 {
+		t.Errorf("PriceYearly = %d, want 0", plan.PriceYearly)
+	}
+
+	if plan.MaxDogs != 10 {
+		t.Errorf("MaxDogs = %d, want 10", plan.MaxDogs)
+	}
+
+	if plan.IsUnlimited() {
+		t.Error("Free plan should not be unlimited")
+	}
+}
+
+// TestGetDefaultProPlan tests the GetDefaultProPlan function
+func TestGetDefaultProPlan(t *testing.T) {
+	plan := GetDefaultProPlan()
+
+	if plan == nil {
+		t.Fatal("GetDefaultProPlan() returned nil")
+	}
+
+	if plan.Slug != "pro" {
+		t.Errorf("Slug = %s, want pro", plan.Slug)
+	}
+
+	if plan.Name != "Pro" {
+		t.Errorf("Name = %s, want Pro", plan.Name)
+	}
+
+	// Pro plan should have prices set
+	if plan.PriceMonthly == 0 {
+		t.Error("PriceMonthly should not be 0 for pro plan")
+	}
+
+	if plan.PriceYearly == 0 {
+		t.Error("PriceYearly should not be 0 for pro plan")
+	}
+
+	// Pro plan should have unlimited dogs
+	if plan.MaxDogs != -1 {
+		t.Errorf("MaxDogs = %d, want -1 (unlimited)", plan.MaxDogs)
+	}
+
+	if !plan.IsUnlimited() {
+		t.Error("Pro plan should be unlimited")
+	}
+
+	// Yearly should be cheaper than 12x monthly
+	yearlySavings := plan.GetYearlySavings()
+	if yearlySavings <= 0 {
+		t.Errorf("GetYearlySavings() = %d, want > 0", yearlySavings)
+	}
+}

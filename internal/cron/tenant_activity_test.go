@@ -1,8 +1,12 @@
+//go:build integration
+
 package cron
 
 import (
 	"testing"
 	"time"
+
+	"github.com/tranmh/gassigeher/internal/testutil"
 )
 
 func TestNewTenantActivityChecker(t *testing.T) {
@@ -335,6 +339,212 @@ func TestMostRecentActivitySelection(t *testing.T) {
 // Helper function to create time pointers
 func timePtr(t time.Time) *time.Time {
 	return &t
+}
+
+// ============================================================================
+// parseTimestampString Tests
+// ============================================================================
+
+func TestParseTimestampString(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantErr   bool
+		wantEmpty bool
+	}{
+		{
+			name:      "empty string",
+			input:     "",
+			wantErr:   true,
+			wantEmpty: true,
+		},
+		{
+			name:    "RFC3339 format",
+			input:   "2025-01-15T14:30:00Z",
+			wantErr: false,
+		},
+		{
+			name:    "RFC3339 with timezone offset",
+			input:   "2025-01-15T14:30:00+01:00",
+			wantErr: false,
+		},
+		{
+			name:    "RFC3339Nano format",
+			input:   "2025-01-15T14:30:00.123456789Z",
+			wantErr: false,
+		},
+		{
+			name:    "legacy format with monotonic clock suffix",
+			input:   "2025-01-15 14:30:00.123456789 +0100 CET m=+123.456",
+			wantErr: false,
+		},
+		{
+			name:    "date only format",
+			input:   "2025-01-15",
+			wantErr: false,
+		},
+		{
+			name:    "datetime without T separator",
+			input:   "2025-01-15 14:30:00",
+			wantErr: false,
+		},
+		{
+			name:    "datetime with T but no timezone",
+			input:   "2025-01-15T14:30:00",
+			wantErr: false,
+		},
+		{
+			name:    "invalid format",
+			input:   "not-a-date",
+			wantErr: true,
+		},
+		{
+			name:    "partial invalid format",
+			input:   "2025-13-45",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseTimestampString(tt.input)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("parseTimestampString(%q) expected error, got nil", tt.input)
+				}
+				if !tt.wantEmpty && result.IsZero() {
+					// Expected
+				}
+			} else {
+				if err != nil {
+					t.Errorf("parseTimestampString(%q) unexpected error: %v", tt.input, err)
+				}
+				if result.IsZero() {
+					t.Errorf("parseTimestampString(%q) returned zero time", tt.input)
+				}
+			}
+		})
+	}
+}
+
+func TestParseTimestampString_MonotonicClockFormats(t *testing.T) {
+	// Test various monotonic clock suffix formats that might appear in the database
+	formats := []string{
+		"2025-12-24 14:30:00.123456789 +0100 CET m=+123.456",
+		"2025-12-24 14:30:00.123456 +0100 CET m=+0.001",
+		"2025-12-24 14:30:00 +0100 CET m=+0.0",
+		"2025-12-24 14:30:00.999999999 -0700 PST m=+999999.999",
+	}
+
+	for _, format := range formats {
+		t.Run(format, func(t *testing.T) {
+			result, err := parseTimestampString(format)
+			if err != nil {
+				t.Errorf("parseTimestampString(%q) unexpected error: %v", format, err)
+				return
+			}
+			if result.IsZero() {
+				t.Errorf("parseTimestampString(%q) returned zero time", format)
+			}
+			// Verify year is correct
+			if result.Year() != 2025 {
+				t.Errorf("parseTimestampString(%q) year = %d, want 2025", format, result.Year())
+			}
+		})
+	}
+}
+
+// ============================================================================
+// Database Integration Tests for TenantActivityChecker
+// ============================================================================
+
+func TestCheckAndFlagInactiveTenants_NoActiveTenants(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+	db := testutil.SetupTestDB(t)
+	checker := NewTenantActivityChecker(db, 30)
+
+	// Clear tenants or set all to non-active
+	_, err := db.Exec("UPDATE tenants SET status = 'suspended' WHERE 1=1")
+	if err != nil {
+		t.Fatalf("Failed to update tenants: %v", err)
+	}
+
+	err = checker.CheckAndFlagInactiveTenants()
+	if err != nil {
+		t.Errorf("CheckAndFlagInactiveTenants failed: %v", err)
+	}
+}
+
+func TestCheckAndFlagInactiveTenants_ActiveTenants(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+	db := testutil.SetupTestDB(t)
+	checker := NewTenantActivityChecker(db, 30)
+
+	err := checker.CheckAndFlagInactiveTenants()
+	if err != nil {
+		t.Errorf("CheckAndFlagInactiveTenants failed: %v", err)
+	}
+}
+
+func TestGetInactiveTenants_ReturnsResults(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+	db := testutil.SetupTestDB(t)
+	checker := NewTenantActivityChecker(db, 30)
+
+	results, err := checker.GetInactiveTenants()
+	if err != nil {
+		t.Errorf("GetInactiveTenants failed: %v", err)
+	}
+
+	// Verify results contain expected fields (if any)
+	for _, r := range results {
+		if r.TenantID == 0 {
+			t.Error("TenantID should not be 0")
+		}
+		if r.TenantSlug == "" {
+			t.Error("TenantSlug should not be empty")
+		}
+		if !r.IsInactive {
+			t.Error("Returned tenant should be inactive")
+		}
+	}
+}
+
+func TestGetAllTenantActivity_ReturnsResults(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+	db := testutil.SetupTestDB(t)
+	checker := NewTenantActivityChecker(db, 30)
+
+	results, err := checker.GetAllTenantActivity()
+	if err != nil {
+		t.Errorf("GetAllTenantActivity failed: %v", err)
+	}
+
+	// Verify structure of returned data
+	for _, r := range results {
+		if r.TenantID == 0 {
+			t.Error("TenantID should not be 0")
+		}
+		if r.TenantSlug == "" {
+			t.Error("TenantSlug should not be empty")
+		}
+		if r.TenantName == "" {
+			t.Error("TenantName should not be empty")
+		}
+		// DaysInactive should be calculated
+		if r.DaysInactive < 0 {
+			t.Error("DaysInactive should not be negative")
+		}
+	}
 }
 
 // BUG 3 RED PHASE: CheckAndFlagInactiveTenants should actually flag tenants

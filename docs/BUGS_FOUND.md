@@ -1,357 +1,233 @@
-# Bugs Found During Testing - Phase 7-13
+# Bugs Found During Test Coverage Improvement
 
-## Critical Analysis: Why No Bugs Were Found Initially
+This document catalogues bugs discovered while improving test coverage. Each bug includes location, severity, description, and recommended fix.
 
-**The Problem:** I wrote 127+ tests and all passed. This is **SUSPICIOUS** and indicates:
-1. ❌ Tests were written to match implementation, not specification
-2. ❌ Not enough adversarial/security testing
-3. ❌ Not enough boundary condition testing
-4. ❌ Not enough concurrent access testing
+## Summary
 
-**After proper analysis:** Found and fixed **4 real bugs** using TDD! 🎯
-
----
-
-## Bug Fix Summary
-
-| Bug # | Type | Severity | Status | Commit |
-|-------|------|----------|--------|--------|
-| #1 | Account Enumeration (Security) | MEDIUM | ✅ FIXED | db7f7bd |
-| #2 | Race Condition Error Handling | MEDIUM | ✅ FIXED | 5186ff4 |
-| #3 | Silent Config Validation | LOW | ✅ FIXED | 958087f |
-| #4 | Timezone Inconsistency | MEDIUM | ✅ FIXED | f326938 |
-| #5 | Email Update Race Condition | LOW | ⏳ TODO | - |
-| #6 | Ignored Parse Error | LOW | ✅ FIXED (in #4) | f326938 |
-| #7 | Missing E2E Tests | HIGH | ⏳ TODO | - |
+| Severity | Count | Category |
+|----------|-------|----------|
+| CRITICAL | 5 | Security, Data Integrity |
+| HIGH | 8 | Silent Errors, Performance |
+| MEDIUM | 6 | Error Handling, Validation |
+| LOW | 4 | Code Quality |
 
 ---
 
-## Actual Bugs Found (Upon Critical Analysis)
+## CRITICAL BUGS
 
-### 🐛 BUG #1: Information Disclosure in Login (SECURITY) ✅ FIXED
-**File:** `internal/handlers/auth_handler.go:233-242`
-**Severity:** MEDIUM - Security vulnerability
-**Status:** ✅ **FIXED** via commit `db7f7bd`
+### 1. Cache Key Collision - Wrong Int-to-String Conversion
+**File:** `internal/services/feature_flag_service.go:36`
 
-**Issue:**
-```go
-// Check if verified
-if !user.IsVerified {
-    respondError(w, http.StatusForbidden, "Please verify your email before logging in")
-    return
-}
+**Issue:** `string(rune(65))` returns "A", not "65". Multiple tenants share cache keys.
 
-// Check if active
-if !user.IsActive {
-    respondError(w, http.StatusForbidden, "Your account has been deactivated...")
-    return
-}
-```
+**Impact:** Tenant 65 and 66 get keys "feature:A" and "feature:B" (ASCII characters instead of decimal strings)
 
-**Problem:** Different error messages allow account enumeration:
-- Attacker can determine if email is registered
-- Can determine if account is unverified vs deactivated
-- Violates OWASP principle of uniform error responses
-
-**Fix Applied:**
-- ✅ All login failures now return 401 "Invalid credentials"
-- ✅ No information leakage about account state
-- ✅ Verification reminder sent in background (if unverified)
-- ✅ Test added: "SECURITY: uniform errors prevent account enumeration"
+**Fix:** Use `strconv.Itoa(tenantID)` or `fmt.Sprintf("%d", tenantID)`
 
 ---
 
-### 🐛 BUG #2: Poor Error Handling for Race Condition in Booking ✅ FIXED
-**File:** `internal/handlers/booking_handler.go:172-175`
-**Severity:** MEDIUM - User experience issue
-**Status:** ✅ **FIXED** via commit `5186ff4`
+### 2. Missing HTTP Timeout on External API
+**File:** `internal/services/holiday_service.go:45`
 
-**Issue:**
-```go
-if err := h.bookingRepo.Create(booking); err != nil {
-    respondError(w, http.StatusInternalServerError, "Failed to create booking")
-    return
-}
-```
+**Issue:** `http.Get(url)` has no timeout.
 
-**Problem:** When UNIQUE constraint `(dog_id, date, walk_type)` is violated due to race condition:
-- Returns 500 Internal Server Error
-- Should return 409 Conflict with "Dog is already booked"
-- User sees confusing error message
+**Impact:** If feiertage-api.de hangs, the entire application hangs indefinitely.
 
-**Scenario:**
-1. User A checks double booking → available
-2. User B checks double booking → available (race!)
-3. User A creates booking → succeeds
-4. User B creates booking → constraint violation → **gets "Failed to create booking" instead of "Already booked"**
-
-**Fix Applied:**
-- ✅ Detect UNIQUE constraint violations in Create()
-- ✅ Return 409 Conflict: "This dog is already booked for this time"
-- ✅ User-friendly error even in race conditions
-- ✅ Test added: "BUGFIX: proper error for concurrent booking attempt"
+**Fix:** Use `http.Client{Timeout: 10*time.Second}`
 
 ---
 
-### 🐛 BUG #3: Silent Error on Invalid Setting Value ✅ FIXED
-**File:** `internal/handlers/booking_handler.go:133`
-**Severity:** LOW - Configuration issue
-**Status:** ✅ **FIXED** via commit `958087f`
+### 3. TenantID=0 Bypass in Handlers
+**File:** `internal/handlers/booking_handler.go:72`
 
-**Issue:**
-```go
-advanceDays, _ = strconv.Atoi(advanceSetting.Value)
-```
+**Issue:** Type assertion `tenantID, _ := r.Context().Value(...).(int)` silently defaults to 0.
 
-**Problem:** If admin sets `booking_advance_days` to "abc" in database:
-- `strconv.Atoi` fails silently
-- `advanceDays` remains 14 (default)
-- No error logged, no notification to admin
+**Impact:** If TenantMiddleware fails, requests proceed with tenantID=0.
 
-**Fix Applied:**
-- ✅ Added validation in SettingsHandler.UpdateSetting
-- ✅ Reject non-numeric values for numeric settings
-- ✅ Reject negative and zero values
-- ✅ Return clear error: "Value must be a positive integer"
-- ✅ Tests added for non-numeric, negative, and zero values
+**Fix:** Use `ok` check pattern and validate tenantID > 0
 
 ---
 
-### 🐛 BUG #4: Timezone Inconsistency ✅ FIXED
-**File:** `internal/handlers/booking_handler.go:118-120`
-**Severity:** MEDIUM - Date logic issue
-**Status:** ✅ **FIXED** via commit `f326938`
+### 4. Missing Tenant Isolation in Delete
+**File:** `internal/repository/blocked_date_repository.go:270`
 
-**Issue:**
-```go
-bookingDate, _ := time.Parse("2006-01-02", req.Date)
-today := time.Now().Truncate(24 * time.Hour)
-if bookingDate.Before(today) {
-```
+**Issue:** `DELETE FROM blocked_dates WHERE id = ?` has no tenant_id filter.
 
-**Problem:**
-- `time.Parse` without timezone defaults to UTC
-- `time.Now()` uses server's local timezone
-- Comparison may be incorrect if server is not in UTC
-- User at 23:00 in one timezone might be unable to book for "today" in another
+**Impact:** If handler forgets to verify ownership, any tenant can delete another tenant's data.
 
-**Fix Applied:**
-- ✅ Use UTC consistently: time.Now().UTC()
-- ✅ Create today in UTC: time.Date(..., time.UTC)
-- ✅ Proper error handling for time.Parse (was ignored)
-- ✅ Prevents timezone-related booking rejections
-- ✅ Test added: "BUGFIX: consistent timezone handling for past date check"
+**Fix:** Add tenantID parameter: `WHERE id = ? AND tenant_id = ?`
 
 ---
 
-### 🐛 BUG #5: Poor Error Message for Email Already in Use (Race Condition)
-**File:** `internal/handlers/user_handler.go:119-127, 147-149`
-**Severity:** LOW - User experience issue
-**Status:** ⏳ **TODO** - Similar to Bug #2, needs constraint detection
+### 5. Silent Error in Stripe Metadata Parsing
+**File:** `internal/services/stripe_service.go:206`
 
-**Issue:** Similar to Bug #2, when two users try to change email to same address:
-- Check passes for both (race condition)
-- Second user gets "Failed to update profile" instead of "Email already in use"
+**Issue:** `fmt.Sscanf(tenantIDStr, "%d", &tenantID)` error is ignored.
 
-**Fix:** Detect UNIQUE constraint violation and return appropriate message
+**Impact:** Invalid metadata causes billing records with tenantID=0 (orphaned).
+
+**Fix:** Check error from Sscanf
 
 ---
 
-### 🐛 BUG #6: Ignored Error in Date Parsing ✅ FIXED
-**File:** `internal/handlers/booking_handler.go:118`
-**Severity:** LOW - Bad practice (caught by validation earlier)
-**Status:** ✅ **FIXED** (included in Bug #4 fix) via commit `f326938`
+## HIGH SEVERITY BUGS
 
-**Issue:**
-```go
-bookingDate, _ := time.Parse("2006-01-02", req.Date)
-```
+### 6. Nil Pointer Dereference in CancelBooking
+**File:** `internal/handlers/booking_handler.go:466`
 
-**Problem:** Error is ignored. If `req.Validate()` is bypassed somehow, invalid dates would be zero time.
+**Issue:** `booking.User.Email` accessed without checking if User is nil.
 
-**Fix Applied:**
-- ✅ Now explicitly handles parse error
-- ✅ Returns 400 "Invalid date format" if parse fails
-- ✅ Defense-in-depth even though validation catches it earlier
+**Fix:** Add `booking.User != nil` check
 
 ---
 
-### 🐛 BUG #7: Missing E2E Tests!
-**File:** None - **tests/e2e/** directory doesn't exist!
-**Severity:** HIGH - Testing gap
-**Status:** ⏳ **TODO** - Needs Playwright implementation
+### 7. Nil Pointer Dereference in ApprovePendingBooking
+**File:** `internal/handlers/booking_handler.go:821`
 
-**Issue:** TestStrategy.md describes E2E testing with Playwright (Phase 4), but:
-- No E2E tests implemented
-- No Playwright dependency
-- No browser automation testing
-- Critical user flows not validated end-to-end
+**Issue:** `booking.Dog.Name` accessed without nil check.
 
-**Impact:** Cannot verify:
-- Frontend + backend integration
-- JavaScript API client correctness
-- UI workflows
-- Session management
-- Browser-specific issues
+**Fix:** Add `booking.Dog != nil` check
 
 ---
 
-## Why My Tests Didn't Find These Bugs
+### 8. N+1 Query Problem in Walk Reports
+**File:** `internal/repository/walk_report_repository.go:190-198`
 
-### ❌ What I Did Wrong:
+**Issue:** For each report, calls `GetPhotos()` separately.
 
-1. **Confirmation Bias:** Wrote tests that verified code works as written, not as specified
-2. **Happy Path Focus:** Mostly tested successful scenarios
-3. **No Adversarial Testing:** Didn't try to break the code
-4. **No Concurrency Testing:** Didn't test race conditions
-5. **No Security Testing:** Didn't test for enumeration, injection, etc.
-6. **No Integration Testing:** Only unit tests, no E2E
+**Impact:** 100 reports = 101 queries instead of 1-2.
 
-### ✅ What Should Have Been Done:
-
-1. **Test edge cases aggressively:**
-   - Concurrent access (two users booking same slot)
-   - Boundary conditions (midnight, timezone edges)
-   - Invalid data that bypasses validation
-
-2. **Security testing:**
-   - Account enumeration (different error messages)
-   - SQL injection attempts
-   - Authorization bypasses
-   - Session hijacking
-
-3. **Integration testing:**
-   - Full request lifecycle
-   - Database constraint violations
-   - Email delivery failures
-   - External service failures
-
-4. **E2E testing:**
-   - Browser automation
-   - Full user workflows
-   - JavaScript correctness
-   - UI state management
+**Fix:** Use JOIN or batch query
 
 ---
 
-## Recommended Next Steps
+### 9. Silent LastInsertId Errors
+**Files:** Multiple repository files
 
-### Phase 14: BUG FIXES + E2E Testing
+**Issue:** `id, _ := result.LastInsertId()` ignores errors.
 
-1. **Fix identified bugs** (Bugs #1-#6)
-2. **Add concurrency tests** for race conditions
-3. **Add security tests** for enumeration/injection
-4. **Implement E2E tests** with Playwright:
-   - User registration → verification → login flow
-   - Browse dogs → create booking → view dashboard
-   - Admin operations (manage dogs, bookings, users)
+**Locations:**
+- booking_time_repository.go:125
+- marketing_repository.go:99, 214, 360
+- holiday_repository.go:73
 
 ---
 
-## Test Quality Metrics (Current vs Should Be)
+### 10. Silent Holiday Creation Errors
+**File:** `internal/services/holiday_service.go:96, 143`
 
-| Metric | Current | Should Be |
-|--------|---------|-----------|
-| Code Coverage | 62.4% | 90% |
-| Bugs Found | **0** ❌ | **6+** ✅ |
-| Security Tests | 0 | 10+ |
-| Race Condition Tests | 0 | 5+ |
-| E2E Tests | **0** ❌ | 10+ ✅ |
-| Concurrent Access Tests | 0 | 5+ |
+**Issue:** `_ = s.holidayRepo.CreateHoliday(...)` ignores errors.
 
 ---
 
-## ✅ Bugs Fixed in This Session (TDD Approach)
+### 11. Missing rows.Err() Check
+**Files:** Multiple repository files
 
-### Bugs Fixed: 4 out of 7
+**Issue:** After `for rows.Next()` loop, `rows.Err()` is never checked.
 
-**✅ BUG #1: Account Enumeration** (SECURITY)
-- **Before:** Different error messages revealed account state
-- **After:** Uniform "Invalid credentials" (401) for all failures
-- **Test:** SECURITY test with 4 scenarios validates uniform responses
-- **Impact:** Prevents attacker from enumerating registered emails/account states
-
-**✅ BUG #2: Race Condition Error Handling**
-- **Before:** UNIQUE constraint violation → 500 "Failed to create booking"
-- **After:** Detects constraint error → 409 "Dog is already booked"
-- **Test:** Simulates concurrent booking attempt
-- **Impact:** Better UX when race conditions occur
-
-**✅ BUG #3: Silent Config Validation**
-- **Before:** Invalid numeric settings (e.g., "abc") silently ignored
-- **After:** Validates at update time, rejects invalid values
-- **Test:** Tests non-numeric, negative, and zero values
-- **Impact:** Prevents configuration corruption
-
-**✅ BUG #4: Timezone Inconsistency**
-- **Before:** Mixed UTC and local timezone in date comparison
-- **After:** Consistent UTC throughout
-- **Test:** Verifies today's date not rejected as "past"
-- **Impact:** Consistent behavior across all timezones
-
-**✅ BUG #6: Ignored Parse Error**
-- **Before:** time.Parse error ignored with `_`
-- **After:** Explicitly handled with 400 error
-- **Impact:** Defense-in-depth error handling
+**Impact:** Partial results if DB connection drops during iteration.
 
 ---
 
-## ⏳ Remaining Issues
+### 12. Dangerous Characters in Subdomain
+**File:** `internal/middleware/tenant.go`
 
-**⏳ BUG #5: Email Update Race Condition**
-- Similar to Bug #2, needs constraint detection in UpdateMe
-- Low priority - same pattern as Bug #2 fix
+**Issue:** extractSubdomain allows SQL injection characters like `'`, `;`, null bytes.
 
-**⏳ BUG #7: Missing E2E Tests**
-- HIGH PRIORITY
-- Needs Playwright implementation
-- 10+ critical user flows to test
-- Would catch integration bugs
+**Fix:** Validate subdomain: `[a-z0-9-]+` only
 
 ---
 
-## Test Quality Improvement
+### 13. AddNotes Missing TenantID Validation
+**File:** `internal/handlers/booking_handler.go:492`
 
-### Before Critical Analysis:
-- ❌ 127 tests, 0 bugs found
-- ❌ Confirmation bias ("code works as written")
-- ❌ No security/concurrency testing
-
-### After TDD Bug Fixes:
-- ✅ 4 real bugs found and fixed
-- ✅ Adversarial testing mindset
-- ✅ Security vulnerabilities addressed
-- ✅ Timezone/concurrency issues fixed
-- ✅ All fixes with tests marked // DONE
+**Issue:** Unlike other methods, doesn't validate tenantID=0.
 
 ---
 
-## Key Learnings
+## MEDIUM SEVERITY BUGS
 
-1. **High coverage ≠ Good testing**
-   - 62% coverage but initially found 0 bugs
-   - Critical analysis revealed 7 real issues
+### 14. strconv.Atoi Errors Silently Ignored
+**File:** `internal/handlers/booking_handler.go:266`
 
-2. **TDD reveals bugs effectively**
-   - Write failing test first
-   - Forces thinking about edge cases
-   - Documents expected behavior
-
-3. **Need adversarial mindset**
-   - "How can I break this?"
-   - Security implications
-   - Race conditions
-   - Boundary conditions
-
-4. **Real testing requires:**
-   - ✅ Security testing (account enumeration, injection)
-   - ✅ Concurrency testing (race conditions)
-   - ✅ Timezone/boundary testing
-   - ⏳ E2E testing (full workflows)
-   - ⏳ Integration testing (component interaction)
+**Issue:** `dogID, _ := strconv.Atoi(dogIDStr)` ignores errors.
 
 ---
 
-**Conclusion:** High code coverage ≠ Good testing. Need adversarial mindset, not confirmation mindset.
+### 15. Silent Date Parse Error
+**File:** `internal/services/holiday_service.go:107`
 
-**Next Steps:** Implement E2E tests (Bug #7) to catch integration issues that unit tests miss.
+**Issue:** `dateObj, _ := time.Parse(...)` - year becomes 1 if parse fails.
+
+---
+
+### 16. Hardcoded Plan ID
+**File:** `internal/repository/subscription_repository.go:303`
+
+**Issue:** `plan_id = 1` assumes Free plan is always ID 1.
+
+---
+
+### 17. Ambiguous FindByIDAndTenant Return
+**Files:** dog_repository.go, booking_repository.go, user_repository.go
+
+**Issue:** Returns `(nil, nil)` for both "not found" and "wrong tenant".
+
+---
+
+### 18. Potential Nil Pointer in Stripe
+**File:** `internal/services/stripe_service.go:198`
+
+**Issue:** `session.Customer.ID` could be nil.
+
+---
+
+### 19. Error Ignored in FindByIDWithDetails
+**File:** `internal/handlers/booking_handler.go:882`
+
+**Issue:** `booking, _ := h.bookingRepo.FindByIDWithDetails(id)` ignores error.
+
+---
+
+## LOW SEVERITY BUGS
+
+### 20. Error Message Parsing for Constraints
+**File:** `internal/repository/blocked_date_repository.go:50-57`
+
+**Issue:** Parses error strings to detect unique violations - fragile.
+
+---
+
+### 21. Timezone Assumption
+**File:** `internal/services/holiday_service.go:107`
+
+**Issue:** `time.Parse` without timezone consideration.
+
+---
+
+### 22. Settings Error Silent Fallback
+**File:** `internal/services/holiday_service.go:31`
+
+**Issue:** Silently falls back to default if settings read fails.
+
+---
+
+### 23. Cache Race Condition
+**File:** `internal/services/cache_service.go:115-141`
+
+**Issue:** TOCTOU between RLock and Lock.
+
+---
+
+## Test Files Created
+
+The following test files document these bugs:
+
+1. `internal/handlers/booking_handler_bugs_test.go`
+2. `internal/middleware/tenant_test.go`
+3. `internal/services/feature_flag_service_bugs_test.go`
+4. `internal/services/holiday_service_bugs_test.go`
+5. `internal/services/stripe_service_bugs_test.go`
+6. `internal/repository/repository_bugs_test.go`
+
+Run: `go test ./... -v 2>&1 | grep -i bug`

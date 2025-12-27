@@ -121,6 +121,10 @@ func (r *BlockedDateRepository) FindAll(tenantID int) ([]*models.BlockedDate, er
 		blockedDates = append(blockedDates, blockedDate)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating blocked dates: %w", err)
+	}
+
 	return blockedDates, nil
 }
 
@@ -265,14 +269,34 @@ func (r *BlockedDateRepository) FindByID(id int, tenantID int) (*models.BlockedD
 	return blockedDate, nil
 }
 
-// Delete deletes a blocked date
-// SaaS SECURITY: Caller MUST verify tenant ownership before calling this function
-func (r *BlockedDateRepository) Delete(id int) error {
-	query := `DELETE FROM blocked_dates WHERE id = ?`
+// Delete deletes a blocked date with tenant isolation enforcement
+// SaaS SECURITY: This function now enforces tenant isolation at the database level
+func (r *BlockedDateRepository) Delete(id int, tenantID int) error {
+	var query string
+	var args []interface{}
 
-	_, err := r.db.Exec(query, id)
+	if tenantID > 0 {
+		// SaaS mode: enforce tenant isolation in the query itself
+		query = `DELETE FROM blocked_dates WHERE id = ? AND tenant_id = ?`
+		args = []interface{}{id, tenantID}
+	} else {
+		// Simple mode: no tenant filtering
+		query = `DELETE FROM blocked_dates WHERE id = ?`
+		args = []interface{}{id}
+	}
+
+	result, err := r.db.Exec(query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to delete blocked date: %w", err)
+	}
+
+	// Verify a row was actually deleted
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to verify deletion: %w", err)
+	}
+	if affected == 0 {
+		return fmt.Errorf("blocked date not found or access denied")
 	}
 
 	return nil
@@ -356,6 +380,10 @@ func (r *BlockedDateRepository) GetBlockedDogsForDate(date string, tenantID int)
 			return true, nil, nil
 		}
 		dogIDs = append(dogIDs, int(dogID.Int64))
+	}
+
+	if err := rows.Err(); err != nil {
+		return false, nil, fmt.Errorf("error iterating blocked dogs: %w", err)
 	}
 
 	return false, dogIDs, nil

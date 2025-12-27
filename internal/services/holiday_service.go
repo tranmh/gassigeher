@@ -12,6 +12,11 @@ import (
 	"github.com/tranmh/gassigeher/internal/repository"
 )
 
+// httpClient with timeout for external API calls
+var httpClient = &http.Client{
+	Timeout: 10 * time.Second,
+}
+
 type HolidayService struct {
 	holidayRepo  *repository.HolidayRepository
 	settingsRepo *repository.SettingsRepository
@@ -39,10 +44,10 @@ func (s *HolidayService) FetchAndCacheHolidays(tenantID int, year int) error {
 		return s.populateHolidaysFromCache(tenantID, cached, year)
 	}
 
-	// Cache miss - fetch from API
+	// Cache miss - fetch from API (with 10s timeout)
 	url := fmt.Sprintf("https://feiertage-api.de/api/?jahr=%d&nur_land=%s", year, state)
 
-	resp, err := http.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		return fmt.Errorf("failed to fetch holidays: %w", err)
 	}
@@ -84,6 +89,7 @@ func (s *HolidayService) FetchAndCacheHolidays(tenantID int, year int) error {
 	}
 
 	// Insert holidays into custom_holidays table for this tenant
+	var createErrors []error
 	for name, holiday := range holidays {
 		h := &models.CustomHoliday{
 			Date:     holiday.Datum,
@@ -92,8 +98,15 @@ func (s *HolidayService) FetchAndCacheHolidays(tenantID int, year int) error {
 			Source:   "api",
 		}
 
-		// Insert or ignore if already exists
-		_ = s.holidayRepo.CreateHoliday(tenantID, h)
+		// Insert or ignore if already exists (log errors but continue)
+		if err := s.holidayRepo.CreateHoliday(tenantID, h); err != nil {
+			createErrors = append(createErrors, fmt.Errorf("failed to create holiday %s: %w", name, err))
+		}
+	}
+
+	// Log errors but don't fail the operation (some holidays may already exist)
+	if len(createErrors) > 0 {
+		fmt.Printf("Warning: %d holiday creation errors for tenant %d\n", len(createErrors), tenantID)
 	}
 
 	return nil
@@ -101,12 +114,19 @@ func (s *HolidayService) FetchAndCacheHolidays(tenantID int, year int) error {
 
 // IsHoliday checks if a date is a holiday for a tenant
 func (s *HolidayService) IsHoliday(tenantID int, date string) (bool, error) {
+	// Validate date format first
+	dateObj, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return false, fmt.Errorf("invalid date format: %w", err)
+	}
+
 	// Check if API usage is enabled
 	if setting, err := s.settingsRepo.Get(tenantID, "use_feiertage_api"); err == nil && setting != nil && setting.Value == "true" {
-		// Ensure holidays are cached for this year
-		dateObj, _ := time.Parse("2006-01-02", date)
+		// Ensure holidays are cached for this year (log but don't fail on error)
 		year := dateObj.Year()
-		_ = s.FetchAndCacheHolidays(tenantID, year)
+		if err := s.FetchAndCacheHolidays(tenantID, year); err != nil {
+			fmt.Printf("Warning: Failed to fetch holidays for tenant %d, year %d: %v\n", tenantID, year, err)
+		}
 	}
 
 	// Check database
@@ -115,9 +135,11 @@ func (s *HolidayService) IsHoliday(tenantID int, date string) (bool, error) {
 
 // GetHolidaysForYear returns all holidays in a year for a tenant
 func (s *HolidayService) GetHolidaysForYear(tenantID int, year int) ([]models.CustomHoliday, error) {
-	// Fetch and cache if API enabled
+	// Fetch and cache if API enabled (log but don't fail on error)
 	if setting, err := s.settingsRepo.Get(tenantID, "use_feiertage_api"); err == nil && setting != nil && setting.Value == "true" {
-		_ = s.FetchAndCacheHolidays(tenantID, year)
+		if err := s.FetchAndCacheHolidays(tenantID, year); err != nil {
+			fmt.Printf("Warning: Failed to fetch holidays for tenant %d, year %d: %v\n", tenantID, year, err)
+		}
 	}
 
 	return s.holidayRepo.GetHolidaysByYear(tenantID, year)
@@ -133,6 +155,7 @@ func (s *HolidayService) populateHolidaysFromCache(tenantID int, cached string, 
 		return err
 	}
 
+	var createErrors int
 	for name, holiday := range holidays {
 		h := &models.CustomHoliday{
 			Date:     holiday.Datum,
@@ -140,7 +163,14 @@ func (s *HolidayService) populateHolidaysFromCache(tenantID int, cached string, 
 			IsActive: true,
 			Source:   "api",
 		}
-		_ = s.holidayRepo.CreateHoliday(tenantID, h)
+		if err := s.holidayRepo.CreateHoliday(tenantID, h); err != nil {
+			createErrors++
+		}
+	}
+
+	// Log errors but don't fail (some holidays may already exist)
+	if createErrors > 0 {
+		fmt.Printf("Warning: %d holiday creation errors for tenant %d from cache\n", createErrors, tenantID)
 	}
 
 	return nil
