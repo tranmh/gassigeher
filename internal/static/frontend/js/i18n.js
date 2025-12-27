@@ -1,14 +1,26 @@
 // Internationalization (i18n) system
 class I18n {
     constructor(locale = null) {
-        // Load from localStorage or default to 'de'
-        this.locale = locale || localStorage.getItem('gassigeher_language') || 'de';
         this.translations = {};
         this.availableLocales = ['de', 'en'];
         this.localeNames = {
             'de': 'Deutsch',
             'en': 'English'
         };
+
+        // Validate locale from localStorage against whitelist to prevent XSS
+        const storedLocale = localStorage.getItem('gassigeher_language');
+        if (locale && this.availableLocales.includes(locale)) {
+            this.locale = locale;
+        } else if (storedLocale && this.availableLocales.includes(storedLocale)) {
+            this.locale = storedLocale;
+        } else {
+            this.locale = 'de'; // Default to German
+            // Remove invalid locale from storage
+            if (storedLocale && !this.availableLocales.includes(storedLocale)) {
+                localStorage.removeItem('gassigeher_language');
+            }
+        }
     }
 
     async load() {

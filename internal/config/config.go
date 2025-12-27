@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -220,7 +221,7 @@ func (c *Config) GetDBConfig() *database.DBConfig {
 		ConnectionString: c.DBConnectionString,
 		Path:             c.DatabasePath,
 		Host:             c.DBHost,
-		Port:             c.DBPort,
+		Port:             c.GetEffectiveDBPort(), // Use effective port with defaults
 		Database:         c.DBName,
 		Username:         c.DBUser,
 		Password:         c.DBPassword,
@@ -283,6 +284,133 @@ func (c *Config) IsLocalDevelopment() bool {
 // Auto-enabled for local development (.local, .localhost domains) or via BILLING_TEST_MODE=true
 func (c *Config) IsBillingTestModeEnabled() bool {
 	return c.BillingTestMode || c.IsLocalDevelopment()
+}
+
+// Validate validates the configuration and returns an error if invalid
+// This should be called after Load() to ensure all critical settings are correct
+func (c *Config) Validate() error {
+	var errors []string
+
+	// CRITICAL: JWT Secret validation - reject insecure defaults in production
+	if !c.IsLocalDevelopment() && c.BaseDomain != "" {
+		// Production mode (SaaS) - strict validation
+		if c.JWTSecret == "change-this-in-production-INSECURE" ||
+			strings.Contains(strings.ToLower(c.JWTSecret), "insecure") ||
+			len(c.JWTSecret) < 32 {
+			errors = append(errors, "JWT_SECRET must be at least 32 characters and not contain 'insecure' in production")
+		}
+	} else if c.JWTSecret == "change-this-in-production-INSECURE" {
+		// Simple mode - warn but don't fail
+		fmt.Println("WARNING: Using insecure JWT secret. Set JWT_SECRET environment variable for production.")
+	}
+
+	// CRITICAL: Validate non-negative integer values
+	if c.JWTExpirationHours <= 0 {
+		errors = append(errors, "JWT_EXPIRATION_HOURS must be a positive integer")
+	}
+	if c.BookingAdvanceDays < 0 {
+		errors = append(errors, "BOOKING_ADVANCE_DAYS cannot be negative")
+	}
+	if c.CancellationNoticeHours < 0 {
+		errors = append(errors, "CANCELLATION_NOTICE_HOURS cannot be negative")
+	}
+	if c.AutoDeactivationDays < 0 {
+		errors = append(errors, "AUTO_DEACTIVATION_DAYS cannot be negative")
+	}
+	if c.MaxUploadSizeMB <= 0 {
+		errors = append(errors, "MAX_UPLOAD_SIZE_MB must be a positive integer")
+	}
+	if c.DBMaxOpenConns < 0 {
+		errors = append(errors, "DB_MAX_OPEN_CONNS cannot be negative")
+	}
+	if c.DBMaxIdleConns < 0 {
+		errors = append(errors, "DB_MAX_IDLE_CONNS cannot be negative")
+	}
+	if c.DBConnMaxLifetime < 0 {
+		errors = append(errors, "DB_CONN_MAX_LIFETIME cannot be negative")
+	}
+
+	// HIGH: Validate PORT is numeric
+	if c.Port != "" {
+		if port, err := strconv.Atoi(c.Port); err != nil {
+			errors = append(errors, fmt.Sprintf("PORT must be a valid number, got: %s", c.Port))
+		} else if port < 1 || port > 65535 {
+			errors = append(errors, fmt.Sprintf("PORT must be between 1 and 65535, got: %d", port))
+		}
+	}
+
+	// HIGH: Validate DB port when using MySQL/PostgreSQL
+	if c.DBType == "mysql" || c.DBType == "postgres" {
+		if c.DBPort < 0 {
+			errors = append(errors, "DB_PORT cannot be negative")
+		}
+		// Note: DBPort = 0 is allowed as it means "use default port"
+	}
+
+	// HIGH: Validate SMTP configuration
+	if c.EmailProvider == "smtp" && c.SMTPHost != "" {
+		if c.SMTPPort <= 0 || c.SMTPPort > 65535 {
+			errors = append(errors, "SMTP_PORT must be a valid port number (1-65535)")
+		}
+		// Warn if neither TLS nor SSL is enabled (insecure)
+		if !c.SMTPUseTLS && !c.SMTPUseSSL {
+			fmt.Println("WARNING: Neither SMTP_USE_TLS nor SMTP_USE_SSL is enabled. Email transmission will be unencrypted.")
+		}
+	}
+
+	// HIGH: Validate S3 configuration when enabled
+	if c.UseS3 {
+		if c.S3Endpoint == "" {
+			errors = append(errors, "S3_ENDPOINT is required when USE_S3 is enabled")
+		}
+		if c.S3AccessKey == "" {
+			errors = append(errors, "S3_ACCESS_KEY is required when USE_S3 is enabled")
+		}
+		if c.S3SecretKey == "" {
+			errors = append(errors, "S3_SECRET_KEY is required when USE_S3 is enabled")
+		}
+		if c.S3BucketName == "" {
+			errors = append(errors, "S3_BUCKET_NAME is required when USE_S3 is enabled")
+		}
+	}
+
+	// Validate DBType
+	validDBTypes := map[string]bool{"sqlite": true, "mysql": true, "postgres": true}
+	if !validDBTypes[c.DBType] {
+		errors = append(errors, fmt.Sprintf("DB_TYPE must be 'sqlite', 'mysql', or 'postgres', got: %s", c.DBType))
+	}
+
+	// Validate EmailProvider
+	validEmailProviders := map[string]bool{"gmail": true, "smtp": true}
+	if !validEmailProviders[c.EmailProvider] {
+		errors = append(errors, fmt.Sprintf("EMAIL_PROVIDER must be 'gmail' or 'smtp', got: %s", c.EmailProvider))
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("configuration validation failed:\n- %s", strings.Join(errors, "\n- "))
+	}
+
+	return nil
+}
+
+// GetDefaultDBPort returns the default port for the configured database type
+func (c *Config) GetDefaultDBPort() int {
+	switch c.DBType {
+	case "mysql":
+		return 3306
+	case "postgres":
+		return 5432
+	default:
+		return 0 // SQLite doesn't use a port
+	}
+}
+
+// GetEffectiveDBPort returns the configured port or default if not set
+func (c *Config) GetEffectiveDBPort() int {
+	if c.DBPort > 0 {
+		return c.DBPort
+	}
+	return c.GetDefaultDBPort()
 }
 
 // DONE

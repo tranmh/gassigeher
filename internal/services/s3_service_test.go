@@ -99,7 +99,10 @@ func TestTenantIsolation_ObjectKeyFormat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			objectKey := s.GetObjectKey(tt.tenantSlug, tt.path)
+			objectKey, err := s.GetObjectKey(tt.tenantSlug, tt.path)
+			if err != nil {
+				t.Fatalf("GetObjectKey() unexpected error: %v", err)
+			}
 
 			if objectKey != tt.expectedPrefix {
 				t.Errorf("GetObjectKey() = %q, want %q", objectKey, tt.expectedPrefix)
@@ -239,7 +242,10 @@ func TestTenantIsolation_PublicURLFormat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.tenantSlug+"/"+tt.path, func(t *testing.T) {
-			objectKey := s.GetObjectKey(tt.tenantSlug, tt.path)
+			objectKey, err := s.GetObjectKey(tt.tenantSlug, tt.path)
+			if err != nil {
+				t.Fatalf("GetObjectKey() unexpected error: %v", err)
+			}
 			publicURL := s.GetPublicURL(objectKey)
 
 			if publicURL != tt.expectedURL {
@@ -267,7 +273,10 @@ func TestTenantIsolation_CannotAccessOtherTenantPaths(t *testing.T) {
 	tenantB := "tenant-b"
 
 	// Generate a normal key for tenant A
-	keyA := s.GetObjectKey(tenantA, "dogs/photo.jpg")
+	keyA, err := s.GetObjectKey(tenantA, "dogs/photo.jpg")
+	if err != nil {
+		t.Fatalf("GetObjectKey() unexpected error: %v", err)
+	}
 
 	// The key should ONLY contain tenant A's namespace
 	if strings.Contains(keyA, tenantB) {
@@ -283,7 +292,7 @@ func TestTenantIsolation_CannotAccessOtherTenantPaths(t *testing.T) {
 	// Even if tenant A provides tenant B's slug in the path, it should stay in A's namespace
 	// (validateS3Path would reject this, but let's verify the key generation anyway)
 	pathWithTenantB := "dogs/../../../tenants/" + tenantB + "/secret.jpg"
-	err := validateS3Path(pathWithTenantB)
+	err = validateS3Path(pathWithTenantB)
 	if err == nil {
 		t.Error("Path validation should reject paths containing traversal attempts")
 	}

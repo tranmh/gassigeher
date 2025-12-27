@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -121,12 +122,118 @@ type AdminUpdateUserRequest struct {
 	Phone     *string `json:"phone,omitempty"`
 }
 
-// Phone regex: allows digits, country code, separators, and balanced parentheses
-// Supports formats like: 0123456789, +49 123456789, (0123) 456789, 0123-456789
-var phoneRegex = regexp.MustCompile(`^\+?[\s\-\.]?(?:\()?[0-9]{1,4}(?:\))?[\s\-\.]?[0-9]{1,4}[\s\-\.]?[0-9]{3,}[\s\-\.]?[0-9]{0,4}$`)
+// phoneRegex: Simple, ReDoS-safe regex for phone validation
+// SECURITY FIX: Previous regex was vulnerable to catastrophic backtracking (ReDoS)
+// This simple regex allows: optional +, then digits with optional separators (space, dash, dot, parentheses)
+// Actual validation logic is done in ValidatePhone function
+var phoneRegex = regexp.MustCompile(`^[+]?[0-9()\s.\-]{7,30}$`)
 
 // emailRegex validates basic email format
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+
+// Password complexity constants
+const (
+	PasswordMinLength = 8
+	PasswordMaxLength = 128
+)
+
+// hasUppercase checks if string contains at least one uppercase letter
+func hasUppercase(s string) bool {
+	for _, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			return true
+		}
+	}
+	return false
+}
+
+// hasLowercase checks if string contains at least one lowercase letter
+func hasLowercase(s string) bool {
+	for _, r := range s {
+		if r >= 'a' && r <= 'z' {
+			return true
+		}
+	}
+	return false
+}
+
+// hasDigit checks if string contains at least one digit
+func hasDigit(s string) bool {
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			return true
+		}
+	}
+	return false
+}
+
+// hasSpecialChar checks if string contains at least one special character
+func hasSpecialChar(s string) bool {
+	specialChars := "!@#$%^&*()_+-=[]{}|;':\",./<>?"
+	for _, r := range s {
+		if strings.ContainsRune(specialChars, r) {
+			return true
+		}
+	}
+	return false
+}
+
+// ValidatePasswordComplexity validates that a password meets complexity requirements
+// SECURITY FIX: Enforce strong password policy to prevent brute force attacks
+// Requirements: 8+ chars, at least one uppercase, one lowercase, one digit
+func ValidatePasswordComplexity(password string) error {
+	if len(password) < PasswordMinLength {
+		return errors.New("Passwort muss mindestens 8 Zeichen lang sein")
+	}
+	if len(password) > PasswordMaxLength {
+		return errors.New("Passwort darf maximal 128 Zeichen lang sein")
+	}
+	if !hasUppercase(password) {
+		return errors.New("Passwort muss mindestens einen Großbuchstaben enthalten")
+	}
+	if !hasLowercase(password) {
+		return errors.New("Passwort muss mindestens einen Kleinbuchstaben enthalten")
+	}
+	if !hasDigit(password) {
+		return errors.New("Passwort muss mindestens eine Ziffer enthalten")
+	}
+	return nil
+}
+
+// ValidateURL validates a URL for security and format
+// SECURITY FIX: Prevents XSS via malicious URLs (javascript:, data:, etc.)
+// Only allows http and https schemes
+func ValidateURL(urlStr string) error {
+	urlStr = strings.TrimSpace(urlStr)
+	if urlStr == "" {
+		return nil // Empty URLs are allowed (optional field)
+	}
+
+	// Parse the URL
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return errors.New("Ungültiges URL-Format")
+	}
+
+	// SECURITY: Only allow http and https schemes
+	// Blocks: javascript:, data:, file:, vbscript:, etc.
+	scheme := strings.ToLower(parsedURL.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return errors.New("URL muss mit http:// oder https:// beginnen")
+	}
+
+	// Verify the URL has a host
+	if parsedURL.Host == "" {
+		return errors.New("URL muss einen gültigen Host enthalten")
+	}
+
+	// Check for reasonable URL length (prevent DoS via extremely long URLs)
+	if len(urlStr) > 2048 {
+		return errors.New("URL ist zu lang (maximal 2048 Zeichen)")
+	}
+
+	return nil
+}
 
 // ValidateEmail validates an email address for security and format
 // SECURITY: Prevents CRLF/header injection attacks and validates basic format
@@ -210,8 +317,9 @@ func (r *RegisterRequest) Validate() error {
 	if r.Password == "" {
 		return errors.New("Passwort ist erforderlich")
 	}
-	if len(r.Password) < 8 {
-		return errors.New("Passwort muss mindestens 8 Zeichen lang sein")
+	// SECURITY FIX: Use strong password complexity validation
+	if err := ValidatePasswordComplexity(r.Password); err != nil {
+		return err
 	}
 	if r.Password != r.ConfirmPassword {
 		return errors.New("Passwörter stimmen nicht überein")

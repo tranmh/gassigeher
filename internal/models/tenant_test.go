@@ -57,7 +57,7 @@ func TestTenantRegistrationRequest_Validate(t *testing.T) {
 		AdminFirstName:   "Max",
 		AdminLastName:    "Mustermann",
 		AdminEmail:       "admin@tierheim.de",
-		AdminPassword:    "password123",
+		AdminPassword:    "Password123", // Must meet complexity: uppercase, lowercase, digit
 	}
 
 	t.Run("valid request", func(t *testing.T) {

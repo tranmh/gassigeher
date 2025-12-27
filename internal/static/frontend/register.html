@@ -245,44 +245,86 @@
 
         function showAlert(type, message) {
             const container = document.getElementById('alert-container');
-            container.innerHTML = `
-                <div class="alert alert-${type}">
-                    ${message}
-                </div>
-            `;
+            // Use textContent to prevent XSS - safe against script injection
+            container.innerHTML = '';
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+            container.appendChild(alertDiv);
         }
 
         function showRegistrationSuccess(message, whatsappLink) {
             // Hide the form
             document.getElementById('register-form').style.display = 'none';
 
+            // Validate WhatsApp link to prevent javascript: protocol injection
+            let safeWhatsappLink = '';
+            try {
+                const url = new URL(whatsappLink);
+                if (url.protocol === 'https:' &&
+                    (url.hostname === 'chat.whatsapp.com' ||
+                     url.hostname === 'wa.me' ||
+                     url.hostname === 'api.whatsapp.com')) {
+                    safeWhatsappLink = url.href;
+                }
+            } catch (e) {
+                console.warn('Invalid WhatsApp link');
+            }
+
             // Show success message with WhatsApp button
             const container = document.getElementById('alert-container');
-            container.innerHTML = `
-                <div style="text-align: center; padding: 30px 0;">
-                    <div style="font-size: 4rem; margin-bottom: 20px;">✅</div>
-                    <h2 style="margin-bottom: 15px;">Registrierung erfolgreich!</h2>
-                    <p style="margin-bottom: 25px; color: #666;">${message}</p>
+            container.innerHTML = '';
 
-                    <div style="background: #dcf8c6; padding: 20px; border-radius: 8px; margin-bottom: 25px; border-left: 4px solid #25d366;">
-                        <p style="margin: 0 0 15px 0; font-weight: 600;">
-                            <span style="font-size: 1.5rem; margin-right: 8px;">💬</span>
-                            Unserer WhatsApp-Gruppe beitreten
-                        </p>
-                        <p style="margin: 0 0 15px 0; font-size: 0.9rem; color: #666;">
-                            Bleibe auf dem Laufenden und tausche dich mit anderen Gassigehern aus!
-                        </p>
-                        <a href="${whatsappLink}" target="_blank" rel="noopener noreferrer"
-                           style="display: inline-block; padding: 12px 30px; background-color: #25d366; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">
-                            WhatsApp-Gruppe beitreten
-                        </a>
-                    </div>
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = 'text-align: center; padding: 30px 0;';
 
-                    <a href="/login.html" class="btn" style="margin-top: 10px;">
-                        Zur Anmeldung
-                    </a>
-                </div>
-            `;
+            const icon = document.createElement('div');
+            icon.style.cssText = 'font-size: 4rem; margin-bottom: 20px;';
+            icon.textContent = '✅';
+
+            const title = document.createElement('h2');
+            title.style.marginBottom = '15px';
+            title.textContent = 'Registrierung erfolgreich!';
+
+            const messageEl = document.createElement('p');
+            messageEl.style.cssText = 'margin-bottom: 25px; color: #666;';
+            messageEl.textContent = message; // Safe - uses textContent
+
+            wrapper.appendChild(icon);
+            wrapper.appendChild(title);
+            wrapper.appendChild(messageEl);
+
+            // Only show WhatsApp section if we have a valid link
+            if (safeWhatsappLink) {
+                const whatsappBox = document.createElement('div');
+                whatsappBox.style.cssText = 'background: #dcf8c6; padding: 20px; border-radius: 8px; margin-bottom: 25px; border-left: 4px solid #25d366;';
+                whatsappBox.innerHTML = `
+                    <p style="margin: 0 0 15px 0; font-weight: 600;">
+                        <span style="font-size: 1.5rem; margin-right: 8px;">💬</span>
+                        Unserer WhatsApp-Gruppe beitreten
+                    </p>
+                    <p style="margin: 0 0 15px 0; font-size: 0.9rem; color: #666;">
+                        Bleibe auf dem Laufenden und tausche dich mit anderen Gassigehern aus!
+                    </p>
+                `;
+                const whatsappBtn = document.createElement('a');
+                whatsappBtn.href = safeWhatsappLink;
+                whatsappBtn.target = '_blank';
+                whatsappBtn.rel = 'noopener noreferrer';
+                whatsappBtn.style.cssText = 'display: inline-block; padding: 12px 30px; background-color: #25d366; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;';
+                whatsappBtn.textContent = 'WhatsApp-Gruppe beitreten';
+                whatsappBox.appendChild(whatsappBtn);
+                wrapper.appendChild(whatsappBox);
+            }
+
+            const loginBtn = document.createElement('a');
+            loginBtn.href = '/login.html';
+            loginBtn.className = 'btn';
+            loginBtn.style.marginTop = '10px';
+            loginBtn.textContent = 'Zur Anmeldung';
+            wrapper.appendChild(loginBtn);
+
+            container.appendChild(wrapper);
         }
     </script>
 </body>

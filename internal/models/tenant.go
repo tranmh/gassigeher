@@ -271,8 +271,9 @@ func (r *TenantRegistrationRequest) Validate() error {
 	if !isValidEmail(r.AdminEmail) {
 		return errors.New("invalid admin email format")
 	}
-	if len(r.AdminPassword) < 8 {
-		return errors.New("admin password must be at least 8 characters")
+	// SECURITY FIX: Use strong password complexity validation
+	if err := ValidatePasswordComplexity(r.AdminPassword); err != nil {
+		return err
 	}
 
 	return nil

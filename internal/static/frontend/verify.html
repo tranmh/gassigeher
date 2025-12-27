@@ -58,17 +58,54 @@
             }
         });
 
+        // Validate WhatsApp URL to prevent javascript: protocol injection
+        function validateWhatsAppLink(link) {
+            if (!link) return '';
+            try {
+                const url = new URL(link);
+                if (url.protocol === 'https:' &&
+                    (url.hostname === 'chat.whatsapp.com' ||
+                     url.hostname === 'wa.me' ||
+                     url.hostname === 'api.whatsapp.com')) {
+                    return url.href;
+                }
+            } catch (e) {
+                console.warn('Invalid WhatsApp link');
+            }
+            return '';
+        }
+
         function showResult(success, message, whatsappData) {
             const container = document.getElementById('verification-status');
+            container.innerHTML = ''; // Clear existing content
+
             const icon = success ? '✅' : '❌';
             const title = success
                 ? window.i18n.t('verification.success')
                 : window.i18n.t('verification.error');
 
-            let whatsappSection = '';
+            // Build content safely using DOM methods
+            const h1 = document.createElement('h1');
+            h1.style.fontSize = '4rem';
+            h1.textContent = icon;
+
+            const h2 = document.createElement('h2');
+            h2.textContent = title;
+
+            const p = document.createElement('p');
+            p.textContent = message; // Safe - uses textContent
+
+            container.appendChild(h1);
+            container.appendChild(h2);
+            container.appendChild(p);
+
+            // Add WhatsApp section if enabled and link is valid
             if (success && whatsappData && whatsappData.enabled && whatsappData.link) {
-                whatsappSection = `
-                    <div style="background: #dcf8c6; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #25d366; text-align: left;">
+                const safeLink = validateWhatsAppLink(whatsappData.link);
+                if (safeLink) {
+                    const whatsappDiv = document.createElement('div');
+                    whatsappDiv.style.cssText = 'background: #dcf8c6; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #25d366; text-align: left;';
+                    whatsappDiv.innerHTML = `
                         <p style="margin: 0 0 15px 0; font-weight: 600; text-align: center;">
                             <span style="font-size: 1.5rem; margin-right: 8px;">💬</span>
                             Unserer WhatsApp-Gruppe beitreten
@@ -76,31 +113,31 @@
                         <p style="margin: 0 0 15px 0; font-size: 0.9rem; color: #666; text-align: center;">
                             Bleibe auf dem Laufenden und tausche dich mit anderen Gassigehern aus!
                         </p>
-                        <div style="text-align: center;">
-                            <a href="${whatsappData.link}" target="_blank" rel="noopener noreferrer"
-                               style="display: inline-block; padding: 12px 30px; background-color: #25d366; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">
-                                WhatsApp-Gruppe beitreten
-                            </a>
-                        </div>
-                    </div>
-                `;
+                        <div style="text-align: center;"></div>
+                    `;
+                    const whatsappBtn = document.createElement('a');
+                    whatsappBtn.href = safeLink;
+                    whatsappBtn.target = '_blank';
+                    whatsappBtn.rel = 'noopener noreferrer';
+                    whatsappBtn.style.cssText = 'display: inline-block; padding: 12px 30px; background-color: #25d366; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;';
+                    whatsappBtn.textContent = 'WhatsApp-Gruppe beitreten';
+                    whatsappDiv.querySelector('div').appendChild(whatsappBtn);
+                    container.appendChild(whatsappDiv);
+                }
             }
 
-            container.innerHTML = `
-                <h1 style="font-size: 4rem;">${icon}</h1>
-                <h2>${title}</h2>
-                <p>${message}</p>
-                ${whatsappSection}
-                ${success ? `
-                    <a href="/login.html" class="btn" style="margin-top: 20px;">
-                        ${window.i18n.t('verification.go_to_login')}
-                    </a>
-                ` : `
-                    <a href="/" class="btn" style="margin-top: 20px;">
-                        ${window.i18n.t('common.back')}
-                    </a>
-                `}
-            `;
+            // Add action button
+            const actionBtn = document.createElement('a');
+            actionBtn.className = 'btn';
+            actionBtn.style.marginTop = '20px';
+            if (success) {
+                actionBtn.href = '/login.html';
+                actionBtn.textContent = window.i18n.t('verification.go_to_login');
+            } else {
+                actionBtn.href = '/';
+                actionBtn.textContent = window.i18n.t('common.back');
+            }
+            container.appendChild(actionBtn);
         }
     </script>
 </body>

@@ -191,12 +191,34 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
 }
 
 // DeleteBlockedDate deletes a blocked date (admin only)
+// SaaS SECURITY FIX: Now verifies tenant ownership before deletion
 func (h *BlockedDateHandler) DeleteBlockedDate(w http.ResponseWriter, r *http.Request) {
 	// Get ID from URL
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid blocked date ID")
+		return
+	}
+
+	// SaaS SECURITY: Extract tenant ID and verify ownership
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	// Get blocked date to verify tenant ownership
+	blockedDate, err := h.blockedDateRepo.FindByID(id, tenantID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to get blocked date")
+		return
+	}
+	if blockedDate == nil {
+		// Not found or belongs to different tenant
+		respondError(w, http.StatusNotFound, "Blocked date not found")
+		return
+	}
+
+	// Double-check tenant ownership for defense-in-depth
+	if tenantID > 0 && blockedDate.TenantID != tenantID {
+		respondError(w, http.StatusNotFound, "Blocked date not found")
 		return
 	}
 

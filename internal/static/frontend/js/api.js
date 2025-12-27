@@ -2,7 +2,18 @@
 class API {
     constructor() {
         this.baseURL = '/api/v1';
-        this.token = localStorage.getItem('gassigeher_token');
+        // Validate token format to prevent localStorage XSS
+        // JWT has 3 base64url segments separated by dots
+        const storedToken = localStorage.getItem('gassigeher_token');
+        if (storedToken && /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(storedToken)) {
+            this.token = storedToken;
+        } else {
+            this.token = null;
+            // Remove invalid token from storage
+            if (storedToken) {
+                localStorage.removeItem('gassigeher_token');
+            }
+        }
     }
 
     // Set authentication token
@@ -86,6 +97,21 @@ class API {
 
             return responseData;
         } catch (error) {
+            // Enhanced error handling for network issues
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                const networkError = new Error('Netzwerkfehler: Bitte überprüfen Sie Ihre Internetverbindung');
+                networkError.isNetworkError = true;
+                networkError.originalError = error;
+                throw networkError;
+            }
+
+            // Handle request timeout/abort
+            if (error.name === 'AbortError') {
+                const timeoutError = new Error('Anfrage dauerte zu lange. Bitte versuchen Sie es erneut.');
+                timeoutError.isTimeout = true;
+                throw timeoutError;
+            }
+
             throw error;
         }
     }

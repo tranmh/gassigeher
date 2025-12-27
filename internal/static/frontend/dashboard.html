@@ -663,17 +663,42 @@
 
         function showAlert(type, message) {
             const container = document.getElementById('alert-container');
-            container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            // Use textContent to prevent XSS - safe against script injection
+            container.innerHTML = '';
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+            container.appendChild(alertDiv);
             setTimeout(() => container.innerHTML = '', 5000);
+        }
+
+        // Validate WhatsApp URL to prevent javascript: protocol injection
+        function validateWhatsAppLink(link) {
+            if (!link) return '';
+            try {
+                const url = new URL(link);
+                if (url.protocol === 'https:' &&
+                    (url.hostname === 'chat.whatsapp.com' ||
+                     url.hostname === 'wa.me' ||
+                     url.hostname === 'api.whatsapp.com')) {
+                    return url.href;
+                }
+            } catch (e) {
+                console.warn('Invalid WhatsApp link');
+            }
+            return '';
         }
 
         async function loadWhatsAppButton() {
             try {
                 const whatsappData = await api.getWhatsAppSettings();
                 if (whatsappData.enabled && whatsappData.link) {
-                    const btn = document.getElementById('whatsapp-btn');
-                    btn.href = whatsappData.link;
-                    btn.style.display = 'inline-block';
+                    const safeLink = validateWhatsAppLink(whatsappData.link);
+                    if (safeLink) {
+                        const btn = document.getElementById('whatsapp-btn');
+                        btn.href = safeLink;
+                        btn.style.display = 'inline-block';
+                    }
                 }
             } catch (error) {
                 console.error('Error loading WhatsApp settings:', error);

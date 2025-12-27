@@ -369,7 +369,10 @@ func (r *TenantRepository) GetStats(tenantID int) (*models.TenantStats, error) {
 	}
 
 	// Bookings this month
-	firstOfMonth := time.Now().Format("2006-01-01")
+	// BUGFIX: Previous code used "2006-01-01" format which always returns January 1st
+	// Now correctly calculates the first day of the current month
+	now := time.Now()
+	firstOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
 	err = r.db.QueryRow(`SELECT COUNT(*) FROM bookings WHERE tenant_id = ? AND date >= ?`, tenantID, firstOfMonth).Scan(&stats.BookingsThisMonth)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count monthly bookings: %w", err)

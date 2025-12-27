@@ -40,9 +40,15 @@
 
     // If admin check is required, we need to verify with the server
     if (requireAdmin || requireSuperAdmin) {
-        // Create a synchronous check by blocking with a promise
-        // Note: This is handled asynchronously, page may briefly show
-        // Consider using a loading overlay for better UX
+        // Hide body content immediately to prevent unauthorized flash
+        document.body.style.visibility = 'hidden';
+
+        // Create loading overlay
+        var loader = document.createElement('div');
+        loader.id = 'auth-check-loader';
+        loader.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(255,255,255,0.95);display:flex;align-items:center;justify-content:center;z-index:9999;';
+        loader.innerHTML = '<div style="color:#333;font-size:16px;">Berechtigung wird überprüft...</div>';
+        document.body.appendChild(loader);
 
         api.getMe().then(function(user) {
             if (requireSuperAdmin && !user.is_super_admin) {
@@ -51,6 +57,10 @@
             } else if (requireAdmin && !user.is_admin) {
                 console.warn('AuthGuard: Admin access required');
                 window.location.href = '/dashboard.html';
+            } else {
+                // Authorized - show page content
+                document.body.style.visibility = '';
+                if (loader.parentNode) loader.remove();
             }
         }).catch(function(error) {
             console.error('AuthGuard: Failed to verify user:', error);

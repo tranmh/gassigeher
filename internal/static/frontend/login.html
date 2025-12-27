@@ -113,11 +113,12 @@
 
         function showAlert(type, message) {
             const container = document.getElementById('alert-container');
-            container.innerHTML = `
-                <div class="alert alert-${type}">
-                    ${message}
-                </div>
-            `;
+            // Use textContent to prevent XSS - safe against script injection
+            container.innerHTML = '';
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+            container.appendChild(alertDiv);
         }
     </script>
 </body>

@@ -80,21 +80,22 @@ function getDogPhotoHtml(dog, useThumbnail = false, className = 'dog-card-image'
     const photoUrl = getDogPhotoUrl(dog, useThumbnail);
     const altText = getDogPhotoAlt(dog);
     const loadingAttr = lazyLoad ? ' loading="lazy"' : '';
-    // Sanitize dog.id to prevent XSS in onload handler
-    const safeId = escapeForAttribute(dog.id) || Math.random().toString(36).substring(2, 11);
+    // Sanitize dog.id to prevent XSS - use only alphanumeric and underscore
+    const safeId = String(dog.id || Math.random().toString(36).substring(2, 11)).replace(/[^a-zA-Z0-9_-]/g, '');
     const uniqueId = `dog-img-${safeId}`;
 
     // For SVG placeholders, no skeleton needed
     const isSvgPlaceholder = photoUrl.includes('.svg');
 
     if (withSkeleton && !isSvgPlaceholder) {
+        // Use data attribute instead of inline onload handler to prevent XSS
         return `<div class="dog-card-image-container" id="container-${uniqueId}">
                     <img src="${photoUrl}"
                          alt="${altText}"
-                         class="${className}"
+                         class="${className} dog-photo-with-loader"
                          id="${uniqueId}"
-                         ${loadingAttr}
-                         onload="handleImageLoad('${uniqueId}')">
+                         data-image-id="${uniqueId}"
+                         ${loadingAttr}>
                 </div>`;
     }
 
@@ -157,6 +158,12 @@ function getPlaceholderUrl() {
  * @param {string} imageId - ID of the image element
  */
 function handleImageLoad(imageId) {
+    // Validate imageId to only contain safe characters
+    if (typeof imageId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(imageId)) {
+        console.warn('Invalid image ID provided to handleImageLoad');
+        return;
+    }
+
     const img = document.getElementById(imageId);
     const container = document.getElementById(`container-${imageId}`);
 
@@ -175,6 +182,58 @@ function handleImageLoad(imageId) {
         container.classList.add('loaded');
     }
 }
+
+/**
+ * Initialize dog photo load handlers using event delegation
+ * Call this after inserting dog photo HTML into the DOM
+ * @param {HTMLElement} container - Optional container to scope the initialization (defaults to document)
+ */
+function initDogPhotoLoadHandlers(container = document) {
+    const images = container.querySelectorAll('img.dog-photo-with-loader');
+
+    images.forEach(img => {
+        // Skip if already initialized
+        if (img.dataset.loadHandlerAttached) return;
+        img.dataset.loadHandlerAttached = 'true';
+
+        const imageId = img.dataset.imageId;
+        if (!imageId) return;
+
+        // Handle already loaded images (from cache)
+        if (img.complete && img.naturalHeight !== 0) {
+            handleImageLoad(imageId);
+        } else {
+            // Attach load handler
+            img.addEventListener('load', function() {
+                handleImageLoad(imageId);
+            });
+
+            // Handle errors gracefully
+            img.addEventListener('error', function() {
+                const imgContainer = document.getElementById(`container-${imageId}`);
+                if (imgContainer) {
+                    imgContainer.classList.add('loaded');
+                }
+            });
+        }
+    });
+}
+
+// Set up global delegated load event handler for dog photos
+// This catches load events that fire before initDogPhotoLoadHandlers is called
+(function() {
+    if (typeof document !== 'undefined') {
+        document.addEventListener('load', function(event) {
+            const img = event.target;
+            if (img.tagName === 'IMG' && img.classList.contains('dog-photo-with-loader')) {
+                const imageId = img.dataset.imageId;
+                if (imageId && !img.dataset.loadHandlerAttached) {
+                    handleImageLoad(imageId);
+                }
+            }
+        }, true); // Use capture phase to catch events early
+    }
+})();
 
 /**
  * Preload critical images (first N dogs on page)

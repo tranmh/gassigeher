@@ -222,7 +222,51 @@ func (r *BlockedDateRepository) FindByDateAndDog(date string, dogID *int, tenant
 	return blockedDate, nil
 }
 
+// FindByID finds a blocked date by ID
+// SaaS SECURITY: Requires tenant_id to verify ownership before operations
+func (r *BlockedDateRepository) FindByID(id int, tenantID int) (*models.BlockedDate, error) {
+	query := `
+		SELECT id, tenant_id, date, dog_id, reason, created_by, created_at
+		FROM blocked_dates
+		WHERE id = ?
+	`
+	args := []interface{}{id}
+
+	// SaaS: Filter by tenant if specified (for security)
+	if tenantID > 0 {
+		query += " AND tenant_id = ?"
+		args = append(args, tenantID)
+	}
+
+	blockedDate := &models.BlockedDate{}
+	var tenantIDNull sql.NullInt64
+	err := r.db.QueryRow(query, args...).Scan(
+		&blockedDate.ID,
+		&tenantIDNull,
+		&blockedDate.Date,
+		&blockedDate.DogID,
+		&blockedDate.Reason,
+		&blockedDate.CreatedBy,
+		&blockedDate.CreatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to find blocked date: %w", err)
+	}
+
+	if tenantIDNull.Valid {
+		blockedDate.TenantID = int(tenantIDNull.Int64)
+	}
+
+	return blockedDate, nil
+}
+
 // Delete deletes a blocked date
+// SaaS SECURITY: Caller MUST verify tenant ownership before calling this function
 func (r *BlockedDateRepository) Delete(id int) error {
 	query := `DELETE FROM blocked_dates WHERE id = ?`
 

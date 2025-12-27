@@ -265,8 +265,21 @@
 
                     const photoUrl = dog.photo ? `/uploads/${dog.photo}` : '/assets/images/placeholders/dog-placeholder.svg';
 
-                    const externalLinkHtml = dog.external_link
-                        ? `<a href="${dog.external_link}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 12px; color: var(--primary-green); text-decoration: none; font-weight: 500;">mehr über mich &rarr;</a>`
+                    // Validate external link URL to prevent javascript: protocol injection
+                    let safeExternalLink = '';
+                    if (dog.external_link) {
+                        try {
+                            const url = new URL(dog.external_link);
+                            if (url.protocol === 'http:' || url.protocol === 'https:') {
+                                safeExternalLink = url.href;
+                            }
+                        } catch (e) {
+                            console.warn('Invalid external link for dog:', dog.name);
+                        }
+                    }
+
+                    const externalLinkHtml = safeExternalLink
+                        ? `<a href="${safeExternalLink}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 12px; color: var(--primary-green); text-decoration: none; font-weight: 500;">mehr über mich &rarr;</a>`
                         : '';
 
                     return `

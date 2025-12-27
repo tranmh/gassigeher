@@ -59,6 +59,24 @@ func validateS3Path(path string) error {
 	return nil
 }
 
+// S3 operation timeout constants
+const (
+	// DefaultS3Timeout is the default timeout for S3 operations if not specified in context
+	DefaultS3Timeout = 30 * time.Second
+)
+
+// ensureContextTimeout returns a context with timeout if the original doesn't have one
+// SECURITY FIX: Prevents indefinite hangs on S3 operations
+func ensureContextTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	// Check if context already has a deadline
+	if _, hasDeadline := ctx.Deadline(); hasDeadline {
+		// Context already has a deadline, use as-is
+		return ctx, func() {}
+	}
+	// Add timeout to prevent indefinite operations
+	return context.WithTimeout(ctx, timeout)
+}
+
 // S3Service handles S3-compatible object storage operations (Hetzner Object Storage)
 type S3Service struct {
 	client     *minio.Client
@@ -105,7 +123,12 @@ func NewS3Service(cfg *S3Config) (*S3Service, error) {
 
 // Upload uploads data to S3 and returns the public URL
 // Path format: tenants/{slug}/{path}
+// SECURITY FIX: Now includes context timeout to prevent indefinite hangs
 func (s *S3Service) Upload(ctx context.Context, tenantSlug, path string, data []byte, contentType string) (string, error) {
+	// Ensure context has timeout
+	ctx, cancel := ensureContextTimeout(ctx, DefaultS3Timeout)
+	defer cancel()
+
 	// Validate path to prevent traversal attacks
 	if err := validateS3Path(path); err != nil {
 		return "", fmt.Errorf("invalid path: %w", err)
@@ -129,12 +152,22 @@ func (s *S3Service) Upload(ctx context.Context, tenantSlug, path string, data []
 }
 
 // Delete removes an object from S3
+// SECURITY FIX: Now includes context timeout to prevent indefinite hangs
 func (s *S3Service) Delete(ctx context.Context, objectKey string) error {
+	// Ensure context has timeout
+	ctx, cancel := ensureContextTimeout(ctx, DefaultS3Timeout)
+	defer cancel()
+
 	return s.client.RemoveObject(ctx, s.bucketName, objectKey, minio.RemoveObjectOptions{})
 }
 
 // DeleteByPath deletes an object by tenant slug and path
+// SECURITY FIX: Now includes context timeout to prevent indefinite hangs
 func (s *S3Service) DeleteByPath(ctx context.Context, tenantSlug, path string) error {
+	// Ensure context has timeout
+	ctx, cancel := ensureContextTimeout(ctx, DefaultS3Timeout)
+	defer cancel()
+
 	// Validate path to prevent traversal attacks
 	if err := validateS3Path(path); err != nil {
 		return fmt.Errorf("invalid path: %w", err)
@@ -144,11 +177,16 @@ func (s *S3Service) DeleteByPath(ctx context.Context, tenantSlug, path string) e
 	}
 
 	objectKey := fmt.Sprintf("tenants/%s/%s", tenantSlug, path)
-	return s.Delete(ctx, objectKey)
+	return s.client.RemoveObject(ctx, s.bucketName, objectKey, minio.RemoveObjectOptions{})
 }
 
 // GetPresignedURL generates a presigned URL for temporary access
+// SECURITY FIX: Now includes context timeout to prevent indefinite hangs
 func (s *S3Service) GetPresignedURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error) {
+	// Ensure context has timeout
+	ctx, cancel := ensureContextTimeout(ctx, DefaultS3Timeout)
+	defer cancel()
+
 	url, err := s.client.PresignedGetObject(ctx, s.bucketName, objectKey, expiry, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
@@ -157,13 +195,26 @@ func (s *S3Service) GetPresignedURL(ctx context.Context, objectKey string, expir
 }
 
 // BucketExists checks if the configured bucket exists
+// SECURITY FIX: Now includes context timeout to prevent indefinite hangs
 func (s *S3Service) BucketExists(ctx context.Context) (bool, error) {
+	// Ensure context has timeout
+	ctx, cancel := ensureContextTimeout(ctx, DefaultS3Timeout)
+	defer cancel()
+
 	return s.client.BucketExists(ctx, s.bucketName)
 }
 
 // GetObjectKey returns the full object key for a tenant path
-func (s *S3Service) GetObjectKey(tenantSlug, path string) string {
-	return fmt.Sprintf("tenants/%s/%s", tenantSlug, path)
+// SECURITY FIX: Now validates inputs to prevent path traversal
+func (s *S3Service) GetObjectKey(tenantSlug, path string) (string, error) {
+	// Validate path to prevent traversal attacks
+	if err := validateS3Path(path); err != nil {
+		return "", fmt.Errorf("invalid path: %w", err)
+	}
+	if err := validateS3Path(tenantSlug); err != nil {
+		return "", fmt.Errorf("invalid tenant slug: %w", err)
+	}
+	return fmt.Sprintf("tenants/%s/%s", tenantSlug, path), nil
 }
 
 // GetPublicURL returns the public URL for an object key

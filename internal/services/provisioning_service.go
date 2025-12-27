@@ -74,17 +74,30 @@ func (s *ProvisioningService) CreateDefaultBookingRules(tx *sql.Tx, tenantID int
 
 // generateRegistrationPassword generates a random 8-character alphanumeric password
 // Format: uppercase letters and digits (e.g., "AB12CD34")
+// SECURITY FIX: Uses rejection sampling to avoid modulo bias
 func generateRegistrationPassword() (string, error) {
 	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	result := make([]byte, 8)
-	randomBytes := make([]byte, 8)
+	const charsLen = byte(len(chars)) // 36 characters
+	// Calculate the largest multiple of charsLen that fits in a byte
+	// 256 / 36 = 7 remainder 4, so 7 * 36 = 252
+	const maxUnbiased = byte(252) // Largest value divisible by 36 below 256
 
-	if _, err := rand.Read(randomBytes); err != nil {
-		return "", fmt.Errorf("failed to generate random bytes: %w", err)
-	}
+	result := make([]byte, 8)
+	randomByte := make([]byte, 1)
 
 	for i := 0; i < 8; i++ {
-		result[i] = chars[randomBytes[i]%byte(len(chars))]
+		// Use rejection sampling to avoid modulo bias
+		for {
+			if _, err := rand.Read(randomByte); err != nil {
+				return "", fmt.Errorf("failed to generate random bytes: %w", err)
+			}
+			// Reject values >= maxUnbiased to ensure uniform distribution
+			if randomByte[0] < maxUnbiased {
+				result[i] = chars[randomByte[0]%charsLen]
+				break
+			}
+			// Rare case (4/256 ≈ 1.5% chance): try again
+		}
 	}
 
 	return string(result), nil

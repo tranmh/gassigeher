@@ -3,11 +3,30 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
 	"github.com/tranmh/gassigeher/internal/models"
 )
+
+// berlinLocation caches the Europe/Berlin timezone for consistent time handling
+var berlinLocation *time.Location
+
+func init() {
+	var err error
+	berlinLocation, err = time.LoadLocation("Europe/Berlin")
+	if err != nil {
+		log.Printf("Warning: Could not load Europe/Berlin timezone, falling back to UTC: %v", err)
+		berlinLocation = time.UTC
+	}
+}
+
+// getBerlinTime returns the current time in Europe/Berlin timezone
+// This ensures consistent time handling for booking operations
+func getBerlinTime() time.Time {
+	return time.Now().In(berlinLocation)
+}
 
 // normalizeDate ensures date is in YYYY-MM-DD format (strips any time suffix)
 func normalizeDate(date string) string {
@@ -316,8 +335,8 @@ func (r *BookingRepository) CheckDoubleBookingForTenant(tenantID, dogID int, dat
 
 // AutoComplete marks all past scheduled bookings as completed
 func (r *BookingRepository) AutoComplete() (int, error) {
-	// Get current date and time
-	now := time.Now()
+	// Get current date and time in Europe/Berlin timezone for consistency
+	now := getBerlinTime()
 	currentDate := now.Format("2006-01-02")
 	currentTime := now.Format("15:04")
 
@@ -399,7 +418,8 @@ func (r *BookingRepository) GetUpcoming(userID int, limit int) ([]*models.Bookin
 // SaaS: Global operation (cron job), includes tenant_id in result
 func (r *BookingRepository) GetForReminders() ([]*models.Booking, error) {
 	// Get bookings scheduled within the next 1-2 hours
-	now := time.Now()
+	// Use Europe/Berlin timezone for consistency with cron service
+	now := getBerlinTime()
 	oneHourFromNow := now.Add(1 * time.Hour)
 	twoHoursFromNow := now.Add(2 * time.Hour)
 

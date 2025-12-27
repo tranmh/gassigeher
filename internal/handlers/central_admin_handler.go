@@ -489,7 +489,7 @@ func (h *CentralAdminHandler) SearchUsers(w http.ResponseWriter, r *http.Request
 	searchPattern := "%" + searchTerm + "%"
 	rows, err := h.db.Query(`
 		SELECT u.id, u.tenant_id, u.first_name, u.last_name, u.email, u.is_admin, u.is_super_admin,
-		       u.is_active, u.created_at, t.name as tenant_name
+		       u.is_central_admin, u.is_active, u.created_at, t.name as tenant_name
 		FROM users u
 		LEFT JOIN tenants t ON u.tenant_id = t.id
 		WHERE u.is_deleted = 0
@@ -505,23 +505,24 @@ func (h *CentralAdminHandler) SearchUsers(w http.ResponseWriter, r *http.Request
 	defer rows.Close()
 
 	type UserSearchResult struct {
-		ID           int       `json:"id"`
-		TenantID     int       `json:"tenant_id"`
-		FirstName    string    `json:"first_name"`
-		LastName     string    `json:"last_name"`
-		Email        *string   `json:"email"`
-		IsAdmin      bool      `json:"is_admin"`
-		IsSuperAdmin bool      `json:"is_super_admin"`
-		IsActive     bool      `json:"is_active"`
-		CreatedAt    time.Time `json:"created_at"`
-		TenantName   *string   `json:"tenant_name"`
+		ID             int       `json:"id"`
+		TenantID       int       `json:"tenant_id"`
+		FirstName      string    `json:"first_name"`
+		LastName       string    `json:"last_name"`
+		Email          *string   `json:"email"`
+		IsAdmin        bool      `json:"is_admin"`
+		IsSuperAdmin   bool      `json:"is_super_admin"`
+		IsCentralAdmin bool      `json:"is_central_admin"`
+		IsActive       bool      `json:"is_active"`
+		CreatedAt      time.Time `json:"created_at"`
+		TenantName     *string   `json:"tenant_name"`
 	}
 
 	results := []UserSearchResult{}
 	for rows.Next() {
 		var u UserSearchResult
 		if err := rows.Scan(&u.ID, &u.TenantID, &u.FirstName, &u.LastName, &u.Email,
-			&u.IsAdmin, &u.IsSuperAdmin, &u.IsActive, &u.CreatedAt, &u.TenantName); err != nil {
+			&u.IsAdmin, &u.IsSuperAdmin, &u.IsCentralAdmin, &u.IsActive, &u.CreatedAt, &u.TenantName); err != nil {
 			log.Printf("Error scanning user search result: %v", err)
 			continue
 		}

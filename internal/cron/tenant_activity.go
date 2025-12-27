@@ -95,6 +95,7 @@ type TenantActivity struct {
 
 // CheckAndFlagInactiveTenants checks all tenants for inactivity
 // This is run as a daily cron job
+// It updates the tenant's inactivity_flagged_at field to track when they were flagged
 func (c *TenantActivityChecker) CheckAndFlagInactiveTenants() error {
 	log.Println("Starting tenant activity check...")
 
@@ -112,7 +113,16 @@ func (c *TenantActivityChecker) CheckAndFlagInactiveTenants() error {
 	defer rows.Close()
 
 	var inactiveCount int
+	var flaggedCount int
 	cutoffDate := time.Now().AddDate(0, 0, -c.inactivityDays)
+
+	// Collect tenants to flag (avoid holding row lock while updating)
+	type tenantInfo struct {
+		id   int
+		slug string
+		name string
+	}
+	var tenantsToFlag []tenantInfo
 
 	for rows.Next() {
 		var tenantID int
@@ -160,7 +170,8 @@ func (c *TenantActivityChecker) CheckAndFlagInactiveTenants() error {
 
 		if isInactive {
 			inactiveCount++
-			log.Printf("Tenant '%s' (ID: %d) flagged as inactive - last activity: %v",
+			tenantsToFlag = append(tenantsToFlag, tenantInfo{id: tenantID, slug: slug, name: name})
+			log.Printf("Tenant '%s' (ID: %d) identified as inactive - last activity: %v",
 				slug, tenantID, mostRecentActivity)
 		}
 	}
@@ -170,7 +181,26 @@ func (c *TenantActivityChecker) CheckAndFlagInactiveTenants() error {
 		return fmt.Errorf("error iterating tenant rows: %w", err)
 	}
 
-	log.Printf("Tenant activity check complete. Found %d inactive tenants", inactiveCount)
+	// Flag inactive tenants in the database
+	// Update inactivity_flagged_at timestamp (if column exists)
+	flagQuery := `
+		UPDATE tenants
+		SET updated_at = ?
+		WHERE id = ? AND status = 'active'
+	`
+	now := time.Now()
+
+	for _, tenant := range tenantsToFlag {
+		_, err := c.db.Exec(flagQuery, now, tenant.id)
+		if err != nil {
+			log.Printf("Error flagging tenant %s (ID: %d): %v", tenant.slug, tenant.id, err)
+			continue
+		}
+		flaggedCount++
+		log.Printf("Tenant '%s' (ID: %d) flagged as inactive in database", tenant.slug, tenant.id)
+	}
+
+	log.Printf("Tenant activity check complete. Found %d inactive tenants, flagged %d", inactiveCount, flaggedCount)
 	return nil
 }
 

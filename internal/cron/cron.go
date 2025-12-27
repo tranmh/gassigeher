@@ -102,10 +102,20 @@ func (s *CronService) Stop() {
 	close(s.stopChan)
 }
 
-// runPeriodically runs a function periodically
+// runPeriodically runs a function periodically with panic recovery
 func (s *CronService) runPeriodically(name string, interval time.Duration, fn func()) {
+	// Wrapper function with panic recovery
+	safeRun := func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("Panic in cron job '%s': %v", name, r)
+			}
+		}()
+		fn()
+	}
+
 	// Run immediately on start
-	fn()
+	safeRun()
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -114,7 +124,7 @@ func (s *CronService) runPeriodically(name string, interval time.Duration, fn fu
 		select {
 		case <-ticker.C:
 			log.Printf("Running cron job: %s", name)
-			fn()
+			safeRun()
 		case <-s.stopChan:
 			log.Printf("Stopped cron job: %s", name)
 			return
@@ -206,10 +216,21 @@ func (s *CronService) sendBookingReminders() {
 
 // runDaily runs a function daily at a specific time (also runs once immediately on startup)
 // Uses Europe/Berlin timezone for scheduling to ensure consistency across servers
+// Includes panic recovery to prevent goroutine leaks
 func (s *CronService) runDaily(name string, hour, minute int, fn func()) {
+	// Wrapper function with panic recovery
+	safeRun := func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("Panic in daily job '%s': %v", name, r)
+			}
+		}()
+		fn()
+	}
+
 	// Run immediately on startup
 	log.Printf("Running daily job on startup: %s", name)
-	fn()
+	safeRun()
 
 	berlinLoc := getBerlinLocation()
 
@@ -228,7 +249,7 @@ func (s *CronService) runDaily(name string, hour, minute int, fn func()) {
 		select {
 		case <-time.After(duration):
 			log.Printf("Running daily job: %s", name)
-			fn()
+			safeRun()
 		case <-s.stopChan:
 			log.Printf("Stopped daily job: %s", name)
 			return

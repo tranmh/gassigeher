@@ -226,13 +226,15 @@ function initRegistrationForm() {
                 throw new Error(result.error || 'Registrierung fehlgeschlagen');
             }
 
-            // Store registration result for checkout (use sessionStorage, cleared on tab close)
-            // Note: Password storage is temporary and cleared immediately after checkout
+            // SECURITY FIX: Do NOT store password in sessionStorage (XSS vulnerability)
+            // Store only non-sensitive registration result for checkout flow
+            // The checkout token from backend is used for authentication instead
             sessionStorage.setItem('gassigeher_checkout_data', JSON.stringify({
                 login_url: result.login_url,
                 slug: result.slug,
                 adminEmail: data.admin_email,
-                adminPassword: data.admin_password
+                // Use checkout_token from backend for secure authentication
+                checkout_token: result.checkout_token || null
             }));
             registrationResult = result;
 
@@ -323,31 +325,38 @@ async function initiateProCheckout(registrationResult) {
     }
 
     try {
-        // First, we need to authenticate to get a token
-        // The tenant was just created, so we need to login to the tenant subdomain
+        // SECURITY FIX: Use checkout_token instead of password for authentication
+        // The checkout_token is a short-lived JWT returned from registration
         const baseUrl = checkoutData.login_url.replace(/\/login\/?$/, '');
-        const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                email: checkoutData.adminEmail,
-                password: checkoutData.adminPassword
-            })
-        });
 
-        // Clear sensitive data immediately after use
-        sessionStorage.removeItem('gassigeher_checkout_data');
+        let token;
 
-        if (!loginResponse.ok) {
-            throw new Error('Login fehlgeschlagen');
+        // Check if we have a checkout_token from registration
+        if (checkoutData.checkout_token) {
+            // Use the checkout token directly (preferred secure method)
+            token = checkoutData.checkout_token;
+        } else {
+            // No checkout token available - redirect to login page
+            // This is the secure fallback when password-less checkout isn't available
+            sessionStorage.removeItem('gassigeher_checkout_data');
+
+            // Show message and redirect to login
+            const successDiv = document.getElementById('success-message-pro');
+            if (successDiv) {
+                successDiv.innerHTML = `
+                    <div class="alert alert-info">
+                        <p>Bitte melden Sie sich an, um den Checkout abzuschließen.</p>
+                        <a href="${checkoutData.login_url}" class="btn btn-primary">Zur Anmeldung</a>
+                    </div>
+                `;
+            }
+            return;
         }
 
-        const loginData = await loginResponse.json();
-        const token = loginData.token;
+        // Clear checkout data immediately after use
+        sessionStorage.removeItem('gassigeher_checkout_data');
 
-        // Now create checkout session with the token
+        // Create checkout session with the checkout token
         const billingResponse = await fetch(`${baseUrl}/api/v1/billing/checkout`, {
             method: 'POST',
             headers: {

@@ -145,6 +145,7 @@ func (s *AuthService) GenerateImpersonationJWT(targetUserID int, targetEmail str
 }
 
 // ValidateJWT validates and parses a JWT token
+// SECURITY FIX: Now explicitly validates token expiration
 func (s *AuthService) ValidateJWT(tokenString string) (*jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -158,6 +159,14 @@ func (s *AuthService) ValidateJWT(tokenString string) (*jwt.MapClaims, error) {
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		// SECURITY FIX: Explicitly validate expiration time
+		exp, ok := claims["exp"].(float64)
+		if !ok {
+			return nil, fmt.Errorf("token missing expiration claim")
+		}
+		if time.Now().Unix() > int64(exp) {
+			return nil, fmt.Errorf("token has expired")
+		}
 		return &claims, nil
 	}
 

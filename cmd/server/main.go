@@ -66,6 +66,11 @@ func main() {
 	// Load configuration
 	cfg := config.Load()
 
+	// Validate configuration
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("Configuration error: %v", err)
+	}
+
 	// Initialize database with multi-database support
 	dbConfig := cfg.GetDBConfig()
 	db, dialect, err := database.InitializeWithConfig(dbConfig)
