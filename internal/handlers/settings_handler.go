@@ -206,9 +206,10 @@ func (h *SettingsHandler) UploadLogo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update setting with local path (prefixed with /uploads/)
+	// Upsert setting with local path (prefixed with /uploads/)
+	// Use Upsert because site_logo setting may not exist yet
 	localURL := "/uploads/" + logoPath
-	if err := h.settingsRepo.Update(tenantID, "site_logo", localURL); err != nil {
+	if err := h.settingsRepo.Upsert(tenantID, "site_logo", localURL); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to update logo setting")
 		return
 	}
@@ -271,7 +272,8 @@ func (h *SettingsHandler) ResetLogo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Reset setting to appropriate default URL
-	if err := h.settingsRepo.Update(tenantID, "site_logo", resetLogoURL); err != nil {
+	// Use Upsert because site_logo setting may not exist yet
+	if err := h.settingsRepo.Upsert(tenantID, "site_logo", resetLogoURL); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to reset logo setting")
 		return
 	}

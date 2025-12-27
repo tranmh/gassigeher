@@ -439,9 +439,10 @@ func main() {
 
 	// System settings (admin only)
 	admin.HandleFunc("/settings", settingsHandler.GetAllSettings).Methods("GET")
-	admin.HandleFunc("/settings/{key}", settingsHandler.UpdateSetting).Methods("PUT")
+	// Logo routes must be registered BEFORE {key} to avoid being matched by the wildcard
 	admin.HandleFunc("/settings/logo", settingsHandler.UploadLogo).Methods("POST")
 	admin.HandleFunc("/settings/logo", settingsHandler.ResetLogo).Methods("DELETE")
+	admin.HandleFunc("/settings/{key}", settingsHandler.UpdateSetting).Methods("PUT")
 
 	// Experience requests management (admin only)
 	admin.HandleFunc("/experience-requests/{id}/approve", experienceHandler.ApproveRequest).Methods("PUT")
