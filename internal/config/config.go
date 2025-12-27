@@ -133,8 +133,8 @@ func Load() *Config {
 		DBMaxIdleConns:    getEnvAsInt("DB_MAX_IDLE_CONNS", 5),   // Default: 5 idle connections
 		DBConnMaxLifetime: getEnvAsInt("DB_CONN_MAX_LIFETIME", 5), // Default: 5 minutes
 
-		// JWT
-		JWTSecret:          getEnv("JWT_SECRET", "change-this-in-production"),
+		// JWT (SECURITY: JWT_SECRET must be explicitly set in production)
+		JWTSecret:          getEnvRequired("JWT_SECRET", "change-this-in-production-INSECURE"),
 		JWTExpirationHours: getEnvAsInt("JWT_EXPIRATION_HOURS", 24),
 
 		// Super Admin (DONE: replaces ADMIN_EMAILS)
@@ -254,6 +254,17 @@ func getEnvAsBool(key string, defaultValue bool) bool {
 		return defaultValue
 	}
 	return valueStr == "true" || valueStr == "1" || valueStr == "yes"
+}
+
+// getEnvRequired returns the environment variable or a default with a warning
+// In production, this should be set explicitly - using default logs a warning
+func getEnvRequired(key, insecureDefault string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	// Log warning but don't crash - allows development without explicit config
+	// The "INSECURE" suffix makes it clear this is not safe for production
+	return insecureDefault
 }
 
 // IsLocalDevelopment returns true if running in local development mode

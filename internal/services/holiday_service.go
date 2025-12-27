@@ -52,7 +52,10 @@ func (s *HolidayService) FetchAndCacheHolidays(tenantID int, year int) error {
 		return fmt.Errorf("holiday API returned status %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	// Limit response body size to prevent DoS (1MB max - holiday data is small JSON)
+	const maxBodySize = 1 * 1024 * 1024
+	limitedReader := io.LimitReader(resp.Body, maxBodySize)
+	body, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return fmt.Errorf("failed to read API response: %w", err)
 	}

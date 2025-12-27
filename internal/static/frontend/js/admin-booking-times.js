@@ -96,11 +96,15 @@
     // Create rule table row
     function createRuleRow(rule) {
         const tr = document.createElement('tr');
+        // Sanitize user-controlled data to prevent XSS
+        const safeName = window.sanitizeHTML ? window.sanitizeHTML(rule.rule_name) : rule.rule_name.replace(/[<>&"']/g, c => ({'<':'&lt;', '>':'&gt;', '&':'&amp;', '"':'&quot;', "'":'&#39;'}[c]));
+        const safeStartTime = window.sanitizeHTML ? window.sanitizeHTML(rule.start_time) : rule.start_time.replace(/[<>&"']/g, c => ({'<':'&lt;', '>':'&gt;', '&':'&amp;', '"':'&quot;', "'":'&#39;'}[c]));
+        const safeEndTime = window.sanitizeHTML ? window.sanitizeHTML(rule.end_time) : rule.end_time.replace(/[<>&"']/g, c => ({'<':'&lt;', '>':'&gt;', '&':'&amp;', '"':'&quot;', "'":'&#39;'}[c]));
 
         tr.innerHTML = `
-            <td>${rule.rule_name}</td>
-            <td><input type="time" value="${rule.start_time}" data-field="start"></td>
-            <td><input type="time" value="${rule.end_time}" data-field="end"></td>
+            <td>${safeName}</td>
+            <td><input type="time" value="${safeStartTime}" data-field="start"></td>
+            <td><input type="time" value="${safeEndTime}" data-field="end"></td>
             <td>
                 <select data-field="blocked">
                     <option value="0" ${!rule.is_blocked ? 'selected' : ''}>Erlaubt</option>
@@ -232,10 +236,13 @@
     // Create holiday table row
     function createHolidayRow(holiday) {
         const tr = document.createElement('tr');
+        // Sanitize user-controlled data to prevent XSS
+        const safeDate = window.sanitizeHTML ? window.sanitizeHTML(holiday.date) : holiday.date.replace(/[<>&"']/g, c => ({'<':'&lt;', '>':'&gt;', '&':'&amp;', '"':'&quot;', "'":'&#39;'}[c]));
+        const safeName = window.sanitizeHTML ? window.sanitizeHTML(holiday.name) : holiday.name.replace(/[<>&"']/g, c => ({'<':'&lt;', '>':'&gt;', '&':'&amp;', '"':'&quot;', "'":'&#39;'}[c]));
 
         tr.innerHTML = `
-            <td>${holiday.date}</td>
-            <td>${holiday.name}</td>
+            <td>${safeDate}</td>
+            <td>${safeName}</td>
             <td>${holiday.source === 'api' ? 'Automatisch' : 'Manuell'}</td>
             <td>
                 <label>

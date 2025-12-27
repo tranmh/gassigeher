@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -94,11 +95,18 @@ func CORSMiddleware(baseURL string) func(http.Handler) http.Handler {
 				baseURL = "http://localhost:8080"
 			}
 
-			// Allowed origins for CORS (configurable base + additional domains)
+			// Allowed origins for CORS (configurable via BASE_URL and CORS_ALLOWED_ORIGINS)
 			allowedOrigins := []string{
 				baseURL,
-				"https://gassi.cuong.net",
-				"https://www.gassi.cuong.net",
+			}
+			// Add additional origins from environment variable if set (comma-separated)
+			if extraOrigins := os.Getenv("CORS_ALLOWED_ORIGINS"); extraOrigins != "" {
+				for _, origin := range strings.Split(extraOrigins, ",") {
+					origin = strings.TrimSpace(origin)
+					if origin != "" {
+						allowedOrigins = append(allowedOrigins, origin)
+					}
+				}
 			}
 
 			origin := r.Header.Get("Origin")
@@ -134,6 +142,7 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
+				w.Header().Set("Content-Type", "application/json")
 				http.Error(w, `{"error":"Missing authorization header"}`, http.StatusUnauthorized)
 				return
 			}
@@ -141,6 +150,7 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 			// Extract token from "Bearer <token>"
 			parts := strings.Split(authHeader, " ")
 			if len(parts) != 2 || parts[0] != "Bearer" {
+				w.Header().Set("Content-Type", "application/json")
 				http.Error(w, `{"error":"Invalid authorization header format"}`, http.StatusUnauthorized)
 				return
 			}
@@ -151,19 +161,22 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 			authService := services.NewAuthService(jwtSecret, 24) // expiration not used here
 			claims, err := authService.ValidateJWT(tokenString)
 			if err != nil {
-			http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized) // BUG FIX #3
+				w.Header().Set("Content-Type", "application/json")
+				http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
 				return
 			}
 
 			// Extract claims
 			userID, ok := (*claims)["user_id"].(float64)
 			if !ok {
+				w.Header().Set("Content-Type", "application/json")
 				http.Error(w, `{"error":"Invalid token claims"}`, http.StatusUnauthorized)
 				return
 			}
 
 			email, ok := (*claims)["email"].(string)
 			if !ok {
+				w.Header().Set("Content-Type", "application/json")
 				http.Error(w, `{"error":"Invalid token claims"}`, http.StatusUnauthorized)
 				return
 			}
@@ -206,10 +219,12 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 			if subdomainTenantID != 0 {
 				// Subdomain tenant is set - JWT must have matching tenant_id
 				if jwtTenantID == 0 {
+					w.Header().Set("Content-Type", "application/json")
 					http.Error(w, `{"error":"Token ohne Tierheim-ID ungültig"}`, http.StatusUnauthorized)
 					return
 				}
 				if subdomainTenantID != jwtTenantID {
+					w.Header().Set("Content-Type", "application/json")
 					http.Error(w, `{"error":"Token für anderes Tierheim ungültig"}`, http.StatusUnauthorized)
 					return
 				}

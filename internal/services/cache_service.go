@@ -20,6 +20,8 @@ type CacheService struct {
 	defaultTTL time.Duration
 	maxEntries int
 	stats      CacheStats
+	stopCh     chan struct{} // Channel to stop cleanup goroutine
+	stopped    bool          // Flag to track if Close() was called
 }
 
 // CacheStats tracks cache performance metrics
@@ -54,6 +56,7 @@ func NewCacheService(cfg CacheConfig) *CacheService {
 		data:       make(map[string]*CacheEntry),
 		defaultTTL: cfg.DefaultTTL,
 		maxEntries: cfg.MaxEntries,
+		stopCh:     make(chan struct{}),
 	}
 
 	// Start background cleanup if configured
@@ -62,6 +65,20 @@ func NewCacheService(cfg CacheConfig) *CacheService {
 	}
 
 	return c
+}
+
+// Close stops the background cleanup goroutine and releases resources
+func (c *CacheService) Close() {
+	c.mu.Lock()
+	if c.stopped {
+		c.mu.Unlock()
+		return
+	}
+	c.stopped = true
+	c.mu.Unlock()
+
+	// Signal cleanup goroutine to stop
+	close(c.stopCh)
 }
 
 // NewDefaultCacheService creates a cache with default settings
@@ -243,8 +260,15 @@ func (c *CacheService) evictOldest() {
 // runCleanup periodically removes expired entries
 func (c *CacheService) runCleanup(interval time.Duration) {
 	ticker := time.NewTicker(interval)
-	for range ticker.C {
-		c.cleanup()
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			c.cleanup()
+		case <-c.stopCh:
+			return
+		}
 	}
 }
 

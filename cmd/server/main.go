@@ -34,19 +34,14 @@ func main() {
 	resetAllTenants := flag.Bool("reset-all-tenants", false, "Reset all local dev tenants (local dev only)")
 	flag.Parse()
 
-	// Check if the .env file exists
+	// Load environment variables from .env file if it exists
 	if _, err := os.Stat(*envPath); os.IsNotExist(err) {
-		log.Printf("No .env found, using env vars")
+		log.Printf("No .env file found at %s, using environment variables", *envPath)
 	} else {
 		if err := godotenv.Load(*envPath); err != nil {
-			log.Fatalf("Error loading .env: %v", err)
+			log.Fatalf("Error loading .env file from %s: %v", *envPath, err)
 		}
-		log.Printf("Loaded from: %s", *envPath)
-	}
-
-	// Load environment variables from specified path
-	if err := godotenv.Load(*envPath); err != nil {
-		log.Fatalf("Error loading .env file from %s: %v", *envPath, err)
+		log.Printf("Loaded configuration from: %s", *envPath)
 	}
 
 	// Initialize logger with rotation support
@@ -673,17 +668,29 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
+	// Channel for server errors
+	serverErr := make(chan error, 1)
+
 	// Start server in goroutine
 	go func() {
 		log.Printf("Server starting on port %s...", port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", err)
+			serverErr <- err
 		}
 	}()
 
-	// Block until shutdown signal received
-	sig := <-quit
-	log.Printf("Received signal %v, initiating graceful shutdown...", sig)
+	// Block until shutdown signal or server error
+	select {
+	case err := <-serverErr:
+		log.Printf("Server failed to start: %v", err)
+		// Allow cleanup to proceed
+	case sig := <-quit:
+		log.Printf("Received signal %v, initiating graceful shutdown...", sig)
+	}
+
+	// Stop cron service first (before HTTP server shutdown)
+	cronService.Stop()
+	log.Println("Cron service stopped")
 
 	// Create context with timeout for shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

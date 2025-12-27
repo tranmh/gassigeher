@@ -66,17 +66,35 @@ func NewGmailProvider(config *EmailConfig) (EmailProvider, error) {
 	}, nil
 }
 
+// sanitizeHeader removes CRLF characters to prevent email header injection
+func sanitizeHeader(s string) string {
+	// Remove carriage return, newline, and null bytes
+	result := make([]byte, 0, len(s))
+	for i := 0; i < len(s); i++ {
+		if s[i] != '\r' && s[i] != '\n' && s[i] != 0 {
+			result = append(result, s[i])
+		}
+	}
+	return string(result)
+}
+
 // SendEmail sends an email via Gmail API
 func (p *GmailProvider) SendEmail(to, subject, body string) error {
 	var message gmail.Message
 
+	// Sanitize header values to prevent header injection attacks
+	to = sanitizeHeader(to)
+	subject = sanitizeHeader(subject)
+	fromEmail := sanitizeHeader(p.fromEmail)
+	bccAdmin := sanitizeHeader(p.bccAdmin)
+
 	// Build email content with optional BCC
 	emailContent := fmt.Sprintf("From: %s\r\n"+
-		"To: %s\r\n", p.fromEmail, to)
+		"To: %s\r\n", fromEmail, to)
 
 	// Add BCC header if configured
-	if p.bccAdmin != "" {
-		emailContent += fmt.Sprintf("Bcc: %s\r\n", p.bccAdmin)
+	if bccAdmin != "" {
+		emailContent += fmt.Sprintf("Bcc: %s\r\n", bccAdmin)
 	}
 
 	emailContent += fmt.Sprintf("Subject: %s\r\n"+
