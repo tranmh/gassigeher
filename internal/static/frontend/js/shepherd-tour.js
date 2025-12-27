@@ -133,7 +133,7 @@
         },
         {
             id: 'nav-dogs',
-            attachTo: { element: 'a[href="/dogs.html"]', on: 'bottom' },
+            attachTo: { element: 'nav a[href="/dogs.html"], #main-nav a[href="/dogs.html"]', on: 'bottom' },
             title: 'Unsere Hunde',
             text: 'Hier findest du alle verfügbaren Hunde. Klicke auf einen Hund, um mehr über ihn zu erfahren und einen Spaziergang zu buchen.',
             buttons: [
@@ -143,7 +143,7 @@
         },
         {
             id: 'nav-calendar',
-            attachTo: { element: 'a[href="/calendar.html"]', on: 'bottom' },
+            attachTo: { element: 'nav a[href="/calendar.html"], #main-nav a[href="/calendar.html"]', on: 'bottom' },
             title: 'Kalender',
             text: 'Im Kalender siehst du alle deine gebuchten Spaziergänge auf einen Blick.',
             buttons: [
@@ -153,7 +153,7 @@
         },
         {
             id: 'my-bookings',
-            attachTo: { element: '#my-bookings, .bookings-section, .upcoming-walks', on: 'top' },
+            attachTo: { element: '#upcoming-bookings', on: 'top' },
             title: 'Deine Buchungen',
             text: 'Hier siehst du deine anstehenden Spaziergänge. Du kannst sie bei Bedarf auch stornieren.',
             buttons: [
@@ -169,7 +169,7 @@
         },
         {
             id: 'profile',
-            attachTo: { element: 'a[href="/profile.html"]', on: 'bottom' },
+            attachTo: { element: 'nav a[href="/profile.html"], #main-nav a[href="/profile.html"]', on: 'bottom' },
             title: 'Dein Profil',
             text: 'In deinem Profil kannst du deine Daten bearbeiten und dein Erfahrungslevel einsehen.',
             buttons: [
@@ -191,24 +191,40 @@
             ]
         },
         {
-            id: 'dog-card',
-            attachTo: { element: '.dog-card:first-child, .dog-item:first-child', on: 'right' },
-            title: 'Hunde-Karte',
-            text: 'Jeder Hund hat eine eigene Karte mit Foto, Name und Eigenschaften. Die Farbe zeigt das erforderliche Erfahrungslevel.',
+            id: 'colors-info',
+            attachTo: { element: '#colors-info', on: 'bottom' },
+            title: 'Deine Farben',
+            text: 'Hier siehst du, welche Farbkategorien du hast. Du kannst nur Hunde mit passenden Farben buchen.',
             buttons: [
                 defaultButtons.back,
                 defaultButtons.next
             ]
         },
         {
-            id: 'color-legend',
-            attachTo: { element: '.color-legend, .filter-section, #color-filter', on: 'bottom' },
-            title: 'Farbkategorien',
-            text: 'Grün = Anfänger, Gelb = Etwas Erfahrung, Orange/Blau = Fortgeschritten. Dein Level bestimmt, welche Hunde du buchen kannst.',
+            id: 'filter-bar',
+            attachTo: { element: '.filter-bar', on: 'bottom' },
+            title: 'Filter & Suche',
+            text: 'Nutze die Filter, um Hunde nach Rasse, Größe oder Farbe zu filtern.',
             buttons: [
                 defaultButtons.back,
                 defaultButtons.next
             ]
+        },
+        {
+            id: 'dog-card',
+            attachTo: { element: '.dog-grid .card:first-child, #dogs-list .card:first-child', on: 'right' },
+            title: 'Hunde-Karte',
+            text: 'Jeder Hund hat eine eigene Karte mit Foto, Name und Eigenschaften. Die Farbe zeigt das erforderliche Erfahrungslevel.',
+            buttons: [
+                defaultButtons.back,
+                defaultButtons.next
+            ],
+            beforeShowPromise: function() {
+                return new Promise(resolve => {
+                    // Wait for dogs to load
+                    setTimeout(resolve, 500);
+                });
+            }
         },
         {
             id: 'booking-hint',
@@ -234,7 +250,7 @@
         },
         {
             id: 'admin-stats',
-            attachTo: { element: '.stats-grid, .dashboard-stats, #stats-section', on: 'bottom' },
+            attachTo: { element: '#stats-grid', on: 'bottom' },
             title: 'Statistik-Übersicht',
             text: 'Hier siehst du wichtige Kennzahlen: Aktive Benutzer, Buchungen, verfügbare Hunde und mehr.',
             buttons: [
@@ -244,7 +260,7 @@
         },
         {
             id: 'admin-nav-dogs',
-            attachTo: { element: 'a[href="/admin-dogs.html"]', on: 'bottom' },
+            attachTo: { element: 'nav a[href="/admin-dogs.html"], #main-nav a[href="/admin-dogs.html"]', on: 'bottom' },
             title: 'Hunde verwalten',
             text: 'Hier kannst du Hunde hinzufügen, bearbeiten oder die Verfügbarkeit ändern.',
             buttons: [
@@ -254,7 +270,7 @@
         },
         {
             id: 'admin-nav-users',
-            attachTo: { element: 'a[href="/admin-users.html"]', on: 'bottom' },
+            attachTo: { element: '.nav-dropdown-menu a[href="/admin-users.html"]', on: 'bottom' },
             title: 'Benutzer verwalten',
             text: 'Verwalte Benutzerkonten, vergebe Berechtigungen und bearbeite Erfahrungslevel.',
             buttons: [
@@ -264,7 +280,7 @@
         },
         {
             id: 'admin-nav-bookings',
-            attachTo: { element: '.nav-dropdown:has(a[href="/admin-bookings.html"]), a[href="/admin-bookings.html"]', on: 'bottom' },
+            attachTo: { element: '.nav-dropdown-menu a[href="/admin-bookings.html"]', on: 'bottom' },
             title: 'Buchungen & Termine',
             text: 'Im Buchungsbereich findest du alle Termine, Genehmigungen und gesperrte Tage.',
             buttons: [
@@ -274,7 +290,7 @@
         },
         {
             id: 'admin-nav-settings',
-            attachTo: { element: '.nav-dropdown:has(a[href="/admin-settings.html"]), a[href="/admin-settings.html"]', on: 'bottom' },
+            attachTo: { element: '.nav-dropdown-menu a[href="/admin-settings.html"]', on: 'bottom' },
             title: 'Einstellungen',
             text: 'Konfiguriere Systemeinstellungen, Branding und Buchungszeiten.',
             buttons: [
@@ -290,9 +306,22 @@
         let tour = null;
         let tourType = 'user';
 
+        // Wait for Shepherd to be available
+        if (typeof Shepherd === 'undefined') {
+            console.log('[GassigeherTour] Shepherd.js not yet loaded, retrying in 200ms...');
+            setTimeout(initTour, 200);
+            return null;
+        }
+
+        console.log('[GassigeherTour] Initializing tour for path:', path);
+        console.log('[GassigeherTour] Demo tenant:', isDemoTenant());
+        console.log('[GassigeherTour] User tour complete:', isTourComplete('user'));
+        console.log('[GassigeherTour] Admin tour complete:', isTourComplete('admin'));
+
         // Determine which tour to show based on page
         if (path.includes('admin-dashboard')) {
             if (!isTourComplete('admin')) {
+                console.log('[GassigeherTour] Starting admin tour...');
                 tour = createTour('admin');
                 if (tour) {
                     adminDashboardSteps.forEach(step => tour.addStep(step));
@@ -301,6 +330,7 @@
             }
         } else if (path.includes('dashboard') && !path.includes('admin')) {
             if (!isTourComplete('user')) {
+                console.log('[GassigeherTour] Starting user dashboard tour...');
                 tour = createTour('user');
                 if (tour) {
                     userDashboardSteps.forEach(step => tour.addStep(step));
@@ -308,6 +338,7 @@
             }
         } else if (path.includes('dogs.html') && !path.includes('admin')) {
             if (!isTourComplete('user')) {
+                console.log('[GassigeherTour] Starting dogs page tour...');
                 tour = createTour('user');
                 if (tour) {
                     dogsPageSteps.forEach(step => tour.addStep(step));
@@ -318,17 +349,19 @@
         // Start tour after a short delay to ensure page is loaded
         if (tour) {
             setTimeout(() => {
-                // Only start if elements exist
-                const firstStep = tour.steps[0];
-                if (firstStep && !firstStep.options.attachTo) {
-                    tour.start();
-                } else if (firstStep && firstStep.options.attachTo) {
-                    const el = document.querySelector(firstStep.options.attachTo.element);
-                    if (el || !firstStep.options.attachTo.element) {
+                try {
+                    // The first step (welcome) has no attachTo, so just start
+                    const firstStep = tour.steps[0];
+                    if (firstStep) {
+                        console.log('[GassigeherTour] Starting tour with first step:', firstStep.id);
                         tour.start();
                     }
+                } catch (e) {
+                    console.error('[GassigeherTour] Error starting tour:', e);
                 }
-            }, 500);
+            }, 800);
+        } else {
+            console.log('[GassigeherTour] No tour to start (already complete or wrong page)');
         }
 
         return tour;

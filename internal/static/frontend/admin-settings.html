@@ -194,6 +194,17 @@
                 </div>
             </div>
 
+            <!-- Guided Tour Replay -->
+            <div class="card" style="margin-top: 30px; border-left: 4px solid #17a2b8;">
+                <h2 style="color: #17a2b8;">🎓 Einführungstour</h2>
+                <p style="font-size: 0.85rem; color: #666; margin-bottom: 20px;">
+                    Zeige die interaktive Einführungstour für den Admin-Bereich erneut an.
+                </p>
+                <button class="btn btn-secondary" data-action="replay-admin-tour" style="display: inline-flex; align-items: center; gap: 8px;">
+                    🎓 Admin-Tour wiederholen
+                </button>
+            </div>
+
             <!-- GDPR Data Export Section -->
             <div class="card" style="margin-top: 30px;">
                 <h2>📦 DSGVO Datenexport</h2>
@@ -256,6 +267,16 @@
             'export-all-data': function(e) {
                 e.preventDefault();
                 exportAllData();
+            },
+            'replay-admin-tour': function(e) {
+                e.preventDefault();
+                if (typeof GassigeherTour !== 'undefined') {
+                    GassigeherTour.resetTour('admin');
+                    window.location.href = '/admin-dashboard.html';
+                } else {
+                    localStorage.removeItem('gassigeher_admin_tour_complete');
+                    window.location.href = '/admin-dashboard.html';
+                }
             }
         });
 

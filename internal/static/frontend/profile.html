@@ -180,6 +180,15 @@
                 </form>
             </div>
 
+            <!-- Guided Tour Replay -->
+            <div class="card" style="border-left: 4px solid #17a2b8;">
+                <h3 style="color: #17a2b8;">🎓 Einführungstour</h3>
+                <p style="margin-bottom: 15px;">Zeige die interaktive Einführungstour erneut an, um die wichtigsten Funktionen kennenzulernen.</p>
+                <button class="btn btn-secondary" data-action="replay-tour" style="display: inline-flex; align-items: center; gap: 8px;">
+                    🎓 Tour wiederholen
+                </button>
+            </div>
+
             <!-- WhatsApp Group -->
             <div class="card" id="whatsapp-card" style="display: none; border-left: 4px solid #25d366;">
                 <h3 style="color: #25d366;">💬 WhatsApp-Gruppe</h3>
@@ -234,6 +243,16 @@
                 const colorId = parseInt(el.dataset.colorId);
                 const colorName = el.dataset.colorName;
                 requestColor(colorId, colorName);
+            },
+            'replay-tour': function(e) {
+                e.preventDefault();
+                if (typeof GassigeherTour !== 'undefined') {
+                    GassigeherTour.resetTour('user');
+                    window.location.href = '/dashboard.html';
+                } else {
+                    localStorage.removeItem('gassigeher_user_tour_complete');
+                    window.location.href = '/dashboard.html';
+                }
             }
         });
 
