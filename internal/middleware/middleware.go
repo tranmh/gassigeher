@@ -351,12 +351,13 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 
 		// Content Security Policy (Enhanced for XSS protection)
-		// SECURITY: GASSI-2025-003 - Temporarily re-added 'unsafe-inline' to script-src
-		// REASON: Application uses inline scripts for auth checks and page logic.
-		//         Removing 'unsafe-inline' broke all protected pages (no auth redirect).
-		// TODO: Migrate all inline scripts to external .js files, then remove 'unsafe-inline'
+		// SECURITY: GASSI-2025-003 - 'unsafe-inline' still required in script-src
+		// PROGRESS: login.html and register.html migrated to external JS (js/pages/*.js)
+		// REMAINING: ~25 other HTML files still use inline scripts for page-specific logic
+		// MITIGATION: All user-input handling uses textContent (not innerHTML) to prevent XSS
+		// TODO: Continue migrating inline scripts to js/pages/*.js, then remove 'unsafe-inline'
 		// Note: img-src includes tierheim-goeppingen.de for the default site logo
-		// style-src still has 'unsafe-inline' for inline styles (lower risk than scripts)
+		// style-src has 'unsafe-inline' for inline styles (lower risk than scripts)
 		// Note: cdn.jsdelivr.net is allowed for Shepherd.js guided tours library
 		csp := strings.Join([]string{
 			"default-src 'self'",

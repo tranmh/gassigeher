@@ -1110,18 +1110,35 @@ func (h *UserHandler) AdminCreateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Send temp password email
+	// Send temp password email synchronously to ensure delivery
+	// If email fails, return temp password to admin so they can communicate it manually
+	emailSent := false
 	if h.emailService != nil {
-		go h.emailService.SendTempPasswordEmail(req.Email, req.FirstName, tempPassword)
+		if err := h.emailService.SendTempPasswordEmail(req.Email, req.FirstName, tempPassword); err != nil {
+			log.Printf("ERROR: Failed to send temp password email to %s: %v", req.Email, err)
+		} else {
+			emailSent = true
+		}
 	}
 
 	// Don't return sensitive data
 	user.PasswordHash = nil
 
-	respondJSON(w, http.StatusCreated, map[string]interface{}{
-		"message": "Benutzer erfolgreich erstellt. Temporäres Passwort wurde per E-Mail gesendet.",
-		"user":    user,
-	})
+	// Build response based on email delivery status
+	response := map[string]interface{}{
+		"user": user,
+	}
+
+	if emailSent {
+		response["message"] = "Benutzer erfolgreich erstellt. Temporäres Passwort wurde per E-Mail gesendet."
+	} else {
+		// Email failed - return temp password so admin can share it manually
+		response["message"] = "Benutzer erstellt, aber E-Mail konnte nicht gesendet werden. Bitte teilen Sie das temporäre Passwort manuell mit."
+		response["temp_password"] = tempPassword
+		response["email_failed"] = true
+	}
+
+	respondJSON(w, http.StatusCreated, response)
 }
 
 // AdminDeleteUser deletes a user account (super-admin only, GDPR anonymization)

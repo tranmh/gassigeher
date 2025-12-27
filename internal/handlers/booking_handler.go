@@ -315,11 +315,11 @@ func (h *BookingHandler) GetBooking(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(middleware.UserIDKey).(int)
 	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
 	// SaaS: Extract tenant ID from context
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
-	if tenantID == 0 {
-		respondError(w, http.StatusBadRequest, "Tenant context required")
+	if !ok || tenantID == 0 {
+		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
 
@@ -357,7 +357,13 @@ func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(middleware.UserIDKey).(int)
 	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
 	// SaaS: Extract tenant ID from context
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+
+	// SaaS: Require valid tenant context (SECURITY FIX: tenantID=0 bypass vulnerability)
+	if !ok || tenantID == 0 {
+		respondError(w, http.StatusInternalServerError, "Request validation failed")
+		return
+	}
 
 	// Parse request
 	var req models.CancelBookingRequest
@@ -374,12 +380,6 @@ func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) {
 	}
 	if booking == nil {
 		respondError(w, http.StatusNotFound, "Booking not found")
-		return
-	}
-
-	// SaaS: Require valid tenant context (SECURITY FIX: tenantID=0 bypass vulnerability)
-	if tenantID == 0 {
-		respondError(w, http.StatusBadRequest, "Tenant context required")
 		return
 	}
 	// SaaS: Verify booking belongs to current tenant
@@ -548,7 +548,13 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 	// Get admin user ID
 	userID, _ := r.Context().Value(middleware.UserIDKey).(int)
 	// SaaS: Extract tenant ID from context
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+
+	// SaaS: Require valid tenant context (SECURITY FIX: tenantID=0 bypass vulnerability)
+	if !ok || tenantID == 0 {
+		respondError(w, http.StatusInternalServerError, "Request validation failed")
+		return
+	}
 
 	// Parse request
 	var req models.MoveBookingRequest
@@ -571,12 +577,6 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 	}
 	if booking == nil {
 		respondError(w, http.StatusNotFound, "Booking not found")
-		return
-	}
-
-	// SaaS: Require valid tenant context (SECURITY FIX: tenantID=0 bypass vulnerability)
-	if tenantID == 0 {
-		respondError(w, http.StatusBadRequest, "Tenant context required")
 		return
 	}
 	// SaaS: Verify booking belongs to current tenant
@@ -772,11 +772,11 @@ func (h *BookingHandler) ApprovePendingBooking(w http.ResponseWriter, r *http.Re
 
 	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)
 	// SaaS: Extract tenant ID from context
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
-	if tenantID == 0 {
-		respondError(w, http.StatusBadRequest, "Tenant context required")
+	if !ok || tenantID == 0 {
+		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
 
@@ -842,7 +842,13 @@ func (h *BookingHandler) RejectPendingBooking(w http.ResponseWriter, r *http.Req
 
 	adminID, _ := r.Context().Value(middleware.UserIDKey).(int)
 	// SaaS: Extract tenant ID from context
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+
+	// SaaS: Require valid tenant context (SECURITY FIX: tenantID=0 bypass vulnerability)
+	if !ok || tenantID == 0 {
+		respondError(w, http.StatusInternalServerError, "Request validation failed")
+		return
+	}
 
 	// Extract booking ID from path
 	pathParts := strings.Split(r.URL.Path, "/")
@@ -878,11 +884,6 @@ func (h *BookingHandler) RejectPendingBooking(w http.ResponseWriter, r *http.Req
 	// SaaS: Verify booking belongs to current tenant before rejecting
 	if booking == nil {
 		respondError(w, http.StatusNotFound, "Booking not found")
-		return
-	}
-	// SaaS: Require valid tenant context (SECURITY FIX: tenantID=0 bypass vulnerability)
-	if tenantID == 0 {
-		respondError(w, http.StatusBadRequest, "Tenant context required")
 		return
 	}
 	if booking.TenantID != tenantID {

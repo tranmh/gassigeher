@@ -145,9 +145,9 @@ func (h *FeatureFlagHandler) DeleteFlag(w http.ResponseWriter, r *http.Request) 
 // GetTenantFlags returns flags with status for current tenant
 // GET /api/v1/admin/feature-flags
 func (h *FeatureFlagHandler) GetTenantFlags(w http.ResponseWriter, r *http.Request) {
-	tenantID := middleware.GetTenantID(r)
-	if tenantID == 0 {
-		respondError(w, http.StatusBadRequest, "Kein Tenant gefunden")
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+	if !ok || tenantID == 0 {
+		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
 
@@ -165,9 +165,9 @@ func (h *FeatureFlagHandler) GetTenantFlags(w http.ResponseWriter, r *http.Reque
 // SetTenantFlag enables/disables a flag for the current tenant
 // PUT /api/v1/admin/feature-flags/{id}
 func (h *FeatureFlagHandler) SetTenantFlag(w http.ResponseWriter, r *http.Request) {
-	tenantID := middleware.GetTenantID(r)
-	if tenantID == 0 {
-		respondError(w, http.StatusBadRequest, "Kein Tenant gefunden")
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+	if !ok || tenantID == 0 {
+		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
 
@@ -199,9 +199,9 @@ func (h *FeatureFlagHandler) SetTenantFlag(w http.ResponseWriter, r *http.Reques
 // ResetTenantFlag removes a tenant-specific override (falls back to global)
 // DELETE /api/v1/admin/feature-flags/{id}
 func (h *FeatureFlagHandler) ResetTenantFlag(w http.ResponseWriter, r *http.Request) {
-	tenantID := middleware.GetTenantID(r)
-	if tenantID == 0 {
-		respondError(w, http.StatusBadRequest, "Kein Tenant gefunden")
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+	if !ok || tenantID == 0 {
+		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
 

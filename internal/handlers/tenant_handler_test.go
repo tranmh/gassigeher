@@ -392,15 +392,16 @@ func TestTenantHandler_GetCurrentTenant(t *testing.T) {
 		}
 	})
 
-	t.Run("returns 400 when no tenant in context", func(t *testing.T) {
+	t.Run("returns 500 when no tenant in context (security: hide implementation details)", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/tenant", nil)
 		// No tenant context
 
 		rec := httptest.NewRecorder()
 		handler.GetCurrentTenant(rec, req)
 
-		if rec.Code != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", rec.Code)
+		// SECURITY: Return 500 instead of 400 to hide implementation details
+		if rec.Code != http.StatusInternalServerError {
+			t.Errorf("Expected status 500, got %d", rec.Code)
 		}
 	})
 }
@@ -491,7 +492,7 @@ func TestTenantHandler_UpdateTenant(t *testing.T) {
 		}
 	})
 
-	t.Run("returns 400 when no tenant in context", func(t *testing.T) {
+	t.Run("returns 500 when no tenant in context (security: hide implementation details)", func(t *testing.T) {
 		reqBody := map[string]string{"name": "Test"}
 		body, _ := json.Marshal(reqBody)
 
@@ -502,8 +503,9 @@ func TestTenantHandler_UpdateTenant(t *testing.T) {
 		rec := httptest.NewRecorder()
 		handler.UpdateTenant(rec, req)
 
-		if rec.Code != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", rec.Code)
+		// SECURITY: Return 500 instead of 400 to hide implementation details
+		if rec.Code != http.StatusInternalServerError {
+			t.Errorf("Expected status 500, got %d", rec.Code)
 		}
 	})
 }
@@ -543,15 +545,16 @@ func TestTenantHandler_GetTenantStats(t *testing.T) {
 		}
 	})
 
-	t.Run("returns 400 when no tenant in context", func(t *testing.T) {
+	t.Run("returns 500 when no tenant in context", func(t *testing.T) {
+		// Security: Return 500 to hide implementation details (don't reveal tenant context issues)
 		req := httptest.NewRequest("GET", "/api/tenant/stats", nil)
 		// No tenant context
 
 		rec := httptest.NewRecorder()
 		handler.GetTenantStats(rec, req)
 
-		if rec.Code != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", rec.Code)
+		if rec.Code != http.StatusInternalServerError {
+			t.Errorf("Expected status 500, got %d", rec.Code)
 		}
 	})
 }

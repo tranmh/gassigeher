@@ -386,9 +386,9 @@ func (h *TenantHandler) CheckSlug(w http.ResponseWriter, r *http.Request) {
 
 // GetCurrentTenant returns the current tenant information
 func (h *TenantHandler) GetCurrentTenant(w http.ResponseWriter, r *http.Request) {
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
-	if tenantID == 0 {
-		respondError(w, http.StatusBadRequest, "Kein Tenant gefunden")
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+	if !ok || tenantID == 0 {
+		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
 
@@ -418,9 +418,9 @@ type UpdateTenantRequest struct {
 
 // UpdateTenant updates the current tenant's information (admin only)
 func (h *TenantHandler) UpdateTenant(w http.ResponseWriter, r *http.Request) {
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
-	if tenantID == 0 {
-		respondError(w, http.StatusBadRequest, "Kein Tenant gefunden")
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+	if !ok || tenantID == 0 {
+		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
 
@@ -492,11 +492,11 @@ type BrandingResponse struct {
 
 // GetBranding returns the branding information for the current tenant (public endpoint)
 func (h *TenantHandler) GetBranding(w http.ResponseWriter, r *http.Request) {
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 	tenantSlug, _ := r.Context().Value(middleware.TenantSlugKey).(string)
 
-	if tenantID == 0 {
-		respondError(w, http.StatusBadRequest, "Kein Tenant gefunden")
+	if !ok || tenantID == 0 {
+		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
 
@@ -563,9 +563,9 @@ type UpdateBrandingRequest struct {
 
 // UpdateBranding updates the branding settings for the current tenant (admin only)
 func (h *TenantHandler) UpdateBranding(w http.ResponseWriter, r *http.Request) {
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
-	if tenantID == 0 {
-		respondError(w, http.StatusBadRequest, "Kein Tenant gefunden")
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+	if !ok || tenantID == 0 {
+		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
 
@@ -646,9 +646,9 @@ func (h *TenantHandler) UpdateBranding(w http.ResponseWriter, r *http.Request) {
 
 // GetTenantStats returns statistics for the current tenant
 func (h *TenantHandler) GetTenantStats(w http.ResponseWriter, r *http.Request) {
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
-	if tenantID == 0 {
-		respondError(w, http.StatusBadRequest, "Kein Tenant gefunden")
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+	if !ok || tenantID == 0 {
+		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
 
@@ -828,9 +828,9 @@ func (h *TenantHandler) processReferralCode(code string, refereeTenantID int) {
 // Allows tenant admin to download all data for their tenant
 func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request) {
 	// Get tenant ID from context
-	tenantID := middleware.GetTenantID(r)
-	if tenantID == 0 {
-		respondError(w, http.StatusBadRequest, "Kein Tierheim ausgewählt")
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+	if !ok || tenantID == 0 {
+		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
 

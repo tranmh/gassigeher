@@ -144,10 +144,10 @@ func (h *DogHandler) GetDog(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// SaaS: Get tenant_id from context for isolation
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
-	if tenantID == 0 {
+	if !ok || tenantID == 0 {
 		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
@@ -328,10 +328,10 @@ func (h *DogHandler) UpdateDog(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// SaaS: Get tenant_id from context for isolation
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
-	if tenantID == 0 {
+	if !ok || tenantID == 0 {
 		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
@@ -457,10 +457,10 @@ func (h *DogHandler) DeleteDog(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// SaaS SECURITY: Get tenant_id from context for cross-tenant check
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
-	if tenantID == 0 {
+	if !ok || tenantID == 0 {
 		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
@@ -699,10 +699,10 @@ func (h *DogHandler) ToggleAvailability(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// SaaS: Get tenant_id from context for isolation
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
-	if tenantID == 0 {
+	if !ok || tenantID == 0 {
 		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
@@ -791,10 +791,10 @@ func (h *DogHandler) SetFeatured(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// SaaS: Get tenant_id from context for isolation
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
-	if tenantID == 0 {
+	if !ok || tenantID == 0 {
 		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
