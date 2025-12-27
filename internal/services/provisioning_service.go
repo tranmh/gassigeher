@@ -104,11 +104,18 @@ func generateRegistrationPassword() (string, error) {
 }
 
 // CreateDefaultSettings creates default system settings for a tenant
-func (s *ProvisioningService) CreateDefaultSettings(tx *sql.Tx, tenantID int) error {
+// federalState should be a valid German state code (e.g., "BW", "BY", "NW")
+// which will be used for automatic holiday detection via feiertage-api.de
+func (s *ProvisioningService) CreateDefaultSettings(tx *sql.Tx, tenantID int, federalState string) error {
 	// Generate a random registration password for this tenant
 	registrationPassword, err := generateRegistrationPassword()
 	if err != nil {
 		return fmt.Errorf("failed to generate registration password: %w", err)
+	}
+
+	// Default to BW if no federal state provided
+	if federalState == "" {
+		federalState = "BW"
 	}
 
 	settings := map[string]string{
@@ -116,6 +123,8 @@ func (s *ProvisioningService) CreateDefaultSettings(tx *sql.Tx, tenantID int) er
 		"cancellation_notice_hours": "12",
 		"auto_deactivation_days":    "365",
 		"registration_password":     registrationPassword,
+		"feiertage_state":           federalState, // Use tenant's federal state for holiday detection
+		"use_feiertage_api":         "true",       // Enable holiday API by default
 	}
 
 	for key, value := range settings {
@@ -147,7 +156,8 @@ func (s *ProvisioningService) CreateDefaultSubscription(tx *sql.Tx, tenantID int
 }
 
 // ProvisionTenant creates all default data for a new tenant
-func (s *ProvisioningService) ProvisionTenant(tx *sql.Tx, tenantID int) error {
+// federalState is used to configure holiday detection for the tenant's region
+func (s *ProvisioningService) ProvisionTenant(tx *sql.Tx, tenantID int, federalState string) error {
 	// Create default color categories
 	if err := s.CreateDefaultColors(tx, tenantID); err != nil {
 		return fmt.Errorf("CreateDefaultColors failed: %w", err)
@@ -158,8 +168,8 @@ func (s *ProvisioningService) ProvisionTenant(tx *sql.Tx, tenantID int) error {
 		return fmt.Errorf("CreateDefaultBookingRules failed: %w", err)
 	}
 
-	// Create default system settings
-	if err := s.CreateDefaultSettings(tx, tenantID); err != nil {
+	// Create default system settings (including feiertage_state from federalState)
+	if err := s.CreateDefaultSettings(tx, tenantID, federalState); err != nil {
 		return fmt.Errorf("CreateDefaultSettings failed: %w", err)
 	}
 

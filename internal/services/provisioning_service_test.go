@@ -132,7 +132,8 @@ func TestProvisioningService_CreateDefaultSettings(t *testing.T) {
 	}
 	defer tx.Rollback()
 
-	err = service.CreateDefaultSettings(tx, int(tenantID))
+	// Pass federal state "BY" (Bayern) to test it gets stored correctly
+	err = service.CreateDefaultSettings(tx, int(tenantID), "BY")
 	if err != nil {
 		t.Fatalf("CreateDefaultSettings failed: %v", err)
 	}
@@ -142,10 +143,12 @@ func TestProvisioningService_CreateDefaultSettings(t *testing.T) {
 	}
 
 	// Verify settings were created
-	var bookingDays, cancellationHours, deactivationDays string
+	var bookingDays, cancellationHours, deactivationDays, feiertagState, useFeiertagAPI string
 	db.QueryRow("SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'booking_advance_days'", tenantID).Scan(&bookingDays)
 	db.QueryRow("SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'cancellation_notice_hours'", tenantID).Scan(&cancellationHours)
 	db.QueryRow("SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'auto_deactivation_days'", tenantID).Scan(&deactivationDays)
+	db.QueryRow("SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'feiertage_state'", tenantID).Scan(&feiertagState)
+	db.QueryRow("SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'use_feiertage_api'", tenantID).Scan(&useFeiertagAPI)
 
 	if bookingDays != "14" {
 		t.Errorf("Expected booking_advance_days = '14', got '%s'", bookingDays)
@@ -155,6 +158,12 @@ func TestProvisioningService_CreateDefaultSettings(t *testing.T) {
 	}
 	if deactivationDays != "365" {
 		t.Errorf("Expected auto_deactivation_days = '365', got '%s'", deactivationDays)
+	}
+	if feiertagState != "BY" {
+		t.Errorf("Expected feiertage_state = 'BY', got '%s'", feiertagState)
+	}
+	if useFeiertagAPI != "true" {
+		t.Errorf("Expected use_feiertage_api = 'true', got '%s'", useFeiertagAPI)
 	}
 }
 
@@ -180,8 +189,8 @@ func TestProvisioningService_ProvisionTenant(t *testing.T) {
 	}
 	defer tx.Rollback()
 
-	// Provision the tenant
-	err = service.ProvisionTenant(tx, int(tenantID))
+	// Provision the tenant with federal state "NW" (Nordrhein-Westfalen)
+	err = service.ProvisionTenant(tx, int(tenantID), "NW")
 	if err != nil {
 		t.Fatalf("ProvisionTenant failed: %v", err)
 	}
@@ -202,8 +211,17 @@ func TestProvisioningService_ProvisionTenant(t *testing.T) {
 	if ruleCount != 7 {
 		t.Errorf("Expected 7 booking rules, got %d", ruleCount)
 	}
-	if settingCount != 4 {
-		t.Errorf("Expected 4 settings (including registration_password), got %d", settingCount)
+	// Now 6 settings: booking_advance_days, cancellation_notice_hours, auto_deactivation_days,
+	// registration_password, feiertage_state, use_feiertage_api
+	if settingCount != 6 {
+		t.Errorf("Expected 6 settings, got %d", settingCount)
+	}
+
+	// Verify feiertage_state was set correctly
+	var feiertagState string
+	db.QueryRow("SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'feiertage_state'", tenantID).Scan(&feiertagState)
+	if feiertagState != "NW" {
+		t.Errorf("Expected feiertage_state = 'NW', got '%s'", feiertagState)
 	}
 }
 
@@ -229,7 +247,7 @@ func TestProvisioningService_CreateDefaultSettings_IncludesRegistrationPassword(
 	}
 	defer tx.Rollback()
 
-	err = service.CreateDefaultSettings(tx, int(tenantID))
+	err = service.CreateDefaultSettings(tx, int(tenantID), "BW")
 	if err != nil {
 		t.Fatalf("CreateDefaultSettings failed: %v", err)
 	}
@@ -276,7 +294,7 @@ func TestProvisioningService_ProvisionTenant_Idempotent(t *testing.T) {
 
 	// First provision
 	tx1, _ := db.Begin()
-	err = service.ProvisionTenant(tx1, int(tenantID))
+	err = service.ProvisionTenant(tx1, int(tenantID), "BW")
 	if err != nil {
 		tx1.Rollback()
 		t.Fatalf("First ProvisionTenant failed: %v", err)
@@ -292,7 +310,7 @@ func TestProvisioningService_ProvisionTenant_Idempotent(t *testing.T) {
 	tx2, _ := db.Begin()
 	// Note: Colors and rules will fail due to unique constraints, but settings should be fine
 	// We expect this to fail actually since colors have unique constraint per tenant
-	err = service.ProvisionTenant(tx2, int(tenantID))
+	err = service.ProvisionTenant(tx2, int(tenantID), "BW")
 	if err == nil {
 		tx2.Commit()
 		// If it succeeded, counts should be the same
@@ -309,5 +327,149 @@ func TestProvisioningService_ProvisionTenant_Idempotent(t *testing.T) {
 	} else {
 		// It's expected to fail if there are unique constraints
 		tx2.Rollback()
+	}
+}
+
+// TestProvisioningService_CreateDefaultSettings_FederalStateForHolidays tests that the
+// federal state from tenant registration is correctly used for holiday detection.
+// This is a critical test that verifies the fix for the bug where the registration UI
+// claimed "Das Bundesland wird für die automatische Feiertagserkennung verwendet"
+// but the federal_state was not actually connected to the holiday service.
+func TestProvisioningService_CreateDefaultSettings_FederalStateForHolidays(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	service := NewProvisioningService(db)
+
+	// Test each German federal state to ensure they are all supported
+	testCases := []struct {
+		name         string
+		federalState string
+	}{
+		{"Baden-Württemberg", "BW"},
+		{"Bayern", "BY"},
+		{"Berlin", "BE"},
+		{"Brandenburg", "BB"},
+		{"Bremen", "HB"},
+		{"Hamburg", "HH"},
+		{"Hessen", "HE"},
+		{"Mecklenburg-Vorpommern", "MV"},
+		{"Niedersachsen", "NI"},
+		{"Nordrhein-Westfalen", "NW"},
+		{"Rheinland-Pfalz", "RP"},
+		{"Saarland", "SL"},
+		{"Sachsen", "SN"},
+		{"Sachsen-Anhalt", "ST"},
+		{"Schleswig-Holstein", "SH"},
+		{"Thüringen", "TH"},
+	}
+
+	for i, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a new tenant for each state
+			result, err := db.Exec(`
+				INSERT INTO tenants (slug, name, contact_email, federal_state, status)
+				VALUES (?, ?, ?, ?, 'active')
+			`, "state-test-"+tc.federalState, "Test "+tc.name, "test"+tc.federalState+"@example.com", tc.federalState)
+			if err != nil {
+				t.Fatalf("Failed to create tenant: %v", err)
+			}
+			tenantID, _ := result.LastInsertId()
+
+			// Provision with the federal state
+			tx, err := db.Begin()
+			if err != nil {
+				t.Fatalf("Failed to begin transaction: %v", err)
+			}
+
+			err = service.CreateDefaultSettings(tx, int(tenantID), tc.federalState)
+			if err != nil {
+				tx.Rollback()
+				t.Fatalf("CreateDefaultSettings failed: %v", err)
+			}
+
+			if err := tx.Commit(); err != nil {
+				t.Fatalf("Failed to commit: %v", err)
+			}
+
+			// Verify feiertage_state matches the tenant's federal state
+			var storedState string
+			err = db.QueryRow(
+				"SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'feiertage_state'",
+				tenantID,
+			).Scan(&storedState)
+			if err != nil {
+				t.Fatalf("Failed to get feiertage_state for %s: %v", tc.name, err)
+			}
+
+			if storedState != tc.federalState {
+				t.Errorf("Expected feiertage_state = '%s' for %s, got '%s'", tc.federalState, tc.name, storedState)
+			}
+
+			// Verify use_feiertage_api is enabled
+			var apiEnabled string
+			err = db.QueryRow(
+				"SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'use_feiertage_api'",
+				tenantID,
+			).Scan(&apiEnabled)
+			if err != nil {
+				t.Fatalf("Failed to get use_feiertage_api: %v", err)
+			}
+
+			if apiEnabled != "true" {
+				t.Errorf("Expected use_feiertage_api = 'true', got '%s'", apiEnabled)
+			}
+
+			// Clean up for next iteration (to avoid unique constraint issues with same test running multiple times)
+			if i < len(testCases)-1 {
+				db.Exec("DELETE FROM system_settings WHERE tenant_id = ?", tenantID)
+				db.Exec("DELETE FROM tenants WHERE id = ?", tenantID)
+			}
+		})
+	}
+}
+
+// TestProvisioningService_CreateDefaultSettings_EmptyFederalStateDefaultsToBW tests that
+// when no federal state is provided, it defaults to "BW" (Baden-Württemberg)
+func TestProvisioningService_CreateDefaultSettings_EmptyFederalStateDefaultsToBW(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	service := NewProvisioningService(db)
+
+	// Create a tenant
+	result, err := db.Exec(`
+		INSERT INTO tenants (slug, name, contact_email, federal_state, status)
+		VALUES ('empty-state-test', 'Empty State Test', 'empty@example.com', '', 'active')
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create tenant: %v", err)
+	}
+	tenantID, _ := result.LastInsertId()
+
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("Failed to begin transaction: %v", err)
+	}
+	defer tx.Rollback()
+
+	// Pass empty string for federal state
+	err = service.CreateDefaultSettings(tx, int(tenantID), "")
+	if err != nil {
+		t.Fatalf("CreateDefaultSettings failed: %v", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("Failed to commit: %v", err)
+	}
+
+	// Verify it defaulted to BW
+	var storedState string
+	err = db.QueryRow(
+		"SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'feiertage_state'",
+		tenantID,
+	).Scan(&storedState)
+	if err != nil {
+		t.Fatalf("Failed to get feiertage_state: %v", err)
+	}
+
+	if storedState != "BW" {
+		t.Errorf("Expected feiertage_state to default to 'BW', got '%s'", storedState)
 	}
 }
