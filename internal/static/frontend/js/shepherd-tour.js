@@ -10,9 +10,9 @@
  * - "Replay tour" button in profile/settings
  */
 
-// Shepherd.js is loaded via CDN in HTML pages that use tours
-// <script src="https://cdn.jsdelivr.net/npm/shepherd.js@13.0.0/dist/js/shepherd.min.js"></script>
-// <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shepherd.js@13.0.0/dist/css/shepherd.css"/>
+// Shepherd.js is loaded locally in HTML pages that use tours
+// <script src="/vendor/shepherd.min.js"></script>
+// <link rel="stylesheet" href="/vendor/shepherd.css"/>
 
 (function() {
     'use strict';
@@ -300,17 +300,27 @@
         }
     ];
 
+    // Track retry attempts
+    let shepherdRetryCount = 0;
+    const MAX_SHEPHERD_RETRIES = 10; // Max 2 seconds of retries
+
     // Initialize tour for current page
     function initTour() {
         const path = window.location.pathname;
         let tour = null;
         let tourType = 'user';
 
-        // Wait for Shepherd to be available
+        // Wait for Shepherd to be available (with max retries)
         if (typeof Shepherd === 'undefined') {
-            console.log('[GassigeherTour] Shepherd.js not yet loaded, retrying in 200ms...');
-            setTimeout(initTour, 200);
-            return null;
+            shepherdRetryCount++;
+            if (shepherdRetryCount <= MAX_SHEPHERD_RETRIES) {
+                console.log(`[GassigeherTour] Shepherd.js not yet loaded, retry ${shepherdRetryCount}/${MAX_SHEPHERD_RETRIES}...`);
+                setTimeout(initTour, 200);
+                return null;
+            } else {
+                console.warn('[GassigeherTour] Shepherd.js failed to load after max retries. Tour disabled.');
+                return null;
+            }
         }
 
         console.log('[GassigeherTour] Initializing tour for path:', path);
