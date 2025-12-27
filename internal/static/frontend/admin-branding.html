@@ -247,6 +247,20 @@
     <script src="/js/sanitize.js"></script>
     <script src="/js/event-handlers.js"></script>
     <script>
+        // Theme presets (matching backend models/tenant.go)
+        const themePresets = {
+            classic: { primary: '#82b965', secondary: '#26272b', accent: '#4a90e2', background: '#fef9f3', text: '#2c3e34' },
+            ocean: { primary: '#0077b6', secondary: '#023e8a', accent: '#48cae4', background: '#f0f9ff', text: '#1a365d' },
+            forest: { primary: '#2d6a4f', secondary: '#1b4332', accent: '#52b788', background: '#f0fdf4', text: '#14532d' },
+            sunset: { primary: '#f97316', secondary: '#7c2d12', accent: '#fb923c', background: '#fff7ed', text: '#431407' },
+            lavender: { primary: '#7c3aed', secondary: '#4c1d95', accent: '#a78bfa', background: '#faf5ff', text: '#3b0764' },
+            coral: { primary: '#f43f5e', secondary: '#881337', accent: '#fb7185', background: '#fff1f2', text: '#4c0519' },
+            midnight: { primary: '#3b82f6', secondary: '#1e3a5f', accent: '#60a5fa', background: '#f8fafc', text: '#0f172a' },
+            emerald: { primary: '#10b981', secondary: '#064e3b', accent: '#34d399', background: '#ecfdf5', text: '#022c22' },
+            rose: { primary: '#ec4899', secondary: '#831843', accent: '#f472b6', background: '#fdf2f8', text: '#500724' },
+            slate: { primary: '#64748b', secondary: '#334155', accent: '#94a3b8', background: '#f8fafc', text: '#1e293b' }
+        };
+
         // Register page-specific action handlers
         registerActions({
             'save-branding': function(e) { e.preventDefault(); saveBranding(); },
@@ -381,6 +395,20 @@
             });
         }
 
+        // Apply theme preset colors to form fields
+        function applyThemePreset(presetName) {
+            const preset = themePresets[presetName];
+            if (!preset) return;
+
+            const colorFields = ['primary', 'secondary', 'accent', 'background', 'text'];
+            colorFields.forEach(field => {
+                const color = preset[field];
+                document.getElementById(`color-${field}`).value = color;
+                document.getElementById(`color-${field}-picker`).value = color;
+            });
+            updatePreview();
+        }
+
         // Clear custom colors
         function clearCustomColors() {
             const colorFields = ['primary', 'secondary', 'accent', 'background', 'text'];
@@ -389,6 +417,14 @@
                 document.getElementById(`color-${field}-picker`).value = '#808080';
             });
             updatePreview();
+        }
+
+        // Setup theme preset listener
+        function setupThemePresetListener() {
+            const themeSelect = document.getElementById('theme-preset');
+            themeSelect.addEventListener('change', () => {
+                applyThemePreset(themeSelect.value);
+            });
         }
 
         // Show alert message
@@ -416,6 +452,7 @@
             await loadBranding();
             syncColorInputs();
             setupLivePreview();
+            setupThemePresetListener();
         });
     </script>
 </body>
