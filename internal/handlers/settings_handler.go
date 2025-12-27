@@ -130,8 +130,11 @@ func (h *SettingsHandler) UpdateSetting(w http.ResponseWriter, r *http.Request) 
 	respondJSON(w, http.StatusOK, map[string]string{"message": "Setting updated successfully"})
 }
 
-// Default logo URL (Tierheim Goeppingen)
+// Default logo URL (Tierheim Goeppingen) - only for Simple-Mode
 const defaultLogoURL = "https://www.tierheim-goeppingen.de/wp-content/uploads/2017/04/Logo_4c_homepagebanner3.png"
+
+// Placeholder logo URL for SaaS-Mode tenants without custom logo
+const placeholderLogoURL = "/assets/images/placeholders/logo-placeholder.svg"
 
 // GetLogo returns the current logo URL (public endpoint, no auth required)
 func (h *SettingsHandler) GetLogo(w http.ResponseWriter, r *http.Request) {
@@ -144,9 +147,18 @@ func (h *SettingsHandler) GetLogo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logoURL := defaultLogoURL
+	// Determine default logo based on mode
+	// SaaS-Mode (tenantID > 0): use placeholder
+	// Simple-Mode (tenantID == 0): use Tierheim Goeppingen logo
+	var logoURL string
 	if setting != nil && setting.Value != "" {
 		logoURL = setting.Value
+	} else if tenantID > 0 {
+		// SaaS-Mode: new tenants get neutral placeholder
+		logoURL = placeholderLogoURL
+	} else {
+		// Simple-Mode: use original default
+		logoURL = defaultLogoURL
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"logo_url": logoURL})
@@ -248,14 +260,24 @@ func (h *SettingsHandler) ResetLogo(w http.ResponseWriter, r *http.Request) {
 	// Delete custom logo file (if exists)
 	h.imageService.DeleteLogo()
 
-	// Reset setting to default URL
-	if err := h.settingsRepo.Update(tenantID, "site_logo", defaultLogoURL); err != nil {
+	// Determine default logo based on mode
+	var resetLogoURL string
+	if tenantID > 0 {
+		// SaaS-Mode: reset to placeholder
+		resetLogoURL = placeholderLogoURL
+	} else {
+		// Simple-Mode: reset to Tierheim Goeppingen logo
+		resetLogoURL = defaultLogoURL
+	}
+
+	// Reset setting to appropriate default URL
+	if err := h.settingsRepo.Update(tenantID, "site_logo", resetLogoURL); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to reset logo setting")
 		return
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{
 		"message":  "Logo reset to default",
-		"logo_url": defaultLogoURL,
+		"logo_url": resetLogoURL,
 	})
 }

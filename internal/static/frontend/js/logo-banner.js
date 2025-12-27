@@ -6,8 +6,8 @@
 (function() {
     'use strict';
 
-    // Default logo URL (Tierheim Goeppingen)
-    const DEFAULT_LOGO = 'https://www.tierheim-goeppingen.de/wp-content/uploads/2017/04/Logo_4c_homepagebanner3.png';
+    // Placeholder logo URL for tenants without custom logo
+    const PLACEHOLDER_LOGO = '/assets/images/placeholders/logo-placeholder.svg';
 
     /**
      * Creates and injects the logo banner into the page
@@ -27,27 +27,27 @@
         // Create logo image
         const logoImg = document.createElement('img');
         logoImg.className = 'logo-banner-img';
-        logoImg.alt = 'Gassigeher - Tierheim Goeppingen';
+        logoImg.alt = 'Gassigeher';
 
         // Try to fetch logo URL from API
         try {
             const response = await fetch('/api/v1/settings/logo');
             if (response.ok) {
                 const data = await response.json();
-                logoImg.src = data.logo_url || DEFAULT_LOGO;
+                logoImg.src = data.logo_url || PLACEHOLDER_LOGO;
             } else {
-                logoImg.src = DEFAULT_LOGO;
+                logoImg.src = PLACEHOLDER_LOGO;
             }
         } catch (error) {
-            console.warn('Failed to fetch logo setting, using default:', error);
-            logoImg.src = DEFAULT_LOGO;
+            console.warn('Failed to fetch logo setting, using placeholder:', error);
+            logoImg.src = PLACEHOLDER_LOGO;
         }
 
-        // Handle image load error - fallback to default
+        // Handle image load error - fallback to placeholder
         logoImg.onerror = function() {
-            if (this.src !== DEFAULT_LOGO) {
-                console.warn('Logo failed to load, falling back to default');
-                this.src = DEFAULT_LOGO;
+            if (this.src !== PLACEHOLDER_LOGO) {
+                console.warn('Logo failed to load, falling back to placeholder');
+                this.src = PLACEHOLDER_LOGO;
             }
         };
 
