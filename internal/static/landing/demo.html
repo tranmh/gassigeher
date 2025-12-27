@@ -339,7 +339,12 @@
         }
 
         function renderCredentials(container, data) {
-            const demoUrl = 'https://demo.gassigeher.org';
+            // Build demo URL dynamically based on current domain
+            const protocol = window.location.protocol;
+            const hostParts = window.location.host.split('.');
+            // Remove first subdomain if exists (e.g., "www" or "landing"), keep base domain
+            const baseDomain = hostParts.length > 2 ? hostParts.slice(-2).join('.') : window.location.host;
+            const demoUrl = `${protocol}//demo.${baseDomain}`;
 
             container.innerHTML = `
                 <div class="credentials-grid">
