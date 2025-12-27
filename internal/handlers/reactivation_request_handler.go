@@ -111,9 +111,9 @@ func (h *ReactivationRequestHandler) ListRequests(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Populate user details
+	// Populate user details (with tenant verification for defense in depth)
 	for _, req := range requests {
-		user, err := h.userRepo.FindByID(req.UserID)
+		user, err := h.userRepo.FindByIDAndTenant(req.UserID, tenantID)
 		if err == nil && user != nil {
 			req.User = user
 		}
@@ -161,8 +161,8 @@ func (h *ReactivationRequestHandler) ApproveRequest(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// Get user
-	user, err := h.userRepo.FindByID(reactivationRequest.UserID)
+	// Get user (with tenant verification for defense in depth)
+	user, err := h.userRepo.FindByIDAndTenant(reactivationRequest.UserID, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get user")
 		return
@@ -231,8 +231,8 @@ func (h *ReactivationRequestHandler) DenyRequest(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Get user
-	user, err := h.userRepo.FindByID(reactivationRequest.UserID)
+	// Get user (with tenant verification for defense in depth)
+	user, err := h.userRepo.FindByIDAndTenant(reactivationRequest.UserID, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get user")
 		return

@@ -84,8 +84,8 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get user to check experience level
-	user, err := h.userRepo.FindByID(userID)
+	// Get user to check experience level (with tenant verification)
+	user, err := h.userRepo.FindByIDAndTenant(userID, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get user")
 		return
@@ -101,20 +101,13 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get dog
-	dog, err := h.dogRepo.FindByID(req.DogID)
+	// Get dog (with tenant verification - prevents cross-tenant booking)
+	dog, err := h.dogRepo.FindByIDAndTenant(req.DogID, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get dog")
 		return
 	}
 	if dog == nil {
-		respondError(w, http.StatusNotFound, "Dog not found")
-		return
-	}
-
-	// SaaS: Verify dog belongs to current tenant (prevents cross-tenant booking)
-	// Returns "Dog not found" to avoid information leakage about other tenants' dogs
-	if tenantID > 0 && dog.TenantID != tenantID {
 		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
@@ -324,24 +317,19 @@ func (h *BookingHandler) GetBooking(w http.ResponseWriter, r *http.Request) {
 	// SaaS: Extract tenant ID from context
 	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
-	// Get booking
-	booking, err := h.bookingRepo.FindByID(id)
+	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
+	if tenantID == 0 {
+		respondError(w, http.StatusBadRequest, "Tenant context required")
+		return
+	}
+
+	// Get booking (with tenant verification)
+	booking, err := h.bookingRepo.FindByIDAndTenant(id, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get booking")
 		return
 	}
 	if booking == nil {
-		respondError(w, http.StatusNotFound, "Booking not found")
-		return
-	}
-
-	// SaaS: Require valid tenant context (SECURITY FIX: tenantID=0 bypass vulnerability)
-	if tenantID == 0 {
-		respondError(w, http.StatusBadRequest, "Tenant context required")
-		return
-	}
-	// SaaS: Verify booking belongs to current tenant
-	if booking.TenantID != tenantID {
 		respondError(w, http.StatusNotFound, "Booking not found")
 		return
 	}
@@ -515,24 +503,13 @@ func (h *BookingHandler) AddNotes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get booking
-	booking, err := h.bookingRepo.FindByID(id)
+	// Get booking (with tenant verification)
+	booking, err := h.bookingRepo.FindByIDAndTenant(id, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get booking")
 		return
 	}
 	if booking == nil {
-		respondError(w, http.StatusNotFound, "Booking not found")
-		return
-	}
-
-	// SaaS: Require valid tenant context (SECURITY FIX: tenantID=0 bypass vulnerability)
-	if tenantID == 0 {
-		respondError(w, http.StatusBadRequest, "Tenant context required")
-		return
-	}
-	// SaaS: Verify booking belongs to current tenant
-	if booking.TenantID != tenantID {
 		respondError(w, http.StatusNotFound, "Booking not found")
 		return
 	}
@@ -797,6 +774,12 @@ func (h *BookingHandler) ApprovePendingBooking(w http.ResponseWriter, r *http.Re
 	// SaaS: Extract tenant ID from context
 	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
+	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
+	if tenantID == 0 {
+		respondError(w, http.StatusBadRequest, "Tenant context required")
+		return
+	}
+
 	// Extract booking ID from path
 	pathParts := strings.Split(r.URL.Path, "/")
 	if len(pathParts) < 5 {
@@ -813,21 +796,12 @@ func (h *BookingHandler) ApprovePendingBooking(w http.ResponseWriter, r *http.Re
 	}
 
 	// SaaS: Verify booking belongs to current tenant before approving
-	booking, err := h.bookingRepo.FindByID(id)
+	booking, err := h.bookingRepo.FindByIDAndTenant(id, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get booking")
 		return
 	}
 	if booking == nil {
-		respondError(w, http.StatusNotFound, "Booking not found")
-		return
-	}
-	// SaaS: Require valid tenant context (SECURITY FIX: tenantID=0 bypass vulnerability)
-	if tenantID == 0 {
-		respondError(w, http.StatusBadRequest, "Tenant context required")
-		return
-	}
-	if booking.TenantID != tenantID {
 		respondError(w, http.StatusNotFound, "Booking not found")
 		return
 	}

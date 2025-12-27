@@ -52,8 +52,8 @@ func (h *UserColorHandler) GetUserColors(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Check if user exists
-	user, err := h.userRepo.FindByID(userID)
+	// Check if user exists and belongs to this tenant
+	user, err := h.userRepo.FindByIDAndTenant(userID, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get user")
 		return
@@ -93,8 +93,8 @@ func (h *UserColorHandler) AddColorToUser(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Check if user exists
-	user, err := h.userRepo.FindByID(userID)
+	// Check if user exists and belongs to this tenant
+	user, err := h.userRepo.FindByIDAndTenant(userID, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get user")
 		return
@@ -176,8 +176,8 @@ func (h *UserColorHandler) RemoveColorFromUser(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Check if user exists
-	user, err := h.userRepo.FindByID(userID)
+	// Check if user exists and belongs to this tenant
+	user, err := h.userRepo.FindByIDAndTenant(userID, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get user")
 		return
@@ -228,8 +228,8 @@ func (h *UserColorHandler) SetUserColors(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Check if user exists
-	user, err := h.userRepo.FindByID(userID)
+	// Check if user exists and belongs to this tenant
+	user, err := h.userRepo.FindByIDAndTenant(userID, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get user")
 		return

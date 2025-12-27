@@ -80,10 +80,10 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// If dog_id is provided, verify the dog exists
+	// If dog_id is provided, verify the dog exists and belongs to tenant
 	var dogName string
 	if req.DogID != nil {
-		dog, err := h.dogRepo.FindByID(*req.DogID)
+		dog, err := h.dogRepo.FindByIDAndTenant(*req.DogID, tenantID)
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "Failed to verify dog")
 			return
@@ -152,15 +152,15 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
 		}
 		cancelledCount++
 
-		// Get user details for email
-		user, err := h.userRepo.FindByID(booking.UserID)
+		// Get user details for email (with tenant verification for defense in depth)
+		user, err := h.userRepo.FindByIDAndTenant(booking.UserID, tenantID)
 		if err != nil || user == nil {
 			fmt.Printf("Warning: Failed to get user %d for cancellation email: %v\n", booking.UserID, err)
 			continue
 		}
 
-		// Get dog details for email
-		dog, err := h.dogRepo.FindByID(booking.DogID)
+		// Get dog details for email (with tenant verification for defense in depth)
+		dog, err := h.dogRepo.FindByIDAndTenant(booking.DogID, tenantID)
 		if err != nil || dog == nil {
 			fmt.Printf("Warning: Failed to get dog %d for cancellation email: %v\n", booking.DogID, err)
 			continue

@@ -189,6 +189,24 @@ func (r *DogRepository) FindByID(id int) (*models.Dog, error) {
 	return dog, nil
 }
 
+// FindByIDAndTenant finds a dog by ID with tenant isolation
+// SaaS: Returns nil if dog doesn't belong to the specified tenant
+// Use tenantID=0 for Simple-Mode (no tenant filtering)
+func (r *DogRepository) FindByIDAndTenant(id int, tenantID int) (*models.Dog, error) {
+	dog, err := r.FindByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if dog == nil {
+		return nil, nil
+	}
+	// In SaaS mode (tenantID > 0), verify tenant membership
+	if tenantID > 0 && dog.TenantID != tenantID {
+		return nil, nil // Dog doesn't belong to this tenant
+	}
+	return dog, nil
+}
+
 // FindAll finds all dogs with optional filtering
 // SaaS: tenantID=0 returns all dogs (for global admin), otherwise filters by tenant
 func (r *DogRepository) FindAll(filter *models.DogFilterRequest, tenantID int) ([]*models.Dog, error) {

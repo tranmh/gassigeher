@@ -147,6 +147,24 @@ func (r *BookingRepository) FindByID(id int) (*models.Booking, error) {
 	return booking, nil
 }
 
+// FindByIDAndTenant finds a booking by ID with tenant isolation
+// SaaS: Returns nil if booking doesn't belong to the specified tenant
+// Use tenantID=0 for Simple-Mode (no tenant filtering)
+func (r *BookingRepository) FindByIDAndTenant(id int, tenantID int) (*models.Booking, error) {
+	booking, err := r.FindByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if booking == nil {
+		return nil, nil
+	}
+	// In SaaS mode (tenantID > 0), verify tenant membership
+	if tenantID > 0 && booking.TenantID != tenantID {
+		return nil, nil // Booking doesn't belong to this tenant
+	}
+	return booking, nil
+}
+
 // FindAll finds all bookings with optional filters
 // SaaS: Now includes tenant filtering - use filter.TenantID or pass 0 for global admin
 func (r *BookingRepository) FindAll(filter *models.BookingFilterRequest) ([]*models.Booking, error) {

@@ -40,9 +40,13 @@ func NewDashboardHandler(db *sql.DB, cfg *config.Config) *DashboardHandler {
 func (h *DashboardHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	stats := &models.DashboardStats{}
 
+	// SaaS: Get tenant_id from context first (needed for all queries)
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Get total completed walks
 	completedBookings, err := h.bookingRepo.FindAll(&models.BookingFilterRequest{
-		Status: strPtr("completed"),
+		Status:   strPtr("completed"),
+		TenantID: intPtr(tenantID),
 	})
 	if err == nil {
 		stats.TotalWalksCompleted = len(completedBookings)
@@ -53,6 +57,7 @@ func (h *DashboardHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	upcomingBookings, err := h.bookingRepo.FindAll(&models.BookingFilterRequest{
 		Status:   strPtr("scheduled"),
 		DateFrom: &today,
+		TenantID: intPtr(tenantID),
 	})
 	if err == nil {
 		stats.UpcomingWalksTotal = len(upcomingBookings)
@@ -64,9 +69,6 @@ func (h *DashboardHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-
-	// SaaS: Get tenant_id from context
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Get active/inactive users
 	activeUsers, err := h.userRepo.FindAll(boolPtr(true), tenantID)
@@ -113,16 +115,20 @@ func (h *DashboardHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 func (h *DashboardHandler) GetRecentActivity(w http.ResponseWriter, r *http.Request) {
 	activities := []*models.ActivityItem{}
 
+	// SaaS: Get tenant_id from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
 	// Get recent bookings (last 24 hours)
 	yesterday := time.Now().Add(-24 * time.Hour).Format("2006-01-02")
 	recentBookings, err := h.bookingRepo.FindAll(&models.BookingFilterRequest{
 		DateFrom: &yesterday,
+		TenantID: intPtr(tenantID),
 	})
 
 	if err == nil {
 		for _, booking := range recentBookings {
-			// Get dog name
-			dog, err := h.dogRepo.FindByID(booking.DogID)
+			// Get dog name (with tenant verification for defense in depth)
+			dog, err := h.dogRepo.FindByIDAndTenant(booking.DogID, tenantID)
 			dogName := "Unknown"
 			if err == nil && dog != nil {
 				// HTML-escape dog name to prevent XSS attacks
@@ -174,4 +180,8 @@ func strPtr(s string) *string {
 
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+func intPtr(i int) *int {
+	return &i
 }

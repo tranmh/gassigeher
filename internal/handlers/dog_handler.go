@@ -143,22 +143,22 @@ func (h *DogHandler) GetDog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dog, err := h.dogRepo.FindByID(id)
+	// SaaS: Get tenant_id from context for isolation
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
+	if tenantID == 0 {
+		respondError(w, http.StatusNotFound, "Dog not found")
+		return
+	}
+
+	dog, err := h.dogRepo.FindByIDAndTenant(id, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Database error")
 		return
 	}
 
 	if dog == nil {
-		respondError(w, http.StatusNotFound, "Dog not found")
-		return
-	}
-
-	// SaaS SECURITY: Verify dog belongs to the requesting tenant
-	// SECURITY FIX: Always check tenant isolation - prevents bypass via tenantID=0
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
-	if dog.TenantID != tenantID {
-		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
@@ -327,23 +327,23 @@ func (h *DogHandler) UpdateDog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get existing dog
-	dog, err := h.dogRepo.FindByID(id)
+	// SaaS: Get tenant_id from context for isolation
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
+	if tenantID == 0 {
+		respondError(w, http.StatusNotFound, "Dog not found")
+		return
+	}
+
+	// Get existing dog with tenant verification
+	dog, err := h.dogRepo.FindByIDAndTenant(id, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Database error")
 		return
 	}
 
 	if dog == nil {
-		respondError(w, http.StatusNotFound, "Dog not found")
-		return
-	}
-
-	// SaaS SECURITY: Verify dog belongs to the requesting tenant
-	// SECURITY FIX: Always check tenant isolation - prevents bypass via tenantID=0
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
-	if dog.TenantID != tenantID {
-		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
@@ -459,25 +459,23 @@ func (h *DogHandler) DeleteDog(w http.ResponseWriter, r *http.Request) {
 	// SaaS SECURITY: Get tenant_id from context for cross-tenant check
 	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
+	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
+	if tenantID == 0 {
+		respondError(w, http.StatusNotFound, "Dog not found")
+		return
+	}
+
 	// Check if force delete is requested
 	force := r.URL.Query().Get("force") == "true"
 
 	if force {
 		// Force delete: cancel all future bookings and delete dog
-		dog, err := h.dogRepo.FindByID(id)
+		dog, err := h.dogRepo.FindByIDAndTenant(id, tenantID)
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "Failed to fetch dog")
 			return
 		}
 		if dog == nil {
-			respondError(w, http.StatusNotFound, "Dog not found")
-			return
-		}
-
-		// SaaS SECURITY: Verify dog belongs to the requesting tenant
-		// SECURITY FIX: Always check tenant isolation - prevents bypass via tenantID=0
-		if dog.TenantID != tenantID {
-			// Return 404 to prevent tenant enumeration
 			respondError(w, http.StatusNotFound, "Dog not found")
 			return
 		}
@@ -525,19 +523,12 @@ func (h *DogHandler) DeleteDog(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Normal delete (will fail if future bookings exist)
-	// SaaS SECURITY: First verify dog belongs to the requesting tenant
-	dog, err := h.dogRepo.FindByID(id)
+	dog, err := h.dogRepo.FindByIDAndTenant(id, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to fetch dog")
 		return
 	}
 	if dog == nil {
-		respondError(w, http.StatusNotFound, "Dog not found")
-		return
-	}
-	// SECURITY FIX: Always check tenant isolation - prevents bypass via tenantID=0
-	if dog.TenantID != tenantID {
-		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
@@ -577,23 +568,17 @@ func (h *DogHandler) UploadDogPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get existing dog
-	dog, err := h.dogRepo.FindByID(id)
+	// SaaS: Get tenant_id from context for isolation
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	// Get existing dog with tenant verification
+	dog, err := h.dogRepo.FindByIDAndTenant(id, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Database error")
 		return
 	}
 
 	if dog == nil {
-		respondError(w, http.StatusNotFound, "Dog not found")
-		return
-	}
-
-	// SaaS SECURITY: Verify dog belongs to the requesting tenant
-	// SECURITY FIX: Always check tenant isolation - prevents bypass via tenantID=0
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
-	if dog.TenantID != tenantID {
-		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
@@ -713,20 +698,21 @@ func (h *DogHandler) ToggleAvailability(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// SaaS SECURITY: First fetch dog and verify it belongs to the requesting tenant
-	dog, err := h.dogRepo.FindByID(id)
+	// SaaS: Get tenant_id from context for isolation
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
+	if tenantID == 0 {
+		respondError(w, http.StatusNotFound, "Dog not found")
+		return
+	}
+
+	dog, err := h.dogRepo.FindByIDAndTenant(id, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Database error")
 		return
 	}
 	if dog == nil {
-		respondError(w, http.StatusNotFound, "Dog not found")
-		return
-	}
-	// SECURITY FIX: Always check tenant isolation - prevents bypass via tenantID=0
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
-	if dog.TenantID != tenantID {
-		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
@@ -749,8 +735,8 @@ func (h *DogHandler) ToggleAvailability(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Get updated dog
-	dog, err = h.dogRepo.FindByID(id)
+	// Get updated dog (tenant already verified above)
+	dog, err = h.dogRepo.FindByIDAndTenant(id, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to fetch updated dog")
 		return
@@ -804,23 +790,23 @@ func (h *DogHandler) SetFeatured(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if dog exists
-	dog, err := h.dogRepo.FindByID(id)
+	// SaaS: Get tenant_id from context for isolation
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
+	if tenantID == 0 {
+		respondError(w, http.StatusNotFound, "Dog not found")
+		return
+	}
+
+	// Check if dog exists and belongs to tenant
+	dog, err := h.dogRepo.FindByIDAndTenant(id, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Database error")
 		return
 	}
 
 	if dog == nil {
-		respondError(w, http.StatusNotFound, "Dog not found")
-		return
-	}
-
-	// SaaS SECURITY: Verify dog belongs to the requesting tenant
-	// SECURITY FIX: Always check tenant isolation - prevents bypass via tenantID=0
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
-	if dog.TenantID != tenantID {
-		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
@@ -834,8 +820,8 @@ func (h *DogHandler) SetFeatured(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get updated dog
-	dog, err = h.dogRepo.FindByID(id)
+	// Get updated dog (tenant already verified above)
+	dog, err = h.dogRepo.FindByIDAndTenant(id, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to fetch updated dog")
 		return

@@ -70,8 +70,8 @@ func (h *ExperienceRequestHandler) CreateRequest(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Get user
-	user, err := h.userRepo.FindByID(userID)
+	// Get user (with tenant verification)
+	user, err := h.userRepo.FindByIDAndTenant(userID, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get user")
 		return
@@ -167,10 +167,10 @@ func (h *ExperienceRequestHandler) ListRequests(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// If admin, populate user details
+	// If admin, populate user details (with tenant verification for defense in depth)
 	if isAdmin {
 		for _, req := range requests {
-			user, err := h.userRepo.FindByID(req.UserID)
+			user, err := h.userRepo.FindByIDAndTenant(req.UserID, tenantID)
 			if err == nil && user != nil {
 				req.User = user
 			}
@@ -219,8 +219,8 @@ func (h *ExperienceRequestHandler) ApproveRequest(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Get user
-	user, err := h.userRepo.FindByID(experienceRequest.UserID)
+	// Get user (with tenant verification for defense in depth)
+	user, err := h.userRepo.FindByIDAndTenant(experienceRequest.UserID, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get user")
 		return
@@ -306,8 +306,8 @@ func (h *ExperienceRequestHandler) DenyRequest(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Get user
-	user, err := h.userRepo.FindByID(experienceRequest.UserID)
+	// Get user (with tenant verification for defense in depth)
+	user, err := h.userRepo.FindByIDAndTenant(experienceRequest.UserID, tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get user")
 		return
