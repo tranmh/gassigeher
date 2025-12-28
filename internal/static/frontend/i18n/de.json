@@ -7,8 +7,24 @@
     "profile": "Profil",
     "dashboard": "Dashboard",
     "calendar": "Kalender",
+    "help": "Hilfe",
     "admin_area": "🔧 Admin-Bereich",
     "user_area": "👤 Benutzer-Bereich"
+  },
+  "help": {
+    "title": "Hilfe & FAQ",
+    "subtitle": "Finden Sie Antworten auf häufig gestellte Fragen",
+    "search_placeholder": "Suchen Sie nach einem Thema...",
+    "category_all": "Alle",
+    "category_booking": "Buchung",
+    "category_account": "Konto",
+    "category_dogs": "Hunde",
+    "no_results": "Keine Ergebnisse gefunden",
+    "no_results_hint": "Versuchen Sie es mit anderen Suchbegriffen oder stöbern Sie in den Kategorien",
+    "still_need_help": "Noch Fragen?",
+    "contact_hint": "Wir helfen Ihnen gerne weiter",
+    "contact_us": "Kontakt aufnehmen",
+    "results_for": "Ergebnisse für"
   },
   "auth": {
     "login": "Anmelden",
@@ -520,5 +536,87 @@
     "self_host_message": "Gassigeher ist Open Source. Laden Sie den Code herunter, hosten Sie selbst, unbegrenzte Hunde. Kein Problem.",
     "upgrade_success": "Erfolgreich auf Pro upgraded!",
     "downgrade_warning": "Nach der Kündigung behältst du deine bestehenden Hunde, kannst aber keine neuen hinzufügen wenn du über dem Free-Limit bist."
+  },
+  "help_tooltips": {
+    "experience_green": {
+      "title": "Grün - Anfänger",
+      "text": "Geeignet für ruhige, gut erzogene Hunde. Ideal für neue Gassigeher ohne Vorerfahrung."
+    },
+    "experience_orange": {
+      "title": "Orange - Erfahren",
+      "text": "Für Hunde mit etwas mehr Temperament. Erfordert Erfahrung im Umgang mit Hunden."
+    },
+    "experience_blue": {
+      "title": "Blau - Experte",
+      "text": "Für anspruchsvolle Hunde mit besonderen Bedürfnissen. Nur für sehr erfahrene Gassigeher."
+    },
+    "experience_locked": {
+      "title": "Gesperrte Stufe",
+      "text": "Dieser Hund erfordert eine höhere Erfahrungsstufe. Du kannst eine Höherstufung beantragen."
+    },
+    "booking_advance_days": {
+      "title": "Vorlaufzeit",
+      "text": "Wie viele Tage im Voraus können Buchungen vorgenommen werden? Standard: 14 Tage."
+    },
+    "booking_cancellation": {
+      "title": "Stornierungsfrist",
+      "text": "Buchungen können bis zu dieser Zeit vor dem Termin kostenlos storniert werden."
+    },
+    "booking_approval": {
+      "title": "Genehmigung erforderlich",
+      "text": "Manche Zeiten oder Hunde erfordern eine Genehmigung durch einen Administrator."
+    },
+    "dog_size_small": {
+      "title": "Klein",
+      "text": "Hunde unter 10 kg. Leicht zu führen, ideal für Anfänger."
+    },
+    "dog_size_medium": {
+      "title": "Mittel",
+      "text": "Hunde zwischen 10-25 kg. Die häufigste Größenkategorie."
+    },
+    "dog_size_large": {
+      "title": "Groß",
+      "text": "Hunde über 25 kg. Erfordert mehr Kraft und Erfahrung."
+    },
+    "dog_featured": {
+      "title": "Vorgestellter Hund",
+      "text": "Dieser Hund wird auf der Startseite hervorgehoben und sucht besonders dringend nach Gassigehern."
+    },
+    "account_verification": {
+      "title": "E-Mail-Verifizierung",
+      "text": "Deine E-Mail muss verifiziert sein, um Buchungen vorzunehmen. Prüfe deinen Posteingang."
+    },
+    "account_deactivation": {
+      "title": "Auto-Deaktivierung",
+      "text": "Konten werden nach längerer Inaktivität automatisch deaktiviert."
+    },
+    "account_level_request": {
+      "title": "Höherstufung beantragen",
+      "text": "Nach einigen erfolgreichen Spaziergängen kannst du eine höhere Erfahrungsstufe beantragen."
+    },
+    "color_category": {
+      "title": "Farbkategorie",
+      "text": "Hunde werden nach Erfahrungsanforderungen in Farbkategorien eingeteilt."
+    },
+    "color_pattern": {
+      "title": "Muster-Symbol",
+      "text": "Zusätzlich zur Farbe wird ein Symbol verwendet für bessere Barrierefreiheit."
+    },
+    "admin_blocked_dates": {
+      "title": "Gesperrte Termine",
+      "text": "An diesen Tagen sind keine Buchungen möglich (Feiertage, Veranstaltungen, etc.)."
+    },
+    "admin_booking_times": {
+      "title": "Buchungszeiten",
+      "text": "Lege fest, zu welchen Zeiten an welchen Tagen Spaziergänge gebucht werden können."
+    },
+    "admin_holidays": {
+      "title": "Feiertage",
+      "text": "Feiertage werden automatisch erkannt. Du kannst auch eigene Feiertage hinzufügen."
+    },
+    "admin_auto_deactivation": {
+      "title": "Auto-Deaktivierung",
+      "text": "Nach wie vielen Tagen Inaktivität werden Nutzerkonten automatisch deaktiviert?"
+    }
   }
 }

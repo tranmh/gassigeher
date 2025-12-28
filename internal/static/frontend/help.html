@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hilfe - Gassigeher</title>
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <script src="/js/theme-loader.js"></script>
+    <style>
+        .help-search-container {
+            max-width: 600px;
+            margin: 0 auto 30px;
+        }
+        .help-search {
+            position: relative;
+        }
+        .help-search input {
+            width: 100%;
+            padding: 15px 20px 15px 50px;
+            font-size: 1.1rem;
+            border: 2px solid #e1e8e5;
+            border-radius: 30px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .help-search input:focus {
+            border-color: var(--primary-green, #82b965);
+            box-shadow: 0 0 0 3px rgba(130, 185, 101, 0.2);
+            outline: none;
+        }
+        .help-search-icon {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.3rem;
+            color: #888;
+        }
+        .help-search-clear {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            color: #888;
+            cursor: pointer;
+            display: none;
+            padding: 5px;
+        }
+        .help-search-clear:hover {
+            color: #333;
+        }
+        .help-search-clear.visible {
+            display: block;
+        }
+
+        .category-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 30px;
+            justify-content: center;
+        }
+        .category-tab {
+            padding: 10px 20px;
+            border: 2px solid #e1e8e5;
+            border-radius: 25px;
+            background: #fff;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .category-tab:hover {
+            border-color: var(--primary-green, #82b965);
+            background: rgba(130, 185, 101, 0.05);
+        }
+        .category-tab.active {
+            background: var(--primary-green, #82b965);
+            border-color: var(--primary-green, #82b965);
+            color: white;
+        }
+        .category-tab .count {
+            background: rgba(0,0,0,0.1);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            margin-left: 6px;
+        }
+        .category-tab.active .count {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .faq-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .faq-item {
+            background: #fff;
+            border: 1px solid #e1e8e5;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            overflow: hidden;
+            transition: box-shadow 0.2s;
+        }
+        .faq-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .faq-question {
+            padding: 18px 50px 18px 20px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            color: #2c3e34;
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .faq-question::after {
+            content: '+';
+            position: absolute;
+            right: 20px;
+            font-size: 1.5rem;
+            font-weight: 300;
+            color: #888;
+            transition: transform 0.3s;
+        }
+        .faq-item.open .faq-question::after {
+            content: '−';
+        }
+        .faq-category-icon {
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+        .faq-answer {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            background: #fafbfa;
+        }
+        .faq-item.open .faq-answer {
+            max-height: 1000px;
+        }
+        .faq-answer-content {
+            padding: 0 20px 20px 52px;
+            line-height: 1.7;
+            color: #555;
+        }
+        .faq-answer-content a {
+            color: var(--primary-green, #82b965);
+            text-decoration: underline;
+        }
+        .faq-answer-content strong {
+            color: #333;
+        }
+
+        .search-results-info {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+        }
+        .search-highlight {
+            background: #fff3cd;
+            padding: 1px 3px;
+            border-radius: 3px;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        .no-results-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        .no-results h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .help-footer {
+            text-align: center;
+            margin-top: 50px;
+            padding: 40px 20px;
+            background: #f8f9f8;
+            border-radius: 12px;
+        }
+        .help-footer h3 {
+            margin-bottom: 15px;
+        }
+        .help-footer p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .category-tabs {
+                gap: 8px;
+            }
+            .category-tab {
+                padding: 8px 14px;
+                font-size: 0.85rem;
+            }
+            .faq-question {
+                padding: 15px 45px 15px 15px;
+                font-size: 0.95rem;
+            }
+            .faq-answer-content {
+                padding: 0 15px 15px 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <button class="menu-toggle" data-action="toggle-menu" aria-label="Menu">☰</button>
+            <a href="/" class="logo">🐕 Gassigeher</a>
+            <nav id="main-nav">
+                <ul>
+                    <li><a href="/dashboard.html" data-i18n="nav.dashboard">Dashboard</a></li>
+                    <li><a href="/dogs.html" data-i18n="dogs.all_dogs">Hunde</a></li>
+                    <li><a href="/calendar.html" data-i18n="nav.calendar">Kalender</a></li>
+                    <li><a href="/profile.html" style="display: flex; align-items: center; gap: 8px;">
+                        <span id="header-photo" style="width: 32px; height: 32px; border-radius: 50%; background: #ddd; display: inline-flex; align-items: center; justify-content: center; overflow: hidden;">👤</span>
+                        <span data-i18n="nav.profile">Profil</span>
+                    </a></li>
+                    <li><a href="/help.html" class="active" data-i18n="nav.help">Hilfe</a></li>
+                    <li id="admin-area-link" style="display: none;"><a href="/admin-dashboard.html" class="area-switcher" data-i18n="nav.admin_area">🔧 Admin-Bereich</a></li>
+                    <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <div class="nav-overlay" id="nav-overlay" data-action="toggle-menu"></div>
+
+    <main style="padding: 40px 0;">
+        <div class="container">
+            <h1 style="text-align: center; margin-bottom: 10px;" data-i18n="help.title">Hilfe & FAQ</h1>
+            <p style="text-align: center; color: #666; margin-bottom: 30px;" data-i18n="help.subtitle">
+                Finden Sie Antworten auf häufig gestellte Fragen
+            </p>
+
+            <!-- Search -->
+            <div class="help-search-container">
+                <div class="help-search">
+                    <span class="help-search-icon">🔍</span>
+                    <input type="text" id="faq-search" placeholder="Suchen Sie nach einem Thema..." data-i18n-placeholder="help.search_placeholder">
+                    <button class="help-search-clear" id="search-clear" data-action="clear-search">✕</button>
+                </div>
+            </div>
+
+            <!-- Category Tabs -->
+            <div class="category-tabs" id="category-tabs">
+                <button class="category-tab active" data-category="all">
+                    Alle <span class="count" id="count-all">0</span>
+                </button>
+                <button class="category-tab" data-category="booking">
+                    📅 Buchung <span class="count" id="count-booking">0</span>
+                </button>
+                <button class="category-tab" data-category="account">
+                    👤 Konto <span class="count" id="count-account">0</span>
+                </button>
+                <button class="category-tab" data-category="dogs">
+                    🐕 Hunde <span class="count" id="count-dogs">0</span>
+                </button>
+            </div>
+
+            <!-- Search Results Info -->
+            <div class="search-results-info" id="search-results-info" style="display: none;"></div>
+
+            <!-- FAQ List -->
+            <div class="faq-container" id="faq-container">
+                <!-- FAQs will be rendered here -->
+            </div>
+
+            <!-- No Results -->
+            <div class="no-results" id="no-results" style="display: none;">
+                <div class="no-results-icon">🔍</div>
+                <h3 data-i18n="help.no_results">Keine Ergebnisse gefunden</h3>
+                <p data-i18n="help.no_results_hint">Versuchen Sie es mit anderen Suchbegriffen oder stöbern Sie in den Kategorien</p>
+            </div>
+
+            <!-- Contact CTA -->
+            <div class="help-footer">
+                <h3 data-i18n="help.still_need_help">Noch Fragen?</h3>
+                <p data-i18n="help.contact_hint">Wir helfen Ihnen gerne weiter</p>
+                <a href="/landing/contact.html" class="btn" data-i18n="help.contact_us">Kontakt aufnehmen</a>
+            </div>
+        </div>
+    </main>
+
+    <script src="/js/nav-menu.js"></script>
+    <script src="/js/i18n.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/sanitize.js"></script>
+    <script src="/js/impersonation-banner.js"></script>
+    <script src="/js/event-handlers.js"></script>
+    <script src="/shared/js/faq-data.js"></script>
+    <script>
+        // Category icons mapping
+        const CATEGORY_ICONS = {
+            'booking': '📅',
+            'account': '👤',
+            'dogs': '🐕',
+            'shared': '📋'
+        };
+
+        let currentCategory = 'all';
+        let currentSearchQuery = '';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check authentication
+            if (!api.isAuthenticated()) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // Load translations
+            await window.i18n.load();
+            window.i18n.updateElement(document.body);
+
+            // Initialize impersonation banner
+            await ImpersonationBanner.init();
+
+            // Load user data for header
+            try {
+                const user = await api.getMe();
+                updateHeaderPhoto(user);
+                showAdminLinkIfAdmin(user);
+            } catch (error) {
+                console.error('Error loading user:', error);
+            }
+
+            // Initialize FAQ display
+            updateCategoryCounts();
+            renderFAQs();
+
+            // Setup event listeners
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            // Search input
+            const searchInput = document.getElementById('faq-search');
+            const searchClear = document.getElementById('search-clear');
+
+            searchInput.addEventListener('input', (e) => {
+                currentSearchQuery = e.target.value;
+                searchClear.classList.toggle('visible', currentSearchQuery.length > 0);
+                renderFAQs();
+            });
+
+            // Clear search button
+            registerAction('clear-search', () => {
+                searchInput.value = '';
+                currentSearchQuery = '';
+                searchClear.classList.remove('visible');
+                renderFAQs();
+                searchInput.focus();
+            });
+
+            // Category tabs
+            document.querySelectorAll('.category-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    currentCategory = tab.dataset.category;
+                    renderFAQs();
+                });
+            });
+
+            // Keyboard navigation
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    if (currentSearchQuery) {
+                        searchInput.value = '';
+                        currentSearchQuery = '';
+                        searchClear.classList.remove('visible');
+                        renderFAQs();
+                    }
+                }
+            });
+        }
+
+        function updateCategoryCounts() {
+            const allFAQs = getFAQsForApp();
+            document.getElementById('count-all').textContent = allFAQs.length;
+            document.getElementById('count-booking').textContent = allFAQs.filter(f => f.category === 'booking').length;
+            document.getElementById('count-account').textContent = allFAQs.filter(f => f.category === 'account').length;
+            document.getElementById('count-dogs').textContent = allFAQs.filter(f => f.category === 'dogs' || f.category === 'shared').length;
+        }
+
+        function renderFAQs() {
+            const container = document.getElementById('faq-container');
+            const noResults = document.getElementById('no-results');
+            const searchInfo = document.getElementById('search-results-info');
+
+            // Get filtered FAQs
+            let faqs;
+            if (currentSearchQuery) {
+                faqs = searchFAQs(currentSearchQuery, false);
+                // Filter by category if not 'all'
+                if (currentCategory !== 'all') {
+                    faqs = faqs.filter(faq =>
+                        faq.category === currentCategory ||
+                        (currentCategory === 'dogs' && faq.category === 'shared')
+                    );
+                }
+            } else if (currentCategory === 'all') {
+                faqs = getFAQsForApp();
+            } else if (currentCategory === 'dogs') {
+                faqs = getFAQsForApp().filter(f => f.category === 'dogs' || f.category === 'shared');
+            } else {
+                faqs = getFAQsByCategory(currentCategory);
+            }
+
+            // Show/hide elements based on results
+            if (faqs.length === 0) {
+                container.style.display = 'none';
+                noResults.style.display = 'block';
+                searchInfo.style.display = 'none';
+                return;
+            }
+
+            container.style.display = 'block';
+            noResults.style.display = 'none';
+
+            // Show search info
+            if (currentSearchQuery) {
+                searchInfo.style.display = 'block';
+                searchInfo.innerHTML = `${faqs.length} Ergebnis${faqs.length !== 1 ? 'se' : ''} für "<strong>${escapeHtml(currentSearchQuery)}</strong>"`;
+            } else {
+                searchInfo.style.display = 'none';
+            }
+
+            // Render FAQs
+            container.innerHTML = faqs.map(faq => `
+                <div class="faq-item" data-faq-id="${faq.id}">
+                    <div class="faq-question" data-action="toggle-faq" data-id="${faq.id}">
+                        <span class="faq-category-icon">${CATEGORY_ICONS[faq.category] || '📋'}</span>
+                        <span>${highlightSearch(escapeHtml(faq.question), currentSearchQuery)}</span>
+                    </div>
+                    <div class="faq-answer">
+                        <div class="faq-answer-content">
+                            ${faq.answer}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Setup FAQ toggle handlers
+            document.querySelectorAll('[data-action="toggle-faq"]').forEach(el => {
+                el.addEventListener('click', () => {
+                    const faqItem = el.closest('.faq-item');
+                    const wasOpen = faqItem.classList.contains('open');
+
+                    // Close all other FAQs
+                    document.querySelectorAll('.faq-item.open').forEach(item => {
+                        if (item !== faqItem) {
+                            item.classList.remove('open');
+                        }
+                    });
+
+                    // Toggle current FAQ
+                    faqItem.classList.toggle('open', !wasOpen);
+                });
+            });
+        }
+
+        function highlightSearch(text, query) {
+            if (!query) return text;
+            const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
+            return text.replace(regex, '<span class="search-highlight">$1</span>');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function escapeRegex(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        function updateHeaderPhoto(user) {
+            const headerPhoto = document.getElementById('header-photo');
+            if (user.profile_photo) {
+                headerPhoto.innerHTML = `<img src="/uploads/${user.profile_photo}" alt="Profil" style="width: 100%; height: 100%; object-fit: cover;">`;
+            }
+        }
+
+        function showAdminLinkIfAdmin(user) {
+            if (user.is_admin || user.is_super_admin) {
+                document.getElementById('admin-area-link').style.display = '';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -29,6 +29,7 @@
                         <span id="header-photo" style="width: 32px; height: 32px; border-radius: 50%; background: #ddd; display: inline-flex; align-items: center; justify-content: center; overflow: hidden;">👤</span>
                         <span data-i18n="nav.profile">Profil</span>
                     </a></li>
+                    <li><a href="/help.html" data-i18n="nav.help">Hilfe</a></li>
                     <li id="admin-area-link" style="display: none;"><a href="/admin-dashboard.html" class="area-switcher" data-i18n="nav.admin_area">🔧 Admin-Bereich</a></li>
                     <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
@@ -46,7 +47,7 @@
             <!-- User Colors Info -->
             <div id="colors-info" class="card" style="margin-bottom: 20px;">
                 <p style="margin: 0;">
-                    <strong data-i18n="colors.your_colors">Deine Farben:</strong>
+                    <strong data-i18n="colors.your_colors" data-help="color_category">Deine Farben:</strong>
                     <span id="user-colors" style="display: inline-flex; gap: 6px; flex-wrap: wrap; margin-left: 8px;"></span>
                 </p>
                 <p style="font-size: 0.875rem; color: #666; margin-top: 10px; margin-bottom: 0;">
@@ -872,8 +873,17 @@
                 console.error('[BOOKING ERROR] Failed to create booking:', error);
                 console.error('[BOOKING ERROR] Error message:', error.message);
                 console.error('[BOOKING ERROR] Error stack:', error.stack);
-                showAlert('error', error.message || 'Fehler beim Erstellen der Buchung');
-                alert('BOOKING FEHLER: ' + error.message + '\n\nBitte prüfe die Konsole für Details.');
+
+                // Use BookingErrors for user-friendly error display
+                if (window.BookingErrors) {
+                    const context = {
+                        dog: currentBookingDog?.name || 'Hund',
+                        date: date
+                    };
+                    BookingErrors.show(error, context);
+                } else {
+                    showAlert('error', error.message || 'Fehler beim Erstellen der Buchung');
+                }
             }
         }
 
@@ -895,6 +905,10 @@
             setTimeout(() => container.innerHTML = '', 5000);
         }
     </script>
+    <!-- Booking error explainer -->
+    <script src="/js/booking-errors.js"></script>
+    <!-- Contextual help tooltips -->
+    <script src="/js/help-tooltips.js"></script>
     <!-- Shepherd.js guided tour (local) -->
     <script src="/vendor/shepherd.min.js"></script>
     <script src="/js/shepherd-tour.js"></script>

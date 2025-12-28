@@ -72,6 +72,7 @@
                         <span id="header-photo" style="width: 32px; height: 32px; border-radius: 50%; background: #ddd; display: inline-flex; align-items: center; justify-content: center; overflow: hidden;">👤</span>
                         <span data-i18n="nav.profile">Profil</span>
                     </a></li>
+                    <li><a href="/help.html" data-i18n="nav.help">Hilfe</a></li>
                     <li id="admin-area-link" style="display: none;"><a href="/admin-dashboard.html" class="area-switcher" data-i18n="nav.admin_area">🔧 Admin-Bereich</a></li>
                     <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
@@ -138,7 +139,7 @@
 
             <!-- User Colors -->
             <div class="card">
-                <h3 data-i18n="colors.your_colors">Deine Farben</h3>
+                <h3 data-i18n="colors.your_colors" data-help="color_category">Deine Farben</h3>
                 <div id="user-colors-container">
                     <p data-i18n="colors.no_colors">Du hast noch keine Farbkategorien</p>
                 </div>
@@ -625,5 +626,6 @@
             }
         }
     </script>
+    <script src="/js/help-tooltips.js"></script>
 </body>
 </html>

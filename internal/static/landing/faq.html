@@ -7,6 +7,157 @@
     <meta name="description" content="Häufig gestellte Fragen zu Gassigeher, dem kostenlosen Buchungssystem für Tierheime.">
     <link rel="stylesheet" href="/landing/assets/css/landing.css">
     <link rel="icon" href="/assets/images/favicon.ico">
+    <style>
+        .faq-search-container {
+            max-width: 600px;
+            margin: 0 auto 40px;
+        }
+        .faq-search {
+            position: relative;
+        }
+        .faq-search input {
+            width: 100%;
+            padding: 15px 20px 15px 50px;
+            font-size: 1.1rem;
+            border: 2px solid #e1e1e1;
+            border-radius: 30px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .faq-search input:focus {
+            border-color: #82b965;
+            box-shadow: 0 0 0 3px rgba(130, 185, 101, 0.2);
+            outline: none;
+        }
+        .faq-search-icon {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.3rem;
+            color: #888;
+        }
+        .faq-search-clear {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            color: #888;
+            cursor: pointer;
+            display: none;
+            padding: 5px;
+        }
+        .faq-search-clear:hover {
+            color: #333;
+        }
+        .faq-search-clear.visible {
+            display: block;
+        }
+        .search-results-info {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+        }
+        .search-highlight {
+            background: #fff3cd;
+            padding: 1px 3px;
+            border-radius: 3px;
+        }
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        .no-results-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        .faq-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .faq-item {
+            background: #fff;
+            border: 1px solid #e1e1e1;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            overflow: hidden;
+            transition: box-shadow 0.2s;
+        }
+        .faq-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .faq-question {
+            padding: 18px 50px 18px 20px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            color: #333;
+            position: relative;
+        }
+        .faq-question::after {
+            content: '+';
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.5rem;
+            font-weight: 300;
+            color: #888;
+            transition: transform 0.3s;
+        }
+        .faq-item.open .faq-question::after {
+            content: '−';
+        }
+        .faq-answer {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            background: #fafafa;
+        }
+        .faq-item.open .faq-answer {
+            max-height: 1000px;
+        }
+        .faq-answer-content {
+            padding: 0 20px 20px 20px;
+            line-height: 1.7;
+            color: #555;
+        }
+        .faq-answer-content a {
+            color: #82b965;
+            text-decoration: underline;
+        }
+        .faq-answer-content strong {
+            color: #333;
+        }
+        .faq-cta {
+            text-align: center;
+            margin-top: 50px;
+            padding: 40px 20px;
+            background: #f8f8f8;
+            border-radius: 12px;
+        }
+        .faq-cta h3 {
+            margin-bottom: 15px;
+        }
+        .faq-cta p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+        @media (max-width: 768px) {
+            .faq-question {
+                padding: 15px 45px 15px 15px;
+                font-size: 0.95rem;
+            }
+            .faq-answer-content {
+                padding: 0 15px 15px 15px;
+            }
+        }
+    </style>
 </head>
 <body>
     <header class="header">
@@ -17,7 +168,7 @@
             <nav class="nav">
                 <a href="/landing/">Startseite</a>
                 <a href="/landing/pricing.html">Preise</a>
-                <a href="/landing/faq.html">FAQ</a>
+                <a href="/landing/faq.html" class="active">FAQ</a>
                 <a href="/landing/demo.html" class="nav-demo">Demo testen</a>
                 <a href="/landing/register.html" class="btn btn-primary">Jetzt starten</a>
             </nav>
@@ -27,81 +178,35 @@
     <main class="faq-page">
         <h1>Häufig gestellte Fragen</h1>
 
-        <div class="faq-item">
-            <div class="faq-question">Kann ich Gassigeher vor der Registrierung testen?</div>
-            <div class="faq-answer">
-                <p>Ja! Wir bieten eine vollständige <a href="/landing/demo.html">Live-Demo</a> an. Sie können alle Funktionen ausprobieren - als Administrator, als Gassigeher mit verschiedenen Erfahrungsstufen. Die Demo wird täglich zurückgesetzt, so dass Sie bedenkenlos alles testen können.</p>
+        <!-- Search -->
+        <div class="faq-search-container">
+            <div class="faq-search">
+                <span class="faq-search-icon">🔍</span>
+                <input type="text" id="faq-search" placeholder="Suchen Sie nach einem Thema...">
+                <button class="faq-search-clear" id="search-clear">✕</button>
             </div>
         </div>
 
-        <div class="faq-item">
-            <div class="faq-question">Ist Gassigeher wirklich kostenlos?</div>
-            <div class="faq-answer">
-                <p>Ja! Der <strong>Free-Plan</strong> ist dauerhaft kostenlos und enthält alle Grundfunktionen für bis zu 10 Hunde. Für größere Tierheime mit mehr Hunden bieten wir optional einen <strong>Pro-Plan</strong> ab 29 EUR/Monat an. Es gibt keine versteckten Kosten.</p>
-            </div>
+        <!-- Search Results Info -->
+        <div class="search-results-info" id="search-results-info" style="display: none;"></div>
+
+        <!-- FAQ Container -->
+        <div class="faq-container" id="faq-container">
+            <!-- FAQs will be rendered here by JavaScript -->
         </div>
 
-        <div class="faq-item">
-            <div class="faq-question">Wie lange dauert die Einrichtung?</div>
-            <div class="faq-answer">
-                <p>Die Registrierung dauert etwa 2-3 Minuten. Danach können Sie sofort Hunde hinzufügen und Ihr System einrichten. Die meisten Tierheime sind innerhalb einer Stunde voll einsatzbereit.</p>
-            </div>
+        <!-- No Results -->
+        <div class="no-results" id="no-results" style="display: none;">
+            <div class="no-results-icon">🔍</div>
+            <h3>Keine Ergebnisse gefunden</h3>
+            <p>Versuchen Sie es mit anderen Suchbegriffen</p>
         </div>
 
-        <div class="faq-item">
-            <div class="faq-question">Welche technischen Voraussetzungen gibt es?</div>
-            <div class="faq-answer">
-                <p>Keine! Gassigeher läuft komplett im Browser. Sie brauchen nur einen Internetzugang und einen aktuellen Browser (Chrome, Firefox, Safari oder Edge). Es muss nichts installiert werden.</p>
-            </div>
-        </div>
-
-        <div class="faq-item">
-            <div class="faq-question">Was sind Farbkategorien?</div>
-            <div class="faq-answer">
-                <p>Farbkategorien helfen dabei sicherzustellen, dass anspruchsvolle Hunde nur von erfahrenen Freiwilligen geführt werden. Jedes Tierheim kann eigene Farbkategorien definieren (z.B. Grün für Anfänger, Orange für Fortgeschrittene, Blau für Erfahrene). Freiwillige können höhere Farbfreigaben beantragen, die dann von Admins genehmigt werden.</p>
-            </div>
-        </div>
-
-        <div class="faq-item">
-            <div class="faq-question">Können Freiwillige selbst Termine buchen?</div>
-            <div class="faq-answer">
-                <p>Ja! Freiwillige registrieren sich mit ihrer E-Mail-Adresse und können dann Spaziergänge selbstständig buchen. Sie sehen in einem Kalender alle verfügbaren Termine und Hunde, die ihrer Erfahrungsstufe entsprechen.</p>
-            </div>
-        </div>
-
-        <div class="faq-item">
-            <div class="faq-question">Wie werden Daten geschützt?</div>
-            <div class="faq-answer">
-                <p>Gassigeher ist DSGVO-konform. Alle Daten werden verschlüsselt übertragen (SSL) und in Deutschland gehostet. Nutzer können ihr Konto jederzeit selbst löschen. Passwörter werden sicher gehasht gespeichert.</p>
-            </div>
-        </div>
-
-        <div class="faq-item">
-            <div class="faq-question">Kann ich das Design anpassen?</div>
-            <div class="faq-answer">
-                <p>Ja! Sie können aus verschiedenen Farbthemen wählen oder eigene Farben definieren. So passt Gassigeher zu Ihrem Tierheim-Branding.</p>
-            </div>
-        </div>
-
-        <div class="faq-item">
-            <div class="faq-question">Was passiert bei technischen Problemen?</div>
-            <div class="faq-answer">
-                <p>Bei technischen Fragen können Sie uns jederzeit per E-Mail kontaktieren. Wir bemühen uns, alle Anfragen innerhalb von 24-48 Stunden zu beantworten.</p>
-            </div>
-        </div>
-
-        <div class="faq-item">
-            <div class="faq-question">Kann ich meine Daten exportieren?</div>
-            <div class="faq-answer">
-                <p>Ja, Sie können jederzeit Ihre Daten exportieren. Kontaktieren Sie uns einfach und wir stellen Ihnen einen vollständigen Export zur Verfügung.</p>
-            </div>
-        </div>
-
-        <div class="faq-item">
-            <div class="faq-question">Wie kann ich Gassigeher unterstützen?</div>
-            <div class="faq-answer">
-                <p>Am einfachsten über unsere <a href="https://buymeacoffee.com/gassigeher" target="_blank">Buy Me a Coffee</a> Seite. Jede Spende hilft uns, die Hosting-Kosten zu decken und das System weiterzuentwickeln. Aber am meisten hilft es uns, wenn Sie Gassigeher weiterempfehlen!</p>
-            </div>
+        <!-- CTA -->
+        <div class="faq-cta">
+            <h3>Noch Fragen?</h3>
+            <p>Wir helfen Ihnen gerne weiter</p>
+            <a href="/landing/contact.html" class="btn btn-primary">Kontakt aufnehmen</a>
         </div>
     </main>
 
@@ -121,5 +226,120 @@
     </footer>
 
     <script src="/landing/assets/js/landing.js"></script>
+    <script src="/shared/js/faq-data.js"></script>
+    <script>
+        let currentSearchQuery = '';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderFAQs();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            const searchInput = document.getElementById('faq-search');
+            const searchClear = document.getElementById('search-clear');
+
+            searchInput.addEventListener('input', (e) => {
+                currentSearchQuery = e.target.value;
+                searchClear.classList.toggle('visible', currentSearchQuery.length > 0);
+                renderFAQs();
+            });
+
+            searchClear.addEventListener('click', () => {
+                searchInput.value = '';
+                currentSearchQuery = '';
+                searchClear.classList.remove('visible');
+                renderFAQs();
+                searchInput.focus();
+            });
+
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && currentSearchQuery) {
+                    searchInput.value = '';
+                    currentSearchQuery = '';
+                    searchClear.classList.remove('visible');
+                    renderFAQs();
+                }
+            });
+        }
+
+        function renderFAQs() {
+            const container = document.getElementById('faq-container');
+            const noResults = document.getElementById('no-results');
+            const searchInfo = document.getElementById('search-results-info');
+
+            // Get FAQs for landing page
+            const faqs = currentSearchQuery
+                ? searchFAQs(currentSearchQuery, true)
+                : getFAQsForLanding();
+
+            // Show/hide elements based on results
+            if (faqs.length === 0) {
+                container.style.display = 'none';
+                noResults.style.display = 'block';
+                searchInfo.style.display = 'none';
+                return;
+            }
+
+            container.style.display = 'block';
+            noResults.style.display = 'none';
+
+            // Show search info
+            if (currentSearchQuery) {
+                searchInfo.style.display = 'block';
+                searchInfo.innerHTML = `${faqs.length} Ergebnis${faqs.length !== 1 ? 'se' : ''} für "<strong>${escapeHtml(currentSearchQuery)}</strong>"`;
+            } else {
+                searchInfo.style.display = 'none';
+            }
+
+            // Render FAQs
+            container.innerHTML = faqs.map(faq => `
+                <div class="faq-item" data-faq-id="${faq.id}">
+                    <div class="faq-question">
+                        ${highlightSearch(escapeHtml(faq.question), currentSearchQuery)}
+                    </div>
+                    <div class="faq-answer">
+                        <div class="faq-answer-content">
+                            ${faq.answer}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Setup click handlers for accordion
+            document.querySelectorAll('.faq-question').forEach(question => {
+                question.addEventListener('click', () => {
+                    const faqItem = question.closest('.faq-item');
+                    const wasOpen = faqItem.classList.contains('open');
+
+                    // Close all other FAQs
+                    document.querySelectorAll('.faq-item.open').forEach(item => {
+                        if (item !== faqItem) {
+                            item.classList.remove('open');
+                        }
+                    });
+
+                    // Toggle current FAQ
+                    faqItem.classList.toggle('open', !wasOpen);
+                });
+            });
+        }
+
+        function highlightSearch(text, query) {
+            if (!query) return text;
+            const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
+            return text.replace(regex, '<span class="search-highlight">$1</span>');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function escapeRegex(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+    </script>
 </body>
 </html>

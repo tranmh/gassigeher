@@ -157,6 +157,92 @@
         .alert.show {
             display: block;
         }
+
+        /* FAQ Deflection Panel */
+        .faq-deflection {
+            background: #f0f9eb;
+            border: 1px solid #c3e6cb;
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+            display: none;
+        }
+        .faq-deflection.show {
+            display: block;
+        }
+        .faq-deflection-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .faq-deflection-header span {
+            font-size: 1.5rem;
+        }
+        .faq-deflection-header h4 {
+            margin: 0;
+            font-size: 1rem;
+            color: #155724;
+        }
+        .faq-deflection-list {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 12px 0;
+        }
+        .faq-deflection-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        .faq-deflection-list li:last-child {
+            border-bottom: none;
+        }
+        .faq-deflection-list a {
+            color: #155724;
+            text-decoration: none;
+            font-size: 0.95rem;
+            display: block;
+        }
+        .faq-deflection-list a:hover {
+            text-decoration: underline;
+        }
+        .faq-deflection-footer {
+            font-size: 0.85rem;
+            color: #666;
+        }
+        .faq-deflection-footer a {
+            color: var(--color-primary);
+        }
+
+        /* Check FAQ Banner */
+        .faq-banner {
+            background: linear-gradient(135deg, #e8f5e0 0%, #d4edda 100%);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .faq-banner h3 {
+            margin: 0 0 8px 0;
+            font-size: 1.1rem;
+            color: #155724;
+        }
+        .faq-banner p {
+            margin: 0 0 12px 0;
+            color: #666;
+            font-size: 0.95rem;
+        }
+        .faq-banner .btn {
+            background: #155724;
+            color: white;
+            padding: 10px 24px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .faq-banner .btn:hover {
+            background: #0d3d18;
+        }
     </style>
 </head>
 <body>
@@ -185,6 +271,13 @@
 
         <section class="contact-section">
             <div class="container">
+                <!-- FAQ Check Banner -->
+                <div class="faq-banner">
+                    <h3>Vielleicht finden Sie Ihre Antwort schon in unseren FAQ?</h3>
+                    <p>Viele Fragen wurden bereits beantwortet - schauen Sie doch mal rein!</p>
+                    <a href="/landing/faq.html" class="btn">FAQ durchsuchen</a>
+                </div>
+
                 <div class="contact-grid">
                     <div class="contact-form-container">
                         <form class="contact-form" id="contactForm">
@@ -193,6 +286,20 @@
                             </div>
                             <div class="alert alert-error" id="errorAlert">
                                 Es ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut oder kontaktieren Sie uns direkt per E-Mail.
+                            </div>
+
+                            <!-- FAQ Deflection Panel -->
+                            <div class="faq-deflection" id="faqDeflection">
+                                <div class="faq-deflection-header">
+                                    <span>💡</span>
+                                    <h4>Diese Fragen könnten helfen</h4>
+                                </div>
+                                <ul class="faq-deflection-list" id="faqDeflectionList">
+                                    <!-- Populated by JavaScript -->
+                                </ul>
+                                <div class="faq-deflection-footer">
+                                    Ihre Frage nicht dabei? <a href="/landing/faq.html">Alle FAQ anzeigen</a>
+                                </div>
                             </div>
 
                             <div class="form-group">
@@ -297,7 +404,85 @@
         </div>
     </footer>
 
+    <script src="/shared/js/faq-data.js"></script>
     <script>
+        // FAQ Deflection based on subject
+        const subjectToFAQs = {
+            'general': [1, 2, 3, 11], // Demo, kostenlos, Einrichtung, Farben
+            'support': [4, 8, 11],    // Technisch, Probleme, Farben
+            'sales': [2, 7, 9],       // Kostenlos, Design, Export
+            'partnership': [2, 10],   // Kostenlos, Unterstützen
+            'press': [2, 6],          // Kostenlos, Datenschutz
+            'other': [1, 2, 8]        // Demo, Kostenlos, Probleme
+        };
+
+        const subjectSelect = document.getElementById('subject');
+        const faqDeflection = document.getElementById('faqDeflection');
+        const faqDeflectionList = document.getElementById('faqDeflectionList');
+        const messageInput = document.getElementById('message');
+
+        // Show relevant FAQs when subject changes
+        subjectSelect.addEventListener('change', function() {
+            updateFAQDeflection();
+        });
+
+        // Also check when typing in message
+        let debounceTimer;
+        messageInput.addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                updateFAQDeflection();
+            }, 500);
+        });
+
+        function updateFAQDeflection() {
+            const subject = subjectSelect.value;
+            const message = messageInput.value.toLowerCase();
+
+            if (!subject && message.length < 10) {
+                faqDeflection.classList.remove('show');
+                return;
+            }
+
+            let relevantFAQs = [];
+
+            // Get FAQs based on subject
+            if (subject && subjectToFAQs[subject]) {
+                const faqIds = subjectToFAQs[subject];
+                relevantFAQs = FAQ_DATA.filter(faq => faqIds.includes(faq.id));
+            }
+
+            // Also search by message keywords
+            if (message.length >= 10) {
+                const keywordMatches = searchFAQs(message, true);
+                // Add unique matches
+                keywordMatches.forEach(faq => {
+                    if (!relevantFAQs.find(f => f.id === faq.id)) {
+                        relevantFAQs.push(faq);
+                    }
+                });
+            }
+
+            // Limit to 4 FAQs
+            relevantFAQs = relevantFAQs.slice(0, 4);
+
+            if (relevantFAQs.length > 0) {
+                faqDeflectionList.innerHTML = relevantFAQs.map(faq =>
+                    `<li><a href="/landing/faq.html#faq-${faq.id}">${escapeHtml(faq.question)}</a></li>`
+                ).join('');
+                faqDeflection.classList.add('show');
+            } else {
+                faqDeflection.classList.remove('show');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Form submission
         document.getElementById('contactForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
@@ -335,6 +520,7 @@
                 if (response.ok) {
                     successAlert.classList.add('show');
                     this.reset();
+                    faqDeflection.classList.remove('show');
                 } else {
                     errorAlert.textContent = data.error || 'Es ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut.';
                     throw new Error(data.error || 'Server error');
