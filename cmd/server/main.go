@@ -216,6 +216,7 @@ func main() {
 	consentHandler := handlers.NewConsentHandler(db)
 	featureFlagHandler := handlers.NewFeatureFlagHandler(db)
 	marketingHandler := handlers.NewMarketingHandler(db)
+	promoCodeHandler := handlers.NewPromoCodeHandler(db, cfg)
 	importHandler := handlers.NewImportHandler(db)
 
 	// Initialize global cache service
@@ -334,6 +335,7 @@ func main() {
 	router.HandleFunc("/api/v1/marketing/fomo", marketingHandler.GetActiveFOMO).Methods("GET")
 	router.HandleFunc("/api/v1/marketing/referral/{code}", marketingHandler.ValidateReferralCode).Methods("GET")
 	router.HandleFunc("/api/v1/marketing/references", marketingHandler.ListReferenceEntries).Methods("GET")
+	router.HandleFunc("/api/v1/promo-codes/validate/{code}", promoCodeHandler.ValidatePromoCode).Methods("GET")
 	router.HandleFunc("/api/v1/tenants/check-slug", tenantHandler.CheckSlug).Methods("GET")
 
 	// Contact form (public - for landing page inquiries)
@@ -405,14 +407,20 @@ func main() {
 	protected.HandleFunc("/walk-reports/{id}/photos/{photoId}", walkReportHandler.DeletePhoto).Methods("DELETE")
 	protected.HandleFunc("/dogs/{id}/walk-reports", walkReportHandler.GetDogWalkReports).Methods("GET")
 
-	// SaaS Billing routes (authenticated users)
-	protected.HandleFunc("/billing/subscription", billingHandler.GetSubscription).Methods("GET")
-	protected.HandleFunc("/billing/plans", billingHandler.GetPlans).Methods("GET")
-	protected.HandleFunc("/billing/usage", billingHandler.GetUsage).Methods("GET")
-	protected.HandleFunc("/billing/checkout", billingHandler.CreateCheckout).Methods("POST")
-	protected.HandleFunc("/billing/portal", billingHandler.CreateBillingPortal).Methods("POST")
-	protected.HandleFunc("/billing/cancel", billingHandler.CancelSubscription).Methods("POST")
-	protected.HandleFunc("/billing/test-upgrade", billingHandler.TestUpgrade).Methods("POST") // Test mode only
+	// SaaS Billing routes (super-admin or central-admin only)
+	// Access restricted to tenant super-admin for their own billing, or central admin for impersonation
+	billing := protected.PathPrefix("/billing").Subrouter()
+	billing.Use(middleware.RequireTenantSuperAdminOrCentralAdmin)
+	billing.HandleFunc("/subscription", billingHandler.GetSubscription).Methods("GET")
+	billing.HandleFunc("/plans", billingHandler.GetPlans).Methods("GET")
+	billing.HandleFunc("/usage", billingHandler.GetUsage).Methods("GET")
+	billing.HandleFunc("/checkout", billingHandler.CreateCheckout).Methods("POST")
+	billing.HandleFunc("/portal", billingHandler.CreateBillingPortal).Methods("POST")
+	billing.HandleFunc("/cancel", billingHandler.CancelSubscription).Methods("POST")
+	billing.HandleFunc("/test-upgrade", billingHandler.TestUpgrade).Methods("POST") // Test mode only
+	billing.HandleFunc("/invoices", billingHandler.GetInvoices).Methods("GET")
+	billing.HandleFunc("/invoices/{id:[0-9]+}", billingHandler.GetInvoice).Methods("GET")
+	billing.HandleFunc("/invoices/{id:[0-9]+}/pdf", billingHandler.DownloadInvoicePDF).Methods("GET")
 
 	// Feature flags (authenticated users - check if flags are enabled)
 	protected.HandleFunc("/feature-flags/{key}/check", featureFlagHandler.CheckFlag).Methods("GET")
@@ -589,6 +597,13 @@ func main() {
 	centralAdmin.HandleFunc("/marketing/references/{id}", marketingHandler.GetReferenceEntry).Methods("GET")
 	centralAdmin.HandleFunc("/marketing/references/{id}/approve", marketingHandler.ApproveReferenceEntry).Methods("PUT")
 	centralAdmin.HandleFunc("/marketing/references/{id}", marketingHandler.DeleteReferenceEntry).Methods("DELETE")
+
+	// Promo codes (central admin)
+	centralAdmin.HandleFunc("/promo-codes", promoCodeHandler.GetAllPromoCodes).Methods("GET")
+	centralAdmin.HandleFunc("/promo-codes", promoCodeHandler.CreatePromoCode).Methods("POST")
+	centralAdmin.HandleFunc("/promo-codes/{id}", promoCodeHandler.GetPromoCode).Methods("GET")
+	centralAdmin.HandleFunc("/promo-codes/{id}", promoCodeHandler.UpdatePromoCode).Methods("PUT")
+	centralAdmin.HandleFunc("/promo-codes/{id}", promoCodeHandler.DeletePromoCode).Methods("DELETE")
 
 	// Uploads directory (user photos, dog photos) - must remain on filesystem
 	// BUG FIX #4: Use SafeFileServer to prevent null byte injection and path traversal

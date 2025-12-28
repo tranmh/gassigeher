@@ -184,6 +184,98 @@
             font-size: 0.75rem;
             margin-left: 4px;
         }
+        .promo-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .promo-input-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .promo-input-group input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            text-transform: uppercase;
+        }
+        .promo-result {
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: 6px;
+            display: none;
+        }
+        .promo-result.success {
+            display: block;
+            background: #d4edda;
+            color: #155724;
+        }
+        .promo-result.error {
+            display: block;
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .free-months-section {
+            background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%);
+            border: 2px solid #ffc107;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .free-months-count {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #856404;
+        }
+        .free-months-label {
+            font-size: 1.1rem;
+            color: #856404;
+            margin-top: 4px;
+        }
+        .free-months-source {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 8px;
+        }
+        .trial-countdown {
+            margin-top: 12px;
+            padding: 10px 16px;
+            background: rgba(255,255,255,0.7);
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+        .invoice-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+        .invoice-table th,
+        .invoice-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .invoice-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #26272b;
+        }
+        .invoice-table tr:hover {
+            background: #f8f9fa;
+        }
+        .invoice-download {
+            color: #82b965;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .invoice-download:hover {
+            text-decoration: underline;
+        }
         .upgrade-cta {
             background: linear-gradient(135deg, #82b965 0%, #6fa050 100%);
             color: white;
@@ -229,7 +321,6 @@
                     <li><a href="/dashboard.html" data-i18n="nav.dashboard">Dashboard</a></li>
                     <li><a href="/dogs.html" data-i18n="dogs.title">Hunde</a></li>
                     <li><a href="/profile.html" data-i18n="profile.title">Profil</a></li>
-                    <li><a href="/billing.html" data-i18n="billing.title" class="active">Abrechnung</a></li>
                     <li id="admin-link" style="display:none;"><a href="/admin-dashboard.html" data-i18n="nav.admin_area">Admin-Bereich</a></li>
                     <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
                 </ul>
@@ -250,6 +341,24 @@
                 <div id="usage-content">
                     <p data-i18n="common.loading">Laden...</p>
                 </div>
+            </div>
+
+            <!-- Free Months Section (shown if active) -->
+            <div class="free-months-section" id="free-months-section" style="display: none;">
+                <div class="free-months-count" id="free-months-count">0</div>
+                <div class="free-months-label">Gratismonate verbleibend</div>
+                <div class="free-months-source" id="free-months-source"></div>
+                <div class="trial-countdown" id="trial-countdown" style="display: none;"></div>
+            </div>
+
+            <!-- Promo Code Section -->
+            <div class="promo-section" id="promo-section">
+                <h3>Haben Sie einen Gutschein- oder Empfehlungscode?</h3>
+                <div class="promo-input-group">
+                    <input type="text" id="promo-code-input" placeholder="CODE EINGEBEN" maxlength="50">
+                    <button class="btn btn-secondary" data-action="validate-promo">Prüfen</button>
+                </div>
+                <div class="promo-result" id="promo-result"></div>
             </div>
 
             <!-- Transparency Message -->
@@ -278,6 +387,14 @@
                 <div id="subscription-content"></div>
             </div>
 
+            <!-- Invoice History -->
+            <div class="card" id="invoice-section" style="display: none;">
+                <h2>Rechnungen</h2>
+                <div id="invoice-content">
+                    <p data-i18n="common.loading">Laden...</p>
+                </div>
+            </div>
+
             <!-- Open Source Notice -->
             <div class="card" style="text-align: center; margin-top: 30px;">
                 <h3 data-i18n="billing.self_host_title">Lieber selbst hosten?</h3>
@@ -303,13 +420,16 @@
         registerActions({
             'upgrade-to-pro': function(e) { e.preventDefault(); upgradeToPro(); },
             'open-billing-portal': function(e) { e.preventDefault(); openBillingPortal(); },
-            'cancel-subscription': function(e) { e.preventDefault(); cancelSubscription(); }
+            'cancel-subscription': function(e) { e.preventDefault(); cancelSubscription(); },
+            'validate-promo': function(e) { e.preventDefault(); validatePromoCode(); }
         });
 
         let currentBillingCycle = 'monthly';
         let plans = [];
         let currentSubscription = null;
         let stripePublishableKey = null;
+        let validatedPromoCode = null;
+        let subscriptionData = null;
 
         async function init() {
             await window.i18n.load();
@@ -321,16 +441,22 @@
                 return;
             }
 
-            // Show admin link if admin
-            if (user.is_admin || user.is_super_admin) {
-                document.getElementById('admin-link').style.display = '';
+            // Billing page requires super-admin access
+            // Regular admins and users are redirected to dashboard
+            if (!user.is_super_admin) {
+                window.location.href = '/dashboard.html';
+                return;
             }
+
+            // Show admin link (super-admin always has admin access)
+            document.getElementById('admin-link').style.display = '';
 
             // Load data
             await Promise.all([
                 loadUsage(),
                 loadPlans(),
-                loadSubscription()
+                loadSubscription(),
+                loadInvoices()
             ]);
 
             // Setup billing cycle toggle
@@ -396,13 +522,155 @@
                 const response = await api.fetch('/api/v1/billing/subscription');
                 const data = await response.json();
 
+                subscriptionData = data;
                 currentSubscription = data.subscription;
 
                 if (currentSubscription && currentSubscription.plan_id > 1) {
                     renderSubscriptionDetails();
                 }
+
+                // Display free months if available
+                renderFreeMonths(data);
             } catch (error) {
                 console.error('Failed to load subscription:', error);
+            }
+        }
+
+        function renderFreeMonths(data) {
+            const section = document.getElementById('free-months-section');
+            const freeMonthsRemaining = data.free_months_remaining || 0;
+
+            if (freeMonthsRemaining <= 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = '';
+            document.getElementById('free-months-count').textContent = freeMonthsRemaining;
+
+            // Show source
+            const sourceEl = document.getElementById('free-months-source');
+            const sourceLabels = {
+                'promo': 'Aus Gutscheincode',
+                'referral': 'Aus Empfehlungscode',
+                'promo+referral': 'Aus Gutschein- und Empfehlungscode',
+                'admin_grant': 'Von Administrator gewährt',
+                'trial': 'Testphase'
+            };
+            const source = data.free_months_source || '';
+            sourceEl.textContent = sourceLabels[source] || '';
+
+            // Show trial countdown if in trial
+            const countdownEl = document.getElementById('trial-countdown');
+            if (data.trial_ends_at && data.days_until_trial_ends !== undefined) {
+                countdownEl.style.display = '';
+                const trialEnd = new Date(data.trial_ends_at).toLocaleDateString('de-DE');
+                countdownEl.innerHTML = `Endet am: <strong>${trialEnd}</strong> (${data.days_until_trial_ends} Tage)`;
+            } else {
+                countdownEl.style.display = 'none';
+            }
+        }
+
+        async function loadInvoices() {
+            try {
+                const response = await api.fetch('/api/v1/billing/invoices');
+                const data = await response.json();
+
+                const invoices = data.invoices || [];
+                const section = document.getElementById('invoice-section');
+                const content = document.getElementById('invoice-content');
+
+                if (invoices.length === 0) {
+                    section.style.display = 'none';
+                    return;
+                }
+
+                section.style.display = '';
+                content.innerHTML = `
+                    <table class="invoice-table">
+                        <thead>
+                            <tr>
+                                <th>Nummer</th>
+                                <th>Datum</th>
+                                <th>Betrag</th>
+                                <th>Status</th>
+                                <th>Download</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${invoices.map(inv => {
+                                const date = new Date(inv.created_at).toLocaleDateString('de-DE');
+                                const amount = (inv.amount_cents / 100).toFixed(2).replace('.', ',');
+                                const statusLabels = {
+                                    'paid': 'Bezahlt',
+                                    'open': 'Offen',
+                                    'draft': 'Entwurf',
+                                    'void': 'Storniert',
+                                    'uncollectible': 'Uneinbringlich'
+                                };
+                                const status = statusLabels[inv.status] || inv.status;
+                                const hasPdf = inv.pdf_url || inv.pdf_path;
+
+                                return `
+                                    <tr>
+                                        <td>${escapeHtml(inv.invoice_number)}</td>
+                                        <td>${date}</td>
+                                        <td>€${amount}</td>
+                                        <td><span class="status-badge status-${inv.status === 'paid' ? 'active' : 'past_due'}">${status}</span></td>
+                                        <td>
+                                            ${hasPdf ? `<a href="/api/v1/billing/invoices/${inv.id}/pdf" class="invoice-download" target="_blank">PDF</a>` : '-'}
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                console.error('Failed to load invoices:', error);
+                document.getElementById('invoice-section').style.display = 'none';
+            }
+        }
+
+        async function validatePromoCode() {
+            const input = document.getElementById('promo-code-input');
+            const result = document.getElementById('promo-result');
+            const code = input.value.trim().toUpperCase();
+
+            if (!code) {
+                result.className = 'promo-result error';
+                result.textContent = 'Bitte geben Sie einen Code ein';
+                return;
+            }
+
+            try {
+                const response = await api.fetch(`/api/v1/promo-codes/validate/${encodeURIComponent(code)}`);
+
+                // Check for HTTP errors first
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    result.className = 'promo-result error';
+                    result.textContent = errorData.error || errorData.message || 'Ungültiger Code';
+                    validatedPromoCode = null;
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (data.valid) {
+                    result.className = 'promo-result success';
+                    result.textContent = `✓ ${data.message || data.description}`;
+                    validatedPromoCode = code;
+                } else {
+                    result.className = 'promo-result error';
+                    result.textContent = data.message || 'Ungültiger Code';
+                    validatedPromoCode = null;
+                }
+            } catch (error) {
+                console.error('Promo code validation error:', error);
+                result.className = 'promo-result error';
+                result.textContent = 'Fehler beim Prüfen des Codes';
+                validatedPromoCode = null;
             }
         }
 
@@ -527,19 +795,35 @@
 
         async function upgradeToPro() {
             try {
+                // Build checkout request with optional promo code
+                const checkoutData = {
+                    plan_slug: 'pro',
+                    billing_cycle: currentBillingCycle
+                };
+
+                // Include promo code if validated
+                if (validatedPromoCode) {
+                    checkoutData.promo_code = validatedPromoCode;
+                }
+
                 const response = await api.fetch('/api/v1/billing/checkout', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        plan_slug: 'pro',
-                        billing_cycle: currentBillingCycle
-                    })
+                    body: JSON.stringify(checkoutData)
                 });
 
                 const data = await response.json();
 
                 if (data.checkout_url) {
-                    window.location.href = data.checkout_url;
+                    // Show trial days info if applicable
+                    if (data.trial_days > 0) {
+                        showAlert(`Ihr Code wurde angewendet! Sie erhalten ${Math.round(data.trial_days / 30)} Gratismonate.`, 'success');
+                        setTimeout(() => {
+                            window.location.href = data.checkout_url;
+                        }, 2000);
+                    } else {
+                        window.location.href = data.checkout_url;
+                    }
                 } else if (data.error) {
                     showAlert(data.error, 'error');
                 }

@@ -289,6 +289,32 @@ func RequireCentralAdmin(next http.Handler) http.Handler {
 	})
 }
 
+// RequireTenantSuperAdminOrCentralAdmin requires either:
+// 1. Tenant super-admin (is_super_admin = true) - for their own tenant's billing
+// 2. Central admin (is_central_admin = true) - for impersonation/platform access
+// Used for sensitive tenant operations like billing management
+func RequireTenantSuperAdminOrCentralAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check if user is central admin - always allowed
+		isCentralAdmin, _ := r.Context().Value(IsCentralAdminKey).(bool)
+		if isCentralAdmin {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Check if user is tenant super-admin
+		isSuperAdmin, _ := r.Context().Value(IsSuperAdminKey).(bool)
+		if isSuperAdmin {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Neither central admin nor tenant super-admin - deny access
+		w.Header().Set("Content-Type", "application/json")
+		http.Error(w, `{"error":"Super-Admin oder Central-Admin Zugriff erforderlich"}`, http.StatusForbidden)
+	})
+}
+
 // AllowImpersonationEnd is a middleware that allows impersonation tokens to access
 // the end-impersonation endpoint. It checks if either:
 // 1. The user is a central admin, OR

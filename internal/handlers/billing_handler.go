@@ -6,8 +6,11 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/stripe/stripe-go/v76"
 	"github.com/tranmh/gassigeher/internal/config"
 	"github.com/tranmh/gassigeher/internal/middleware"
@@ -23,6 +26,9 @@ type BillingHandler struct {
 	stripeService    *services.StripeService
 	subscriptionRepo *repository.SubscriptionRepository
 	dogRepo          *repository.DogRepository
+	invoiceRepo      *repository.InvoiceRepository
+	promoCodeRepo    *repository.PromoCodeRepository
+	marketingRepo    *repository.MarketingRepository
 }
 
 // NewBillingHandler creates a new billing handler
@@ -33,6 +39,9 @@ func NewBillingHandler(db *sql.DB, cfg *config.Config, stripeService *services.S
 		stripeService:    stripeService,
 		subscriptionRepo: repository.NewSubscriptionRepository(db),
 		dogRepo:          repository.NewDogRepository(db),
+		invoiceRepo:      repository.NewInvoiceRepository(db),
+		promoCodeRepo:    repository.NewPromoCodeRepository(db),
+		marketingRepo:    repository.NewMarketingRepository(db),
 	}
 }
 
@@ -62,10 +71,26 @@ func (h *BillingHandler) GetSubscription(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	respondJSON(w, http.StatusOK, map[string]interface{}{
+	// Build enhanced response with free months info
+	response := map[string]interface{}{
 		"subscription": subscription,
 		"plan":         subscription.Plan,
-	})
+	}
+
+	// Add free months info if applicable
+	if subscription.FreeMonthsRemaining > 0 || subscription.FreeMonthsGranted > 0 {
+		response["free_months_remaining"] = subscription.FreeMonthsRemaining
+		response["free_months_granted"] = subscription.FreeMonthsGranted
+		response["free_months_source"] = subscription.GetFreeMonthsSourceLabel()
+	}
+
+	// Add trial info if applicable
+	if subscription.IsInTrial() {
+		response["trial_ends_at"] = subscription.TrialEndsAt
+		response["days_until_trial_ends"] = subscription.GetDaysUntilTrialEnds()
+	}
+
+	respondJSON(w, http.StatusOK, response)
 }
 
 // GetPlans returns all available pricing plans
@@ -141,6 +166,8 @@ func (h *BillingHandler) GetUsage(w http.ResponseWriter, r *http.Request) {
 type CreateCheckoutRequest struct {
 	PlanSlug     string `json:"plan_slug"`
 	BillingCycle string `json:"billing_cycle"`
+	PromoCode    string `json:"promo_code,omitempty"`
+	ReferralCode string `json:"referral_code,omitempty"`
 }
 
 // CreateCheckout creates a Stripe checkout session
@@ -192,14 +219,113 @@ func (h *BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Get user email from context (needed for Stripe)
+	// Get user email from context (required for Stripe checkout)
 	email, _ := r.Context().Value(middleware.EmailKey).(string)
 	if email == "" {
-		email = "customer@example.com" // Fallback - Stripe will ask for email
+		respondError(w, http.StatusBadRequest, "E-Mail-Adresse nicht verfügbar. Bitte melden Sie sich erneut an.")
+		return
 	}
 
-	// Create checkout session
-	session, err := h.stripeService.CreateCheckoutSession(tenantID, req.PlanSlug, req.BillingCycle, email)
+	// Build checkout options
+	options := &services.CheckoutOptions{}
+	trialDays := 0
+
+	// Validate and apply promo code if provided
+	if req.PromoCode != "" {
+		promoCode, err := h.promoCodeRepo.GetByCode(req.PromoCode)
+		if err != nil {
+			log.Printf("ERROR: Failed to look up promo code: %v", err)
+			respondError(w, http.StatusInternalServerError, "Fehler beim Prüfen des Gutscheincodes")
+			return
+		}
+
+		if promoCode == nil || !promoCode.IsValid() {
+			respondError(w, http.StatusBadRequest, "Ungültiger oder abgelaufener Gutscheincode")
+			return
+		}
+
+		// Check if promo code is valid for the requested plan
+		if promoCode.ValidForPlans != "" {
+			// ValidForPlans is stored as JSON array like '["pro"]' or '["free","pro"]'
+			if !strings.Contains(promoCode.ValidForPlans, `"`+req.PlanSlug+`"`) {
+				respondError(w, http.StatusBadRequest, "Dieser Gutscheincode ist für den gewählten Plan nicht gültig")
+				return
+			}
+		}
+
+		// Check if tenant has already used this promo code
+		hasUsed, err := h.promoCodeRepo.HasTenantUsedCode(promoCode.ID, tenantID)
+		if err != nil {
+			log.Printf("ERROR: Failed to check promo code usage: %v", err)
+			respondError(w, http.StatusInternalServerError, "Fehler beim Prüfen des Gutscheincodes")
+			return
+		}
+		if hasUsed {
+			respondError(w, http.StatusBadRequest, "Dieser Gutscheincode wurde bereits verwendet")
+			return
+		}
+
+		options.PromoCode = req.PromoCode
+		options.PromoCodeID = promoCode.ID
+
+		// Apply free months as trial days
+		if promoCode.DiscountType == models.DiscountTypeFreeMonths {
+			trialDays += promoCode.DiscountValue * 30 // 30 days per month
+		}
+	}
+
+	// Validate and apply referral code if provided
+	if req.ReferralCode != "" {
+		referralCode, err := h.marketingRepo.GetReferralCodeByCode(req.ReferralCode)
+		if err != nil {
+			log.Printf("ERROR: Failed to look up referral code: %v", err)
+			respondError(w, http.StatusInternalServerError, "Fehler beim Prüfen des Empfehlungscodes")
+			return
+		}
+
+		if referralCode == nil || !referralCode.IsActive {
+			respondError(w, http.StatusBadRequest, "Ungültiger oder inaktiver Empfehlungscode")
+			return
+		}
+
+		// Check if referral code has expired
+		if referralCode.ExpiresAt != nil && referralCode.ExpiresAt.Before(time.Now()) {
+			respondError(w, http.StatusBadRequest, "Empfehlungscode ist abgelaufen")
+			return
+		}
+
+		// Check if max uses reached
+		if referralCode.MaxUses != nil && referralCode.UsesCount >= *referralCode.MaxUses {
+			respondError(w, http.StatusBadRequest, "Empfehlungscode hat die maximale Anzahl an Verwendungen erreicht")
+			return
+		}
+
+		// Check if tenant has already used any referral code
+		hasUsed, err := h.marketingRepo.HasTenantUsedReferral(tenantID)
+		if err != nil {
+			log.Printf("ERROR: Failed to check referral usage: %v", err)
+			respondError(w, http.StatusInternalServerError, "Fehler beim Prüfen des Empfehlungscodes")
+			return
+		}
+		if hasUsed {
+			respondError(w, http.StatusBadRequest, "Sie haben bereits einen Empfehlungscode verwendet")
+			return
+		}
+
+		options.ReferralCode = req.ReferralCode
+		options.ReferralCodeID = referralCode.ID
+
+		// Add referee free months as trial days
+		trialDays += referralCode.DiscountMonthsReferee * 30
+	}
+
+	// Set trial days if any discounts apply
+	if trialDays > 0 {
+		options.TrialDays = trialDays
+	}
+
+	// Create checkout session with options
+	session, err := h.stripeService.CreateCheckoutSessionWithOptions(tenantID, req.PlanSlug, req.BillingCycle, email, options)
 	if err != nil {
 		log.Printf("ERROR: Failed to create checkout session: %v", err)
 		respondError(w, http.StatusInternalServerError, "Fehler beim Erstellen der Checkout-Session")
@@ -207,8 +333,9 @@ func (h *BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) 
 	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"session_id":  session.ID,
+		"session_id":   session.ID,
 		"checkout_url": session.URL,
+		"trial_days":   trialDays,
 	})
 }
 
@@ -432,6 +559,84 @@ func (h *BillingHandler) handleCheckoutCompleted(event *stripe.Event) {
 	if subscription != nil {
 		subscription.PlanID = 2 // Pro plan
 		subscription.Status = models.SubscriptionStatusActive
+
+		// Track which codes were applied for combined source
+		hasPromo := false
+		hasReferral := false
+		totalFreeMonths := 0
+
+		// Apply promo code if present
+		if data.PromoCodeID > 0 {
+			promoCode, err := h.promoCodeRepo.GetByID(data.PromoCodeID)
+			if err == nil && promoCode != nil {
+				// Record usage
+				if err := h.promoCodeRepo.RecordUse(promoCode.ID, data.TenantID); err != nil {
+					log.Printf("ERROR: Failed to record promo code use: %v", err)
+				}
+				if err := h.promoCodeRepo.IncrementUsesCount(promoCode.ID); err != nil {
+					log.Printf("ERROR: Failed to increment promo code uses: %v", err)
+				}
+
+				// Apply free months to subscription
+				if promoCode.DiscountType == models.DiscountTypeFreeMonths {
+					subscription.FreeMonthsRemaining += promoCode.DiscountValue
+					subscription.FreeMonthsGranted += promoCode.DiscountValue
+					subscription.AppliedPromoCodeID = &promoCode.ID
+					hasPromo = true
+					totalFreeMonths += promoCode.DiscountValue
+				}
+
+				log.Printf("Applied promo code %s for tenant %d", promoCode.Code, data.TenantID)
+			}
+		}
+
+		// Apply referral code if present
+		if data.ReferralCodeID > 0 {
+			referralCode, err := h.marketingRepo.GetReferralCode(data.ReferralCodeID)
+			if err == nil && referralCode != nil {
+				// Record referral usage
+				if err := h.marketingRepo.RecordReferralUse(referralCode.ID, data.TenantID); err != nil {
+					log.Printf("ERROR: Failed to record referral use: %v", err)
+				}
+				if err := h.marketingRepo.IncrementReferralCodeUses(referralCode.ID); err != nil {
+					log.Printf("ERROR: Failed to increment referral uses: %v", err)
+				}
+
+				// Apply free months to referee (new tenant)
+				if referralCode.DiscountMonthsReferee > 0 {
+					subscription.FreeMonthsRemaining += referralCode.DiscountMonthsReferee
+					subscription.FreeMonthsGranted += referralCode.DiscountMonthsReferee
+					subscription.AppliedReferralCodeID = &referralCode.ID
+					hasReferral = true
+					totalFreeMonths += referralCode.DiscountMonthsReferee
+				}
+
+				// Grant free months to referrer if they have a subscription
+				if referralCode.ReferrerTenantID != nil && referralCode.DiscountMonthsReferrer > 0 {
+					go h.grantFreeMonthsToReferrer(*referralCode.ReferrerTenantID, referralCode.DiscountMonthsReferrer)
+				}
+
+				log.Printf("Applied referral code %s for tenant %d", referralCode.Code, data.TenantID)
+			}
+		}
+
+		// Set free months source based on which codes were applied
+		if hasPromo && hasReferral {
+			subscription.FreeMonthsSource = strPtr("promo+referral")
+		} else if hasPromo {
+			subscription.FreeMonthsSource = strPtr("promo")
+		} else if hasReferral {
+			subscription.FreeMonthsSource = strPtr("referral")
+		}
+
+		// Set trial end date based on total free months
+		// Use days (months * 30) to match the trial period sent to Stripe
+		if totalFreeMonths > 0 {
+			trialDays := totalFreeMonths * 30
+			trialEnd := time.Now().AddDate(0, 0, trialDays)
+			subscription.TrialEndsAt = &trialEnd
+		}
+
 		err = h.subscriptionRepo.UpdateSubscription(subscription)
 		if err != nil {
 			log.Printf("ERROR: Failed to update subscription for tenant %d: %v", data.TenantID, err)
@@ -441,37 +646,102 @@ func (h *BillingHandler) handleCheckoutCompleted(event *stripe.Event) {
 	log.Printf("Checkout completed for tenant %d, customer %s", data.TenantID, data.CustomerID)
 }
 
+// grantFreeMonthsToReferrer grants free months to the referrer's subscription
+// Uses atomic increment to prevent race conditions
+func (h *BillingHandler) grantFreeMonthsToReferrer(referrerTenantID int, months int) {
+	err := h.subscriptionRepo.IncrementFreeMonths(referrerTenantID, months, "referral")
+	if err != nil {
+		log.Printf("ERROR: Failed to grant free months to referrer tenant %d: %v", referrerTenantID, err)
+		return
+	}
+
+	log.Printf("Granted %d free months to referrer tenant %d", months, referrerTenantID)
+}
+
 // handleInvoicePaid processes invoice.paid events
 func (h *BillingHandler) handleInvoicePaid(event *stripe.Event) {
-	data, err := h.stripeService.ParseSubscriptionEvent(event)
+	// Parse invoice data
+	invoiceData, err := h.stripeService.ParseInvoiceEvent(event)
 	if err != nil {
 		log.Printf("ERROR: Failed to parse invoice event: %v", err)
 		return
 	}
 
 	// Find subscription by Stripe subscription ID
-	subscription, err := h.subscriptionRepo.GetSubscriptionByStripeID(data.SubscriptionID)
+	subscription, err := h.subscriptionRepo.GetSubscriptionByStripeID(invoiceData.SubscriptionID)
 	if err != nil || subscription == nil {
-		log.Printf("ERROR: Subscription not found for Stripe ID %s", data.SubscriptionID)
+		log.Printf("ERROR: Subscription not found for Stripe ID %s", invoiceData.SubscriptionID)
 		return
 	}
 
-	// Update period dates
-	if data.CurrentPeriodStart > 0 {
-		start := time.Unix(data.CurrentPeriodStart, 0)
+	// Update period dates on subscription
+	if invoiceData.PeriodStart > 0 {
+		start := time.Unix(invoiceData.PeriodStart, 0)
 		subscription.CurrentPeriodStart = &start
 	}
-	if data.CurrentPeriodEnd > 0 {
-		end := time.Unix(data.CurrentPeriodEnd, 0)
+	if invoiceData.PeriodEnd > 0 {
+		end := time.Unix(invoiceData.PeriodEnd, 0)
 		subscription.CurrentPeriodEnd = &end
 	}
 
 	subscription.Status = models.SubscriptionStatusActive
 	if err := h.subscriptionRepo.UpdateSubscription(subscription); err != nil {
-		log.Printf("ERROR: Failed to update subscription %s after invoice paid: %v", data.SubscriptionID, err)
+		log.Printf("ERROR: Failed to update subscription %s after invoice paid: %v", invoiceData.SubscriptionID, err)
 	}
 
-	log.Printf("Invoice paid for subscription %s", data.SubscriptionID)
+	// Check if invoice already exists (prevent duplicates)
+	existingInvoice, err := h.invoiceRepo.GetByStripeID(invoiceData.InvoiceID)
+	if err != nil {
+		log.Printf("ERROR: Failed to check existing invoice: %v", err)
+	}
+	if existingInvoice != nil {
+		log.Printf("Invoice %s already exists, skipping creation", invoiceData.InvoiceID)
+		return
+	}
+
+	// Create invoice record
+	subscriptionID := subscription.ID
+	invoiceNumber := invoiceData.InvoiceNumber
+	if invoiceNumber == "" {
+		invoiceNumber = h.invoiceRepo.GenerateNextInvoiceNumber(subscription.TenantID)
+	}
+
+	var periodStart, periodEnd *time.Time
+	if invoiceData.PeriodStart > 0 {
+		t := time.Unix(invoiceData.PeriodStart, 0)
+		periodStart = &t
+	}
+	if invoiceData.PeriodEnd > 0 {
+		t := time.Unix(invoiceData.PeriodEnd, 0)
+		periodEnd = &t
+	}
+
+	now := time.Now()
+	invoice := &models.TenantInvoice{
+		TenantID:        subscription.TenantID,
+		SubscriptionID:  &subscriptionID,
+		StripeInvoiceID: &invoiceData.InvoiceID,
+		InvoiceNumber:   invoiceNumber,
+		Status:          models.InvoiceStatusPaid,
+		AmountCents:     int(invoiceData.AmountPaid),
+		Currency:        invoiceData.Currency,
+		PeriodStart:     periodStart,
+		PeriodEnd:       periodEnd,
+		Description:     "Pro Abonnement",
+		PaidAt:          &now,
+	}
+
+	// Set PDF URL if available
+	if invoiceData.InvoicePDF != "" {
+		invoice.PDFURL = &invoiceData.InvoicePDF
+	}
+
+	if err := h.invoiceRepo.Create(invoice); err != nil {
+		log.Printf("ERROR: Failed to create invoice record: %v", err)
+		return
+	}
+
+	log.Printf("Invoice %s created for tenant %d (amount: %d %s)", invoiceData.InvoiceID, subscription.TenantID, invoiceData.AmountPaid, invoiceData.Currency)
 }
 
 // handleInvoicePaymentFailed processes invoice.payment_failed events
@@ -657,4 +927,124 @@ func (h *BillingHandler) TestUpgrade(w http.ResponseWriter, r *http.Request) {
 		"subscription": subscription,
 		"test_mode":    true,
 	})
+}
+
+// GetInvoices returns all invoices for the tenant
+// GET /api/billing/invoices
+func (h *BillingHandler) GetInvoices(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+	if !ok || tenantID == 0 {
+		respondError(w, http.StatusUnauthorized, "Nicht autorisiert")
+		return
+	}
+
+	invoices, err := h.invoiceRepo.GetByTenant(tenantID)
+	if err != nil {
+		log.Printf("ERROR: Failed to get invoices for tenant %d: %v", tenantID, err)
+		respondError(w, http.StatusInternalServerError, "Fehler beim Laden der Rechnungen")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"invoices": invoices,
+		"count":    len(invoices),
+	})
+}
+
+// GetInvoice returns a single invoice by ID
+// GET /api/billing/invoices/{id}
+func (h *BillingHandler) GetInvoice(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+	if !ok || tenantID == 0 {
+		respondError(w, http.StatusUnauthorized, "Nicht autorisiert")
+		return
+	}
+
+	// Get invoice ID from URL using gorilla/mux
+	vars := mux.Vars(r)
+	invoiceID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Ungültige Rechnungs-ID")
+		return
+	}
+
+	invoice, err := h.invoiceRepo.GetByID(invoiceID)
+	if err != nil {
+		log.Printf("ERROR: Failed to get invoice %d: %v", invoiceID, err)
+		respondError(w, http.StatusInternalServerError, "Fehler beim Laden der Rechnung")
+		return
+	}
+
+	if invoice == nil {
+		respondError(w, http.StatusNotFound, "Rechnung nicht gefunden")
+		return
+	}
+
+	// Security: Verify invoice belongs to this tenant
+	if invoice.TenantID != tenantID {
+		respondError(w, http.StatusForbidden, "Zugriff verweigert")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, invoice)
+}
+
+// DownloadInvoicePDF downloads an invoice PDF
+// GET /api/billing/invoices/{id}/pdf
+func (h *BillingHandler) DownloadInvoicePDF(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+	if !ok || tenantID == 0 {
+		respondError(w, http.StatusUnauthorized, "Nicht autorisiert")
+		return
+	}
+
+	// Get invoice ID from URL using gorilla/mux
+	vars := mux.Vars(r)
+	invoiceID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Ungültige Rechnungs-ID")
+		return
+	}
+
+	invoice, err := h.invoiceRepo.GetByID(invoiceID)
+	if err != nil {
+		log.Printf("ERROR: Failed to get invoice %d: %v", invoiceID, err)
+		respondError(w, http.StatusInternalServerError, "Fehler beim Laden der Rechnung")
+		return
+	}
+
+	if invoice == nil {
+		respondError(w, http.StatusNotFound, "Rechnung nicht gefunden")
+		return
+	}
+
+	// Security: Verify invoice belongs to this tenant
+	if invoice.TenantID != tenantID {
+		respondError(w, http.StatusForbidden, "Zugriff verweigert")
+		return
+	}
+
+	// Check if PDF is available
+	if invoice.PDFURL == nil && invoice.PDFPath == nil {
+		respondError(w, http.StatusNotFound, "PDF nicht verfügbar")
+		return
+	}
+
+	// If we have a Stripe PDF URL, redirect to it
+	if invoice.PDFURL != nil && *invoice.PDFURL != "" {
+		http.Redirect(w, r, *invoice.PDFURL, http.StatusFound)
+		return
+	}
+
+	// If we have a local PDF path (e.g., S3 key), we would generate a pre-signed URL
+	// For now, since Stripe provides the PDF URL directly, local storage is not yet implemented
+	// This would be extended when S3 integration for invoice storage is added
+	if invoice.PDFPath != nil && *invoice.PDFPath != "" {
+		// TODO: Implement S3 pre-signed URL generation when local storage is needed
+		// For now, return an error indicating PDF is being processed
+		respondError(w, http.StatusServiceUnavailable, "PDF wird verarbeitet. Bitte versuchen Sie es später erneut.")
+		return
+	}
+
+	respondError(w, http.StatusNotFound, "PDF nicht gefunden")
 }

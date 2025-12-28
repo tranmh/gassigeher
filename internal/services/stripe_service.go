@@ -63,8 +63,22 @@ func (s *StripeService) GetPublishableKey() string {
 	return s.publishableKey
 }
 
+// CheckoutOptions contains optional parameters for checkout session creation
+type CheckoutOptions struct {
+	TrialDays      int    // Number of trial days (for free months)
+	PromoCode      string // Promo code applied
+	ReferralCode   string // Referral code applied
+	PromoCodeID    int    // Internal promo code ID
+	ReferralCodeID int    // Internal referral code ID
+}
+
 // CreateCheckoutSession creates a Stripe checkout session for subscription
 func (s *StripeService) CreateCheckoutSession(tenantID int, planSlug, billingCycle, customerEmail string) (*stripe.CheckoutSession, error) {
+	return s.CreateCheckoutSessionWithOptions(tenantID, planSlug, billingCycle, customerEmail, nil)
+}
+
+// CreateCheckoutSessionWithOptions creates a Stripe checkout session with additional options
+func (s *StripeService) CreateCheckoutSessionWithOptions(tenantID int, planSlug, billingCycle, customerEmail string, options *CheckoutOptions) (*stripe.CheckoutSession, error) {
 	if s.secretKey == "" {
 		return nil, errors.New("stripe API key not configured")
 	}
@@ -80,6 +94,25 @@ func (s *StripeService) CreateCheckoutSession(tenantID int, planSlug, billingCyc
 		return nil, err
 	}
 
+	// Build metadata with codes
+	metadata := map[string]string{
+		"tenant_id": fmt.Sprintf("%d", tenantID),
+	}
+	if options != nil {
+		if options.PromoCode != "" {
+			metadata["promo_code"] = options.PromoCode
+		}
+		if options.ReferralCode != "" {
+			metadata["referral_code"] = options.ReferralCode
+		}
+		if options.PromoCodeID > 0 {
+			metadata["promo_code_id"] = fmt.Sprintf("%d", options.PromoCodeID)
+		}
+		if options.ReferralCodeID > 0 {
+			metadata["referral_code_id"] = fmt.Sprintf("%d", options.ReferralCodeID)
+		}
+	}
+
 	params := &stripe.CheckoutSessionParams{
 		Mode: stripe.String(string(stripe.CheckoutSessionModeSubscription)),
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
@@ -88,17 +121,18 @@ func (s *StripeService) CreateCheckoutSession(tenantID int, planSlug, billingCyc
 				Quantity: stripe.Int64(1),
 			},
 		},
-		SuccessURL: stripe.String(fmt.Sprintf("%s/billing?session_id={CHECKOUT_SESSION_ID}&success=true", s.baseURL)),
-		CancelURL:  stripe.String(fmt.Sprintf("%s/billing?cancelled=true", s.baseURL)),
+		SuccessURL:    stripe.String(fmt.Sprintf("%s/billing?session_id={CHECKOUT_SESSION_ID}&success=true", s.baseURL)),
+		CancelURL:     stripe.String(fmt.Sprintf("%s/billing?cancelled=true", s.baseURL)),
 		CustomerEmail: stripe.String(customerEmail),
 		SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{
-			Metadata: map[string]string{
-				"tenant_id": fmt.Sprintf("%d", tenantID),
-			},
+			Metadata: metadata,
 		},
-		Metadata: map[string]string{
-			"tenant_id": fmt.Sprintf("%d", tenantID),
-		},
+		Metadata: metadata,
+	}
+
+	// Add trial period if specified (for free months)
+	if options != nil && options.TrialDays > 0 {
+		params.SubscriptionData.TrialPeriodDays = stripe.Int64(int64(options.TrialDays))
 	}
 
 	result, err := checkoutsession.New(params)
@@ -180,6 +214,10 @@ type CheckoutSessionData struct {
 	SubscriptionID string
 	TenantID       int
 	CustomerEmail  string
+	PromoCode      string
+	ReferralCode   string
+	PromoCodeID    int
+	ReferralCodeID int
 }
 
 // ParseCheckoutSessionEvent extracts data from a checkout.session.completed event
@@ -221,17 +259,55 @@ func (s *StripeService) ParseCheckoutSessionEvent(event *stripe.Event) (*Checkou
 		data.TenantID = tenantID
 	}
 
+	// Extract promo code from metadata
+	if promoCode, ok := session.Metadata["promo_code"]; ok {
+		data.PromoCode = promoCode
+	}
+
+	// Extract referral code from metadata
+	if referralCode, ok := session.Metadata["referral_code"]; ok {
+		data.ReferralCode = referralCode
+	}
+
+	// Extract promo code ID from metadata
+	if promoCodeIDStr, ok := session.Metadata["promo_code_id"]; ok {
+		var promoCodeID int
+		fmt.Sscanf(promoCodeIDStr, "%d", &promoCodeID)
+		data.PromoCodeID = promoCodeID
+	}
+
+	// Extract referral code ID from metadata
+	if referralCodeIDStr, ok := session.Metadata["referral_code_id"]; ok {
+		var referralCodeID int
+		fmt.Sscanf(referralCodeIDStr, "%d", &referralCodeID)
+		data.ReferralCodeID = referralCodeID
+	}
+
 	return data, nil
 }
 
 // SubscriptionEventData represents data from subscription events
 type SubscriptionEventData struct {
-	SubscriptionID string
-	CustomerID     string
-	Status         string
-	PlanID         string
+	SubscriptionID     string
+	CustomerID         string
+	Status             string
+	PlanID             string
 	CurrentPeriodStart int64
 	CurrentPeriodEnd   int64
+}
+
+// InvoiceEventData represents data from invoice events
+type InvoiceEventData struct {
+	InvoiceID          string
+	SubscriptionID     string
+	CustomerID         string
+	AmountPaid         int64  // in cents
+	Currency           string
+	Status             string
+	InvoicePDF         string // URL to invoice PDF
+	PeriodStart        int64
+	PeriodEnd          int64
+	InvoiceNumber      string
 }
 
 // ParseSubscriptionEvent extracts data from a subscription event
@@ -253,6 +329,38 @@ func (s *StripeService) ParseSubscriptionEvent(event *stripe.Event) (*Subscripti
 	// Get plan ID from the first item
 	if len(sub.Items.Data) > 0 {
 		data.PlanID = sub.Items.Data[0].Price.ID
+	}
+
+	return data, nil
+}
+
+// ParseInvoiceEvent extracts data from an invoice event
+func (s *StripeService) ParseInvoiceEvent(event *stripe.Event) (*InvoiceEventData, error) {
+	var inv stripe.Invoice
+	err := json.Unmarshal(event.Data.Raw, &inv)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse invoice event: %w", err)
+	}
+
+	data := &InvoiceEventData{
+		InvoiceID:     inv.ID,
+		AmountPaid:    inv.AmountPaid,
+		Currency:      string(inv.Currency),
+		Status:        string(inv.Status),
+		InvoicePDF:    inv.InvoicePDF,
+		PeriodStart:   inv.PeriodStart,
+		PeriodEnd:     inv.PeriodEnd,
+		InvoiceNumber: inv.Number,
+	}
+
+	// Safely extract Subscription ID
+	if inv.Subscription != nil {
+		data.SubscriptionID = inv.Subscription.ID
+	}
+
+	// Safely extract Customer ID
+	if inv.Customer != nil {
+		data.CustomerID = inv.Customer.ID
 	}
 
 	return data, nil

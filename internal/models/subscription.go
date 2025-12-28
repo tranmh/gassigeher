@@ -54,9 +54,25 @@ type TenantSubscription struct {
 	CreatedAt            time.Time  `json:"created_at"`
 	UpdatedAt            time.Time  `json:"updated_at"`
 
+	// Free months tracking (from promo codes, referrals, or admin grants)
+	FreeMonthsRemaining   int        `json:"free_months_remaining"`
+	FreeMonthsGranted     int        `json:"free_months_granted"`
+	FreeMonthsSource      *string    `json:"free_months_source,omitempty"` // promo, referral, admin_grant, trial
+	AppliedPromoCodeID    *int       `json:"applied_promo_code_id,omitempty"`
+	AppliedReferralCodeID *int       `json:"applied_referral_code_id,omitempty"`
+	TrialEndsAt           *time.Time `json:"trial_ends_at,omitempty"`
+
 	// Related data (loaded separately)
 	Plan *PricingPlan `json:"plan,omitempty"`
 }
+
+// Free months source constants
+const (
+	FreeMonthsSourcePromo     = "promo"
+	FreeMonthsSourceReferral  = "referral"
+	FreeMonthsSourceAdminGrant = "admin_grant"
+	FreeMonthsSourceTrial     = "trial"
+)
 
 // CreateSubscriptionRequest represents a request to create/upgrade a subscription
 type CreateSubscriptionRequest struct {
@@ -115,6 +131,54 @@ func (s *TenantSubscription) GetDogLimit() int {
 		return DefaultFreeTierDogLimit
 	}
 	return s.Plan.MaxDogs
+}
+
+// HasFreeMonths returns true if there are free months remaining
+func (s *TenantSubscription) HasFreeMonths() bool {
+	return s.FreeMonthsRemaining > 0
+}
+
+// IsInTrial returns true if the subscription is in a trial period
+func (s *TenantSubscription) IsInTrial() bool {
+	if s.TrialEndsAt == nil {
+		return false
+	}
+	return time.Now().Before(*s.TrialEndsAt)
+}
+
+// GetDaysUntilTrialEnds returns the number of days until trial ends (0 if not in trial)
+func (s *TenantSubscription) GetDaysUntilTrialEnds() int {
+	if s.TrialEndsAt == nil {
+		return 0
+	}
+	if time.Now().After(*s.TrialEndsAt) {
+		return 0
+	}
+	duration := time.Until(*s.TrialEndsAt)
+	days := int(duration.Hours() / 24)
+	if days < 0 {
+		return 0
+	}
+	return days
+}
+
+// GetFreeMonthsSourceLabel returns a German label for the free months source
+func (s *TenantSubscription) GetFreeMonthsSourceLabel() string {
+	if s.FreeMonthsSource == nil {
+		return ""
+	}
+	switch *s.FreeMonthsSource {
+	case FreeMonthsSourcePromo:
+		return "Gutscheincode"
+	case FreeMonthsSourceReferral:
+		return "Empfehlungscode"
+	case FreeMonthsSourceAdminGrant:
+		return "Admin-Gutschrift"
+	case FreeMonthsSourceTrial:
+		return "Testphase"
+	default:
+		return *s.FreeMonthsSource
+	}
 }
 
 // Validate validates the CreateSubscriptionRequest

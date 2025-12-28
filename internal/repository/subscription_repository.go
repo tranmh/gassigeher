@@ -122,6 +122,8 @@ func (r *SubscriptionRepository) GetSubscriptionByTenant(tenantID int) (*models.
 		       ts.current_period_start, ts.current_period_end,
 		       ts.stripe_customer_id, ts.stripe_subscription_id,
 		       ts.cancelled_at, ts.created_at, ts.updated_at,
+		       ts.free_months_remaining, ts.free_months_granted, ts.free_months_source,
+		       ts.applied_promo_code_id, ts.applied_referral_code_id, ts.trial_ends_at,
 		       pp.id, pp.name, pp.slug, pp.max_dogs, pp.price_monthly, pp.price_yearly, pp.is_active, pp.created_at
 		FROM tenant_subscriptions ts
 		JOIN pricing_plans pp ON ts.plan_id = pp.id
@@ -132,7 +134,10 @@ func (r *SubscriptionRepository) GetSubscriptionByTenant(tenantID int) (*models.
 		Plan: &models.PricingPlan{},
 	}
 	var billingCycle, stripeCustomerID, stripeSubscriptionID sql.NullString
-	var currentPeriodStart, currentPeriodEnd, cancelledAt sql.NullTime
+	var currentPeriodStart, currentPeriodEnd, cancelledAt, trialEndsAt sql.NullTime
+	var freeMonthsRemaining, freeMonthsGranted sql.NullInt64
+	var freeMonthsSource sql.NullString
+	var appliedPromoCodeID, appliedReferralCodeID sql.NullInt64
 
 	err := r.db.QueryRow(query, tenantID).Scan(
 		&sub.ID,
@@ -147,6 +152,12 @@ func (r *SubscriptionRepository) GetSubscriptionByTenant(tenantID int) (*models.
 		&cancelledAt,
 		&sub.CreatedAt,
 		&sub.UpdatedAt,
+		&freeMonthsRemaining,
+		&freeMonthsGranted,
+		&freeMonthsSource,
+		&appliedPromoCodeID,
+		&appliedReferralCodeID,
+		&trialEndsAt,
 		&sub.Plan.ID,
 		&sub.Plan.Name,
 		&sub.Plan.Slug,
@@ -182,6 +193,27 @@ func (r *SubscriptionRepository) GetSubscriptionByTenant(tenantID int) (*models.
 	}
 	if cancelledAt.Valid {
 		sub.CancelledAt = &cancelledAt.Time
+	}
+	// Free months fields
+	if freeMonthsRemaining.Valid {
+		sub.FreeMonthsRemaining = int(freeMonthsRemaining.Int64)
+	}
+	if freeMonthsGranted.Valid {
+		sub.FreeMonthsGranted = int(freeMonthsGranted.Int64)
+	}
+	if freeMonthsSource.Valid {
+		sub.FreeMonthsSource = &freeMonthsSource.String
+	}
+	if appliedPromoCodeID.Valid {
+		id := int(appliedPromoCodeID.Int64)
+		sub.AppliedPromoCodeID = &id
+	}
+	if appliedReferralCodeID.Valid {
+		id := int(appliedReferralCodeID.Int64)
+		sub.AppliedReferralCodeID = &id
+	}
+	if trialEndsAt.Valid {
+		sub.TrialEndsAt = &trialEndsAt.Time
 	}
 
 	return sub, nil
@@ -240,6 +272,12 @@ func (r *SubscriptionRepository) UpdateSubscription(sub *models.TenantSubscripti
 			stripe_customer_id = ?,
 			stripe_subscription_id = ?,
 			cancelled_at = ?,
+			free_months_remaining = ?,
+			free_months_granted = ?,
+			free_months_source = ?,
+			applied_promo_code_id = ?,
+			applied_referral_code_id = ?,
+			trial_ends_at = ?,
 			updated_at = ?
 		WHERE id = ?
 	`
@@ -262,6 +300,12 @@ func (r *SubscriptionRepository) UpdateSubscription(sub *models.TenantSubscripti
 		sub.StripeCustomerID,
 		sub.StripeSubscriptionID,
 		sub.CancelledAt,
+		sub.FreeMonthsRemaining,
+		sub.FreeMonthsGranted,
+		sub.FreeMonthsSource,
+		sub.AppliedPromoCodeID,
+		sub.AppliedReferralCodeID,
+		sub.TrialEndsAt,
 		now,
 		sub.ID,
 	)
@@ -392,4 +436,33 @@ func (r *SubscriptionRepository) GetSubscriptionByStripeID(stripeSubscriptionID 
 	}
 
 	return sub, nil
+}
+
+// IncrementFreeMonths atomically adds free months to a tenant's subscription
+// This prevents race conditions when multiple goroutines update the same subscription
+func (r *SubscriptionRepository) IncrementFreeMonths(tenantID int, months int, source string) error {
+	query := `
+		UPDATE tenant_subscriptions
+		SET free_months_remaining = COALESCE(free_months_remaining, 0) + ?,
+		    free_months_granted = COALESCE(free_months_granted, 0) + ?,
+		    free_months_source = ?,
+		    updated_at = ?
+		WHERE tenant_id = ?
+	`
+
+	result, err := r.db.Exec(query, months, months, source, FormatTimestamp(time.Now()), tenantID)
+	if err != nil {
+		return fmt.Errorf("failed to increment free months: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no subscription found for tenant %d", tenantID)
+	}
+
+	return nil
 }
