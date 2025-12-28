@@ -24,12 +24,13 @@ Gassigeher supports two deployment modes:
 | Document | Size | Audience | Purpose |
 |----------|------|----------|---------|
 | **[README.md](../README.md)** | 900+ lines | Everyone | Start here - Both modes, setup, API list |
+| **[FEATURES.md](FEATURES.md)** | 1,000+ lines | Everyone | Complete feature reference (all features) |
 | **[ImplementationPlan.md](ImplementationPlan.md)** | 1,500+ lines | Tech Leads | Simple-Mode architecture, all 10 phases |
 | **[SaaS_Implementation_Plan.md](SaaS_Implementation_Plan.md)** | 2,400+ lines | Tech Leads | SaaS architecture, all 12 phases |
 | **[API.md](API.md)** | 800+ lines | Developers | REST API reference (85+ endpoints) |
 | **[DEPLOYMENT.md](DEPLOYMENT.md)** | 800+ lines | DevOps | Production deployment (both modes) |
 | **[USER_GUIDE.md](USER_GUIDE.md)** | 350+ lines | End Users | How to use the app (German) |
-| **[ADMIN_GUIDE.md](ADMIN_GUIDE.md)** | 500+ lines | Admins | Operations & management |
+| **[ADMIN_GUIDE.md](ADMIN_GUIDE.md)** | 900+ lines | Admins | Operations & management |
 | **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** | 700+ lines | Stakeholders | Executive summary |
 | **[CLAUDE.md](../CLAUDE.md)** | 1,200+ lines | AI/Devs | Development patterns |
 
@@ -42,7 +43,7 @@ Gassigeher supports two deployment modes:
 ### 👤 I'm a User
 **Start**: [USER_GUIDE.md](USER_GUIDE.md)
 - Learn how to register and book walks
-- Understand the experience level system
+- Understand the color-based access system
 - Manage your profile and bookings
 
 **Then**: [Terms](/frontend/terms.html) | [Privacy](/frontend/privacy.html)
@@ -172,20 +173,22 @@ Gassigeher supports two deployment modes:
 
 ### User Features
 **Documented in**: [USER_GUIDE.md](USER_GUIDE.md)
-- Registration, login, email verification
-- Dog browsing with filters
-- Booking system
+- Registration with registration password
+- Dog browsing with filters and color-based access
+- Booking system with time slot selection
 - Profile management and photos
-- Experience level promotions
+- Color request system
 - Account deletion (GDPR)
 
 ### Admin Features
 **Documented in**: [ADMIN_GUIDE.md](ADMIN_GUIDE.md)
-- Admin dashboard with 8 metrics
-- Dog management (CRUD, photos, availability)
-- Booking management (view, cancel, move)
-- User management (activate/deactivate)
-- Experience level approvals
+- Admin dashboard with live statistics
+- Dog management (CRUD, photos, availability, featured)
+- Booking management (view, cancel, move, approve)
+- User management (activate/deactivate, colors)
+- Color request approvals
+- Booking time rules configuration
+- Holiday management
 - Reactivation request handling
 - System settings configuration
 
@@ -193,10 +196,11 @@ Gassigeher supports two deployment modes:
 **Documented in**: [CLAUDE.md](../CLAUDE.md) + [ImplementationPlan.md](ImplementationPlan.md)
 - JWT authentication
 - GDPR anonymization
-- Email system (17 types)
-- Cron jobs (3 automated tasks)
+- Email system (18+ types)
+- Cron jobs (booking reminders, auto-completion, auto-deactivation)
+- German holiday API integration
 - Security headers
-- Test suite
+- Test suite (305+ tests)
 
 ---
 
@@ -235,22 +239,26 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for complete guide.
 
 ### Simple-Mode
 - All 10 implementation phases finished
-- 71 API endpoints implemented
-- 26 pages (15 user + 11 admin)
-- 18 email notification types
+- 85+ API endpoints implemented
+- 26+ pages (user + admin)
+- 18+ email notification types
 - SQLite/MySQL/PostgreSQL support
+- Color-based access control
+- Configurable booking time rules
+- German holiday integration
 - Complete test suite (305+ tests)
 - Production deployment package ready
 
 ### SaaS-Mode
 - All 12 implementation phases finished
 - 85+ API endpoints implemented
-- 30+ pages (user + admin + landing + central)
+- 46+ pages (user + admin + landing + central)
 - 20+ email notification types
 - PostgreSQL with Row-Level Security
-- S3 object storage
-- Stripe billing integration
-- 10 theme presets
+- S3 object storage (Hetzner)
+- Stripe billing integration with promo codes
+- 10 theme presets + custom colors
+- Per-tenant customization
 - Docker + Caddy deployment
 
 **Next Steps**:
@@ -259,4 +267,4 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for complete guide.
 
 ---
 
-**Last Updated**: SaaS-Mode complete - All documentation finalized
+**Last Updated**: December 2025 - Color system, booking times, holidays added

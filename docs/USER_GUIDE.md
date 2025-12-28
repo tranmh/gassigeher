@@ -2,7 +2,7 @@
 
 **Willkommen bei Gassigeher! Diese Anleitung hilft Ihnen, die Plattform optimal zu nutzen.**
 
-**📱 Funktionen**: Hunde buchen | Profil verwalten | Level aufsteigen | Notizen hinzufügen
+**📱 Funktionen**: Hunde buchen | Profil verwalten | Farben beantragen | Berichte erstellen
 **🌐 Sprache**: Deutsch | **📱 Geräte**: Desktop, Tablet, Smartphone
 
 > **Für Administratoren**: Siehe [ADMIN_GUIDE.md](ADMIN_GUIDE.md)
@@ -17,12 +17,15 @@
 1. Besuchen Sie die Startseite
 2. Klicken Sie auf "Registrieren"
 3. Geben Sie Ihre Daten ein:
-   - Name
+   - Vorname und Nachname
    - E-Mail-Adresse
    - Telefonnummer
    - Passwort (mindestens 8 Zeichen, Groß-/Kleinbuchstaben, Zahl)
-4. Akzeptieren Sie die AGB
+   - **Registrierungspasswort** (erhalten Sie vom Tierheim)
+4. Akzeptieren Sie die AGB und Datenschutzerklärung
 5. Klicken Sie auf "Konto erstellen"
+
+> **Hinweis**: Das Registrierungspasswort erhalten Sie direkt vom Tierheim. Es schützt vor unbefugten Registrierungen.
 
 ### 2. E-Mail-Verifizierung
 
@@ -53,28 +56,27 @@ Nutzen Sie die Filteroptionen:
 - **Suche**: Name oder Rasse eingeben
 - **Rasse**: Spezifische Rasse auswählen
 - **Größe**: Klein, Mittel oder Groß
-- **Kategorie**: Grün, Blau oder Orange (je nach Ihrem Level)
+- **Farbe**: Filtern Sie nach Hundefarbe (je nach Ihren zugewiesenen Farben)
+- **Nur meine Farben**: Zeigt nur Hunde an, die Sie buchen können
 
-### Erfahrungslevel-System
+### Farben-System
 
-Hunde sind in drei Kategorien eingeteilt:
+Hunde und Nutzer sind durch Farben organisiert. Jedes Tierheim kann eigene Farben definieren.
 
-🟢 **Grün (Alle Anfänger)**
-- Für alle Nutzer verfügbar
-- Anfängerfreundliche Hunde
-- Ihr Startlevel bei Registrierung
+**So funktioniert es:**
+- Jedem Hund ist eine Farbe zugewiesen
+- Nutzer können mehrere Farben haben
+- Sie können nur Hunde buchen, deren Farbe Sie besitzen
+- Neue Nutzer starten mit der Standardfarbe
 
-🔵 **Blau (Erfahrene Gassigeher)**
-- Erfordert Genehmigung durch Administrator
-- Für Nutzer mit Erfahrung
-- Beantragen Sie in Ihrem Profil
+**Beispiel-Farben:**
+- 🟢 **Grün**: Standardfarbe für alle neuen Nutzer
+- 🔵 **Blau**: Zusätzliche Farbe nach Genehmigung
+- 🟠 **Orange**: Weitere Farbe nach Genehmigung
 
-🟠 **Orange (Nur Erfahrene)**
-- Erfordert Genehmigung durch Administrator
-- Für sehr erfahrene Gassigeher
-- Beantragen Sie nach Erhalt des blauen Levels
+> **Hinweis**: Die Farbnamen und ihre Bedeutung werden von Ihrem Tierheim festgelegt und können variieren.
 
-**Hinweis**: Hunde außerhalb Ihres Levels werden mit einem Schloss-Symbol 🔒 angezeigt.
+**Hunde ohne passende Farbe** werden mit einem Schloss-Symbol 🔒 angezeigt und können nicht gebucht werden.
 
 ---
 
@@ -92,12 +94,13 @@ Sie erhalten eine Bestätigungs-E-Mail mit allen Details.
 
 ### Buchungsregeln
 
-- ✅ Bis zu 14 Tage im Voraus buchen
-- ✅ Nur verfügbare Hunde Ihres Erfahrungslevels
+- ✅ Bis zu 14 Tage im Voraus buchen (kann vom Tierheim angepasst werden)
+- ✅ Nur Hunde mit Ihren zugewiesenen Farben
 - ✅ Mehrere Hunde zur gleichen Zeit möglich
-- ✅ Morgen- und Abendspaziergang am selben Tag möglich
-- ❌ Keine Buchungen an gesperrten Tagen
+- ✅ Verschiedene Zeitfenster am selben Tag möglich
+- ❌ Keine Buchungen an gesperrten Tagen oder Feiertagen
 - ❌ Keine Doppelbuchungen (Hund bereits gebucht)
+- ⚠️ Bestimmte Zeitfenster erfordern Admin-Genehmigung
 
 ---
 
@@ -171,21 +174,22 @@ Nach abgeschlossenen Spaziergängen:
 
 ---
 
-## Erfahrungslevel beantragen
+## Farben beantragen
 
-### Level-Beförderung beantragen
+### Neue Farbe beantragen
 
 1. Gehen Sie zu Ihrem Profil
-2. Finden Sie den Abschnitt "Aktuelles Level"
-3. Klicken Sie auf "Blau Level beantragen" oder "Orange Level beantragen"
-4. Bestätigen Sie Ihre Anfrage
+2. Finden Sie den Abschnitt "Meine Farben"
+3. Klicken Sie auf "Farbe beantragen"
+4. Wählen Sie die gewünschte Farbe aus der Liste
+5. Bestätigen Sie Ihre Anfrage
 
 ### Anfragenstatus prüfen
 
-In Ihrem Profil sehen Sie:
-- **Ausstehend**: Wird geprüft
-- **Genehmigt**: Level wurde erhöht
-- **Abgelehnt**: Anfrage wurde abgelehnt (mit optionaler Nachricht)
+In Ihrem Profil sehen Sie Ihre Farbanfragen mit Status:
+- **Ausstehend**: Wird vom Administrator geprüft
+- **Genehmigt**: Farbe wurde Ihrem Konto hinzugefügt
+- **Abgelehnt**: Anfrage wurde abgelehnt (mit optionaler Begründung)
 
 Sie erhalten eine E-Mail über die Entscheidung.
 
@@ -197,21 +201,23 @@ Sie erhalten E-Mails für:
 
 **Konto:**
 - E-Mail-Verifizierung
-- Willkommensnachricht
+- Willkommensnachricht (mit WhatsApp-Gruppenlink, falls aktiviert)
 - Passwort-Zurücksetzung
 
 **Buchungen:**
 - Buchungsbestätigung
-- Erinnerung (1 Stunde vorher)
+- Erinnerung (1-2 Stunden vorher)
 - Stornierungsbestätigung
+- Buchung genehmigt/abgelehnt (bei genehmigungspflichtigen Zeitfenstern)
 
-**Level:**
-- Level-Beförderung genehmigt/abgelehnt
+**Farben:**
+- Farbanfrage genehmigt/abgelehnt
 
 **Konto-Verwaltung:**
 - Konto deaktiviert
 - Konto reaktiviert
 - Konto gelöscht
+- Warnung vor automatischer Deaktivierung (bei langer Inaktivität)
 
 ---
 
@@ -262,7 +268,7 @@ Falls Ihr Konto deaktiviert wurde:
 Standardmäßig 14 Tage. Der Administrator kann dies anpassen.
 
 ### Kann ich mehrere Hunde gleichzeitig buchen?
-Ja, Sie können unbegrenzt viele Hunde zur gleichen Zeit buchen.
+Ja, Sie können unbegrenzt viele Hunde zur gleichen Zeit buchen, solange Sie die passende Farbe haben.
 
 ### Was passiert, wenn ich zu spät komme?
 Bitte informieren Sie das Tierheim telefonisch. Wiederholtes Zuspätkommen kann zur Deaktivierung führen.
@@ -271,10 +277,13 @@ Bitte informieren Sie das Tierheim telefonisch. Wiederholtes Zuspätkommen kann 
 Sie müssen die Buchung stornieren und eine neue erstellen. Stornierung mindestens 12 Stunden vorher!
 
 ### Was ist, wenn ein Hund krank ist?
-Der Administrator markiert kranke Hunde als "nicht verfügbar". Sie können diese nicht buchen und erhalten eine Erklärung.
+Der Administrator markiert kranke Hunde als "nicht verfügbar". Sie können diese nicht buchen und sehen einen Hinweis zum Grund.
 
-### Wie bekomme ich ein höheres Level?
-Sammeln Sie Erfahrung mit Grün-Hunden, dann beantragen Sie in Ihrem Profil ein höheres Level. Administratoren prüfen Ihre Spaziergangshistorie.
+### Wie bekomme ich zusätzliche Farben?
+Sammeln Sie Erfahrung mit Hunden Ihrer aktuellen Farbe, dann beantragen Sie in Ihrem Profil eine neue Farbe. Administratoren prüfen Ihre Spaziergangshistorie.
+
+### Was bedeuten die verschiedenen Farben?
+Die Bedeutung der Farben wird von Ihrem Tierheim festgelegt. Typischerweise zeigen sie verschiedene Schwierigkeitsgrade oder Erfahrungsanforderungen an.
 
 ### Mein Konto wurde deaktiviert - warum?
 Mögliche Gründe:
@@ -282,6 +291,9 @@ Mögliche Gründe:
 - Administrator-Entscheidung (mit Begründung)
 
 Sie können eine Reaktivierung beantragen.
+
+### Warum brauche ich ein Registrierungspasswort?
+Das Registrierungspasswort schützt das System vor unbefugten Anmeldungen. Sie erhalten es direkt vom Tierheim.
 
 ---
 

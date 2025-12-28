@@ -12,6 +12,7 @@ Gassigeher is a **complete production-ready** dog walking booking system for ani
 **Status**: ✅ Production ready | 85+ API endpoints | 30+ pages | 18+ email types | 350+ tests | GDPR-compliant
 
 > **Essential Reading**:
+> - [FEATURES.md](docs/FEATURES.md) - Complete feature reference (all features documented)
 > - [ImplementationPlan.md](docs/ImplementationPlan.md) - Simple-Mode architecture, all 10 phases
 > - [SaaS_Implementation_Plan.md](docs/SaaS_Implementation_Plan.md) - SaaS architecture, all 12 phases
 > - [API.md](docs/API.md) - All 85+ endpoints with request/response examples
@@ -102,24 +103,39 @@ Server starts on `http://localhost:8080` (configurable via `PORT` environment va
 
 ### Testing
 
+**Three test layers:**
+
+**1. Go Backend Tests:**
 ```bash
-# Run all tests
-go test ./... -v
-
-# Run specific package tests
-go test ./internal/services/... -v
-go test ./internal/models/... -v
-go test ./internal/repository/... -v
-
-# Run single test
-go test ./internal/services/... -run TestAuthService_HashPassword -v
-
-# Coverage report
-go test ./... -coverprofile=coverage.out
-go tool cover -html=coverage.out
+go test ./... -v                                    # All backend tests
+go test ./internal/services/... -v                  # Service tests only
+go test ./internal/services/... -run TestAuthService_HashPassword -v  # Single test
+go test ./... -coverprofile=coverage.out            # With coverage
+go tool cover -html=coverage.out                    # View coverage report
 ```
 
-**Current Coverage:** 305+ tests passing across all packages (handlers, models, repository, services, middleware, database)
+**2. Jest Frontend Tests:**
+```bash
+npm test                        # Run frontend unit tests
+npm run test:watch              # Watch mode for development
+npm run test:coverage           # With coverage report
+```
+
+**3. Playwright E2E Tests:**
+```bash
+cd e2e-tests
+npm run test                    # Headless E2E tests
+npm run test:headed             # With browser visible
+npm run test:debug              # Debug mode
+npm run test:ui                 # Interactive UI mode
+```
+
+**Comprehensive Test Suite:**
+```bash
+./test-overview.sh              # Run all tests with reporting
+```
+
+**Current Coverage:** 305+ Go tests, frontend Jest tests, Playwright E2E tests across all packages
 
 ## Architecture Overview
 
@@ -209,11 +225,11 @@ Response (JSON)
 - Walk history preserved but shows "Deleted User"
 - Legal basis: Legitimate interest (dog care records)
 
-**Experience Level Enforcement:**
-- Helper: `repository.CanUserAccessDog(userLevel, dogCategory)`
-- Levels: green (1) → orange (2) → blue (3) (blue is highest)
-- Users can only book dogs at or below their level
-- Admins/Super-Admins bypass level check and can book any dog
+**Color-Based Access Control:**
+- Users have assigned colors, dogs have required colors
+- Users can only book dogs whose color they possess
+- Colors are customizable per tenant (not fixed to green/blue/orange)
+- Admins/Super-Admins bypass color check and can book any dog
 - Frontend shows locked dogs with 🔒 icon
 
 ## Critical Implementation Details
@@ -517,7 +533,7 @@ Critical variables in `.env`:
 - Automatic seed data generation
 - Super Admin created automatically
 - Credentials in `SUPER_ADMIN_CREDENTIALS.txt` and console
-- 3 test users created (green, blue, orange levels)
+- 3 test users created (with different color assignments)
 - 5 test dogs created
 - 3 test bookings created
 
@@ -781,11 +797,13 @@ See **[Database_Selection_Guide.md](docs/Database_Selection_Guide.md)** for deta
 ## Database Schema Key Points
 
 ### Core Tables (11 total - Both Modes)
-- `users` - User accounts with first_name, last_name, experience level, tenant_id
+- `users` - User accounts with first_name, last_name, colors (via user_colors), tenant_id
 - `dogs` - Dog info with is_featured, external_link, photo fields
 - `bookings` - Walk bookings with approval workflow
 - `blocked_dates` - Admin-blocked dates (global or per-dog)
-- `experience_requests` - User level promotion requests
+- `color_requests` - User color assignment requests
+- `color_categories` - Customizable color definitions per tenant
+- `user_colors` - Many-to-many user-color assignments
 - `reactivation_requests` - Account reactivation requests
 - `system_settings` - Configurable system settings
 - `booking_time_rules` - Configurable time slots per day type
@@ -826,7 +844,7 @@ See **[Database_Selection_Guide.md](docs/Database_Selection_Guide.md)** for deta
 
 **Protected pages**: dogs.html, dashboard.html, profile.html
 
-**Admin pages** (10 pages): admin-dashboard.html, admin-dogs.html, admin-bookings.html, admin-blocked-dates.html, admin-experience-requests.html, admin-users.html, admin-reactivation-requests.html, admin-settings.html, admin-holidays.html, admin-booking-times.html
+**Admin pages** (10+ pages): admin-dashboard.html, admin-dogs.html, admin-bookings.html, admin-blocked-dates.html, admin-color-requests.html, admin-users.html, admin-reactivation-requests.html, admin-settings.html, admin-holidays.html, admin-booking-times.html, admin-colors.html
 
 **SaaS-Mode Landing Pages** (`internal/static/landing/`):
 - index.html - Marketing landing page
@@ -870,16 +888,15 @@ date < current_date OR (date = current_date AND scheduled_time < current_time)
 
 After completion, users can add notes via `PUT /bookings/:id/notes`.
 
-### Experience Level Progression
+### Color Request Workflow
 
 **Rules enforced in code:**
-- Green users can only request Orange (not Blue directly)
-- Orange users can request Blue (the highest level)
-- Cannot request already-owned level
-- Cannot have duplicate pending requests
-- Approval automatically updates user's `experience_level` field
+- Users can request any color they don't already have
+- Cannot request already-assigned color
+- Cannot have pending request for same color
+- Approval automatically adds the color to user via `user_colors` table
 
-Implementation: `internal/handlers/experience_request_handler.go` → `CreateRequest()`.
+Implementation: `internal/handlers/color_request_handler.go` → `CreateRequest()`.
 
 ### Profile Photo Handling
 
@@ -888,7 +905,7 @@ Implementation: `internal/handlers/experience_request_handler.go` → `CreateReq
 2. Save to `UPLOAD_DIR/users/` with original filename
 3. Delete old photo if exists
 4. Update user's `profile_photo` field
-5. Display via `/uploads/<filename>` route (served by nginx in production)
+5. Display via `/uploads/<filename>` route (served by Go handler or Caddy in production)
 
 **Storage**: Photos stored in filesystem, paths in database.
 
@@ -899,7 +916,7 @@ Implementation: `internal/handlers/experience_request_handler.go` → `CreateReq
 - `dogs.photo_thumbnail` - Path to thumbnail (e.g., "dogs/dog_1_thumb.jpg")
 - Both fields nullable (dogs can exist without photos)
 
-**Upload Process (Current - Without Phase 1):**
+**Upload Process:**
 1. Admin selects photo via admin-dogs.html
 2. Client-side validation (JPEG/PNG, max 10MB)
 3. Photo preview shown via FileReader API
@@ -908,14 +925,6 @@ Implementation: `internal/handlers/experience_request_handler.go` → `CreateReq
 6. Backend saves photo to `uploads/dogs/` directory
 7. Database updated with photo path
 8. Old photo deleted if exists
-
-**Upload Process (With Phase 1 - Future):**
-Same as above, but step 6 includes:
-- Automatic resizing to 800x800 max
-- JPEG compression (quality 85%)
-- Thumbnail generation (300x300)
-- Saves both full and thumbnail
-- ~85% file size reduction
 
 **Frontend Display Pattern:**
 
@@ -993,14 +1002,23 @@ Read these for context:
 
 ## Testing Philosophy
 
-Tests are in `*_test.go` files co-located with code.
+**Three-tier testing approach:**
 
-**Test structure established for:**
+**1. Go Backend Tests** (`*_test.go` files co-located with code):
 - Services: Business logic validation
 - Models: Validation method testing
 - Repositories: Database operation testing
+- Follow patterns in `internal/services/auth_service_test.go`
 
-**To add tests:** Follow existing patterns in `internal/services/auth_service_test.go` and `internal/models/booking_test.go`.
+**2. Jest Frontend Tests** (`__tests__/` directories):
+- Unit tests for JavaScript modules
+- Component logic testing
+- API client mocking
+
+**3. Playwright E2E Tests** (`e2e-tests/` directory):
+- Full user journey testing
+- Cross-browser compatibility
+- Visual regression testing
 
 ## Key Files to Understand
 
@@ -1058,16 +1076,19 @@ Defined in `frontend/assets/css/main.css` (compiled from SCSS):
 
 **Styling**: Uses SCSS/SASS for modular styling, compiled to CSS
 
-## German-Only UI
+## Multi-Language Support
 
-All user-facing text in German via `frontend/i18n/de.json` (400+ translations).
+The application supports multiple languages via the i18n system:
+- **German** (`de.json`) - Primary language, 400+ translations
+- **English** (`en.json`) - Secondary language
+
+**i18n Files Location**: `frontend/i18n/`
 
 **When adding features:**
-1. Add keys to `de.json`
+1. Add keys to both `de.json` and `en.json`
 2. Use `data-i18n` attributes in HTML
 3. Call `window.i18n.load()` in page scripts
-
-Framework supports other languages (add `en.json` for English), but currently German-only.
+4. Use `i18n.t('key.path')` for dynamic text
 
 ## Security Notes
 
@@ -1109,7 +1130,7 @@ Located in `internal/services/email_service.go` and `email_account.go`. **18 ema
 **Email types:**
 - Authentication: verification, welcome, password reset
 - Bookings: confirmation, reminder, cancellation, approval/rejection, moved
-- Experience: level approved/denied
+- Colors: color request approved/denied
 - Account: deactivated, reactivated, deletion confirmation
 - Auto-deactivation: warning and notification
 
@@ -1131,8 +1152,8 @@ All templates use inline CSS (no external stylesheets in emails).
 
 Complete production deployment package in `deploy/` folder:
 - `gassigeher.service` - systemd service file
-- `nginx.conf` - Reverse proxy config with SSL
 - `backup.sh` - Daily database backup script
+- For SaaS-Mode: Uses Caddy for wildcard SSL (see `Caddyfile`)
 
 See **DEPLOYMENT.md** for step-by-step production deployment guide.
 
@@ -1192,7 +1213,7 @@ Caddyfile                       # SaaS: Wildcard SSL reverse proxy
 - Update API.md if new endpoints
 - Test GDPR implications (data deletion)
 
-**Experience level changes:**
+**Color changes:**
 - Frontend: Update locked dog display logic
 - Backend: Validation in `CreateBooking` handler
 - Don't forget `CanUserAccessDog()` helper
@@ -1218,7 +1239,7 @@ Caddyfile                       # SaaS: Wildcard SSL reverse proxy
 - Update repository methods (Create, Update, Find*)
 - Rebuild and test
 
-This codebase follows clean architecture principles with clear separation of concerns. All 10 phases are complete and the application is production-ready.
+This codebase follows clean architecture principles with clear separation of concerns. The application is production-ready for both Simple-Mode and SaaS-Mode deployments.
 
 ---
 
@@ -1271,4 +1292,4 @@ Before making changes, read:
 
 ---
 
-**Status**: Production-ready. Simple-Mode (10 phases) + SaaS-Mode (12 phases). Fully documented. 🚀
+**Status**: Production-ready. Simple-Mode + SaaS-Mode. Fully documented.

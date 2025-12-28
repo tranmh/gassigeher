@@ -118,9 +118,10 @@ Login and receive JWT token.
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
     "id": 1,
-    "name": "Max Mustermann",
+    "first_name": "Max",
+    "last_name": "Mustermann",
     "email": "max@example.com",
-    "experience_level": "green",
+    "colors": [{"id": 1, "name": "Grün", "hex_code": "#4CAF50"}],
     "is_admin": false,
     "is_super_admin": false,
     "is_verified": true,
@@ -209,10 +210,11 @@ Get current user's profile.
 ```json
 {
   "id": 1,
-  "name": "Max Mustermann",
+  "first_name": "Max",
+  "last_name": "Mustermann",
   "email": "max@example.com",
   "phone": "+49 123 456789",
-  "experience_level": "green",
+  "colors": [{"id": 1, "name": "Grün", "hex_code": "#4CAF50"}],
   "is_verified": true,
   "is_active": true,
   "profile_photo": "users/photo.jpg",
@@ -231,7 +233,6 @@ Update user profile. Email changes trigger re-verification.
 **Request:**
 ```json
 {
-  "name": "Max M. Mustermann",
   "email": "newemail@example.com",
   "phone": "+49 987 654321"
 }
@@ -519,7 +520,7 @@ Create a new dog walk booking.
 
 **Validation:**
 - Dog must be available
-- User must have required experience level
+- User must have the required color assigned
 - No double-booking for same dog/date/walk_type
 - Date cannot be in the past
 - Date must be within booking advance limit
@@ -825,17 +826,17 @@ Delete a photo from a walk report.
 
 ---
 
-## Experience Request Endpoints
+## Color Request Endpoints
 
-### Create Experience Request
-`POST /experience-requests` 🔒 Protected
+### Create Color Request
+`POST /color-requests` 🔒 Protected
 
-Request a higher experience level.
+Request a new color assignment.
 
 **Request:**
 ```json
 {
-  "requested_level": "blue" // or "orange"
+  "color_id": 2
 }
 ```
 
@@ -844,23 +845,22 @@ Request a higher experience level.
 {
   "id": 1,
   "user_id": 1,
-  "requested_level": "blue",
+  "color_id": 2,
   "status": "pending",
   "created_at": "2025-01-16T10:00:00Z"
 }
 ```
 
 **Rules:**
-- Cannot request orange from green (must get blue first)
-- Cannot have pending request for same level
-- Cannot request already-owned level
+- Cannot have pending request for same color
+- Cannot request already-assigned color
 
 ---
 
-### Approve Experience Request
-`PUT /experience-requests/:id/approve` 🔒 Admin Only
+### Approve Color Request
+`PUT /color-requests/:id/approve` 🔒 Admin Only
 
-Approve an experience level request. Automatically updates user's level.
+Approve a color request. Automatically assigns the color to the user.
 
 **Request:**
 ```json
@@ -1075,7 +1075,7 @@ Approve a color request. Automatically adds color to user.
 **Request:**
 ```json
 {
-  "message": "Welcome to orange level!" // Optional
+  "message": "Color approved! Welcome to the team." // Optional
 }
 ```
 
@@ -1318,10 +1318,11 @@ List all users with optional filters.
 [
   {
     "id": 1,
-    "name": "Max Mustermann",
+    "first_name": "Max",
+    "last_name": "Mustermann",
     "email": "max@example.com",
     "phone": "+49 123 456789",
-    "experience_level": "green",
+    "colors": [{"id": 1, "name": "Grün", "hex_code": "#4CAF50"}],
     "is_active": true,
     "last_activity_at": "2025-01-16T14:30:00Z",
     "created_at": "2025-01-10T09:00:00Z"
@@ -1386,9 +1387,10 @@ Promote a user to admin role. Only the Super Admin can perform this action.
   "message": "User promoted to admin successfully",
   "user": {
     "id": 123,
-    "name": "Anna Schmidt",
+    "first_name": "Anna",
+    "last_name": "Schmidt",
     "email": "anna@shelter.com",
-    "experience_level": "blue",
+    "colors": [{"id": 1, "name": "Grün"}, {"id": 2, "name": "Blau"}],
     "is_admin": true,
     "is_super_admin": false,
     "is_active": true,
@@ -1419,9 +1421,10 @@ Revoke admin privileges from a user. Only the Super Admin can perform this actio
   "message": "Admin privileges revoked successfully",
   "user": {
     "id": 123,
-    "name": "Anna Schmidt",
+    "first_name": "Anna",
+    "last_name": "Schmidt",
     "email": "anna@shelter.com",
-    "experience_level": "blue",
+    "colors": [{"id": 1, "name": "Grün"}, {"id": 2, "name": "Blau"}],
     "is_admin": false,
     "is_super_admin": false,
     "is_active": true,

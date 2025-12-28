@@ -94,7 +94,7 @@ BASE_DOMAIN=gassigeher.org
 - Self-service password reset and change
 - Profile management with photo upload (first name, last name, phone, email)
 - Email re-verification on email change
-- Experience level system (Green → Orange → Blue)
+- Color-based access system (customizable per tenant)
 - Dog browsing with filters and search
 - **Featured dogs** on homepage with random selection
 - **External dog links** to shelter website for more information
@@ -105,7 +105,7 @@ BASE_DOMAIN=gassigeher.org
 - Add notes to completed walks
 - Cancel bookings with notice period
 - **Booking reminders** - Email notifications 1-2 hours before walks
-- Request experience level promotions
+- Request additional color assignments
 - GDPR-compliant account deletion
 - **WhatsApp group integration** - Easy onboarding to shelter's WhatsApp community
 - German UI with mobile-first responsive design
@@ -120,7 +120,7 @@ BASE_DOMAIN=gassigeher.org
 - **Custom holiday management** - Add custom holidays
 - Block dates with reasons (global or per-dog)
 - User management (activate/deactivate accounts, edit names)
-- Experience level request approval workflow
+- Color request approval workflow
 - Reactivation request management
 - **Configurable site logo** - Change site branding via settings
 - **Registration password management** - Control who can register
@@ -137,7 +137,7 @@ BASE_DOMAIN=gassigeher.org
 - Automatic user deactivation after configurable inactivity period
 - Email notifications for all major actions (18 types)
 - **German public holiday API** (feiertage-api.de) with caching
-- Experience-based access control
+- Color-based access control
 - Double-booking prevention
 - Booking validation rules
 - Security headers and XSS protection
@@ -152,14 +152,45 @@ BASE_DOMAIN=gassigeher.org
 - **Subdomain-based routing** - Each shelter gets `{slug}.gassigeher.org`
 - **PostgreSQL Row-Level Security** - Database-enforced data isolation
 - **Per-tenant theming** - 10 color presets + custom colors
+- **Per-tenant branding** - Custom logo, favicon, colors
 - **S3 object storage** - Hetzner Object Storage with local fallback
 - **Stripe billing** - Subscription management with free/pro tiers
 - **Central admin dashboard** - Platform-wide management
+- **User impersonation** - Support users by logging in as them
 - **Self-service registration** - Shelters can register their own tenant
 - **Landing page** - Marketing site with feature showcase
 - **Per-tenant rate limiting** - Configurable limits by subscription tier
 - **Feature flags** - Enable/disable features per tenant
-- **Demo tenant** - Read-only demo for prospective shelters
+- **Demo tenant** - Auto-reset demo for prospective shelters
+- **Promo codes** - Percentage, fixed amount, or free months discounts
+- **Referral system** - Rewards for both referrer and referee
+- **Marketing campaigns** - FOMO countdowns, referral tracking
+
+### Billing & Subscription Tiers (SaaS)
+
+| Feature | Free Plan | Pro Plan |
+|---------|-----------|----------|
+| Price | €0/month | €29/month or €290/year |
+| Dogs | **10 maximum** | Unlimited |
+| Users | Unlimited | Unlimited |
+| Storage | 100MB | 10GB |
+| Support | Community | Priority |
+| Branding | Basic | Full customization |
+
+### Central Admin Features (SaaS)
+- **Platform statistics** - Total tenants, users, dogs, bookings
+- **Tenant management** - View, activate, deactivate tenants
+- **User impersonation** - Log in as any user for support
+- **Billing management** - Subscriptions, invoices, promo codes
+- **Marketing campaigns** - FOMO, referrals, campaigns
+- **Feature flag management** - Global and per-tenant toggles
+
+### Monitoring & Observability
+- **Prometheus metrics** - `/metrics` endpoint for monitoring
+- **Sentry integration** - Error tracking and alerting
+- **Health check endpoint** - `/health` for load balancers
+- **Structured logging** - JSON logs with request IDs
+- **Audit logging** - 30+ tracked actions for compliance
 
 ## Tech Stack
 
@@ -407,13 +438,13 @@ PORT=3000 ./gassigeher
 - `POST /api/blocked-dates` - Block a date (globally or per-dog)
 - `DELETE /api/blocked-dates/:id` - Unblock a date
 
-### Experience Requests (Protected)
-- `POST /api/experience-requests` - Request level promotion
-- `GET /api/experience-requests` - List requests (user sees own, admin sees all pending)
+### Color Requests (Protected)
+- `POST /api/color-requests` - Request color assignment
+- `GET /api/color-requests` - List requests (user sees own, admin sees all pending)
 
-### Experience Requests (Admin Only)
-- `PUT /api/experience-requests/:id/approve` - Approve request
-- `PUT /api/experience-requests/:id/deny` - Deny request
+### Color Requests (Admin Only)
+- `PUT /api/color-requests/:id/approve` - Approve request
+- `PUT /api/color-requests/:id/deny` - Deny request
 
 ### Reactivation Requests (Public)
 - `POST /api/reactivation-requests` - Request account reactivation
@@ -564,7 +595,7 @@ See **[Database_Selection_Guide.md](docs/Database_Selection_Guide.md)** for deta
 - `dogs` - Dog information (with is_featured, external_link)
 - `bookings` - Walk bookings (with approval workflow)
 - `blocked_dates` - Admin-blocked dates (global or per-dog)
-- `experience_requests` - User level promotion requests
+- `color_requests` - User color assignment requests
 - `reactivation_requests` - Account reactivation requests
 - `system_settings` - Configurable system settings
 - `booking_time_rules` - Configurable time slots
@@ -588,7 +619,7 @@ All 25+ migrations run automatically on application startup.
 - **Phase 2**: Dog Management (CRUD, Photos, Categories)
 - **Phase 3**: Booking System (Create, View, Cancel, Auto-complete)
 - **Phase 4**: Blocked Dates & Admin Actions (Block dates, Move bookings)
-- **Phase 5**: Experience Levels (Request, Approve, Deny workflow)
+- **Phase 5**: Color System (Request, Approve, Deny workflow)
 - **Phase 6**: User Profiles & Photos (Edit, Upload, Email re-verification)
 - **Phase 7**: Account Management & GDPR (Delete, Deactivate, Reactivate)
 - **Phase 8**: Admin Dashboard & Reports (Stats, Activity, Settings)
@@ -650,10 +681,8 @@ See [ImplementationPlan.md](docs/ImplementationPlan.md) for complete phase detai
 3. Super Admin clicks "Zu Admin ernennen" on your account
 4. You immediately gain admin access
 
-### Experience Level System
-- **Green (Beginner)**: Default for all new users, can book green-category dogs
-- **Orange (Intermediate)**: Requires admin approval, can book green and orange dogs
-- **Blue (Experienced)**: Requires admin approval, can book all dogs
+### Color-Based Access System
+Colors are customizable per tenant. Users can be assigned multiple colors by admins. Dogs are assigned a required color, and users can only book dogs if they have the matching color assigned. New users start with the first color and can request additional colors through the approval workflow.
 
 ### Booking Time Rules
 The system supports configurable time slots:
@@ -663,18 +692,42 @@ The system supports configurable time slots:
 - **Holiday handling**: Uses German public holiday API
 - **Approval workflow**: Certain times may require admin approval
 
-### Testing
+### Testing Infrastructure
 
-Run all tests:
+**Backend Tests (Go):**
 ```bash
-go test ./... -v
+go test ./... -v                           # All tests
+go test ./internal/services/... -v         # Service tests only
+go test ./... -coverprofile=coverage.out   # With coverage
+go tool cover -html=coverage.out           # View coverage report
 ```
 
-Run tests with coverage:
+**Frontend Tests (Jest):**
 ```bash
-go test ./... -coverprofile=coverage.out
-go tool cover -html=coverage.out
+npm test                    # Run Jest unit tests
+npm run test:watch          # Watch mode
+npm run test:coverage       # With coverage report
 ```
+
+**E2E Tests (Playwright):**
+```bash
+cd e2e-tests
+npm install
+npm run test                # Headless tests
+npm run test:headed         # With visible browser
+npm run test:debug          # Debug mode
+npm run test:ui             # Interactive UI mode
+```
+
+**Comprehensive Test Suite:**
+```bash
+./test-overview.sh          # Full test suite with reporting
+```
+
+**Test Coverage Goals:**
+- Target: 90% code coverage
+- TDD approach: tests written alongside features
+- CI integration: Coverage reports in GitHub Actions
 
 ### Default System Settings
 - Booking advance: 14 days
@@ -723,9 +776,9 @@ The system sends 18 types of email notifications:
 **Admin Actions:**
 10. Booking moved notification
 
-**Experience Levels:**
-11. Level promotion approved
-12. Level promotion denied
+**Color Requests:**
+11. Color assignment approved
+12. Color assignment denied
 
 **Account Lifecycle:**
 13. Account deactivated notification
@@ -771,12 +824,13 @@ See **[DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md)** for navigation gui
 | Document | Lines | Purpose | Audience |
 |----------|-------|---------|----------|
 | **[README.md](README.md)** | 900+ | Project overview, both modes, API list | Developers |
+| **[FEATURES.md](docs/FEATURES.md)** | 1,000+ | Complete feature reference (all features) | Everyone |
 | **[ImplementationPlan.md](docs/ImplementationPlan.md)** | 1,500+ | Simple-Mode architecture & all 10 phases | Technical Leads |
 | **[SaaS_Implementation_Plan.md](docs/SaaS_Implementation_Plan.md)** | 2,400+ | SaaS architecture & all 12 phases | Technical Leads |
 | **[API.md](docs/API.md)** | 800+ | Complete REST API reference with examples | Developers/Integrators |
 | **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** | 800+ | Production deployment (both modes) | DevOps/System Admins |
 | **[USER_GUIDE.md](docs/USER_GUIDE.md)** | 350+ | How to use the application (German) | End Users |
-| **[ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md)** | 500+ | Administrator operations manual | Administrators |
+| **[ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md)** | 900+ | Administrator operations manual | Administrators |
 | **[PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md)** | 700+ | Executive summary & statistics | Stakeholders |
 | **[CLAUDE.md](CLAUDE.md)** | 1,200+ | AI assistant development guide | AI Developers |
 | **[DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md)** | 250+ | Documentation navigation | Everyone |
@@ -877,7 +931,7 @@ See **[DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md)** for navigation gui
 ## Complete Feature List
 
 **Core Features (Simple-Mode & SaaS - 60+ features)**:
-User registration with password • Email verification • JWT authentication • Password reset • Profile management (first/last name) • Photo uploads • Experience levels (Green/Orange/Blue) • Level promotions • Dog browsing • Featured dogs • External dog links • Advanced filters • Dog booking • Booking approval workflow • Configurable time slots • Holiday integration • Booking cancellation • Booking notes • Booking reminders • Dashboard • GDPR account deletion • Auto-deactivation with notification • Reactivation workflow • Admin dashboard • Dog management • Dog-specific blocking • Availability toggle • Booking management • Move bookings • Block dates (global/per-dog) • User management • Admin promotion/demotion • Experience approvals • Registration password • Site logo configuration • WhatsApp integration • System settings • Real-time statistics • Activity feed • Email notifications (18 types) • Multi-provider email (Gmail/SMTP) • BCC admin copy • Auto-completion • Security headers • German i18n • Mobile-responsive design • SCSS modular styling • Terms & privacy pages • Embedded frontend • Version display • Health check • CI/CD pipeline • E2E testing
+User registration with password • Email verification • JWT authentication • Password reset • Profile management (first/last name) • Photo uploads • Color-based access (customizable) • Color requests • Dog browsing • Featured dogs • External dog links • Advanced filters • Dog booking • Booking approval workflow • Configurable time slots • Holiday integration • Booking cancellation • Booking notes • Booking reminders • Dashboard • GDPR account deletion • Auto-deactivation with notification • Reactivation workflow • Admin dashboard • Dog management • Dog-specific blocking • Availability toggle • Booking management • Move bookings • Block dates (global/per-dog) • User management • Admin promotion/demotion • Color approvals • Registration password • Site logo configuration • WhatsApp integration • System settings • Real-time statistics • Activity feed • Email notifications (18 types) • Multi-provider email (Gmail/SMTP) • BCC admin copy • Auto-completion • Security headers • German i18n • Mobile-responsive design • SCSS modular styling • Terms & privacy pages • Embedded frontend • Version display • Health check • CI/CD pipeline • E2E testing
 
 **SaaS-Mode Features (20+ additional)**:
 Subdomain-based multi-tenancy • PostgreSQL Row-Level Security • Per-tenant data isolation • Tenant self-registration • Landing page • Feature showcase • 10 color theme presets • Custom color overrides • Per-tenant logo/favicon • S3 object storage • Tenant-organized file paths • Stripe billing integration • Free/Pro subscription tiers • Central admin dashboard • Platform statistics • Tenant activation/deactivation • Per-tenant rate limiting • Feature flags (platform + tenant) • Demo tenant mode • Brute force protection • Exponential lockout • Docker containerization • Caddy wildcard SSL • DNS challenge automation
@@ -886,7 +940,7 @@ Subdomain-based multi-tenancy • PostgreSQL Row-Level Security • Per-tenant d
 
 ### Core Features (Both Modes)
 1. **Complete GDPR Compliance**: Full anonymization on deletion with legal email confirmation
-2. **Experience-Based Access**: Progressive skill system (Green→Orange→Blue) with admin approvals
+2. **Color-Based Access**: Customizable color system with admin approvals
 3. **Flexible Time Management**: Configurable booking slots with holiday awareness
 4. **Multi-Provider Email**: Gmail API or any SMTP server with audit trail
 5. **Controlled Registration**: Shelter-provided password prevents unauthorized sign-ups

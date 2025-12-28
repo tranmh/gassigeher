@@ -44,7 +44,7 @@ Gassigeher is a **complete, production-ready** web application for managing dog 
 7. Booking system with validation
 8. Dashboard with upcoming and past walks
 9. Profile management with photo upload
-10. Experience level promotion system
+10. Color-based access system with requests
 11. Account deletion (GDPR-compliant)
 12. Terms & Conditions
 13. Privacy Policy (GDPR)
@@ -54,7 +54,7 @@ Gassigeher is a **complete, production-ready** web application for managing dog 
 2. Dog management (CRUD, photos, availability)
 3. Booking management (view all, cancel, move)
 4. Blocked dates management
-5. Experience level request approvals
+5. Color request approvals
 6. User management (activate/deactivate)
 7. Reactivation request management
 8. System settings configuration
@@ -190,13 +190,14 @@ Caddyfile               Wildcard SSL reverse proxy
 
 ## Feature Highlights
 
-### Experience Level System
-**Innovative Three-Tier Access:**
-- 🟢 Green: All beginners (default)
-- 🔵 Blue: Experienced walkers (admin approval)
-- 🟠 Orange: Dedicated experienced (admin approval)
+### Color-Based Access System
+**Flexible, Customizable Access Control:**
+- Colors are defined per tenant (customizable names and hex codes)
+- Dogs are assigned a required color
+- Users can have multiple colors assigned
+- New users start with the default color
 
-Users can request promotions, admins review history and approve.
+Users can request additional colors, admins review history and approve.
 
 ### GDPR Compliance
 **Complete Right to Deletion:**
@@ -216,7 +217,7 @@ Users can request promotions, admins review history and approve.
 - Authentication (3 types)
 - Bookings (4 types)
 - Admin actions (1 type)
-- Experience levels (2 types)
+- Color requests (2 types)
 - Account lifecycle (4 types)
 
 All emails use HTML templates with brand colors.
@@ -347,7 +348,7 @@ All emails use HTML templates with brand colors.
 2. **dogs** - Dog profiles with availability status
 3. **bookings** - Walk bookings with notes
 4. **blocked_dates** - Admin-blocked dates
-5. **experience_requests** - Level promotion requests
+5. **color_requests** - Color assignment requests
 6. **reactivation_requests** - Account reactivation requests
 7. **system_settings** - Configurable settings
 
@@ -370,8 +371,8 @@ All emails use HTML templates with brand colors.
 6. User cancellation
 7. Admin cancellation with reason
 8. Booking moved notification
-9. Experience level approved
-10. Experience level denied
+9. Color request approved
+10. Color request denied
 11. Account deactivated
 12. Account reactivated
 13. Reactivation denied
@@ -390,10 +391,10 @@ All with inline CSS and brand colors (#82b965).
    - Legal email confirmation
    - Audit trail preservation
 
-2. **Intelligent Experience System**
-   - Progressive access (Green → Orange → Blue)
-   - Admin-approved promotions
-   - Based on walk history
+2. **Flexible Color System**
+   - Customizable colors per tenant
+   - Admin-approved color assignments
+   - Based on walk history and experience
 
 3. **Automated User Lifecycle**
    - Auto-deactivation after inactivity
@@ -516,7 +517,7 @@ Upon launch, monitor:
 **User Satisfaction:**
 - Completed walks
 - Cancellation rates
-- Level promotion requests
+- Color assignment requests
 - User retention
 
 ---
@@ -631,7 +632,7 @@ Upon launch, monitor:
 
 ### Technical Innovations
 
-1. **Experience Level System**: Progressive access based on skill
+1. **Color-Based Access**: Flexible color system for dog/user matching
 2. **Auto-Deactivation**: Automated user lifecycle management
 3. **GDPR Anonymization**: Preserves data utility while respecting privacy
 4. **Unified Admin Navigation**: Consistent UX across 8 pages
@@ -742,7 +743,7 @@ Detailed instructions in **DEPLOYMENT.md**.
 - ✅ GDPR-compliant account deletion
 - ✅ Auto-deactivation after 1 year
 - ✅ Dog health status management
-- ✅ Experience level system
+- ✅ Color-based access system
 - ✅ Complete application (not MVP)
 - ✅ Build scripts for Windows and Linux
 - ✅ No external fonts (system fonts only)
@@ -763,7 +764,7 @@ Gassigeher is a **complete, production-ready application** that demonstrates:
 - Professional documentation
 - Deployment readiness
 
-The application is ready to launch and help shelter dogs get the walks they need while providing volunteers with a seamless booking experience.
+The application is ready to launch and help shelter dogs get the walks they need while providing volunteers with a seamless booking system.
 
 **Total Implementation**: ✅ **100% COMPLETE**
 

@@ -70,17 +70,13 @@ Generates comprehensive test data for the Gassigeher application, including user
 
 - **Users** (12 total):
   - 1 super admin user (from SUPER_ADMIN_EMAIL env var, ID=1)
-  - 4 green-level users (beginner walkers)
-  - 4 blue-level users (intermediate walkers)
-  - 3 orange-level users (experienced walkers)
+  - 11 regular users with various color assignments
   - 1 inactive user (for auto-deactivation testing)
   - All verified and ready to use
   - Password for all: **test123**
 
 - **Dogs** (18 total):
-  - 7 green category dogs (easy to handle)
-  - 6 blue category dogs (moderate experience needed)
-  - 5 orange category dogs (experienced handlers only)
+  - Dogs with various color assignments (colors are customizable per tenant)
   - 2 marked as unavailable
   - Realistic German breeds and characteristics
 
@@ -102,7 +98,7 @@ Generates comprehensive test data for the Gassigeher application, including user
 - **Blocked Dates**: 3 random dates in next 2 weeks
   - Tests booking prevention logic
 
-- **Experience Level Requests** (4 total):
+- **Color Requests** (4 total):
   - 2 pending (awaiting admin review)
   - 1 approved (with admin comment)
   - 1 rejected (with reason)
@@ -127,9 +123,7 @@ Login Credentials (all users):
 
 Sample User Logins:
   Super Admin:  admin@tierheim-goeppingen.de
-  Green User:  max.mueller@example.com
-  Blue User:  anna.schmidt@example.com
-  Orange User:  lukas.fischer@example.com
+  Regular User: max.mueller@example.com
 ```
 
 **Testing Scenarios Covered:**
@@ -137,10 +131,10 @@ Sample User Logins:
 1. **Authentication & Authorization**
    - Admin vs regular user access
    - Email verification flow (some users unverified)
-   - Different experience levels
+   - Different color assignments
 
 2. **Booking Management**
-   - Creating bookings at different experience levels
+   - Creating bookings with color-based access control
    - Double-booking prevention (unique constraint)
    - Blocked date prevention
    - Cancellation workflow
@@ -157,10 +151,10 @@ Sample User Logins:
    - Active users with recent activity
    - Inactive users (365+ days old)
    - Deleted accounts (GDPR anonymization)
-   - Experience level progression requests
+   - Color assignment requests
 
 5. **Admin Workflows**
-   - Reviewing experience requests
+   - Reviewing color requests
    - Managing dogs (available/unavailable)
    - Viewing booking statistics
    - Managing blocked dates

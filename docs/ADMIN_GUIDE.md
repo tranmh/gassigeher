@@ -2,8 +2,8 @@
 
 **Umfassende Anleitung für Administratoren zur Verwaltung der Gassigeher-Plattform.**
 
-**🎯 Verwaltung**: 8 Admin-Seiten | Dashboard mit Live-Statistiken | Vollständige Kontrolle
-**🔧 Funktionen**: Hunde, Buchungen, Benutzer, Einstellungen, Level-Anfragen, Reaktivierungen
+**🎯 Verwaltung**: 10+ Admin-Seiten | Dashboard mit Live-Statistiken | Vollständige Kontrolle
+**🔧 Funktionen**: Hunde, Buchungen, Benutzer, Farben, Zeitregeln, Feiertage, Einstellungen
 
 > **Für Benutzer**: Siehe [USER_GUIDE.md](USER_GUIDE.md)
 > **Für Deployment**: Siehe [DEPLOYMENT.md](DEPLOYMENT.md)
@@ -64,8 +64,9 @@ Das Dashboard zeigt Ihnen auf einen Blick:
 - ⚠️ Anzahl inaktiver Benutzer
 - 🐕 Verfügbare Hunde
 - 🚫 Nicht verfügbare Hunde
-- ⭐ Ausstehende Level-Anfragen
+- 🎨 Ausstehende Farbanfragen
 - 🔄 Ausstehende Reaktivierungsanfragen
+- ⏰ Buchungen zur Genehmigung (bei genehmigungspflichtigen Zeiten)
 
 **Letzte Aktivitäten:**
 - Neue Buchungen
@@ -88,14 +89,14 @@ Das Dashboard zeigt Ihnen auf einen Blick:
    - **Rasse**: Rasse (wird für Filter verwendet)
    - **Größe**: Klein, Mittel oder Groß
    - **Alter**: In Jahren
-   - **Kategorie**: Grün, Blau oder Orange
+   - **Farbe**: Wählen Sie eine Farbe (z.B. Grün, Blau, Orange)
    - **Besondere Bedürfnisse** (optional)
    - **Abholort**: Wo der Hund abgeholt wird
    - **Spazierweg** (optional): Bevorzugte Routen
    - **Spazierdauer**: In Minuten
    - **Besondere Anweisungen**: Wichtige Hinweise
-   - **Standard Morgenzeit**: z.B. 09:00
-   - **Standard Abendzeit**: z.B. 17:00
+   - **Externer Link** (optional): Link zur Tierheim-Website
+   - **Hervorgehoben**: Auf Startseite anzeigen
 4. Klicken Sie auf "Speichern"
 
 ### Hund bearbeiten
@@ -150,10 +151,7 @@ Das Dashboard zeigt Ihnen auf einen Blick:
 - Alte Fotos werden automatisch beim Upload neuer Fotos gelöscht
 
 **Platzhalterbild:**
-Hunde ohne Foto zeigen ein professionelles Platzbild in der Farbe ihrer Kategorie:
-- 🟢 Grüne Hunde: Grünes Platzhalterbild
-- 🔵 Blaue Hunde: Blaues Platzhalterbild
-- 🟠 Orange Hunde: Oranges Platzhalterbild
+Hunde ohne Foto zeigen ein professionelles Platzhalterbild in der Farbe ihrer zugewiesenen Farbkategorie.
 
 ### Hund als nicht verfügbar markieren
 
@@ -254,16 +252,16 @@ Nutzen Sie Filter:
 
 ---
 
-## Erfahrungslevel-Anfragen
+## Farbanfragen verwalten
 
 ### Anfragen prüfen
 
-1. Gehen Sie zu "Level-Anfragen verwalten"
+1. Gehen Sie zu "Farbanfragen verwalten"
 2. Sehen Sie alle ausstehenden Anfragen
 3. Für jeden Nutzer sehen Sie:
    - Name und E-Mail
-   - Aktuelles Level
-   - Angefragtes Level
+   - Aktuelle Farben
+   - Angeforderte Farbe
    - Antragsdatum
 
 ### Anfrage genehmigen
@@ -277,7 +275,7 @@ Nutzen Sie Filter:
 **Vorgang:**
 1. Klicken Sie auf "Genehmigen"
 2. Optional: Geben Sie eine Nachricht ein
-3. Das Level des Nutzers wird automatisch erhöht
+3. Die Farbe wird dem Nutzer automatisch hinzugefügt
 4. Nutzer erhält E-Mail-Benachrichtigung
 
 ### Anfrage ablehnen
@@ -290,6 +288,82 @@ Nutzen Sie Filter:
 **Beispiel-Nachrichten:**
 - "Bitte sammeln Sie mehr Erfahrung mit 10+ Spaziergängen"
 - "Genehmigt! Sie haben großartige Arbeit geleistet"
+
+---
+
+## Farbverwaltung
+
+### Farben definieren
+
+Sie können eigene Farben für Ihr Tierheim definieren:
+
+1. Gehen Sie zu "Farben verwalten"
+2. Klicken Sie auf "Farbe hinzufügen"
+3. Geben Sie ein:
+   - **Name**: z.B. "Grün", "Anfänger", "Stufe 1"
+   - **Hex-Code**: Farbcode (z.B. #4CAF50)
+   - **Reihenfolge**: Sortierung in der Liste
+4. Klicken Sie auf "Speichern"
+
+### Farben bearbeiten
+
+1. Finden Sie die Farbe in der Liste
+2. Klicken Sie auf das Bearbeiten-Symbol
+3. Ändern Sie Name, Farbe oder Reihenfolge
+4. Speichern Sie
+
+### Farbe löschen
+
+**Vorsicht**: Farben können nur gelöscht werden, wenn keine Hunde oder Nutzer zugeordnet sind!
+
+1. Ordnen Sie alle Hunde/Nutzer anderen Farben zu
+2. Klicken Sie auf "Löschen"
+3. Bestätigen Sie
+
+### Nutzer-Farben verwalten
+
+Als Admin können Sie Nutzern direkt Farben zuweisen:
+
+1. Gehen Sie zu "Benutzer verwalten"
+2. Finden Sie den Nutzer
+3. Klicken Sie auf "Farben bearbeiten"
+4. Wählen Sie die gewünschten Farben aus
+5. Speichern Sie
+
+---
+
+## Buchungszeiten verwalten
+
+### Zeitregeln konfigurieren
+
+Sie können festlegen, wann Buchungen möglich sind:
+
+1. Gehen Sie zu "Buchungszeiten"
+2. Definieren Sie Regeln für:
+   - **Wochentage**: Morgen-, Mittags-, Abendzeiten
+   - **Wochenende/Feiertage**: Angepasste Zeiten
+3. Markieren Sie Zeitblöcke als:
+   - **Erlaubt**: Buchungen möglich
+   - **Gesperrt**: Keine Buchungen (z.B. Fütterungszeiten)
+   - **Genehmigungspflichtig**: Admin muss Buchung genehmigen
+
+### Feiertage verwalten
+
+1. Gehen Sie zu "Feiertage"
+2. Sie können:
+   - Feiertage aus der API abrufen (deutsche Feiertage)
+   - Eigene Feiertage hinzufügen
+   - Feiertage aktivieren/deaktivieren
+
+### Buchungen genehmigen
+
+Wenn Buchungen in genehmigungspflichtigen Zeitfenstern erstellt werden:
+
+1. Gehen Sie zu "Buchungen zur Genehmigung"
+2. Prüfen Sie die ausstehenden Buchungen
+3. Klicken Sie "Genehmigen" oder "Ablehnen"
+4. Optional: Fügen Sie eine Nachricht hinzu
+5. Nutzer erhält E-Mail-Benachrichtigung
 
 ---
 
@@ -558,33 +632,36 @@ Gehen Sie zu "Einstellungen" und konfigurieren Sie:
 
 ## Best Practices
 
-### Hundekategorien zuweisen
+### Hundefarben zuweisen
 
-**Grün** - Nutzen Sie für:
+Definieren Sie Farben basierend auf den Anforderungen Ihres Tierheims. Typische Einteilung:
+
+**Einstiegsfarbe** (z.B. Grün):
 - Ruhige, gut erzogene Hunde
 - Kleine bis mittelgroße Hunde
 - Hunde ohne besondere Anforderungen
 
-**Blau** - Nutzen Sie für:
+**Mittlere Farbe** (z.B. Blau):
 - Energiegeladene Hunde
 - Große Hunde
 - Hunde mit leichten besonderen Bedürfnissen
 
-**Orange** - Nutzen Sie für:
+**Fortgeschrittene Farbe** (z.B. Orange):
 - Sehr große oder kräftige Hunde
 - Hunde mit Verhaltensproblemen
 - Hunde, die besondere Erfahrung erfordern
 
-### Nutzer-Level genehmigen
+### Farbanfragen genehmigen
 
-**Empfohlene Kriterien für Blau:**
+**Empfohlene Kriterien:**
 - Mindestens 10 abgeschlossene Spaziergänge
 - Keine Stornierungen in letzter Minute
 - Positive Notizen
+- Zuverlässigkeit über Zeit bewiesen
 
-**Empfohlene Kriterien für Orange:**
+**Für fortgeschrittene Farben:**
 - Mindestens 25 abgeschlossene Spaziergänge
-- Davon mindestens 10 mit blauen Hunden
+- Erfahrung mit Hunden mittlerer Schwierigkeit
 - Ausgezeichnete Zuverlässigkeit
 - Detaillierte, hilfreiche Notizen
 
@@ -629,13 +706,17 @@ Gehen Sie zu "Einstellungen" und konfigurieren Sie:
    - Inaktive Nutzer identifizieren
    - Bei Bedarf kontaktieren
 
-2. **Level-Anfragen bearbeiten**:
+2. **Farbanfragen bearbeiten**:
    - Alle ausstehenden Anfragen prüfen
    - Spaziergangshistorie bewerten
 
 3. **Statistiken analysieren**:
    - Beliebte Hunde identifizieren
    - Buchungstrends erkennen
+
+4. **Genehmigungspflichtige Buchungen**:
+   - Alle ausstehenden Buchungen prüfen
+   - Zeitnah genehmigen oder ablehnen
 
 ### Monatliche Aufgaben
 
@@ -676,17 +757,21 @@ Gehen Sie zu "Einstellungen" und konfigurieren Sie:
    - Prüfen: Hunde-Status
    - Lösung: Hund wieder verfügbar machen
 
-2. **Nutzer-Level zu niedrig**
-   - Prüfen: Nutzer-Level und Hund-Kategorie
-   - Lösung: Level-Anfrage genehmigen oder Hund-Kategorie anpassen
+2. **Nutzer fehlt die Farbe**
+   - Prüfen: Nutzer-Farben und Hund-Farbe
+   - Lösung: Farbanfrage genehmigen oder dem Nutzer die Farbe zuweisen
 
 3. **Datum gesperrt**
-   - Prüfen: Gesperrte Tage
+   - Prüfen: Gesperrte Tage und Feiertage
    - Lösung: Sperrung aufheben, falls angebracht
 
 4. **Doppelbuchung**
    - Prüfen: Buchungen für das Datum
    - Lösung: Anderer Zeitpunkt vorschlagen
+
+5. **Zeitfenster gesperrt**
+   - Prüfen: Buchungszeit-Regeln
+   - Lösung: Zeitregel anpassen oder anderen Zeitpunkt wählen
 
 ### E-Mails werden nicht versendet
 
@@ -852,7 +937,9 @@ Bei Bugs oder Feature-Anfragen:
 - [ ] Testbuchung erstellt und verwaltet
 - [ ] Testhund erstellt
 - [ ] Tag gesperrt und entsperrt
-- [ ] Level-Anfrage genehmigt (Test)
+- [ ] Farbanfrage genehmigt (Test)
+- [ ] Buchungszeiten verstanden
+- [ ] Feiertage konfiguriert
 - [ ] Systemeinstellungen verstanden
 - [ ] Backup-Prozess geprüft
 - [ ] Kontaktinformationen notiert
