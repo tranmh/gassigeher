@@ -249,6 +249,8 @@ describe('HelpTooltips.showTooltip', () => {
     });
 
     test('should not create tooltip for unknown key', () => {
+        const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+
         document.body.innerHTML = '<span data-help="unknown_key">Test</span>';
         HelpTooltips.init({ showIcon: false });
 
@@ -257,6 +259,8 @@ describe('HelpTooltips.showTooltip', () => {
 
         const tooltip = document.querySelector('.help-tooltip');
         expect(tooltip).toBeNull();
+
+        consoleSpy.mockRestore();
     });
 
     test('should store reference to active tooltip', () => {
@@ -600,6 +604,8 @@ describe('Content coverage', () => {
 
 describe('Edge cases', () => {
     test('should handle element with empty data-help', () => {
+        const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+
         document.body.innerHTML = '<span data-help="">Test</span>';
         HelpTooltips.init({ showIcon: false });
 
@@ -608,6 +614,8 @@ describe('Edge cases', () => {
 
         // Should not create tooltip for empty key
         expect(document.querySelector('.help-tooltip')).toBeNull();
+
+        consoleSpy.mockRestore();
     });
 
     test('should handle rapid toggle calls', () => {
