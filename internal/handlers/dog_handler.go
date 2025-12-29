@@ -36,6 +36,12 @@ type DogHandler struct {
 
 // NewDogHandler creates a new dog handler
 func NewDogHandler(db *sql.DB, cfg *config.Config) *DogHandler {
+	// Handle nil config gracefully
+	if cfg == nil {
+		log.Printf("WARNING: DogHandler created with nil config, using defaults")
+		cfg = &config.Config{}
+	}
+
 	// Initialize email service (may fail gracefully)
 	emailService, err := services.NewEmailService(services.ConfigToEmailConfig(cfg))
 	if err != nil {
@@ -687,6 +693,96 @@ func (h *DogHandler) UploadDogPhoto(w http.ResponseWriter, r *http.Request) {
 		"message":   "Photo uploaded successfully",
 		"photo":     fullPath,
 		"thumbnail": thumbPath,
+	})
+}
+
+// DeleteDogPhoto handles DELETE /api/dogs/:id/photo - delete dog photo (admin only)
+func (h *DogHandler) DeleteDogPhoto(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid dog ID")
+		return
+	}
+
+	// SaaS: Get tenant_id from context for isolation
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+
+	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
+	if !ok {
+		respondError(w, http.StatusNotFound, "Dog not found")
+		return
+	}
+
+	// Get existing dog with tenant verification
+	dog, err := h.dogRepo.FindByIDAndTenant(id, tenantID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Database error")
+		return
+	}
+
+	if dog == nil {
+		respondError(w, http.StatusNotFound, "Dog not found")
+		return
+	}
+
+	// Check if dog has a photo
+	if dog.Photo == nil || *dog.Photo == "" {
+		respondError(w, http.StatusNotFound, "Dog has no photo to delete")
+		return
+	}
+
+	// Delete photo files (handles both S3 and local storage)
+	if h.s3Service != nil && h.config.UseS3 {
+		// S3 deletion: Use s3Service directly (imageService doesn't have S3 configured)
+		tenantSlug, ok := r.Context().Value(middleware.TenantSlugKey).(string)
+		if !ok || tenantSlug == "" {
+			// This should not happen - middleware should always set tenant slug
+			// Log warning and use safe fallback to prevent nil pointer
+			log.Printf("WARNING: Missing tenant slug in S3 delete for dog %d, using 'default'", id)
+			tenantSlug = "default"
+		}
+
+		ctx := r.Context()
+
+		// Try all possible extensions since upload preserves original extension
+		extensions := []string{".jpg", ".jpeg", ".png"}
+		var deleteErrors []string
+		for _, ext := range extensions {
+			fullPath := fmt.Sprintf("dogs/dog_%d_full%s", id, ext)
+			thumbPath := fmt.Sprintf("dogs/dog_%d_thumb%s", id, ext)
+
+			// Delete from S3 - log errors but continue (file may not exist with this extension)
+			if err := h.s3Service.DeleteByPath(ctx, tenantSlug, fullPath); err != nil {
+				deleteErrors = append(deleteErrors, fmt.Sprintf("%s: %v", fullPath, err))
+			}
+			if err := h.s3Service.DeleteByPath(ctx, tenantSlug, thumbPath); err != nil {
+				deleteErrors = append(deleteErrors, fmt.Sprintf("%s: %v", thumbPath, err))
+			}
+		}
+
+		// Audit log: record photo deletion
+		if len(deleteErrors) > 0 {
+			log.Printf("AUDIT: Dog %d photo deletion in tenant %s had errors: %v", id, tenantSlug, deleteErrors)
+		} else {
+			log.Printf("AUDIT: Dog %d photos deleted successfully in tenant %s", id, tenantSlug)
+		}
+	} else {
+		// Local filesystem deletion
+		h.imageService.DeleteDogPhotos(id)
+	}
+
+	// Update database to clear photo fields
+	dog.Photo = nil
+	dog.PhotoThumbnail = nil
+
+	if err := h.dogRepo.Update(dog); err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to update dog")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{
+		"message": "Foto erfolgreich gelöscht",
 	})
 }
 

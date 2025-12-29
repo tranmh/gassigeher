@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -362,6 +363,11 @@ func main() {
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 	protected.Use(middleware.AddVersionHeader)
 
+	// CSRF protection for state-changing requests
+	csrfMiddleware := middleware.NewCSRFMiddleware()
+	csrfMiddleware.SetSecure(strings.HasPrefix(cfg.BaseURL, "https"))
+	protected.Use(csrfMiddleware.Middleware)
+
 	// Auth
 	protected.HandleFunc("/auth/change-password", authHandler.ChangePassword).Methods("PUT")
 
@@ -441,6 +447,7 @@ func main() {
 	admin.HandleFunc("/dogs/{id}", dogHandler.UpdateDog).Methods("PUT")
 	admin.HandleFunc("/dogs/{id}", dogHandler.DeleteDog).Methods("DELETE")
 	admin.HandleFunc("/dogs/{id}/photo", dogHandler.UploadDogPhoto).Methods("POST")
+	admin.HandleFunc("/dogs/{id}/photo", dogHandler.DeleteDogPhoto).Methods("DELETE")
 	admin.HandleFunc("/dogs/{id}/availability", dogHandler.ToggleAvailability).Methods("PUT")
 	admin.HandleFunc("/dogs/{id}/featured", dogHandler.SetFeatured).Methods("PUT")
 

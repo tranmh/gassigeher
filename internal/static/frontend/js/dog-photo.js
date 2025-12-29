@@ -265,21 +265,45 @@ class DogPhotoManager {
      * Prompt to remove photo
      */
     async promptRemovePhoto() {
+        // Prevent double-click
+        if (this.isDeleting) {
+            return;
+        }
+
         if (!confirm('Möchten Sie das Foto wirklich entfernen?')) {
             return;
         }
 
-        // Note: This would require a DELETE endpoint which may not exist yet
-        // For now, we'll just alert that it's not implemented
-        alert('Foto-Entfernung muss noch über Backend-Endpoint implementiert werden');
+        // Set loading state
+        this.isDeleting = true;
+        const removeBtn = document.querySelector('.btn-danger[onclick*="promptRemovePhoto"]');
+        if (removeBtn) {
+            removeBtn.disabled = true;
+            removeBtn.textContent = 'Wird entfernt...';
+        }
 
-        // TODO: Implement when DELETE /api/v1/dogs/:id/photo endpoint is available
-        // try {
-        //     await api.removeDogPhoto(this.currentDogId);
-        //     // Refresh dog data
-        // } catch (error) {
-        //     alert('Fehler beim Entfernen des Fotos: ' + error.message);
-        // }
+        try {
+            await api.removeDogPhoto(this.currentDogId);
+            // Clear current photo display
+            this.currentPhotoPath = null;
+            this.hideCurrentPhoto('current-photo-container');
+            // Show success message
+            alert('Foto erfolgreich entfernt');
+            // Refresh dog data if callback is available
+            if (typeof window.refreshDogList === 'function') {
+                window.refreshDogList();
+            }
+        } catch (error) {
+            const message = error && error.message ? error.message : 'Unbekannter Fehler';
+            alert('Fehler beim Entfernen des Fotos: ' + message);
+        } finally {
+            // Reset loading state
+            this.isDeleting = false;
+            if (removeBtn) {
+                removeBtn.disabled = false;
+                removeBtn.textContent = 'Entfernen';
+            }
+        }
     }
 
     /**

@@ -24,6 +24,7 @@ type BillingHandler struct {
 	db               *sql.DB
 	cfg              *config.Config
 	stripeService    *services.StripeService
+	s3Service        *services.S3Service // For S3 pre-signed URL generation
 	subscriptionRepo *repository.SubscriptionRepository
 	dogRepo          *repository.DogRepository
 	invoiceRepo      *repository.InvoiceRepository
@@ -33,10 +34,30 @@ type BillingHandler struct {
 
 // NewBillingHandler creates a new billing handler
 func NewBillingHandler(db *sql.DB, cfg *config.Config, stripeService *services.StripeService) *BillingHandler {
+	// Initialize S3 service if configured
+	var s3Service *services.S3Service
+	if cfg != nil && cfg.UseS3 {
+		s3Config := &services.S3Config{
+			Endpoint:   cfg.S3Endpoint,
+			AccessKey:  cfg.S3AccessKey,
+			SecretKey:  cfg.S3SecretKey,
+			BucketName: cfg.S3BucketName,
+			Region:     cfg.S3Region,
+			PublicURL:  cfg.S3PublicURL,
+			UseSSL:     cfg.S3UseSSL,
+		}
+		var err error
+		s3Service, err = services.NewS3Service(s3Config)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize S3 service in BillingHandler: %v", err)
+		}
+	}
+
 	return &BillingHandler{
 		db:               db,
 		cfg:              cfg,
 		stripeService:    stripeService,
+		s3Service:        s3Service,
 		subscriptionRepo: repository.NewSubscriptionRepository(db),
 		dogRepo:          repository.NewDogRepository(db),
 		invoiceRepo:      repository.NewInvoiceRepository(db),
@@ -1030,19 +1051,64 @@ func (h *BillingHandler) DownloadInvoicePDF(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// If we have a Stripe PDF URL, redirect to it
+	// If we have a Stripe PDF URL, return JSON with URL (consistent with S3 response)
 	if invoice.PDFURL != nil && *invoice.PDFURL != "" {
-		http.Redirect(w, r, *invoice.PDFURL, http.StatusFound)
+		// Security: Validate URL is from Stripe domain to prevent open redirect
+		pdfURL := *invoice.PDFURL
+		if !strings.HasPrefix(pdfURL, "https://pay.stripe.com/") &&
+			!strings.HasPrefix(pdfURL, "https://invoice.stripe.com/") &&
+			!strings.HasPrefix(pdfURL, "https://files.stripe.com/") {
+			log.Printf("SECURITY: Invoice %d has suspicious PDF URL: %s", invoice.ID, pdfURL)
+			respondError(w, http.StatusBadRequest, "Ungültige PDF-URL")
+			return
+		}
+		respondJSON(w, http.StatusOK, map[string]string{
+			"url": pdfURL,
+		})
 		return
 	}
 
-	// If we have a local PDF path (e.g., S3 key), we would generate a pre-signed URL
-	// For now, since Stripe provides the PDF URL directly, local storage is not yet implemented
-	// This would be extended when S3 integration for invoice storage is added
+	// If we have a local PDF path (S3 key), generate a pre-signed URL
 	if invoice.PDFPath != nil && *invoice.PDFPath != "" {
-		// TODO: Implement S3 pre-signed URL generation when local storage is needed
-		// For now, return an error indicating PDF is being processed
-		respondError(w, http.StatusServiceUnavailable, "PDF wird verarbeitet. Bitte versuchen Sie es später erneut.")
+		// Check if S3 service is available
+		if h.s3Service == nil {
+			log.Printf("ERROR: S3 service not configured but invoice %d has PDFPath", invoice.ID)
+			respondError(w, http.StatusServiceUnavailable, "PDF-Download nicht verfügbar")
+			return
+		}
+
+		// Get tenant slug from context for S3 path
+		tenantSlug, ok := r.Context().Value(middleware.TenantSlugKey).(string)
+		if !ok || tenantSlug == "" {
+			// This should not happen - middleware should always set tenant slug
+			log.Printf("WARNING: Missing tenant slug for invoice %d S3 download, using 'default'", invoice.ID)
+			tenantSlug = "default"
+		}
+
+		// Build S3 object key with tenant isolation
+		objectKey, err := h.s3Service.GetObjectKey(tenantSlug, *invoice.PDFPath)
+		if err != nil {
+			log.Printf("ERROR: Invalid S3 path for invoice %d: %v", invoice.ID, err)
+			respondError(w, http.StatusInternalServerError, "Ungültiger PDF-Pfad")
+			return
+		}
+
+		// Calculate expiry time BEFORE generating URL to avoid time drift
+		expiry := time.Hour
+		expiresAt := time.Now().Add(expiry)
+
+		// Generate pre-signed URL with 1 hour expiry
+		presignedURL, err := h.s3Service.GetPresignedURL(r.Context(), objectKey, expiry)
+		if err != nil {
+			log.Printf("ERROR: Failed to generate pre-signed URL for invoice %d: %v", invoice.ID, err)
+			respondError(w, http.StatusInternalServerError, "Fehler beim Generieren des Download-Links")
+			return
+		}
+
+		respondJSON(w, http.StatusOK, map[string]string{
+			"url":     presignedURL,
+			"expires": expiresAt.Format(time.RFC3339),
+		})
 		return
 	}
 

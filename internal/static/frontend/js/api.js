@@ -36,6 +36,12 @@ class API {
         return !!(this.token && this.token.trim());
     }
 
+    // Get CSRF token from cookie
+    getCSRFToken() {
+        const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
+        return match ? decodeURIComponent(match[1]) : null;
+    }
+
     // Make HTTP request
     async request(method, endpoint, data = null) {
         const headers = {
@@ -44,6 +50,12 @@ class API {
 
         if (this.token) {
             headers['Authorization'] = `Bearer ${this.token}`;
+        }
+
+        // Include CSRF token for state-changing requests
+        const csrfToken = this.getCSRFToken();
+        if (csrfToken && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+            headers['X-CSRF-Token'] = csrfToken;
         }
 
         const options = {
@@ -122,6 +134,12 @@ class API {
 
         if (this.token) {
             headers['Authorization'] = `Bearer ${this.token}`;
+        }
+
+        // Include CSRF token for file uploads (POST is state-changing)
+        const csrfToken = this.getCSRFToken();
+        if (csrfToken) {
+            headers['X-CSRF-Token'] = csrfToken;
         }
 
         try {
@@ -255,6 +273,10 @@ class API {
         const formData = new FormData();
         formData.append('photo', file);
         return this.uploadFile(`/dogs/${dogId}/photo`, formData);
+    }
+
+    async removeDogPhoto(dogId) {
+        return this.request('DELETE', `/dogs/${dogId}/photo`);
     }
 
     async toggleDogAvailability(dogId, isAvailable, reason = null) {
