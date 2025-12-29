@@ -510,7 +510,9 @@
         function updateHeaderPhoto(user) {
             const headerPhoto = document.getElementById('header-photo');
             if (user.profile_photo) {
-                headerPhoto.innerHTML = `<img src="/uploads/${user.profile_photo}" alt="Profil" style="width: 100%; height: 100%; object-fit: cover;">`;
+                // Handle both local paths and S3 URLs
+                const photoUrl = user.profile_photo.startsWith('http') ? user.profile_photo : `/uploads/${user.profile_photo}`;
+                headerPhoto.innerHTML = `<img src="${photoUrl}" alt="Profil" style="width: 100%; height: 100%; object-fit: cover;">`;
             }
         }
 

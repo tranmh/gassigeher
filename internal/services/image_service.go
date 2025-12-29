@@ -35,10 +35,22 @@ const (
 )
 
 // NewImageService creates a new image service with local filesystem storage
+// For Simple-Mode (single tenant) - no tenant prefix in paths
 func NewImageService(uploadDir string) *ImageService {
 	return &ImageService{
-		uploadDir: uploadDir,
-		useS3:     false,
+		uploadDir:  uploadDir,
+		tenantSlug: "", // Empty = no tenant isolation (Simple-Mode)
+		useS3:      false,
+	}
+}
+
+// NewImageServiceWithTenant creates a new image service with tenant isolation for local storage
+// For SaaS-Mode - all file paths will be prefixed with tenant slug
+func NewImageServiceWithTenant(uploadDir string, tenantSlug string) *ImageService {
+	return &ImageService{
+		uploadDir:  uploadDir,
+		tenantSlug: tenantSlug,
+		useS3:      false,
 	}
 }
 
@@ -55,6 +67,26 @@ func NewImageServiceWithS3(uploadDir string, s3Service *S3Service, tenantSlug st
 // SetTenantSlug updates the tenant slug (used for S3 path organization)
 func (s *ImageService) SetTenantSlug(slug string) {
 	s.tenantSlug = slug
+}
+
+// getTenantBasePath returns the base path for the current tenant
+// For SaaS-Mode: returns "{uploadDir}/{tenantSlug}"
+// For Simple-Mode: returns "{uploadDir}" (no tenant prefix)
+func (s *ImageService) getTenantBasePath() string {
+	if s.tenantSlug != "" {
+		return filepath.Join(s.uploadDir, s.tenantSlug)
+	}
+	return s.uploadDir
+}
+
+// getTenantRelativePath returns a relative path including tenant prefix if set
+// For SaaS-Mode: returns "{tenantSlug}/{subPath}"
+// For Simple-Mode: returns "{subPath}" (no tenant prefix)
+func (s *ImageService) getTenantRelativePath(subPath string) string {
+	if s.tenantSlug != "" {
+		return filepath.Join(s.tenantSlug, subPath)
+	}
+	return subPath
 }
 
 // ProcessDogPhoto processes an uploaded dog photo and creates both full-size and thumbnail versions
@@ -113,7 +145,8 @@ func (s *ImageService) ProcessDogPhoto(file multipart.File, dogID int) (fullPath
 	}
 
 	// Local filesystem storage (default)
-	dogsDir := filepath.Join(s.uploadDir, "dogs")
+	// Use tenant-aware base path for SaaS-Mode isolation
+	dogsDir := filepath.Join(s.getTenantBasePath(), "dogs")
 	if err := os.MkdirAll(dogsDir, 0755); err != nil {
 		return "", "", fmt.Errorf("failed to create dogs directory: %w", err)
 	}
@@ -130,9 +163,11 @@ func (s *ImageService) ProcessDogPhoto(file multipart.File, dogID int) (fullPath
 		return "", "", fmt.Errorf("failed to save thumbnail: %w", err)
 	}
 
-	// Return relative paths (as stored in database)
-	fullRelPath := filepath.Join("dogs", fullFilename)
-	thumbRelPath := filepath.Join("dogs", thumbFilename)
+	// Return relative paths including tenant prefix (as stored in database)
+	// SaaS-Mode: "{tenantSlug}/dogs/dog_{id}_full.jpg"
+	// Simple-Mode: "dogs/dog_{id}_full.jpg"
+	fullRelPath := s.getTenantRelativePath(filepath.Join("dogs", fullFilename))
+	thumbRelPath := s.getTenantRelativePath(filepath.Join("dogs", thumbFilename))
 
 	return fullRelPath, thumbRelPath, nil
 }
@@ -201,6 +236,64 @@ func (s *ImageService) savePNG(img image.Image, path string) error {
 	return nil
 }
 
+// ProcessUserPhoto processes an uploaded user profile photo
+// Returns the relative path (e.g., "users/user_5_profile.jpg")
+// Uses userID in filename to prevent collisions
+func (s *ImageService) ProcessUserPhoto(file multipart.File, userID int, ext string) (string, error) {
+	// Reset file pointer to beginning
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return "", fmt.Errorf("failed to seek file: %w", err)
+	}
+
+	// Decode the uploaded image
+	img, err := imaging.Decode(file)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode image: %w", err)
+	}
+
+	// Create users directory if it doesn't exist
+	// Use tenant-aware base path for SaaS-Mode isolation
+	usersDir := filepath.Join(s.getTenantBasePath(), "users")
+	if err := os.MkdirAll(usersDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create users directory: %w", err)
+	}
+
+	// Resize to fit profile dimensions
+	resized := s.resizeImage(img, MaxImageWidth, MaxImageHeight)
+
+	// Generate unique filename based on user ID
+	filename := fmt.Sprintf("user_%d_profile%s", userID, ext)
+	filePath := filepath.Join(usersDir, filename)
+
+	// Save as JPEG (convert all formats to JPEG for consistency and smaller size)
+	if err := s.saveJPEG(resized, filePath, JPEGQuality); err != nil {
+		return "", fmt.Errorf("failed to save user photo: %w", err)
+	}
+
+	// Return relative path including tenant prefix (as stored in database)
+	// SaaS-Mode: "{tenantSlug}/users/user_{id}_profile.jpg"
+	// Simple-Mode: "users/user_{id}_profile.jpg"
+	return s.getTenantRelativePath(filepath.Join("users", filename)), nil
+}
+
+// DeleteUserPhoto deletes a user's profile photo
+// Does not return error if file doesn't exist (idempotent)
+func (s *ImageService) DeleteUserPhoto(userID int) error {
+	// Use tenant-aware base path for SaaS-Mode isolation
+	usersDir := filepath.Join(s.getTenantBasePath(), "users")
+
+	// Delete possible photo files (both extensions since we might have old data)
+	for _, ext := range []string{".jpg", ".jpeg", ".png"} {
+		photoPath := filepath.Join(usersDir, fmt.Sprintf("user_%d_profile%s", userID, ext))
+		if err := os.Remove(photoPath); err != nil && !os.IsNotExist(err) {
+			// Log but continue - not a critical error
+			continue
+		}
+	}
+
+	return nil
+}
+
 // DeleteDogPhotos deletes both full-size and thumbnail photos for a dog
 // Does not return error if files don't exist (idempotent)
 func (s *ImageService) DeleteDogPhotos(dogID int) error {
@@ -216,8 +309,8 @@ func (s *ImageService) DeleteDogPhotos(dogID int) error {
 		return nil
 	}
 
-	// Local filesystem deletion
-	dogsDir := filepath.Join(s.uploadDir, "dogs")
+	// Local filesystem deletion - use tenant-aware path for SaaS-Mode isolation
+	dogsDir := filepath.Join(s.getTenantBasePath(), "dogs")
 
 	// Delete full-size image
 	fullPath := filepath.Join(dogsDir, fullFilename)
@@ -287,7 +380,8 @@ func (s *ImageService) ProcessLogo(file multipart.File) (string, error) {
 	}
 
 	// Create settings directory if it doesn't exist
-	settingsDir := filepath.Join(s.uploadDir, "settings")
+	// Use tenant-aware base path for SaaS-Mode isolation
+	settingsDir := filepath.Join(s.getTenantBasePath(), "settings")
 	if err := os.MkdirAll(settingsDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create settings directory: %w", err)
 	}
@@ -316,14 +410,17 @@ func (s *ImageService) ProcessLogo(file multipart.File) (string, error) {
 		}
 	}
 
-	// Return relative path
-	return filepath.Join("settings", filename), nil
+	// Return relative path including tenant prefix
+	// SaaS-Mode: "{tenantSlug}/settings/site_logo.png"
+	// Simple-Mode: "settings/site_logo.png"
+	return s.getTenantRelativePath(filepath.Join("settings", filename)), nil
 }
 
 // DeleteLogo removes the custom site logo file (both .jpg and .png variants)
 // Does not return error if files don't exist (idempotent)
 func (s *ImageService) DeleteLogo() error {
-	settingsDir := filepath.Join(s.uploadDir, "settings")
+	// Use tenant-aware base path for SaaS-Mode isolation
+	settingsDir := filepath.Join(s.getTenantBasePath(), "settings")
 
 	// Delete both possible logo files
 	for _, ext := range []string{".jpg", ".png"} {
@@ -350,7 +447,8 @@ func (s *ImageService) ProcessWalkReportPhoto(file multipart.File, reportID int,
 	}
 
 	// Create walk_reports directory if it doesn't exist
-	reportsDir := filepath.Join(s.uploadDir, "walk_reports")
+	// Use tenant-aware base path for SaaS-Mode isolation
+	reportsDir := filepath.Join(s.getTenantBasePath(), "walk_reports")
 	if err := os.MkdirAll(reportsDir, 0755); err != nil {
 		return "", "", fmt.Errorf("failed to create walk_reports directory: %w", err)
 	}
@@ -375,9 +473,11 @@ func (s *ImageService) ProcessWalkReportPhoto(file multipart.File, reportID int,
 		return "", "", fmt.Errorf("failed to save thumbnail: %w", err)
 	}
 
-	// Return relative paths (as stored in database)
-	fullRelPath := filepath.Join("walk_reports", fullFilename)
-	thumbRelPath := filepath.Join("walk_reports", thumbFilename)
+	// Return relative paths including tenant prefix (as stored in database)
+	// SaaS-Mode: "{tenantSlug}/walk_reports/report_{id}_{index}_full.jpg"
+	// Simple-Mode: "walk_reports/report_{id}_{index}_full.jpg"
+	fullRelPath := s.getTenantRelativePath(filepath.Join("walk_reports", fullFilename))
+	thumbRelPath := s.getTenantRelativePath(filepath.Join("walk_reports", thumbFilename))
 
 	return fullRelPath, thumbRelPath, nil
 }

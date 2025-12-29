@@ -247,7 +247,7 @@
         function updateHeaderPhoto() {
             if (currentUser && currentUser.profile_photo) {
                 const headerPhoto = document.getElementById('header-photo');
-                headerPhoto.innerHTML = `<img src="/uploads/${currentUser.profile_photo}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">`;
+                headerPhoto.innerHTML = `<img src="${getPhotoUrl(currentUser.profile_photo)}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">`;
             }
         }
 

@@ -47,6 +47,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      # Mount uploads volume for local storage (when USE_S3=false)
+      # This persists user photos, dog photos, logos across container restarts
+      - uploads_data:/app/uploads
     networks:
       - internal
     healthcheck:
@@ -83,6 +87,8 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+      # Share uploads volume for serving static files (when USE_S3=false)
+      - uploads_data:/srv/uploads:ro
     environment:
       - HETZNER_DNS_TOKEN=${HETZNER_DNS_TOKEN}
     depends_on:
@@ -101,6 +107,7 @@ volumes:
   postgres_data:
   caddy_data:
   caddy_config:
+  uploads_data:  # Persistent storage for user uploads when USE_S3=false
 
 # Usage Instructions:
 #

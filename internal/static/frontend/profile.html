@@ -323,7 +323,9 @@
         function updateHeaderPhoto() {
             if (currentUser && currentUser.profile_photo) {
                 const headerPhoto = document.getElementById('header-photo');
-                headerPhoto.innerHTML = `<img src="/uploads/${currentUser.profile_photo}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">`;
+                // Handle both local paths and S3 URLs
+                const photoUrl = currentUser.profile_photo.startsWith('http') ? currentUser.profile_photo : `/uploads/${currentUser.profile_photo}`;
+                headerPhoto.innerHTML = `<img src="${photoUrl}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">`;
             }
         }
 
@@ -335,7 +337,9 @@
 
             if (currentUser.profile_photo) {
                 const photoPreview = document.getElementById('photo-preview');
-                photoPreview.innerHTML = `<img src="/uploads/${currentUser.profile_photo}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">`;
+                // Handle both local paths and S3 URLs
+                const photoUrl = currentUser.profile_photo.startsWith('http') ? currentUser.profile_photo : `/uploads/${currentUser.profile_photo}`;
+                photoPreview.innerHTML = `<img src="${photoUrl}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profile">`;
             }
         }
 

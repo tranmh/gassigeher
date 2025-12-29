@@ -921,6 +921,326 @@ func TestImageService_ProcessLogo_Overwrites(t *testing.T) {
 	})
 }
 
+// =============================================================================
+// TENANT ISOLATION TESTS (Bug Fixes #1, #3, #4)
+// =============================================================================
+
+// TestImageService_ProcessDogPhoto_TenantIsolation tests that dog photos are isolated per tenant
+// RED PHASE: This test should FAIL until we implement tenant-aware file paths
+func TestImageService_ProcessDogPhoto_TenantIsolation(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create two services for different tenants
+	serviceTenantA := NewImageServiceWithTenant(tempDir, "tenant-a")
+	serviceTenantB := NewImageServiceWithTenant(tempDir, "tenant-b")
+
+	// Create test image
+	buf, err := createTestImage(500, 500, "jpeg")
+	if err != nil {
+		t.Fatalf("Failed to create test image: %v", err)
+	}
+
+	// Both tenants upload a photo for dog ID 1
+	dogID := 1
+
+	// Tenant A uploads
+	fileA := createMultipartFile(buf)
+	pathA, _, err := serviceTenantA.ProcessDogPhoto(fileA, dogID)
+	if err != nil {
+		t.Fatalf("Tenant A upload failed: %v", err)
+	}
+
+	// Tenant B uploads (same dog ID)
+	buf2, _ := createTestImage(600, 600, "jpeg") // Different size to differentiate
+	fileB := createMultipartFile(buf2)
+	pathB, _, err := serviceTenantB.ProcessDogPhoto(fileB, dogID)
+	if err != nil {
+		t.Fatalf("Tenant B upload failed: %v", err)
+	}
+
+	// CRITICAL: Paths must be different (tenant isolated)
+	if pathA == pathB {
+		t.Errorf("TENANT ISOLATION BUG: Paths should be different for different tenants!\nTenant A: %s\nTenant B: %s", pathA, pathB)
+	}
+
+	// Verify paths contain tenant slug
+	if !containsSubstring(pathA, "tenant-a") {
+		t.Errorf("Path should contain tenant slug 'tenant-a': %s", pathA)
+	}
+	if !containsSubstring(pathB, "tenant-b") {
+		t.Errorf("Path should contain tenant slug 'tenant-b': %s", pathB)
+	}
+
+	// Verify both files exist (not overwritten)
+	fullPathA := filepath.Join(tempDir, pathA)
+	fullPathB := filepath.Join(tempDir, pathB)
+
+	if _, err := os.Stat(fullPathA); os.IsNotExist(err) {
+		t.Errorf("Tenant A file should exist: %s", fullPathA)
+	}
+	if _, err := os.Stat(fullPathB); os.IsNotExist(err) {
+		t.Errorf("Tenant B file should exist: %s", fullPathB)
+	}
+}
+
+// TestImageService_ProcessLogo_TenantIsolation tests that logos are isolated per tenant
+// RED PHASE: This test should FAIL until we implement tenant-aware logo paths
+func TestImageService_ProcessLogo_TenantIsolation(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create two services for different tenants
+	serviceTenantA := NewImageServiceWithTenant(tempDir, "shelter-berlin")
+	serviceTenantB := NewImageServiceWithTenant(tempDir, "shelter-munich")
+
+	// Both tenants upload a logo
+	bufA, _ := createTestImage(400, 100, "png")
+	fileA := createMultipartFile(bufA)
+	pathA, err := serviceTenantA.ProcessLogo(fileA)
+	if err != nil {
+		t.Fatalf("Tenant A logo upload failed: %v", err)
+	}
+
+	bufB, _ := createTestImage(500, 120, "png")
+	fileB := createMultipartFile(bufB)
+	pathB, err := serviceTenantB.ProcessLogo(fileB)
+	if err != nil {
+		t.Fatalf("Tenant B logo upload failed: %v", err)
+	}
+
+	// CRITICAL: Paths must be different (tenant isolated)
+	if pathA == pathB {
+		t.Errorf("TENANT ISOLATION BUG: Logo paths should be different!\nTenant A: %s\nTenant B: %s", pathA, pathB)
+	}
+
+	// Verify paths contain tenant slug
+	if !containsSubstring(pathA, "shelter-berlin") {
+		t.Errorf("Logo path should contain tenant slug 'shelter-berlin': %s", pathA)
+	}
+	if !containsSubstring(pathB, "shelter-munich") {
+		t.Errorf("Logo path should contain tenant slug 'shelter-munich': %s", pathB)
+	}
+
+	// Verify both files exist
+	fullPathA := filepath.Join(tempDir, pathA)
+	fullPathB := filepath.Join(tempDir, pathB)
+
+	if _, err := os.Stat(fullPathA); os.IsNotExist(err) {
+		t.Errorf("Tenant A logo should exist: %s", fullPathA)
+	}
+	if _, err := os.Stat(fullPathB); os.IsNotExist(err) {
+		t.Errorf("Tenant B logo should exist: %s", fullPathB)
+	}
+}
+
+// TestImageService_ProcessWalkReportPhoto_TenantIsolation tests that walk report photos are isolated
+// RED PHASE: This test should FAIL until we implement tenant-aware walk report paths
+func TestImageService_ProcessWalkReportPhoto_TenantIsolation(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create two services for different tenants
+	serviceTenantA := NewImageServiceWithTenant(tempDir, "shelter-one")
+	serviceTenantB := NewImageServiceWithTenant(tempDir, "shelter-two")
+
+	// Both tenants upload a photo for report ID 1
+	reportID := 1
+	photoIndex := 0
+
+	bufA, _ := createTestImage(400, 400, "jpeg")
+	fileA := createMultipartFile(bufA)
+	pathA, _, err := serviceTenantA.ProcessWalkReportPhoto(fileA, reportID, photoIndex)
+	if err != nil {
+		t.Fatalf("Tenant A walk report photo upload failed: %v", err)
+	}
+
+	bufB, _ := createTestImage(500, 500, "jpeg")
+	fileB := createMultipartFile(bufB)
+	pathB, _, err := serviceTenantB.ProcessWalkReportPhoto(fileB, reportID, photoIndex)
+	if err != nil {
+		t.Fatalf("Tenant B walk report photo upload failed: %v", err)
+	}
+
+	// CRITICAL: Paths must be different (tenant isolated)
+	if pathA == pathB {
+		t.Errorf("TENANT ISOLATION BUG: Walk report photo paths should be different!\nTenant A: %s\nTenant B: %s", pathA, pathB)
+	}
+
+	// Verify paths contain tenant slug
+	if !containsSubstring(pathA, "shelter-one") {
+		t.Errorf("Walk report path should contain tenant slug 'shelter-one': %s", pathA)
+	}
+	if !containsSubstring(pathB, "shelter-two") {
+		t.Errorf("Walk report path should contain tenant slug 'shelter-two': %s", pathB)
+	}
+}
+
+// TestImageService_DeleteDogPhotos_TenantIsolation tests that deleting dog photos respects tenant isolation
+func TestImageService_DeleteDogPhotos_TenantIsolation(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create services for two tenants
+	serviceTenantA := NewImageServiceWithTenant(tempDir, "tenant-alpha")
+	_ = NewImageServiceWithTenant(tempDir, "tenant-beta") // Just verify it doesn't affect other tenants
+
+	dogID := 5
+
+	// Create test files for both tenants
+	dirA := filepath.Join(tempDir, "tenant-alpha", "dogs")
+	dirB := filepath.Join(tempDir, "tenant-beta", "dogs")
+	os.MkdirAll(dirA, 0755)
+	os.MkdirAll(dirB, 0755)
+
+	fileA := filepath.Join(dirA, "dog_5_full.jpg")
+	fileB := filepath.Join(dirB, "dog_5_full.jpg")
+	os.WriteFile(fileA, []byte("tenant A dog"), 0644)
+	os.WriteFile(fileB, []byte("tenant B dog"), 0644)
+
+	// Tenant A deletes their dog photo
+	err := serviceTenantA.DeleteDogPhotos(dogID)
+	if err != nil {
+		t.Fatalf("Delete failed: %v", err)
+	}
+
+	// Tenant A's file should be deleted
+	if _, err := os.Stat(fileA); !os.IsNotExist(err) {
+		t.Error("Tenant A's file should be deleted")
+	}
+
+	// Tenant B's file should still exist (not affected by tenant A's delete)
+	if _, err := os.Stat(fileB); os.IsNotExist(err) {
+		t.Error("TENANT ISOLATION BUG: Tenant B's file should NOT be deleted!")
+	}
+}
+
+// TestImageService_DeleteLogo_TenantIsolation tests that deleting logo respects tenant isolation
+func TestImageService_DeleteLogo_TenantIsolation(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create services for two tenants
+	serviceTenantA := NewImageServiceWithTenant(tempDir, "org-one")
+	_ = NewImageServiceWithTenant(tempDir, "org-two") // Just verify it doesn't affect other tenants
+
+	// Create test logo files for both tenants
+	dirA := filepath.Join(tempDir, "org-one", "settings")
+	dirB := filepath.Join(tempDir, "org-two", "settings")
+	os.MkdirAll(dirA, 0755)
+	os.MkdirAll(dirB, 0755)
+
+	logoA := filepath.Join(dirA, "site_logo.png")
+	logoB := filepath.Join(dirB, "site_logo.png")
+	os.WriteFile(logoA, []byte("org one logo"), 0644)
+	os.WriteFile(logoB, []byte("org two logo"), 0644)
+
+	// Org One deletes their logo
+	err := serviceTenantA.DeleteLogo()
+	if err != nil {
+		t.Fatalf("Delete failed: %v", err)
+	}
+
+	// Org One's logo should be deleted
+	if _, err := os.Stat(logoA); !os.IsNotExist(err) {
+		t.Error("Org One's logo should be deleted")
+	}
+
+	// Org Two's logo should still exist
+	if _, err := os.Stat(logoB); os.IsNotExist(err) {
+		t.Error("TENANT ISOLATION BUG: Org Two's logo should NOT be deleted!")
+	}
+}
+
+// TestImageService_ProcessUserPhoto_TenantIsolation tests that user profile photos are isolated per tenant
+func TestImageService_ProcessUserPhoto_TenantIsolation(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create two services for different tenants
+	serviceTenantA := NewImageServiceWithTenant(tempDir, "tenant-x")
+	serviceTenantB := NewImageServiceWithTenant(tempDir, "tenant-y")
+
+	// Both tenants upload a photo for user ID 1
+	userID := 1
+
+	bufA, _ := createTestImage(300, 300, "jpeg")
+	fileA := createMultipartFile(bufA)
+	pathA, err := serviceTenantA.ProcessUserPhoto(fileA, userID, ".jpg")
+	if err != nil {
+		t.Fatalf("Tenant A upload failed: %v", err)
+	}
+
+	bufB, _ := createTestImage(400, 400, "jpeg")
+	fileB := createMultipartFile(bufB)
+	pathB, err := serviceTenantB.ProcessUserPhoto(fileB, userID, ".jpg")
+	if err != nil {
+		t.Fatalf("Tenant B upload failed: %v", err)
+	}
+
+	// CRITICAL: Paths must be different (tenant isolated)
+	if pathA == pathB {
+		t.Errorf("TENANT ISOLATION BUG: User photo paths should be different!\nTenant A: %s\nTenant B: %s", pathA, pathB)
+	}
+
+	// Verify paths contain tenant slug
+	if !containsSubstring(pathA, "tenant-x") {
+		t.Errorf("User photo path should contain tenant slug 'tenant-x': %s", pathA)
+	}
+	if !containsSubstring(pathB, "tenant-y") {
+		t.Errorf("User photo path should contain tenant slug 'tenant-y': %s", pathB)
+	}
+
+	// Verify both files exist
+	fullPathA := filepath.Join(tempDir, pathA)
+	fullPathB := filepath.Join(tempDir, pathB)
+
+	if _, err := os.Stat(fullPathA); os.IsNotExist(err) {
+		t.Errorf("Tenant A user photo should exist: %s", fullPathA)
+	}
+	if _, err := os.Stat(fullPathB); os.IsNotExist(err) {
+		t.Errorf("Tenant B user photo should exist: %s", fullPathB)
+	}
+}
+
+// TestImageService_ProcessUserPhoto_UniqueFilename tests that user photos use unique filenames based on userID
+func TestImageService_ProcessUserPhoto_UniqueFilename(t *testing.T) {
+	tempDir := t.TempDir()
+	service := NewImageService(tempDir)
+
+	// Upload photos for different users
+	buf1, _ := createTestImage(300, 300, "jpeg")
+	file1 := createMultipartFile(buf1)
+	path1, err := service.ProcessUserPhoto(file1, 1, ".jpg")
+	if err != nil {
+		t.Fatalf("User 1 upload failed: %v", err)
+	}
+
+	buf2, _ := createTestImage(300, 300, "jpeg")
+	file2 := createMultipartFile(buf2)
+	path2, err := service.ProcessUserPhoto(file2, 2, ".jpg")
+	if err != nil {
+		t.Fatalf("User 2 upload failed: %v", err)
+	}
+
+	// Paths should be different for different users
+	if path1 == path2 {
+		t.Errorf("User photo paths should be different for different users!\nUser 1: %s\nUser 2: %s", path1, path2)
+	}
+
+	// Verify filename format
+	if !containsSubstring(path1, "user_1_profile") {
+		t.Errorf("Path should contain 'user_1_profile': %s", path1)
+	}
+	if !containsSubstring(path2, "user_2_profile") {
+		t.Errorf("Path should contain 'user_2_profile': %s", path2)
+	}
+}
+
+// Helper to check if string contains substring
+func containsSubstring(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr ||
+		(len(s) > 0 && len(substr) > 0 &&
+			(len(s) >= len(substr) &&
+				(s[:len(substr)] == substr ||
+					s[len(s)-len(substr):] == substr ||
+					(len(s) > len(substr) && containsSubstring(s[1:], substr))))))
+}
+
 // TestImageService_PathTraversalPrevention tests that path traversal attacks are blocked
 func TestImageService_PathTraversalPrevention(t *testing.T) {
 	tempDir := t.TempDir()

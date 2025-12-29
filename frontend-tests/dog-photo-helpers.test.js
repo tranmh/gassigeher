@@ -22,6 +22,10 @@ beforeAll(() => {
   window.getDogPhotoUrl = function(dog, useThumbnail = false) {
     if (dog.photo) {
       const photoField = useThumbnail && dog.photo_thumbnail ? dog.photo_thumbnail : dog.photo;
+      // Check if it's already a full URL (S3 storage) - don't prepend /uploads/
+      if (photoField.startsWith('http://') || photoField.startsWith('https://')) {
+        return photoField;
+      }
       return `/uploads/${photoField}`;
     }
     return '/assets/images/placeholders/dog-placeholder.svg';
@@ -209,6 +213,76 @@ describe('getDogPhotoUrl()', () => {
     const url = getDogPhotoUrl(dog);
 
     expect(url).toBe('/assets/images/placeholders/dog-placeholder.svg');
+  });
+
+  // S3 URL handling tests - Bug #5 fix
+  test('should return S3 HTTPS URL directly without prepending /uploads/', () => {
+    const dog = {
+      id: 1,
+      name: 'Rex',
+      photo: 'https://my-bucket.s3.eu-central-1.amazonaws.com/tenants/shelter-berlin/dogs/dog_1_full.jpg',
+    };
+
+    const url = getDogPhotoUrl(dog);
+
+    expect(url).toBe('https://my-bucket.s3.eu-central-1.amazonaws.com/tenants/shelter-berlin/dogs/dog_1_full.jpg');
+    expect(url).not.toContain('/uploads/');
+  });
+
+  test('should return S3 HTTP URL directly without prepending /uploads/', () => {
+    const dog = {
+      id: 1,
+      name: 'Rex',
+      photo: 'http://localhost:9000/bucket/tenants/test/dogs/dog_1_full.jpg',
+    };
+
+    const url = getDogPhotoUrl(dog);
+
+    expect(url).toBe('http://localhost:9000/bucket/tenants/test/dogs/dog_1_full.jpg');
+    expect(url).not.toContain('/uploads/');
+  });
+
+  test('should return S3 thumbnail URL directly without prepending /uploads/', () => {
+    const dog = {
+      id: 1,
+      name: 'Rex',
+      photo: 'https://bucket.example.com/full.jpg',
+      photo_thumbnail: 'https://bucket.example.com/thumb.jpg',
+    };
+
+    const url = getDogPhotoUrl(dog, true);
+
+    expect(url).toBe('https://bucket.example.com/thumb.jpg');
+    expect(url).not.toContain('/uploads/');
+  });
+
+  test('should fallback to full S3 URL when thumbnail not available', () => {
+    const dog = {
+      id: 1,
+      name: 'Rex',
+      photo: 'https://bucket.example.com/full.jpg',
+      photo_thumbnail: null,
+    };
+
+    const url = getDogPhotoUrl(dog, true);
+
+    expect(url).toBe('https://bucket.example.com/full.jpg');
+  });
+
+  test('should still prepend /uploads/ for local paths (not URLs)', () => {
+    const dog = { id: 1, name: 'Rex', photo: 'dogs/rex.jpg' };
+
+    const url = getDogPhotoUrl(dog);
+
+    expect(url).toBe('/uploads/dogs/rex.jpg');
+  });
+
+  test('should handle tenant-prefixed local paths', () => {
+    const dog = { id: 1, name: 'Rex', photo: 'shelter-berlin/dogs/dog_1_full.jpg' };
+
+    const url = getDogPhotoUrl(dog);
+
+    expect(url).toBe('/uploads/shelter-berlin/dogs/dog_1_full.jpg');
   });
 });
 

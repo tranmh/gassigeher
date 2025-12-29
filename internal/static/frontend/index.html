@@ -158,9 +158,11 @@
                     }
 
                     // Load profile photo if available
+                    // Handle both local paths and S3 URLs
                     const headerPhoto = document.getElementById('header-photo');
                     if (headerPhoto && userData.profile_photo) {
-                        headerPhoto.innerHTML = `<img src="/uploads/${userData.profile_photo}"
+                        const photoUrl = userData.profile_photo.startsWith('http') ? userData.profile_photo : `/uploads/${userData.profile_photo}`;
+                        headerPhoto.innerHTML = `<img src="${photoUrl}"
                             style="width: 100%; height: 100%; object-fit: cover;"
                             alt="Profile">`;
                     }

@@ -36,6 +36,7 @@ function escapeForAttribute(value) {
 
 /**
  * Get the photo URL for a dog, with fallback to placeholder
+ * Handles both local paths (prepends /uploads/) and S3 URLs (uses directly)
  * @param {Object} dog - Dog object with photo and color fields
  * @param {boolean} useThumbnail - Whether to use thumbnail (default: false)
  * @returns {string} - Photo URL or placeholder URL
@@ -46,10 +47,42 @@ function getDogPhotoUrl(dog, useThumbnail = false) {
         const photoField = useThumbnail && dog.photo_thumbnail
             ? dog.photo_thumbnail
             : dog.photo;
+
+        // Check if it's already a full URL (S3 storage) - use directly without prepending /uploads/
+        if (photoField.startsWith('http://') || photoField.startsWith('https://')) {
+            return photoField;
+        }
+
+        // Local storage - prepend /uploads/
         return `/uploads/${photoField}`;
     }
 
     return '/assets/images/placeholders/dog-placeholder.svg';
+}
+
+/**
+ * Get the URL for any photo path, handling both local paths and S3 URLs
+ * @param {string} photoPath - The photo path from the database
+ * @param {string} fallback - Optional fallback URL if path is empty
+ * @returns {string} - Photo URL ready for use in src attribute
+ */
+function getPhotoUrl(photoPath, fallback = '') {
+    if (!photoPath) {
+        return fallback;
+    }
+
+    // Check if it's already a full URL (S3 storage) - use directly
+    if (photoPath.startsWith('http://') || photoPath.startsWith('https://')) {
+        return photoPath;
+    }
+
+    // Local storage - prepend /uploads/
+    return `/uploads/${photoPath}`;
+}
+
+// Make getPhotoUrl available globally for inline scripts in HTML files
+if (typeof window !== 'undefined') {
+    window.getPhotoUrl = getPhotoUrl;
 }
 
 /**

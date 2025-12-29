@@ -3,6 +3,8 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -24,10 +26,30 @@ type WalkReportHandler struct {
 	bookingRepo     *repository.BookingRepository
 	dogRepo         *repository.DogRepository
 	imageService    *services.ImageService
+	s3Service       *services.S3Service // SaaS: For S3 storage
 }
 
 // NewWalkReportHandler creates a new walk report handler
 func NewWalkReportHandler(db *sql.DB, cfg *config.Config) *WalkReportHandler {
+	// Initialize S3 service if configured
+	var s3Service *services.S3Service
+	if cfg.UseS3 {
+		s3Config := &services.S3Config{
+			Endpoint:   cfg.S3Endpoint,
+			AccessKey:  cfg.S3AccessKey,
+			SecretKey:  cfg.S3SecretKey,
+			BucketName: cfg.S3BucketName,
+			Region:     cfg.S3Region,
+			PublicURL:  cfg.S3PublicURL,
+			UseSSL:     cfg.S3UseSSL,
+		}
+		var err error
+		s3Service, err = services.NewS3Service(s3Config)
+		if err != nil {
+			println("Warning: Failed to initialize S3 service for walk reports:", err.Error())
+		}
+	}
+
 	return &WalkReportHandler{
 		db:              db,
 		cfg:             cfg,
@@ -35,7 +57,20 @@ func NewWalkReportHandler(db *sql.DB, cfg *config.Config) *WalkReportHandler {
 		bookingRepo:     repository.NewBookingRepository(db),
 		dogRepo:         repository.NewDogRepository(db),
 		imageService:    services.NewImageService(cfg.UploadDir),
+		s3Service:       s3Service,
 	}
+}
+
+// getImageServiceForRequest returns an ImageService with the correct tenant slug for the request
+// In SaaS-Mode, this ensures photos are stored in tenant-specific directories
+func (h *WalkReportHandler) getImageServiceForRequest(r *http.Request) *services.ImageService {
+	tenantSlug, _ := r.Context().Value(middleware.TenantSlugKey).(string)
+	if tenantSlug != "" {
+		// SaaS-Mode: Return tenant-aware ImageService
+		return services.NewImageServiceWithTenant(h.cfg.UploadDir, tenantSlug)
+	}
+	// Simple-Mode: Use default ImageService (no tenant prefix)
+	return h.imageService
 }
 
 // CreateReport creates a new walk report for a completed booking
@@ -337,9 +372,17 @@ func (h *WalkReportHandler) DeleteReport(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	// Delete photos from disk first
+	// Delete photos from storage (S3 or local filesystem)
 	for _, photo := range report.Photos {
-		h.imageService.DeleteWalkReportPhoto(photo.PhotoPath, photo.PhotoThumbnail)
+		// Check if photo is stored in S3 (URL starts with http)
+		if strings.HasPrefix(photo.PhotoPath, "http://") || strings.HasPrefix(photo.PhotoPath, "https://") {
+			// S3 storage - deletion handled separately if needed
+			// For now, we skip S3 deletion as it requires parsing the URL
+			continue
+		}
+		// Local storage - use tenant-aware ImageService
+		imageService := h.getImageServiceForRequest(r)
+		imageService.DeleteWalkReportPhoto(photo.PhotoPath, photo.PhotoThumbnail)
 	}
 
 	// Delete report (photos cascade deleted in DB)
@@ -437,18 +480,59 @@ func (h *WalkReportHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) 
 	// Reset file reader position after MIME check
 	file.Seek(0, 0)
 
-	// Process and save the photo
-	fullPath, thumbPath, err := h.imageService.ProcessWalkReportPhoto(file, reportID, photoCount+1)
-	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to process photo")
-		return
+	var fullPath, thumbPath string
+
+	// SaaS: Use S3 storage if enabled
+	if h.s3Service != nil && h.cfg.UseS3 {
+		// Get tenant slug from context
+		tenantSlug, _ := r.Context().Value(middleware.TenantSlugKey).(string)
+		if tenantSlug == "" {
+			tenantSlug = "default"
+		}
+
+		// Read file data
+		fileData, err := io.ReadAll(file)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "Failed to read file")
+			return
+		}
+
+		// Determine content type
+		contentType := "image/jpeg"
+		if ext == ".png" {
+			contentType = "image/png"
+		}
+
+		// Upload full-size photo to S3
+		fullObjectPath := fmt.Sprintf("walk_reports/report_%d_photo_%d%s", reportID, photoCount+1, ext)
+		fullURL, err := h.s3Service.Upload(r.Context(), tenantSlug, fullObjectPath, fileData, contentType)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "Failed to upload photo to S3")
+			return
+		}
+
+		// For S3, we store the full URL in the database
+		fullPath = fullURL
+		thumbPath = fullURL // S3 uses same URL for now (no auto-resize)
+	} else {
+		// Local filesystem storage with tenant isolation
+		imageService := h.getImageServiceForRequest(r)
+		var err error
+		fullPath, thumbPath, err = imageService.ProcessWalkReportPhoto(file, reportID, photoCount+1)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "Failed to process photo")
+			return
+		}
 	}
 
 	// Add photo to database
 	photo, err := h.walkReportRepo.AddPhoto(tenantID, reportID, fullPath, thumbPath, photoCount)
 	if err != nil {
-		// Clean up files if DB insert fails
-		h.imageService.DeleteWalkReportPhoto(fullPath, thumbPath)
+		// Clean up files if DB insert fails (only for local storage)
+		if h.s3Service == nil || !h.cfg.UseS3 {
+			imageService := h.getImageServiceForRequest(r)
+			imageService.DeleteWalkReportPhoto(fullPath, thumbPath)
+		}
 		respondError(w, http.StatusInternalServerError, "Failed to save photo")
 		return
 	}
@@ -530,8 +614,14 @@ func (h *WalkReportHandler) DeletePhoto(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Delete files from disk
-	h.imageService.DeleteWalkReportPhoto(photo.PhotoPath, photo.PhotoThumbnail)
+	// Delete files from storage (S3 or local filesystem)
+	// Check if photo is stored in S3 (URL starts with http)
+	if !strings.HasPrefix(photo.PhotoPath, "http://") && !strings.HasPrefix(photo.PhotoPath, "https://") {
+		// Local storage - use tenant-aware ImageService
+		imageService := h.getImageServiceForRequest(r)
+		imageService.DeleteWalkReportPhoto(photo.PhotoPath, photo.PhotoThumbnail)
+	}
+	// S3 storage deletion is skipped for now (requires parsing URL)
 
 	respondJSON(w, http.StatusOK, map[string]string{"message": "Photo deleted"})
 }

@@ -78,6 +78,14 @@ admin.gassigeher.org {
         dns hetzner {env.HETZNER_DNS_TOKEN}
     }
 
+    # Serve uploaded files directly from filesystem (when USE_S3=false)
+    # This is more efficient than proxying through the app
+    handle_path /uploads/* {
+        root * /srv/uploads
+        file_server
+    }
+
+    # All other requests go to the app
     reverse_proxy app:8080
 
     # Security headers

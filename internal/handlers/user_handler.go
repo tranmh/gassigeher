@@ -8,7 +8,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -30,7 +29,8 @@ type UserHandler struct {
 	userColorRepo *repository.UserColorRepository
 	authService   *services.AuthService
 	emailService  *services.EmailService
-	s3Service     *services.S3Service // SaaS: For S3 storage
+	imageService  *services.ImageService // For profile photo processing
+	s3Service     *services.S3Service    // SaaS: For S3 storage
 	config        *config.Config
 }
 
@@ -67,9 +67,22 @@ func NewUserHandler(db *sql.DB, cfg *config.Config) *UserHandler {
 		userColorRepo: repository.NewUserColorRepository(db),
 		authService:   services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours),
 		emailService:  emailService,
+		imageService:  services.NewImageService(cfg.UploadDir), // Basic service, tenant set per-request
 		s3Service:     s3Service,
 		config:        cfg,
 	}
+}
+
+// getImageServiceForRequest returns an ImageService with the correct tenant slug for the request
+// In SaaS-Mode, this includes tenant isolation. In Simple-Mode, returns the default service.
+func (h *UserHandler) getImageServiceForRequest(r *http.Request) *services.ImageService {
+	tenantSlug, _ := r.Context().Value(middleware.TenantSlugKey).(string)
+	if tenantSlug != "" {
+		// SaaS-Mode: Create tenant-aware service
+		return services.NewImageServiceWithTenant(h.config.UploadDir, tenantSlug)
+	}
+	// Simple-Mode: Use default service (no tenant isolation)
+	return h.imageService
 }
 
 // GetMe returns the current user's profile
@@ -319,35 +332,23 @@ func (h *UserHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 		photoPath = photoURL
 		log.Printf("Uploaded user %d photo to S3: %s", userID, photoURL)
 	} else {
-		// Local filesystem storage
-		// Create upload directory if it doesn't exist
-		userDir := filepath.Join(h.config.UploadDir, "users")
-		if err := os.MkdirAll(userDir, 0755); err != nil {
-			respondError(w, http.StatusInternalServerError, "Failed to create upload directory")
-			return
-		}
+		// Local filesystem storage with tenant isolation
+		// Get tenant-aware ImageService for this request
+		imageService := h.getImageServiceForRequest(r)
 
-		// Generate filename
-		photoPath = filepath.Join("users", filepath.Base(header.Filename))
-		destPath := filepath.Join(h.config.UploadDir, photoPath)
-
-		// Save file
-		dest, err := os.Create(destPath)
-		if err != nil {
-			respondError(w, http.StatusInternalServerError, "Failed to save file")
-			return
-		}
-		defer dest.Close()
-
-		if _, err := io.Copy(dest, file); err != nil {
-			respondError(w, http.StatusInternalServerError, "Failed to save file")
-			return
-		}
-
-		// Delete old photo if exists (only for local storage)
+		// Delete old photo if exists (before uploading new one)
 		if user.ProfilePhoto != nil && *user.ProfilePhoto != "" {
-			oldPath := filepath.Join(h.config.UploadDir, *user.ProfilePhoto)
-			os.Remove(oldPath) // Ignore errors
+			imageService.DeleteUserPhoto(userID)
+		}
+
+		// Process and save the photo using ImageService
+		// This handles tenant isolation, unique filenames, and resizing
+		var err error
+		photoPath, err = imageService.ProcessUserPhoto(file, userID, ext)
+		if err != nil {
+			log.Printf("Failed to process user photo: %v", err)
+			respondError(w, http.StatusInternalServerError, "Failed to save file")
+			return
 		}
 	}
 
