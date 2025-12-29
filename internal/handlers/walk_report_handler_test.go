@@ -38,7 +38,7 @@ func TestWalkReportHandler_CreateReport(t *testing.T) {
 	// Create a dog
 	dogResult, err := db.Exec(`
 		INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available)
-		VALUES (1, 'Test Dog', 'Mixed', 'medium', 3, 1, 1)
+		VALUES (0, 'Test Dog', 'Mixed', 'medium', 3, 1, 1)
 	`)
 	if err != nil {
 		t.Fatalf("Failed to create test dog: %v", err)
@@ -48,21 +48,21 @@ func TestWalkReportHandler_CreateReport(t *testing.T) {
 	// Create a completed booking for the user
 	bookingResult, _ := db.Exec(`
 		INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status)
-		VALUES (1, ?, ?, ?, '10:00', 'completed')
+		VALUES (0, ?, ?, ?, '10:00', 'completed')
 	`, userID, int(dogID), time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
 	completedBookingID, _ := bookingResult.LastInsertId()
 
 	// Create a scheduled (not completed) booking
 	scheduledResult, _ := db.Exec(`
 		INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status)
-		VALUES (1, ?, ?, ?, '11:00', 'scheduled')
+		VALUES (0, ?, ?, ?, '11:00', 'scheduled')
 	`, userID, int(dogID), time.Now().AddDate(0, 0, 1).Format("2006-01-02"))
 	scheduledBookingID, _ := scheduledResult.LastInsertId()
 
 	// Create a completed booking for other user
 	otherBookingResult, _ := db.Exec(`
 		INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status)
-		VALUES (1, ?, ?, ?, '14:00', 'completed')
+		VALUES (0, ?, ?, ?, '14:00', 'completed')
 	`, otherUserID, int(dogID), time.Now().AddDate(0, 0, -2).Format("2006-01-02"))
 	otherUserBookingID, _ := otherBookingResult.LastInsertId()
 
@@ -78,7 +78,7 @@ func TestWalkReportHandler_CreateReport(t *testing.T) {
 
 		req := httptest.NewRequest("POST", "/api/walk-reports", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -107,7 +107,7 @@ func TestWalkReportHandler_CreateReport(t *testing.T) {
 
 		req := httptest.NewRequest("POST", "/api/walk-reports", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -128,7 +128,7 @@ func TestWalkReportHandler_CreateReport(t *testing.T) {
 
 		req := httptest.NewRequest("POST", "/api/walk-reports", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -149,7 +149,7 @@ func TestWalkReportHandler_CreateReport(t *testing.T) {
 
 		req := httptest.NewRequest("POST", "/api/walk-reports", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		ctx := contextWithTenant(req.Context(), 1, userID, false) // userID trying to create report for otherUser's booking
+		ctx := contextWithTenant(req.Context(), 0, userID, false) // userID trying to create report for otherUser's booking
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -170,7 +170,7 @@ func TestWalkReportHandler_CreateReport(t *testing.T) {
 
 		req := httptest.NewRequest("POST", "/api/walk-reports", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -185,7 +185,7 @@ func TestWalkReportHandler_CreateReport(t *testing.T) {
 		// Create another completed booking for validation test
 		newBookingResult, _ := db.Exec(`
 			INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status)
-			VALUES (1, ?, ?, ?, '15:00', 'completed')
+			VALUES (0, ?, ?, ?, '15:00', 'completed')
 		`, userID, int(dogID), time.Now().AddDate(0, 0, -3).Format("2006-01-02"))
 		newBookingID, _ := newBookingResult.LastInsertId()
 
@@ -198,7 +198,7 @@ func TestWalkReportHandler_CreateReport(t *testing.T) {
 
 		req := httptest.NewRequest("POST", "/api/walk-reports", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -213,7 +213,7 @@ func TestWalkReportHandler_CreateReport(t *testing.T) {
 		// Create another completed booking for validation test
 		newBookingResult, _ := db.Exec(`
 			INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status)
-			VALUES (1, ?, ?, ?, '16:00', 'completed')
+			VALUES (0, ?, ?, ?, '16:00', 'completed')
 		`, userID, int(dogID), time.Now().AddDate(0, 0, -4).Format("2006-01-02"))
 		newBookingID, _ := newBookingResult.LastInsertId()
 
@@ -226,7 +226,7 @@ func TestWalkReportHandler_CreateReport(t *testing.T) {
 
 		req := httptest.NewRequest("POST", "/api/walk-reports", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -247,7 +247,7 @@ func TestWalkReportHandler_CreateReport(t *testing.T) {
 
 		req := httptest.NewRequest("POST", "/api/walk-reports", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -273,27 +273,27 @@ func TestWalkReportHandler_GetReport(t *testing.T) {
 
 	dogResult, _ := db.Exec(`
 		INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available)
-		VALUES (1, 'Test Dog', 'Mixed', 'medium', 3, 1, 1)
+		VALUES (0, 'Test Dog', 'Mixed', 'medium', 3, 1, 1)
 	`)
 	dogID, _ := dogResult.LastInsertId()
 
 	bookingResult, _ := db.Exec(`
 		INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status)
-		VALUES (1, ?, ?, ?, '10:00', 'completed')
+		VALUES (0, ?, ?, ?, '10:00', 'completed')
 	`, userID, int(dogID), time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
 	bookingID, _ := bookingResult.LastInsertId()
 
 	// Create a walk report
 	reportResult, _ := db.Exec(`
 		INSERT INTO walk_reports (tenant_id, booking_id, behavior_rating, energy_level, notes)
-		VALUES (1, ?, 5, 'high', 'Great walk!')
+		VALUES (0, ?, 5, 'high', 'Great walk!')
 	`, int(bookingID))
 	reportID, _ := reportResult.LastInsertId()
 
 	t.Run("returns report by ID", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/walk-reports/1", nil)
 		req = mux.SetURLVars(req, map[string]string{"id": "1"})
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -314,7 +314,7 @@ func TestWalkReportHandler_GetReport(t *testing.T) {
 	t.Run("returns 404 for non-existent report", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/walk-reports/99999", nil)
 		req = mux.SetURLVars(req, map[string]string{"id": "99999"})
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -328,7 +328,7 @@ func TestWalkReportHandler_GetReport(t *testing.T) {
 	t.Run("returns 400 for invalid report ID", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/walk-reports/invalid", nil)
 		req = mux.SetURLVars(req, map[string]string{"id": "invalid"})
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -353,26 +353,26 @@ func TestWalkReportHandler_GetReportByBooking(t *testing.T) {
 
 	dogResult, _ := db.Exec(`
 		INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available)
-		VALUES (1, 'Test Dog', 'Mixed', 'medium', 3, 1, 1)
+		VALUES (0, 'Test Dog', 'Mixed', 'medium', 3, 1, 1)
 	`)
 	dogID, _ := dogResult.LastInsertId()
 
 	bookingResult, _ := db.Exec(`
 		INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status)
-		VALUES (1, ?, ?, ?, '10:00', 'completed')
+		VALUES (0, ?, ?, ?, '10:00', 'completed')
 	`, userID, int(dogID), time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
 	bookingID, _ := bookingResult.LastInsertId()
 
 	// Create a walk report
 	db.Exec(`
 		INSERT INTO walk_reports (tenant_id, booking_id, behavior_rating, energy_level)
-		VALUES (1, ?, 4, 'medium')
+		VALUES (0, ?, 4, 'medium')
 	`, int(bookingID))
 
 	t.Run("returns report by booking ID", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/bookings/1/report", nil)
 		req = mux.SetURLVars(req, map[string]string{"bookingId": "1"})
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -387,13 +387,13 @@ func TestWalkReportHandler_GetReportByBooking(t *testing.T) {
 		// Create another booking without a report
 		noReportBooking, _ := db.Exec(`
 			INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status)
-			VALUES (1, ?, ?, ?, '11:00', 'completed')
+			VALUES (0, ?, ?, ?, '11:00', 'completed')
 		`, userID, int(dogID), time.Now().AddDate(0, 0, -2).Format("2006-01-02"))
 		noReportBookingID, _ := noReportBooking.LastInsertId()
 
 		req := httptest.NewRequest("GET", "/api/bookings/2/report", nil)
 		req = mux.SetURLVars(req, map[string]string{"bookingId": strconv.Itoa(int(noReportBookingID))})
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -418,7 +418,7 @@ func TestWalkReportHandler_GetDogWalkReports(t *testing.T) {
 
 	dogResult, _ := db.Exec(`
 		INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available)
-		VALUES (1, 'Test Dog', 'Mixed', 'medium', 3, 1, 1)
+		VALUES (0, 'Test Dog', 'Mixed', 'medium', 3, 1, 1)
 	`)
 	dogID, _ := dogResult.LastInsertId()
 
@@ -426,20 +426,20 @@ func TestWalkReportHandler_GetDogWalkReports(t *testing.T) {
 	for i := 1; i <= 5; i++ {
 		bookingResult, _ := db.Exec(`
 			INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status)
-			VALUES (1, ?, ?, ?, '10:00', 'completed')
+			VALUES (0, ?, ?, ?, '10:00', 'completed')
 		`, userID, int(dogID), time.Now().AddDate(0, 0, -i).Format("2006-01-02"))
 		bookingID, _ := bookingResult.LastInsertId()
 
 		db.Exec(`
 			INSERT INTO walk_reports (tenant_id, booking_id, behavior_rating, energy_level)
-			VALUES (1, ?, ?, 'medium')
+			VALUES (0, ?, ?, 'medium')
 		`, int(bookingID), i)
 	}
 
 	t.Run("returns reports with stats", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/dogs/1/walk-reports", nil)
 		req = mux.SetURLVars(req, map[string]string{"id": "1"})
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -466,7 +466,7 @@ func TestWalkReportHandler_GetDogWalkReports(t *testing.T) {
 	t.Run("respects limit parameter", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/dogs/1/walk-reports?limit=2", nil)
 		req = mux.SetURLVars(req, map[string]string{"id": "1"})
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -488,7 +488,7 @@ func TestWalkReportHandler_GetDogWalkReports(t *testing.T) {
 	t.Run("returns 404 for non-existent dog", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/dogs/99999/walk-reports", nil)
 		req = mux.SetURLVars(req, map[string]string{"id": "99999"})
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -516,20 +516,20 @@ func TestWalkReportHandler_UpdateReport(t *testing.T) {
 
 	dogResult, _ := db.Exec(`
 		INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available)
-		VALUES (1, 'Test Dog', 'Mixed', 'medium', 3, 1, 1)
+		VALUES (0, 'Test Dog', 'Mixed', 'medium', 3, 1, 1)
 	`)
 	dogID, _ := dogResult.LastInsertId()
 
 	// Create booking and report for userID
 	bookingResult, _ := db.Exec(`
 		INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status)
-		VALUES (1, ?, ?, ?, '10:00', 'completed')
+		VALUES (0, ?, ?, ?, '10:00', 'completed')
 	`, userID, int(dogID), time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
 	bookingID, _ := bookingResult.LastInsertId()
 
 	reportResult, _ := db.Exec(`
 		INSERT INTO walk_reports (tenant_id, booking_id, behavior_rating, energy_level)
-		VALUES (1, ?, 3, 'low')
+		VALUES (0, ?, 3, 'low')
 	`, int(bookingID))
 	reportID, _ := reportResult.LastInsertId()
 
@@ -545,7 +545,7 @@ func TestWalkReportHandler_UpdateReport(t *testing.T) {
 		req := httptest.NewRequest("PUT", "/api/walk-reports/1", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req = mux.SetURLVars(req, map[string]string{"id": "1"})
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -576,7 +576,7 @@ func TestWalkReportHandler_UpdateReport(t *testing.T) {
 		req := httptest.NewRequest("PUT", "/api/walk-reports/1", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req = mux.SetURLVars(req, map[string]string{"id": "1"})
-		ctx := contextWithTenant(req.Context(), 1, otherUserID, false) // otherUser trying to update userID's report
+		ctx := contextWithTenant(req.Context(), 0, otherUserID, false) // otherUser trying to update userID's report
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -597,7 +597,7 @@ func TestWalkReportHandler_UpdateReport(t *testing.T) {
 		req := httptest.NewRequest("PUT", "/api/walk-reports/1", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req = mux.SetURLVars(req, map[string]string{"id": "1"})
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -618,7 +618,7 @@ func TestWalkReportHandler_UpdateReport(t *testing.T) {
 		req := httptest.NewRequest("PUT", "/api/walk-reports/99999", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req = mux.SetURLVars(req, map[string]string{"id": "99999"})
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -639,7 +639,7 @@ func TestWalkReportHandler_UpdateReport(t *testing.T) {
 		req := httptest.NewRequest("PUT", "/api/walk-reports/1", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(int(reportID))})
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -667,14 +667,14 @@ func TestWalkReportHandler_DeleteReport(t *testing.T) {
 
 	dogResult, _ := db.Exec(`
 		INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available)
-		VALUES (1, 'Test Dog', 'Mixed', 'medium', 3, 1, 1)
+		VALUES (0, 'Test Dog', 'Mixed', 'medium', 3, 1, 1)
 	`)
 	dogID, _ := dogResult.LastInsertId()
 
 	// Create booking and report for userID
 	bookingResult, _ := db.Exec(`
 		INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status)
-		VALUES (1, ?, ?, ?, '10:00', 'completed')
+		VALUES (0, ?, ?, ?, '10:00', 'completed')
 	`, userID, int(dogID), time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
 	bookingID, _ := bookingResult.LastInsertId()
 
@@ -682,13 +682,13 @@ func TestWalkReportHandler_DeleteReport(t *testing.T) {
 		// Create a report to delete
 		reportResult, _ := db.Exec(`
 			INSERT INTO walk_reports (tenant_id, booking_id, behavior_rating, energy_level)
-			VALUES (1, ?, 3, 'low')
+			VALUES (0, ?, 3, 'low')
 		`, int(bookingID))
 		reportID, _ := reportResult.LastInsertId()
 
 		req := httptest.NewRequest("DELETE", "/api/walk-reports/1", nil)
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(int(reportID))})
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -703,19 +703,19 @@ func TestWalkReportHandler_DeleteReport(t *testing.T) {
 		// Create another report
 		bookingResult2, _ := db.Exec(`
 			INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status)
-			VALUES (1, ?, ?, ?, '11:00', 'completed')
+			VALUES (0, ?, ?, ?, '11:00', 'completed')
 		`, userID, int(dogID), time.Now().AddDate(0, 0, -2).Format("2006-01-02"))
 		bookingID2, _ := bookingResult2.LastInsertId()
 
 		reportResult2, _ := db.Exec(`
 			INSERT INTO walk_reports (tenant_id, booking_id, behavior_rating, energy_level)
-			VALUES (1, ?, 4, 'medium')
+			VALUES (0, ?, 4, 'medium')
 		`, int(bookingID2))
 		reportID2, _ := reportResult2.LastInsertId()
 
 		req := httptest.NewRequest("DELETE", "/api/walk-reports/2", nil)
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(int(reportID2))})
-		ctx := contextWithTenant(req.Context(), 1, otherUserID, false)
+		ctx := contextWithTenant(req.Context(), 0, otherUserID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -730,19 +730,19 @@ func TestWalkReportHandler_DeleteReport(t *testing.T) {
 		// Create another report
 		bookingResult3, _ := db.Exec(`
 			INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status)
-			VALUES (1, ?, ?, ?, '12:00', 'completed')
+			VALUES (0, ?, ?, ?, '12:00', 'completed')
 		`, userID, int(dogID), time.Now().AddDate(0, 0, -3).Format("2006-01-02"))
 		bookingID3, _ := bookingResult3.LastInsertId()
 
 		reportResult3, _ := db.Exec(`
 			INSERT INTO walk_reports (tenant_id, booking_id, behavior_rating, energy_level)
-			VALUES (1, ?, 5, 'high')
+			VALUES (0, ?, 5, 'high')
 		`, int(bookingID3))
 		reportID3, _ := reportResult3.LastInsertId()
 
 		req := httptest.NewRequest("DELETE", "/api/walk-reports/3", nil)
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(int(reportID3))})
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -756,7 +756,7 @@ func TestWalkReportHandler_DeleteReport(t *testing.T) {
 	t.Run("returns 404 for non-existent report", func(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/api/walk-reports/99999", nil)
 		req = mux.SetURLVars(req, map[string]string{"id": "99999"})
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -782,26 +782,26 @@ func TestWalkReportHandler_UploadPhoto(t *testing.T) {
 
 	dogResult, _ := db.Exec(`
 		INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available)
-		VALUES (1, 'Test Dog', 'Mixed', 'medium', 3, 1, 1)
+		VALUES (0, 'Test Dog', 'Mixed', 'medium', 3, 1, 1)
 	`)
 	dogID, _ := dogResult.LastInsertId()
 
 	bookingResult, _ := db.Exec(`
 		INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status)
-		VALUES (1, ?, ?, ?, '10:00', 'completed')
+		VALUES (0, ?, ?, ?, '10:00', 'completed')
 	`, userID, int(dogID), time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
 	bookingID, _ := bookingResult.LastInsertId()
 
 	reportResult, _ := db.Exec(`
 		INSERT INTO walk_reports (tenant_id, booking_id, behavior_rating, energy_level)
-		VALUES (1, ?, 4, 'medium')
+		VALUES (0, ?, 4, 'medium')
 	`, int(bookingID))
 	reportID, _ := reportResult.LastInsertId()
 
 	t.Run("returns 403 for other user", func(t *testing.T) {
 		req := httptest.NewRequest("POST", "/api/walk-reports/1/photos", nil)
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(int(reportID))})
-		ctx := contextWithTenant(req.Context(), 1, otherUserID, false)
+		ctx := contextWithTenant(req.Context(), 0, otherUserID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -815,7 +815,7 @@ func TestWalkReportHandler_UploadPhoto(t *testing.T) {
 	t.Run("returns 404 for non-existent report", func(t *testing.T) {
 		req := httptest.NewRequest("POST", "/api/walk-reports/99999/photos", nil)
 		req = mux.SetURLVars(req, map[string]string{"id": "99999"})
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -831,13 +831,13 @@ func TestWalkReportHandler_UploadPhoto(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			db.Exec(`
 				INSERT INTO walk_report_photos (tenant_id, walk_report_id, photo_path, photo_thumbnail, display_order)
-				VALUES (1, ?, ?, ?, ?)
+				VALUES (0, ?, ?, ?, ?)
 			`, int(reportID), "path.jpg", "thumb.jpg", i)
 		}
 
 		req := httptest.NewRequest("POST", "/api/walk-reports/1/photos", nil)
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(int(reportID))})
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -872,19 +872,19 @@ func TestWalkReportHandler_PhotoUpload_TenantIsolation(t *testing.T) {
 
 	dogResult, _ := db.Exec(`
 		INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available)
-		VALUES (1, 'Test Dog', 'Mixed', 'medium', 3, 1, 1)
+		VALUES (0, 'Test Dog', 'Mixed', 'medium', 3, 1, 1)
 	`)
 	dogID, _ := dogResult.LastInsertId()
 
 	bookingResult, _ := db.Exec(`
 		INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status)
-		VALUES (1, ?, ?, ?, '10:00', 'completed')
+		VALUES (0, ?, ?, ?, '10:00', 'completed')
 	`, userID, int(dogID), time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
 	bookingID, _ := bookingResult.LastInsertId()
 
 	reportResult, _ := db.Exec(`
 		INSERT INTO walk_reports (tenant_id, booking_id, behavior_rating, energy_level)
-		VALUES (1, ?, 4, 'medium')
+		VALUES (0, ?, 4, 'medium')
 	`, int(bookingID))
 	reportID, _ := reportResult.LastInsertId()
 
@@ -910,7 +910,7 @@ func TestWalkReportHandler_PhotoUpload_TenantIsolation(t *testing.T) {
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(int(reportID))})
 		// Set tenant slug in context for SaaS mode
-		ctx := contextWithTenantSlug(req.Context(), 1, "tenant-a", userID, false)
+		ctx := contextWithTenantSlug(req.Context(), 0, "tenant-a", userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -937,7 +937,7 @@ func TestWalkReportHandler_PhotoUpload_TenantIsolation(t *testing.T) {
 
 		// Create request with tenant context
 		req := httptest.NewRequest("POST", "/api/walk-reports/1/photos", nil)
-		ctx := contextWithTenantSlug(req.Context(), 1, "tenant-b", userID, false)
+		ctx := contextWithTenantSlug(req.Context(), 0, "tenant-b", userID, false)
 		req = req.WithContext(ctx)
 
 		// The handler should use a tenant-aware image service
@@ -973,26 +973,26 @@ func TestWalkReportHandler_DeletePhoto(t *testing.T) {
 
 	dogResult, _ := db.Exec(`
 		INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available)
-		VALUES (1, 'Test Dog', 'Mixed', 'medium', 3, 1, 1)
+		VALUES (0, 'Test Dog', 'Mixed', 'medium', 3, 1, 1)
 	`)
 	dogID, _ := dogResult.LastInsertId()
 
 	bookingResult, _ := db.Exec(`
 		INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status)
-		VALUES (1, ?, ?, ?, '10:00', 'completed')
+		VALUES (0, ?, ?, ?, '10:00', 'completed')
 	`, userID, int(dogID), time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
 	bookingID, _ := bookingResult.LastInsertId()
 
 	reportResult, _ := db.Exec(`
 		INSERT INTO walk_reports (tenant_id, booking_id, behavior_rating, energy_level)
-		VALUES (1, ?, 4, 'medium')
+		VALUES (0, ?, 4, 'medium')
 	`, int(bookingID))
 	reportID, _ := reportResult.LastInsertId()
 
 	// Add a photo
 	photoResult, _ := db.Exec(`
 		INSERT INTO walk_report_photos (tenant_id, walk_report_id, photo_path, photo_thumbnail, display_order)
-		VALUES (1, ?, 'test/path.jpg', 'test/thumb.jpg', 0)
+		VALUES (0, ?, 'test/path.jpg', 'test/thumb.jpg', 0)
 	`, int(reportID))
 	photoID, _ := photoResult.LastInsertId()
 
@@ -1000,7 +1000,7 @@ func TestWalkReportHandler_DeletePhoto(t *testing.T) {
 		// Add another photo to test deletion
 		photoResult2, _ := db.Exec(`
 			INSERT INTO walk_report_photos (tenant_id, walk_report_id, photo_path, photo_thumbnail, display_order)
-			VALUES (1, ?, 'test/path2.jpg', 'test/thumb2.jpg', 1)
+			VALUES (0, ?, 'test/path2.jpg', 'test/thumb2.jpg', 1)
 		`, int(reportID))
 		photoID2, _ := photoResult2.LastInsertId()
 
@@ -1009,7 +1009,7 @@ func TestWalkReportHandler_DeletePhoto(t *testing.T) {
 			"id":      strconv.Itoa(int(reportID)),
 			"photoId": strconv.Itoa(int(photoID2)),
 		})
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -1026,7 +1026,7 @@ func TestWalkReportHandler_DeletePhoto(t *testing.T) {
 			"id":      strconv.Itoa(int(reportID)),
 			"photoId": strconv.Itoa(int(photoID)),
 		})
-		ctx := contextWithTenant(req.Context(), 1, otherUserID, false)
+		ctx := contextWithTenant(req.Context(), 0, otherUserID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -1043,7 +1043,7 @@ func TestWalkReportHandler_DeletePhoto(t *testing.T) {
 			"id":      strconv.Itoa(int(reportID)),
 			"photoId": strconv.Itoa(int(photoID)),
 		})
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -1060,7 +1060,7 @@ func TestWalkReportHandler_DeletePhoto(t *testing.T) {
 			"id":      "99999",
 			"photoId": "1",
 		})
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()

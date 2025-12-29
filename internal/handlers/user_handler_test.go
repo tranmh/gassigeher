@@ -824,7 +824,7 @@ func contextWithSuperAdmin(ctx context.Context, userID int, email string) contex
 	ctx = context.WithValue(ctx, middleware.EmailKey, email)
 	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
 	ctx = context.WithValue(ctx, middleware.IsSuperAdminKey, true)
-	ctx = context.WithValue(ctx, middleware.TenantIDKey, 1) // Use test tenant
+	ctx = context.WithValue(ctx, middleware.TenantIDKey, 0) // Use test tenant
 
 	ctx = context.WithValue(ctx, "user_id", userID)
 	ctx = context.WithValue(ctx, "email", email)
@@ -1116,7 +1116,7 @@ func TestUserHandler_AdminCreateUser(t *testing.T) {
 
 		// Verify colors were assigned - this is the BUG we're testing
 		userColorRepo := repository.NewUserColorRepository(db)
-		userColorIDs, err := userColorRepo.GetUserColorIDs(1, createdUser.ID) // tenantID = 1
+		userColorIDs, err := userColorRepo.GetUserColorIDs(0, createdUser.ID) // tenantID = 0
 		if err != nil {
 			t.Fatalf("Failed to get user colors: %v", err)
 		}
@@ -1329,6 +1329,7 @@ func TestUserHandler_CrossTenantIsolation(t *testing.T) {
 	}
 	handler := NewUserHandler(db, cfg)
 
+	// Tenant 0 and 1 already exist from SetupTestDB
 	// Create tenant 2
 	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
 		VALUES (2, 'tenant-2', 'Tenant 2', 'active', 'tenant2@example.com', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
@@ -1336,8 +1337,9 @@ func TestUserHandler_CrossTenantIsolation(t *testing.T) {
 		t.Fatalf("Failed to create tenant 2: %v", err)
 	}
 
-	// Create a user belonging to tenant 1
+	// Create a user belonging to tenant 1 (SeedTestUser uses tenant 0, so we update it)
 	tenant1UserID := testutil.SeedTestUser(t, db, "tenant1user@example.com", "Tenant1 User", "green")
+	db.Exec("UPDATE users SET tenant_id = 1 WHERE id = ?", tenant1UserID)
 
 	// Verify user belongs to tenant 1
 	var tenantID int

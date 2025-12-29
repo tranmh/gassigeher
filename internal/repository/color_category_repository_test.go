@@ -21,7 +21,7 @@ func TestColorCategoryRepository_Create(t *testing.T) {
 			SortOrder:   100,
 		}
 
-		err := repo.Create(1, color) // tenantID = 1
+		err := repo.Create(0, color) // tenantID = 0
 		if err != nil {
 			t.Fatalf("Create() failed: %v", err)
 		}
@@ -38,7 +38,7 @@ func TestColorCategoryRepository_Create(t *testing.T) {
 			HexCode:   "#aabbcc",
 			SortOrder: 101,
 		}
-		err := repo.Create(1, color1) // tenantID = 1
+		err := repo.Create(0, color1) // tenantID = 0
 		if err != nil {
 			t.Fatalf("First Create() failed: %v", err)
 		}
@@ -49,7 +49,7 @@ func TestColorCategoryRepository_Create(t *testing.T) {
 			HexCode:   "#ddeeff",
 			SortOrder: 102,
 		}
-		err = repo.Create(1, color2) // tenantID = 1
+		err = repo.Create(0, color2) // tenantID = 0
 		if err == nil {
 			t.Error("Expected error for duplicate name, got nil")
 		}
@@ -64,7 +64,7 @@ func TestColorCategoryRepository_FindByID(t *testing.T) {
 	t.Run("color exists", func(t *testing.T) {
 		colorID := testutil.SeedTestColorCategory(t, db, "find-me", "#123456", 10)
 
-		color, err := repo.FindByID(1, colorID) // tenantID = 1
+		color, err := repo.FindByID(0, colorID) // tenantID = 0
 		if err != nil {
 			t.Fatalf("FindByID() failed: %v", err)
 		}
@@ -83,7 +83,7 @@ func TestColorCategoryRepository_FindByID(t *testing.T) {
 	})
 
 	t.Run("color not found", func(t *testing.T) {
-		color, _ := repo.FindByID(1, 99999) // tenantID = 1
+		color, _ := repo.FindByID(0, 99999) // tenantID = 0
 		if color != nil {
 			t.Error("Expected nil for non-existent ID")
 		}
@@ -98,7 +98,7 @@ func TestColorCategoryRepository_FindByName(t *testing.T) {
 	t.Run("color exists", func(t *testing.T) {
 		testutil.SeedTestColorCategory(t, db, "named-color", "#abcdef", 20)
 
-		color, err := repo.FindByName(1, "named-color") // tenantID = 1
+		color, err := repo.FindByName(0, "named-color") // tenantID = 0
 		if err != nil {
 			t.Fatalf("FindByName() failed: %v", err)
 		}
@@ -109,7 +109,7 @@ func TestColorCategoryRepository_FindByName(t *testing.T) {
 	})
 
 	t.Run("color not found", func(t *testing.T) {
-		color, _ := repo.FindByName(1, "non-existent") // tenantID = 1
+		color, _ := repo.FindByName(0, "non-existent") // tenantID = 0
 		if color != nil {
 			t.Error("Expected nil for non-existent name")
 		}
@@ -123,7 +123,7 @@ func TestColorCategoryRepository_FindAll(t *testing.T) {
 
 	// Note: Migration 024 creates 7 default colors
 	t.Run("returns all colors ordered by sort_order", func(t *testing.T) {
-		colors, err := repo.FindAll(1) // tenantID = 1
+		colors, err := repo.FindAll(0) // tenantID = 0
 		if err != nil {
 			t.Fatalf("FindAll() failed: %v", err)
 		}
@@ -150,17 +150,17 @@ func TestColorCategoryRepository_Update(t *testing.T) {
 	t.Run("successful update", func(t *testing.T) {
 		colorID := testutil.SeedTestColorCategory(t, db, "to-update", "#111111", 30)
 
-		color, _ := repo.FindByID(1, colorID) // tenantID = 1
+		color, _ := repo.FindByID(0, colorID) // tenantID = 0
 		color.Name = "updated-name"
 		color.HexCode = "#999999"
 
-		err := repo.Update(1, color) // tenantID = 1
+		err := repo.Update(0, color) // tenantID = 0
 		if err != nil {
 			t.Fatalf("Update() failed: %v", err)
 		}
 
 		// Verify update
-		updated, _ := repo.FindByID(1, colorID) // tenantID = 1
+		updated, _ := repo.FindByID(0, colorID) // tenantID = 0
 		if updated.Name != "updated-name" {
 			t.Errorf("Expected name 'updated-name', got %s", updated.Name)
 		}
@@ -178,13 +178,13 @@ func TestColorCategoryRepository_Delete(t *testing.T) {
 	t.Run("successful delete - no dogs assigned", func(t *testing.T) {
 		colorID := testutil.SeedTestColorCategory(t, db, "to-delete", "#222222", 40)
 
-		err := repo.Delete(1, colorID) // tenantID = 1
+		err := repo.Delete(0, colorID) // tenantID = 0
 		if err != nil {
 			t.Fatalf("Delete() failed: %v", err)
 		}
 
 		// Verify deletion
-		deleted, _ := repo.FindByID(1, colorID) // tenantID = 1
+		deleted, _ := repo.FindByID(0, colorID) // tenantID = 0
 		if deleted != nil {
 			t.Error("Color should be deleted")
 		}
@@ -195,14 +195,14 @@ func TestColorCategoryRepository_Delete(t *testing.T) {
 
 		// Create a dog with this color
 		now := testutil.Now()
-		_, err := db.Exec(`INSERT INTO dogs (name, breed, size, age, color_id, is_available, created_at)
-			VALUES (?, ?, ?, ?, ?, 1, ?)`, "TestDog", "Mix", "medium", 3, colorID, now)
+		_, err := db.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at)
+			VALUES (0, ?, ?, ?, ?, ?, 1, ?)`, "TestDog", "Mix", "medium", 3, colorID, now)
 		if err != nil {
 			t.Fatalf("Failed to create test dog: %v", err)
 		}
 
 		// Try to delete - should fail
-		err = repo.Delete(1, colorID) // tenantID = 1
+		err = repo.Delete(0, colorID) // tenantID = 0
 		if err == nil {
 			t.Error("Expected error when deleting color with dogs assigned")
 		}
@@ -215,7 +215,7 @@ func TestColorCategoryRepository_Count(t *testing.T) {
 	repo := NewColorCategoryRepository(db)
 
 	t.Run("returns correct count", func(t *testing.T) {
-		count, err := repo.Count(1) // tenantID = 1
+		count, err := repo.Count(0) // tenantID = 0
 		if err != nil {
 			t.Fatalf("Count() failed: %v", err)
 		}
@@ -235,7 +235,7 @@ func TestColorCategoryRepository_CountDogsWithColor(t *testing.T) {
 	t.Run("color with no dogs", func(t *testing.T) {
 		colorID := testutil.SeedTestColorCategory(t, db, "no-dogs", "#444444", 60)
 
-		count, err := repo.CountDogsWithColor(1, colorID) // tenantID = 1
+		count, err := repo.CountDogsWithColor(0, colorID) // tenantID = 0
 		if err != nil {
 			t.Fatalf("CountDogsWithColor() failed: %v", err)
 		}
@@ -248,14 +248,14 @@ func TestColorCategoryRepository_CountDogsWithColor(t *testing.T) {
 	t.Run("color with dogs", func(t *testing.T) {
 		colorID := testutil.SeedTestColorCategory(t, db, "with-dogs", "#555555", 70)
 
-		// Create dogs with this color (include tenant_id = 1)
+		// Create dogs with this color (include tenant_id = 0)
 		now := testutil.Now()
 		_, _ = db.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at)
-			VALUES (1, ?, ?, ?, ?, ?, 1, ?)`, "Dog1", "Mix", "medium", 3, colorID, now)
+			VALUES (0, ?, ?, ?, ?, ?, 1, ?)`, "Dog1", "Mix", "medium", 3, colorID, now)
 		_, _ = db.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at)
-			VALUES (1, ?, ?, ?, ?, ?, 1, ?)`, "Dog2", "Lab", "large", 5, colorID, now)
+			VALUES (0, ?, ?, ?, ?, ?, 1, ?)`, "Dog2", "Lab", "large", 5, colorID, now)
 
-		count, err := repo.CountDogsWithColor(1, colorID) // tenantID = 1
+		count, err := repo.CountDogsWithColor(0, colorID) // tenantID = 0
 		if err != nil {
 			t.Fatalf("CountDogsWithColor() failed: %v", err)
 		}

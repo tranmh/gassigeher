@@ -130,10 +130,11 @@ func GetTenantSlug(r *http.Request) string {
 
 // RequireTenant is a middleware that ensures a tenant is present in the context.
 // Use this for routes that must have a tenant (most API routes).
+// Note: tenant_id=0 is valid for Simple-Mode (non-SaaS), so we only check if the key exists.
 func RequireTenant(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tenantID := GetTenantID(r)
-		if tenantID == 0 {
+		_, ok := r.Context().Value(TenantIDKey).(int)
+		if !ok {
 			http.Error(w, `{"error":"Kein Tierheim ausgewählt"}`, http.StatusBadRequest)
 			return
 		}
@@ -147,5 +148,17 @@ func OptionalTenant(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Just pass through - tenant may or may not be set
 		next.ServeHTTP(w, r)
+	})
+}
+
+// SimpleModeMiddleware injects the default tenant (id=0) for Simple-Mode (non-SaaS).
+// Use this when BASE_DOMAIN is not set - all requests use the default tenant.
+// This ensures all repository queries always filter by tenant_id, even in Simple-Mode.
+func SimpleModeMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.WithValue(r.Context(), TenantIDKey, 0)
+		ctx = context.WithValue(ctx, TenantSlugKey, "default")
+		ctx = context.WithValue(ctx, IsDemoKey, false)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

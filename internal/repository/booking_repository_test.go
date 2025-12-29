@@ -17,11 +17,11 @@ import (
 func setupTestDB(t *testing.T) *sql.DB {
 	db := testutil.SetupTestDB(t)
 
-	// Insert test users with explicit IDs (tenant_id = 1 from testutil.SetupTestDB)
+	// Insert test users with explicit IDs (tenant_id = 0 for Simple-Mode)
 	now := time.Now()
 	_, err := db.Exec(`
 		INSERT INTO users (id, tenant_id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
-		VALUES (1, 1, 'Test', 'User', 'test@example.com', 'hash', 1, 1, ?, ?, ?)
+		VALUES (1, 0, 'Test', 'User', 'test@example.com', 'hash', 1, 1, ?, ?, ?)
 	`, now, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create test user 1: %v", err)
@@ -29,7 +29,7 @@ func setupTestDB(t *testing.T) *sql.DB {
 
 	_, err = db.Exec(`
 		INSERT INTO users (id, tenant_id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
-		VALUES (2, 1, 'Test', 'User 2', 'test2@example.com', 'hash', 1, 1, ?, ?, ?)
+		VALUES (2, 0, 'Test', 'User 2', 'test2@example.com', 'hash', 1, 1, ?, ?, ?)
 	`, now, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create test user 2: %v", err)
@@ -38,7 +38,7 @@ func setupTestDB(t *testing.T) *sql.DB {
 	// Insert more test users for complete test coverage
 	_, err = db.Exec(`
 		INSERT INTO users (id, tenant_id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
-		VALUES (3, 1, 'Test', 'User 3', 'test3@example.com', 'hash', 1, 1, ?, ?, ?)
+		VALUES (3, 0, 'Test', 'User 3', 'test3@example.com', 'hash', 1, 1, ?, ?, ?)
 	`, now, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create test user 3: %v", err)
@@ -46,16 +46,16 @@ func setupTestDB(t *testing.T) *sql.DB {
 
 	_, err = db.Exec(`
 		INSERT INTO users (id, tenant_id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
-		VALUES (4, 1, 'Test', 'User 4', 'test4@example.com', 'hash', 1, 1, ?, ?, ?)
+		VALUES (4, 0, 'Test', 'User 4', 'test4@example.com', 'hash', 1, 1, ?, ?, ?)
 	`, now, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create test user 4: %v", err)
 	}
 
-	// Insert test dogs with explicit IDs (tenant_id = 1)
+	// Insert test dogs with explicit IDs (tenant_id = 0)
 	_, err = db.Exec(`
 		INSERT INTO dogs (id, tenant_id, name, breed, color_id, is_available, created_at)
-		VALUES (1, 1, 'Buddy', 'Labrador', 1, 1, ?)
+		VALUES (1, 0, 'Buddy', 'Labrador', 1, 1, ?)
 	`, now)
 	if err != nil {
 		t.Fatalf("Failed to create test dog 1: %v", err)
@@ -63,7 +63,7 @@ func setupTestDB(t *testing.T) *sql.DB {
 
 	_, err = db.Exec(`
 		INSERT INTO dogs (id, tenant_id, name, breed, color_id, is_available, created_at)
-		VALUES (2, 1, 'Max', 'German Shepherd', 1, 1, ?)
+		VALUES (2, 0, 'Max', 'German Shepherd', 1, 1, ?)
 	`, now)
 	if err != nil {
 		t.Fatalf("Failed to create test dog 2: %v", err)
@@ -71,7 +71,7 @@ func setupTestDB(t *testing.T) *sql.DB {
 
 	_, err = db.Exec(`
 		INSERT INTO dogs (id, tenant_id, name, breed, color_id, is_available, created_at)
-		VALUES (3, 1, 'Rocky', 'Bulldog', 1, 1, ?)
+		VALUES (3, 0, 'Rocky', 'Bulldog', 1, 1, ?)
 	`, now)
 	if err != nil {
 		t.Fatalf("Failed to create test dog 3: %v", err)
@@ -79,7 +79,7 @@ func setupTestDB(t *testing.T) *sql.DB {
 
 	_, err = db.Exec(`
 		INSERT INTO dogs (id, tenant_id, name, breed, color_id, is_available, created_at)
-		VALUES (4, 1, 'Luna', 'Poodle', 1, 1, ?)
+		VALUES (4, 0, 'Luna', 'Poodle', 1, 1, ?)
 	`, now)
 	if err != nil {
 		t.Fatalf("Failed to create test dog 4: %v", err)
@@ -121,7 +121,7 @@ func TestBookingRepository_CheckDoubleBooking(t *testing.T) {
 
 	repo := NewBookingRepository(db)
 
-	// Create first booking
+	// Create first booking (tenant_id defaults to 0)
 	booking := &models.Booking{
 		UserID:        1,
 		DogID:         1,
@@ -130,8 +130,8 @@ func TestBookingRepository_CheckDoubleBooking(t *testing.T) {
 	}
 	repo.Create(booking)
 
-	// Check for double booking - same scheduled time
-	isBooked, err := repo.CheckDoubleBooking(1, "2025-12-01", "09:00")
+	// Check for double booking - same scheduled time (tenantID=0, dogID=1)
+	isBooked, err := repo.CheckDoubleBooking(0, 1, "2025-12-01", "09:00")
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -141,7 +141,7 @@ func TestBookingRepository_CheckDoubleBooking(t *testing.T) {
 	}
 
 	// Check different scheduled time - should be available
-	isBooked, err = repo.CheckDoubleBooking(1, "2025-12-01", "15:00")
+	isBooked, err = repo.CheckDoubleBooking(1, 1, "2025-12-01", "15:00")
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -201,7 +201,7 @@ func TestBookingRepository_Cancel(t *testing.T) {
 		repo.Create(booking)
 
 		reason := "Dog is sick"
-		err := repo.Cancel(booking.ID, &reason)
+		err := repo.Cancel(booking.ID, 0, &reason)
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
@@ -226,7 +226,7 @@ func TestBookingRepository_Cancel(t *testing.T) {
 		}
 		repo.Create(booking)
 
-		err := repo.Cancel(booking.ID, nil)
+		err := repo.Cancel(booking.ID, 0, nil)
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
@@ -240,7 +240,7 @@ func TestBookingRepository_Cancel(t *testing.T) {
 
 	t.Run("cancel non-existent booking", func(t *testing.T) {
 		reason := "Test"
-		err := repo.Cancel(99999, &reason)
+		err := repo.Cancel(99999, 0, &reason)
 
 		// May or may not error depending on implementation
 		if err != nil {
@@ -558,7 +558,7 @@ func TestBookingRepository_AddNotes(t *testing.T) {
 	t.Run("add notes to completed booking", func(t *testing.T) {
 		notes := "Great walk! Dog was very energetic."
 
-		err := repo.AddNotes(booking.ID, notes)
+		err := repo.AddNotes(booking.ID, 0, notes)
 		if err != nil {
 			t.Fatalf("AddNotes() failed: %v", err)
 		}
@@ -584,7 +584,7 @@ func TestBookingRepository_AddNotes(t *testing.T) {
 		repo.Create(scheduledBooking)
 
 		notes := "Should fail"
-		err := repo.AddNotes(scheduledBooking.ID, notes)
+		err := repo.AddNotes(scheduledBooking.ID, 0, notes)
 
 		if err == nil {
 			t.Error("Expected error when adding notes to scheduled booking, got nil")
@@ -606,7 +606,7 @@ func TestBookingRepository_AddNotes(t *testing.T) {
 		db.Exec("UPDATE bookings SET status = 'cancelled' WHERE id = ?", cancelledBooking.ID)
 
 		notes := "Should fail"
-		err := repo.AddNotes(cancelledBooking.ID, notes)
+		err := repo.AddNotes(cancelledBooking.ID, 0, notes)
 
 		if err == nil {
 			t.Error("Expected error when adding notes to cancelled booking, got nil")
@@ -624,14 +624,14 @@ func TestBookingRepository_AddNotes(t *testing.T) {
 		repo.Create(completedBooking)
 		db.Exec("UPDATE bookings SET status = 'completed', completed_at = ? WHERE id = ?", time.Now(), completedBooking.ID)
 
-		err := repo.AddNotes(completedBooking.ID, "")
+		err := repo.AddNotes(completedBooking.ID, 0, "")
 		if err != nil {
 			t.Fatalf("AddNotes() with empty notes failed: %v", err)
 		}
 	})
 
 	t.Run("non-existent booking", func(t *testing.T) {
-		err := repo.AddNotes(99999, "Notes for non-existent booking")
+		err := repo.AddNotes(99999, 0, "Notes for non-existent booking")
 
 		if err == nil {
 			t.Error("Expected error for non-existent booking, got nil")
@@ -641,11 +641,11 @@ func TestBookingRepository_AddNotes(t *testing.T) {
 	t.Run("update existing notes", func(t *testing.T) {
 		// Add notes first
 		originalNotes := "Original notes"
-		repo.AddNotes(booking.ID, originalNotes)
+		repo.AddNotes(booking.ID, 0, originalNotes)
 
 		// Update notes
 		updatedNotes := "Updated notes"
-		err := repo.AddNotes(booking.ID, updatedNotes)
+		err := repo.AddNotes(booking.ID, 0, updatedNotes)
 		if err != nil {
 			t.Fatalf("AddNotes() update failed: %v", err)
 		}
@@ -763,7 +763,7 @@ func TestBookingRepository_Update(t *testing.T) {
 	t.Run("update booking time", func(t *testing.T) {
 		booking.ScheduledTime = "10:00"
 
-		err := repo.Update(booking)
+		err := repo.Update(booking, 0)
 		if err != nil {
 			t.Fatalf("Update() failed: %v", err)
 		}
@@ -778,7 +778,7 @@ func TestBookingRepository_Update(t *testing.T) {
 	t.Run("update booking date", func(t *testing.T) {
 		booking.Date = "2025-12-15"
 
-		err := repo.Update(booking)
+		err := repo.Update(booking, 0)
 		if err != nil {
 			t.Fatalf("Update() failed: %v", err)
 		}
@@ -798,7 +798,7 @@ func TestBookingRepository_Update(t *testing.T) {
 			ScheduledTime: "09:00",
 		}
 
-		err := repo.Update(nonExistent)
+		err := repo.Update(nonExistent, 0)
 		// Should not error even if no rows updated
 		if err != nil {
 			t.Logf("Update non-existent booking returned: %v", err)
@@ -832,7 +832,7 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 		reminderScheduledTime := reminderTime.Format("15:04")
 
 		booking := &models.Booking{
-			TenantID:      1,
+			TenantID:      0,
 			UserID:        1,
 			DogID:         1,
 			Date:          reminderDate,
@@ -878,7 +878,7 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 		futureScheduledTime := futureTime.Format("15:04")
 
 		booking := &models.Booking{
-			TenantID:      1,
+			TenantID:      0,
 			UserID:        2,
 			DogID:         2,
 			Date:          futureDate,
@@ -914,7 +914,7 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 
 		completedTime := time.Now()
 		booking := &models.Booking{
-			TenantID:      1,
+			TenantID:      0,
 			UserID:        3,
 			DogID:         3,
 			Date:          reminderDate,
@@ -953,7 +953,7 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 		reminderScheduledTime := reminderTime.Format("15:04")
 
 		booking := &models.Booking{
-			TenantID:      1,
+			TenantID:      0,
 			UserID:        4,
 			DogID:         4,
 			Date:          reminderDate,
@@ -1249,7 +1249,7 @@ func TestApproveBooking_StateTransition(t *testing.T) {
 		adminID := 1
 
 		// Approve booking
-		err = repo.ApproveBooking(int(bookingID), adminID)
+		err = repo.ApproveBooking(int(bookingID), 0, adminID)
 		if err != nil {
 			t.Fatalf("ApproveBooking failed: %v", err)
 		}
@@ -1294,7 +1294,7 @@ func TestApproveBooking_StateTransition(t *testing.T) {
 		adminID := 2
 
 		// Try to approve again
-		err = repo.ApproveBooking(int(bookingID), adminID)
+		err = repo.ApproveBooking(int(bookingID), 0, adminID)
 
 		// Should handle gracefully (no change or error depending on implementation)
 		if err != nil {
@@ -1324,7 +1324,7 @@ func TestApproveBooking_StateTransition(t *testing.T) {
 		adminID := 1
 
 		// Try to approve rejected booking
-		err = repo.ApproveBooking(int(bookingID), adminID)
+		err = repo.ApproveBooking(int(bookingID), 0, adminID)
 
 		// Should handle gracefully (no change or error)
 		if err != nil {
@@ -1362,7 +1362,7 @@ func TestRejectBooking_ReasonRequired(t *testing.T) {
 		reason := "Kein Verfügbar"
 
 		// Reject booking
-		err = repo.RejectBooking(int(bookingID), adminID, reason)
+		err = repo.RejectBooking(int(bookingID), 0, adminID, reason)
 		if err != nil {
 			t.Fatalf("RejectBooking failed: %v", err)
 		}
@@ -1407,7 +1407,7 @@ func TestRejectBooking_ReasonRequired(t *testing.T) {
 		reason := ""
 
 		// Try to reject with empty reason
-		err = repo.RejectBooking(int(bookingID), adminID, reason)
+		err = repo.RejectBooking(int(bookingID), 0, adminID, reason)
 
 		// Should fail with validation error
 		if err == nil {
@@ -1431,7 +1431,7 @@ func TestRejectBooking_ReasonRequired(t *testing.T) {
 		reason := "Test"
 
 		// Try to reject approved booking
-		err = repo.RejectBooking(int(bookingID), adminID, reason)
+		err = repo.RejectBooking(int(bookingID), 0, adminID, reason)
 
 		// Should fail or handle gracefully
 		if err != nil {
@@ -1461,7 +1461,7 @@ func TestRejectBooking_ReasonRequired(t *testing.T) {
 		reason := "Dog is sick"
 
 		// Reject booking
-		err = repo.RejectBooking(int(bookingID), adminID, reason)
+		err = repo.RejectBooking(int(bookingID), 0, adminID, reason)
 		if err != nil {
 			t.Fatalf("RejectBooking failed: %v", err)
 		}

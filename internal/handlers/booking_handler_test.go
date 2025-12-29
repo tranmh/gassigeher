@@ -1407,7 +1407,7 @@ func TestBookingHandler_ColorBasedPermission(t *testing.T) {
 		result, _ := db.Exec(`
 			INSERT INTO dogs (name, breed, size, age, color_id, is_available, tenant_id, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, "ColorDog", "TestBreed", "medium", 3, colorID, true, 1, now, now)
+		`, "ColorDog", "TestBreed", "medium", 3, colorID, true, 0, now, now)
 		dogID, _ := result.LastInsertId()
 
 		// Try to book - should SUCCEED because user has the dog's color
@@ -1448,7 +1448,7 @@ func TestBookingHandler_ColorBasedPermission(t *testing.T) {
 		result, _ := db.Exec(`
 			INSERT INTO dogs (name, breed, size, age, color_id, is_available, tenant_id, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, "RedDog", "TestBreed", "small", 2, colorID, true, 1, now, now)
+		`, "RedDog", "TestBreed", "small", 2, colorID, true, 0, now, now)
 		dogID, _ := result.LastInsertId()
 
 		// Try to book - should FAIL because user doesn't have the dog's color

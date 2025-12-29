@@ -388,7 +388,7 @@ func (h *TenantHandler) CheckSlug(w http.ResponseWriter, r *http.Request) {
 // GetCurrentTenant returns the current tenant information
 func (h *TenantHandler) GetCurrentTenant(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
@@ -420,7 +420,7 @@ type UpdateTenantRequest struct {
 // UpdateTenant updates the current tenant's information (admin only)
 func (h *TenantHandler) UpdateTenant(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
@@ -496,7 +496,7 @@ func (h *TenantHandler) GetBranding(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 	tenantSlug, _ := r.Context().Value(middleware.TenantSlugKey).(string)
 
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
@@ -565,7 +565,7 @@ type UpdateBrandingRequest struct {
 // UpdateBranding updates the branding settings for the current tenant (admin only)
 func (h *TenantHandler) UpdateBranding(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
@@ -648,7 +648,7 @@ func (h *TenantHandler) UpdateBranding(w http.ResponseWriter, r *http.Request) {
 // GetTenantStats returns statistics for the current tenant
 func (h *TenantHandler) GetTenantStats(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
@@ -830,7 +830,7 @@ func (h *TenantHandler) processReferralCode(code string, refereeTenantID int) {
 func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request) {
 	// Get tenant ID from context
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}

@@ -196,7 +196,7 @@ func TestThemeHandler_UpdateTheme(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/api/theme", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true) // tenant_id=0 to match SeedTestUser and DB queries
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -208,7 +208,7 @@ func TestThemeHandler_UpdateTheme(t *testing.T) {
 
 		// Verify in database
 		var preset string
-		db.QueryRow("SELECT theme_preset FROM tenant_settings WHERE tenant_id = 1").Scan(&preset)
+		db.QueryRow("SELECT theme_preset FROM tenant_settings WHERE tenant_id = 0").Scan(&preset)
 		if preset != "forest" {
 			t.Errorf("Expected theme_preset 'forest', got %s", preset)
 		}
@@ -227,7 +227,7 @@ func TestThemeHandler_UpdateTheme(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/api/theme", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true) // tenant_id=0 to match SeedTestUser and DB queries
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -239,7 +239,7 @@ func TestThemeHandler_UpdateTheme(t *testing.T) {
 
 		// Verify in database
 		var primary string
-		db.QueryRow("SELECT color_primary FROM tenant_settings WHERE tenant_id = 1").Scan(&primary)
+		db.QueryRow("SELECT color_primary FROM tenant_settings WHERE tenant_id = 0").Scan(&primary)
 		if primary != "#aabbcc" {
 			t.Errorf("Expected color_primary '#aabbcc', got %s", primary)
 		}
@@ -253,7 +253,7 @@ func TestThemeHandler_UpdateTheme(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/api/theme", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true) // tenant_id=0 to match SeedTestUser
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -274,7 +274,7 @@ func TestThemeHandler_UpdateTheme(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/api/theme", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true) // tenant_id=0 to match SeedTestUser
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -288,7 +288,7 @@ func TestThemeHandler_UpdateTheme(t *testing.T) {
 	t.Run("returns 400 for invalid JSON", func(t *testing.T) {
 		req := httptest.NewRequest("PUT", "/api/theme", bytes.NewReader([]byte("invalid")))
 		req.Header.Set("Content-Type", "application/json")
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true) // tenant_id=0 to match SeedTestUser
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()

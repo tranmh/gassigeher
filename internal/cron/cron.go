@@ -133,6 +133,9 @@ func (s *CronService) runPeriodically(name string, interval time.Duration, fn fu
 }
 
 // autoCompleteBookings marks past scheduled bookings as completed
+// Note: This is a GLOBAL operation that processes ALL tenants intentionally.
+// This ensures bookings are completed regardless of which tenant they belong to.
+// The AutoComplete() method does not filter by tenant_id for this reason.
 func (s *CronService) autoCompleteBookings() {
 	count, err := s.bookingRepo.AutoComplete()
 	if err != nil {
@@ -148,6 +151,9 @@ func (s *CronService) autoCompleteBookings() {
 }
 
 // sendBookingReminders sends reminders for upcoming bookings (1-2 hours before)
+// Note: This is a GLOBAL operation that processes ALL tenants intentionally.
+// The GetForReminders() method returns bookings from all tenants since reminder
+// emails need to be sent regardless of tenant.
 func (s *CronService) sendBookingReminders() {
 	// Check if email service is available
 	if s.emailService == nil {

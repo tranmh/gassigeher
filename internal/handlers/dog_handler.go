@@ -147,7 +147,7 @@ func (h *DogHandler) GetDog(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
@@ -174,12 +174,13 @@ func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// SaaS: Get tenant_id from context
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	// SaaS: Get tenant_id from context (tenant_id=0 is valid for Simple-Mode)
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 
-	// SaaS: Get dog limit from subscription (will be used for atomic create)
-	var dogLimit int = -1 // Default unlimited for non-tenant mode
-	if tenantID > 0 {
+	// Get dog limit from subscription (will be used for atomic create)
+	// tenant_id=0 (Simple-Mode) can also have subscription limits
+	var dogLimit int = -1 // Default unlimited if no subscription
+	if ok {
 		var err error
 		dogLimit, err = h.subscriptionRepo.GetTenantDogLimit(tenantID)
 		if err != nil {
@@ -331,7 +332,7 @@ func (h *DogHandler) UpdateDog(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
@@ -460,7 +461,7 @@ func (h *DogHandler) DeleteDog(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
@@ -491,7 +492,7 @@ func (h *DogHandler) DeleteDog(w http.ResponseWriter, r *http.Request) {
 		cancellationReason := fmt.Sprintf("Hund %s wurde aus dem System entfernt", dog.Name)
 		for _, booking := range bookings {
 			// Cancel the booking
-			err := h.bookingRepo.Cancel(booking.ID, &cancellationReason)
+			err := h.bookingRepo.Cancel(booking.ID, tenantID, &cancellationReason)
 			if err != nil {
 				log.Printf("ERROR: Failed to cancel booking %d: %v", booking.ID, err)
 				continue
@@ -510,7 +511,7 @@ func (h *DogHandler) DeleteDog(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Now delete the dog
-		if err := h.dogRepo.ForceDelete(id); err != nil {
+		if err := h.dogRepo.ForceDelete(id, tenantID); err != nil {
 			respondError(w, http.StatusInternalServerError, "Failed to delete dog")
 			return
 		}
@@ -533,7 +534,7 @@ func (h *DogHandler) DeleteDog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.dogRepo.Delete(id)
+	err = h.dogRepo.Delete(id, tenantID)
 	if err != nil {
 		if strings.Contains(err.Error(), "future bookings") {
 			// Get the future bookings to return to frontend
@@ -702,7 +703,7 @@ func (h *DogHandler) ToggleAvailability(w http.ResponseWriter, r *http.Request) 
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
@@ -730,7 +731,7 @@ func (h *DogHandler) ToggleAvailability(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Toggle availability
-	if err := h.dogRepo.ToggleAvailability(id, req.IsAvailable, req.UnavailableReason); err != nil {
+	if err := h.dogRepo.ToggleAvailability(id, tenantID, req.IsAvailable, req.UnavailableReason); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to toggle availability")
 		return
 	}
@@ -747,7 +748,10 @@ func (h *DogHandler) ToggleAvailability(w http.ResponseWriter, r *http.Request) 
 
 // GetBreeds handles GET /api/dogs/breeds - get list of all breeds
 func (h *DogHandler) GetBreeds(w http.ResponseWriter, r *http.Request) {
-	breeds, err := h.dogRepo.GetBreeds()
+	// SaaS: Get tenant_id from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	breeds, err := h.dogRepo.GetBreeds(tenantID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to fetch breeds")
 		return
@@ -794,7 +798,7 @@ func (h *DogHandler) SetFeatured(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
@@ -815,7 +819,7 @@ func (h *DogHandler) SetFeatured(w http.ResponseWriter, r *http.Request) {
 	// This gives all featured dogs a chance to be shown to visitors
 
 	// Update featured status
-	if err := h.dogRepo.SetFeatured(id, req.IsFeatured); err != nil {
+	if err := h.dogRepo.SetFeatured(id, tenantID, req.IsFeatured); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to update featured status")
 		return
 	}

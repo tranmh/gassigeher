@@ -13,11 +13,17 @@ func TestDemoTenantRepository_CreateState(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	repo := NewDemoTenantRepository(db)
 
+	// Create test tenant with ID=10 for demo state (tenant 0 and 1 are already created by SetupTestDB)
+	now := time.Now()
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at) VALUES (10, 'demo', 'Demo', 'active', 'demo@test.com', ?, ?)`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create test tenant: %v", err)
+	}
+
 	t.Run("create valid state", func(t *testing.T) {
-		now := time.Now()
 		nextReset := now.Add(24 * time.Hour)
 		state := &models.DemoTenantState{
-			TenantID:      1,
+			TenantID:      10,
 			AdminPassword: "testpassword123",
 			LastResetAt:   &now,
 			NextResetAt:   &nextReset,
@@ -34,10 +40,9 @@ func TestDemoTenantRepository_CreateState(t *testing.T) {
 	})
 
 	t.Run("create duplicate tenant fails", func(t *testing.T) {
-		// Tenant 1 already has state from previous test
-		now := time.Now()
+		// Tenant 10 already has state from previous test
 		state := &models.DemoTenantState{
-			TenantID:      1,
+			TenantID:      10,
 			AdminPassword: "anotherpassword",
 			LastResetAt:   &now,
 		}
@@ -54,6 +59,13 @@ func TestDemoTenantRepository_GetState(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	repo := NewDemoTenantRepository(db)
 
+	// Create test tenant with ID=10 for demo state (tenant 0 and 1 are already created by SetupTestDB)
+	now := time.Now()
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at) VALUES (10, 'demo', 'Demo', 'active', 'demo@test.com', ?, ?)`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create test tenant: %v", err)
+	}
+
 	t.Run("state not found returns nil", func(t *testing.T) {
 		state, err := repo.GetState(999)
 		if err != nil {
@@ -66,10 +78,9 @@ func TestDemoTenantRepository_GetState(t *testing.T) {
 
 	t.Run("get existing state", func(t *testing.T) {
 		// Create state first
-		now := time.Now()
 		nextReset := now.Add(24 * time.Hour)
 		createState := &models.DemoTenantState{
-			TenantID:      1,
+			TenantID:      10,
 			AdminPassword: "retrievepassword",
 			LastResetAt:   &now,
 			NextResetAt:   &nextReset,
@@ -80,7 +91,7 @@ func TestDemoTenantRepository_GetState(t *testing.T) {
 		}
 
 		// Get state
-		state, err := repo.GetState(1)
+		state, err := repo.GetState(10)
 		if err != nil {
 			t.Fatalf("GetState() failed: %v", err)
 		}
@@ -93,8 +104,8 @@ func TestDemoTenantRepository_GetState(t *testing.T) {
 			t.Errorf("Expected password 'retrievepassword', got %s", state.AdminPassword)
 		}
 
-		if state.TenantID != 1 {
-			t.Errorf("Expected tenant_id 1, got %d", state.TenantID)
+		if state.TenantID != 10 {
+			t.Errorf("Expected tenant_id 10, got %d", state.TenantID)
 		}
 	})
 }
@@ -104,11 +115,17 @@ func TestDemoTenantRepository_UpdateState(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	repo := NewDemoTenantRepository(db)
 
+	// Create test tenant with ID=10 for demo state (tenant 0 and 1 are already created by SetupTestDB)
+	now := time.Now()
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at) VALUES (10, 'demo', 'Demo', 'active', 'demo@test.com', ?, ?)`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create test tenant: %v", err)
+	}
+
 	t.Run("update existing state", func(t *testing.T) {
 		// Create state first
-		now := time.Now()
 		createState := &models.DemoTenantState{
-			TenantID:      1,
+			TenantID:      10,
 			AdminPassword: "oldpassword",
 			LastResetAt:   &now,
 		}
@@ -119,13 +136,13 @@ func TestDemoTenantRepository_UpdateState(t *testing.T) {
 
 		// Update state
 		newReset := now.Add(48 * time.Hour)
-		err = repo.UpdateState(1, "newpassword", &now, &newReset)
+		err = repo.UpdateState(10, "newpassword", &now, &newReset)
 		if err != nil {
 			t.Fatalf("UpdateState() failed: %v", err)
 		}
 
 		// Verify update
-		state, _ := repo.GetState(1)
+		state, _ := repo.GetState(10)
 		if state.AdminPassword != "newpassword" {
 			t.Errorf("Expected password 'newpassword', got %s", state.AdminPassword)
 		}
@@ -136,6 +153,13 @@ func TestDemoTenantRepository_UpdateState(t *testing.T) {
 func TestDemoTenantRepository_GetCredentials(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	repo := NewDemoTenantRepository(db)
+
+	// Create test tenant with ID=10 for demo state (tenant 0 and 1 are already created by SetupTestDB)
+	now := time.Now()
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at) VALUES (10, 'demo', 'Demo', 'active', 'demo@test.com', ?, ?)`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create test tenant: %v", err)
+	}
 
 	t.Run("no credentials returns nil", func(t *testing.T) {
 		creds, err := repo.GetCredentials(999)
@@ -149,10 +173,9 @@ func TestDemoTenantRepository_GetCredentials(t *testing.T) {
 
 	t.Run("get credentials with super admin", func(t *testing.T) {
 		// Create demo state
-		now := time.Now()
 		nextReset := now.Add(24 * time.Hour)
 		state := &models.DemoTenantState{
-			TenantID:      1,
+			TenantID:      10,
 			AdminPassword: "demopassword",
 			LastResetAt:   &now,
 			NextResetAt:   &nextReset,
@@ -162,18 +185,18 @@ func TestDemoTenantRepository_GetCredentials(t *testing.T) {
 			t.Fatalf("CreateState() failed: %v", err)
 		}
 
-		// Create super admin user for tenant 1
+		// Create super admin user for tenant 10
 		nowStr := testutil.Now()
 		_, err = db.Exec(`
 			INSERT INTO users (tenant_id, email, first_name, last_name, password_hash, is_super_admin, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
-			VALUES (1, 'admin@demo.test', 'Demo', 'Admin', 'hash', 1, 1, 1, ?, ?, ?)
+			VALUES (10, 'admin@demo.test', 'Demo', 'Admin', 'hash', 1, 1, 1, ?, ?, ?)
 		`, nowStr, nowStr, nowStr)
 		if err != nil {
 			t.Fatalf("Failed to create super admin: %v", err)
 		}
 
 		// Get credentials
-		creds, err := repo.GetCredentials(1)
+		creds, err := repo.GetCredentials(10)
 		if err != nil {
 			t.Fatalf("GetCredentials() failed: %v", err)
 		}
@@ -197,11 +220,17 @@ func TestDemoTenantRepository_DeleteState(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	repo := NewDemoTenantRepository(db)
 
+	// Create test tenant with ID=10 for demo state (tenant 0 and 1 are already created by SetupTestDB)
+	now := time.Now()
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at) VALUES (10, 'demo', 'Demo', 'active', 'demo@test.com', ?, ?)`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create test tenant: %v", err)
+	}
+
 	t.Run("delete existing state", func(t *testing.T) {
 		// Create state
-		now := time.Now()
 		state := &models.DemoTenantState{
-			TenantID:      1,
+			TenantID:      10,
 			AdminPassword: "deletepassword",
 			LastResetAt:   &now,
 		}
@@ -211,13 +240,13 @@ func TestDemoTenantRepository_DeleteState(t *testing.T) {
 		}
 
 		// Delete state
-		err = repo.DeleteState(1)
+		err = repo.DeleteState(10)
 		if err != nil {
 			t.Fatalf("DeleteState() failed: %v", err)
 		}
 
 		// Verify deletion
-		deleted, _ := repo.GetState(1)
+		deleted, _ := repo.GetState(10)
 		if deleted != nil {
 			t.Error("Expected state to be deleted")
 		}

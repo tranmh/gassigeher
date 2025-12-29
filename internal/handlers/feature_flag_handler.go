@@ -146,7 +146,7 @@ func (h *FeatureFlagHandler) DeleteFlag(w http.ResponseWriter, r *http.Request) 
 // GET /api/v1/admin/feature-flags
 func (h *FeatureFlagHandler) GetTenantFlags(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
@@ -166,7 +166,7 @@ func (h *FeatureFlagHandler) GetTenantFlags(w http.ResponseWriter, r *http.Reque
 // PUT /api/v1/admin/feature-flags/{id}
 func (h *FeatureFlagHandler) SetTenantFlag(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
@@ -200,7 +200,7 @@ func (h *FeatureFlagHandler) SetTenantFlag(w http.ResponseWriter, r *http.Reques
 // DELETE /api/v1/admin/feature-flags/{id}
 func (h *FeatureFlagHandler) ResetTenantFlag(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}

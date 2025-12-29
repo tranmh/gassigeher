@@ -177,10 +177,11 @@ func main() {
 	router.Use(middleware.SecurityHeadersMiddleware)
 	router.Use(middleware.CORSMiddleware(cfg.BaseURL))
 
-	// SaaS: Tenant resolution middleware (resolves subdomain to tenant_id)
+	// Tenant resolution middleware
 	// Must be after CORS but before auth middleware
 	tenantRepo := repository.NewTenantRepository(db)
 	if cfg.BaseDomain != "" {
+		// SaaS-Mode: Resolve subdomain to tenant_id
 		router.Use(middleware.TenantMiddleware(tenantRepo, cfg.BaseDomain))
 		log.Printf("SaaS mode: Tenant middleware enabled for domain *.%s", cfg.BaseDomain)
 
@@ -189,6 +190,11 @@ func main() {
 		// Pro tier: 100 req/s tenant-wide, 50 req/s per-IP
 		router.Use(middleware.TenantRateLimit(db))
 		log.Println("SaaS mode: Per-tenant rate limiting enabled")
+	} else {
+		// Simple-Mode: Inject default tenant (id=0) for all requests
+		// This ensures all repository queries always filter by tenant_id
+		router.Use(middleware.SimpleModeMiddleware)
+		log.Println("Simple mode: Using default tenant (id=0)")
 	}
 
 	// Initialize handlers

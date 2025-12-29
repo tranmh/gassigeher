@@ -38,7 +38,7 @@ func setupBookingTimeHandlerTest(t *testing.T) (*sql.DB, *BookingTimeHandler, fu
 
 // addTenantContext adds tenant context to a request
 func addTenantContext(req *http.Request) *http.Request {
-	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 1)
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 0)
 	return req.WithContext(ctx)
 }
 
@@ -202,7 +202,7 @@ func TestUpdateRules(t *testing.T) {
 
 	// Get existing rule to update
 	bookingTimeRepo := repository.NewBookingTimeRepository(db)
-	rules, err := bookingTimeRepo.GetRulesByDayType(1, "weekday") // tenantID = 1
+	rules, err := bookingTimeRepo.GetRulesByDayType(0, "weekday") // tenantID = 0
 	if err != nil || len(rules) == 0 {
 		t.Fatalf("Failed to get existing rules: %v", err)
 	}
@@ -387,7 +387,7 @@ func TestDeleteRule(t *testing.T) {
 		EndTime:   "21:00",
 		IsBlocked: false,
 	}
-	if err := bookingTimeRepo.CreateRule(1, testRule); err != nil { // tenantID = 1
+	if err := bookingTimeRepo.CreateRule(0, testRule); err != nil { // tenantID = 0
 		t.Fatalf("Failed to create test rule: %v", err)
 	}
 

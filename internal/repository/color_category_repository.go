@@ -75,12 +75,12 @@ func (r *ColorCategoryRepository) FindByID(tenantID int, id int) (*models.ColorC
 	return color, nil
 }
 
-// FindByName finds a color category by name within a tenant
+// FindByName finds a color category by name within a tenant (case-insensitive)
 func (r *ColorCategoryRepository) FindByName(tenantID int, name string) (*models.ColorCategory, error) {
 	query := `
 		SELECT id, tenant_id, name, hex_code, pattern_icon, sort_order, created_at, updated_at
 		FROM color_categories
-		WHERE name = ? AND tenant_id = ?
+		WHERE LOWER(name) = LOWER(?) AND tenant_id = ?
 	`
 
 	color := &models.ColorCategory{}

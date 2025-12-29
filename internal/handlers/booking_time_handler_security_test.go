@@ -37,7 +37,7 @@ func setupSecurityTest(t *testing.T) (*sql.DB, *BookingTimeHandler, *HolidayHand
 	}
 
 	// Assign default colors to tenant 1
-	db.Exec(`UPDATE color_categories SET tenant_id = 1 WHERE tenant_id IS NULL`)
+	db.Exec(`UPDATE color_categories SET tenant_id = 0 WHERE tenant_id IS NULL`)
 
 	// Insert system settings for tenant 1
 	_, err = db.Exec(`INSERT INTO system_settings (tenant_id, key, value, updated_at) VALUES

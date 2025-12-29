@@ -17,7 +17,7 @@ import (
 
 // reactivationTenantContext adds tenant context to a request
 func reactivationTenantContext(req *http.Request) *http.Request {
-	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 1)
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 0)
 	return req.WithContext(ctx)
 }
 
@@ -116,10 +116,10 @@ func TestReactivationRequestHandler_ListRequests(t *testing.T) {
 	user2ID := testutil.SeedTestUser(t, db, "user2@example.com", "User 2", "green")
 	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
 
-	// Create reactivation requests
+	// Create reactivation requests (tenant_id=0 to match users created by SeedTestUser)
 	now := testutil.Now()
-	db.Exec("INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (1, ?, 'pending', ?)", user1ID, now)
-	db.Exec("INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (1, ?, 'pending', ?)", user2ID, now)
+	db.Exec("INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (0, ?, 'pending', ?)", user1ID, now)
+	db.Exec("INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (0, ?, 'pending', ?)", user2ID, now)
 
 	t.Run("admin sees all requests", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/reactivation-requests", nil)
@@ -169,8 +169,9 @@ func TestReactivationRequestHandler_ApproveRequest(t *testing.T) {
 	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
 
 	// Use InsertAndGetID for cross-database compatibility (RETURNING id not supported in MySQL)
+	// tenant_id=0 to match users created by SeedTestUser
 	now := testutil.Now()
-	requestID := testutil.InsertAndGetID(t, db, "INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (1, ?, 'pending', ?)", userID, now)
+	requestID := testutil.InsertAndGetID(t, db, "INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (0, ?, 'pending', ?)", userID, now)
 
 	t.Run("successful approval reactivates user", func(t *testing.T) {
 		reqBody := map[string]interface{}{
@@ -245,8 +246,9 @@ func TestReactivationRequestHandler_DenyRequest(t *testing.T) {
 	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
 
 	// Use InsertAndGetID for cross-database compatibility (RETURNING id not supported in MySQL)
+	// tenant_id=0 to match users created by SeedTestUser
 	now := testutil.Now()
-	requestID := testutil.InsertAndGetID(t, db, "INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (1, ?, 'pending', ?)", userID, now)
+	requestID := testutil.InsertAndGetID(t, db, "INSERT INTO reactivation_requests (tenant_id, user_id, status, created_at) VALUES (0, ?, 'pending', ?)", userID, now)
 
 	t.Run("successful denial keeps user inactive", func(t *testing.T) {
 		reqBody := map[string]interface{}{

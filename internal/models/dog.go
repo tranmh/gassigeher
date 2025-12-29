@@ -25,7 +25,7 @@ var timeFormatRegex = regexp.MustCompile(`^([01]?[0-9]|2[0-3]):[0-5][0-9]$`)
 // Dog represents a dog in the system
 type Dog struct {
 	ID                   int            `json:"id"`
-	TenantID             int            `json:"tenant_id,omitempty"` // SaaS: Tenant this dog belongs to
+	TenantID             int            `json:"tenant_id"` // SaaS: Tenant this dog belongs to (0 = Simple-Mode default)
 	Name                 string         `json:"name"`
 	Breed                string         `json:"breed"`
 	Size                 string         `json:"size"` // small, medium, large

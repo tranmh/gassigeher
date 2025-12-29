@@ -263,7 +263,7 @@ func TestConcurrentApprovalUpdates(t *testing.T) {
 		wg.Add(1)
 		go func(b *models.Booking) {
 			defer wg.Done()
-			err := bookingRepo.ApproveBooking(b.ID, 2) // Admin ID = 2
+			err := bookingRepo.ApproveBooking(b.ID, 0, 2) // tenantID = 0, Admin ID = 2
 			if err == nil {
 				mu.Lock()
 				approvedCount++

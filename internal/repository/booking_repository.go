@@ -68,16 +68,9 @@ func (r *BookingRepository) Create(booking *models.Booking) error {
 		}
 	}
 
-	// SaaS: Convert TenantID=0 to NULL for single-tenant mode
-	var tenantIDParam interface{}
-	if booking.TenantID > 0 {
-		tenantIDParam = booking.TenantID
-	} else {
-		tenantIDParam = nil
-	}
-
+	// tenant_id=0 is valid for Simple-Mode (non-SaaS)
 	result, err := r.db.Exec(query,
-		tenantIDParam,
+		booking.TenantID,
 		booking.UserID,
 		booking.DogID,
 		booking.Date,
@@ -158,8 +151,8 @@ func (r *BookingRepository) FindByIDAndTenant(id int, tenantID int) (*models.Boo
 	if booking == nil {
 		return nil, nil
 	}
-	// In SaaS mode (tenantID > 0), verify tenant membership
-	if tenantID > 0 && booking.TenantID != tenantID {
+	// Verify tenant membership (works for both Simple-Mode tenant_id=0 and SaaS-Mode)
+	if booking.TenantID != tenantID {
 		return nil, nil // Booking doesn't belong to this tenant
 	}
 	return booking, nil
@@ -177,8 +170,8 @@ func (r *BookingRepository) FindAll(filter *models.BookingFilterRequest) ([]*mod
 	args := []interface{}{}
 
 	if filter != nil {
-		// SaaS: Filter by tenant if specified
-		if filter.TenantID != nil && *filter.TenantID > 0 {
+		// SaaS: Filter by tenant if specified (tenant_id=0 is valid for Simple-Mode)
+		if filter.TenantID != nil {
 			query += " AND tenant_id = ?"
 			args = append(args, *filter.TenantID)
 		}
@@ -264,14 +257,15 @@ func (r *BookingRepository) FindAll(filter *models.BookingFilterRequest) ([]*mod
 }
 
 // Cancel cancels a booking
-func (r *BookingRepository) Cancel(id int, reason *string) error {
+// SaaS: Filters by tenant_id for tenant isolation
+func (r *BookingRepository) Cancel(id int, tenantID int, reason *string) error {
 	query := `
 		UPDATE bookings
 		SET status = ?, admin_cancellation_reason = ?, updated_at = ?
-		WHERE id = ?
+		WHERE id = ? AND tenant_id = ?
 	`
 
-	_, err := r.db.Exec(query, "cancelled", reason, time.Now(), id)
+	_, err := r.db.Exec(query, "cancelled", reason, time.Now(), id, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to cancel booking: %w", err)
 	}
@@ -280,14 +274,15 @@ func (r *BookingRepository) Cancel(id int, reason *string) error {
 }
 
 // AddNotes adds notes to a completed booking
-func (r *BookingRepository) AddNotes(id int, notes string) error {
+// SaaS: Filters by tenant_id for tenant isolation
+func (r *BookingRepository) AddNotes(id int, tenantID int, notes string) error {
 	query := `
 		UPDATE bookings
 		SET user_notes = ?, updated_at = ?
-		WHERE id = ? AND status = 'completed'
+		WHERE id = ? AND tenant_id = ? AND status = 'completed'
 	`
 
-	result, err := r.db.Exec(query, notes, time.Now(), id)
+	result, err := r.db.Exec(query, notes, time.Now(), id, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to add notes: %w", err)
 	}
@@ -305,51 +300,18 @@ func (r *BookingRepository) AddNotes(id int, notes string) error {
 }
 
 // CheckDoubleBooking checks if a dog is already booked for the given date and scheduled time
-func (r *BookingRepository) CheckDoubleBooking(dogID int, date, scheduledTime string) (bool, error) {
+// SaaS: Always filters by tenant_id for tenant isolation (tenant_id=0 for Simple-Mode)
+func (r *BookingRepository) CheckDoubleBooking(tenantID, dogID int, date, scheduledTime string) (bool, error) {
 	query := `
 		SELECT COUNT(*)
 		FROM bookings
-		WHERE dog_id = ? AND date = ? AND scheduled_time = ? AND status = 'scheduled'
+		WHERE tenant_id = ? AND dog_id = ? AND date = ? AND scheduled_time = ? AND status = 'scheduled'
 	`
 
 	var count int
-	err := r.db.QueryRow(query, dogID, date, scheduledTime).Scan(&count)
+	err := r.db.QueryRow(query, tenantID, dogID, date, scheduledTime).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check double booking: %w", err)
-	}
-
-	return count > 0, nil
-}
-
-// CheckDoubleBookingForTenant checks if a dog is already booked for the given date and scheduled time
-// within a specific tenant. This provides defense-in-depth for multi-tenant isolation.
-// SaaS: Always use this method instead of CheckDoubleBooking for tenant-specific operations.
-func (r *BookingRepository) CheckDoubleBookingForTenant(tenantID, dogID int, date, scheduledTime string) (bool, error) {
-	var query string
-	var args []interface{}
-
-	if tenantID > 0 {
-		// SaaS mode: filter by tenant for defense-in-depth
-		query = `
-			SELECT COUNT(*)
-			FROM bookings
-			WHERE tenant_id = ? AND dog_id = ? AND date = ? AND scheduled_time = ? AND status = 'scheduled'
-		`
-		args = []interface{}{tenantID, dogID, date, scheduledTime}
-	} else {
-		// Single-tenant mode: no tenant filter
-		query = `
-			SELECT COUNT(*)
-			FROM bookings
-			WHERE dog_id = ? AND date = ? AND scheduled_time = ? AND status = 'scheduled'
-		`
-		args = []interface{}{dogID, date, scheduledTime}
-	}
-
-	var count int
-	err := r.db.QueryRow(query, args...).Scan(&count)
-	if err != nil {
-		return false, fmt.Errorf("failed to check double booking for tenant: %w", err)
 	}
 
 	return count > 0, nil
@@ -538,6 +500,8 @@ func (r *BookingRepository) GetForReminders() ([]*models.Booking, error) {
 }
 
 // MarkReminderSent marks a booking's reminder as sent
+// Note: This is called by cron job which processes ALL tenants intentionally
+// The cron job fetches bookings with tenant context, so no additional tenant filter needed here
 func (r *BookingRepository) MarkReminderSent(bookingID int) error {
 	query := `UPDATE bookings SET reminder_sent_at = ? WHERE id = ?`
 	_, err := r.db.Exec(query, time.Now(), bookingID)
@@ -548,11 +512,12 @@ func (r *BookingRepository) MarkReminderSent(bookingID int) error {
 }
 
 // Update updates a booking (for admin to move bookings)
-func (r *BookingRepository) Update(booking *models.Booking) error {
+// SaaS: Filters by tenant_id for tenant isolation
+func (r *BookingRepository) Update(booking *models.Booking, tenantID int) error {
 	query := `
 		UPDATE bookings
 		SET date = ?, scheduled_time = ?, updated_at = ?
-		WHERE id = ?
+		WHERE id = ? AND tenant_id = ?
 	`
 
 	_, err := r.db.Exec(query,
@@ -560,6 +525,7 @@ func (r *BookingRepository) Update(booking *models.Booking) error {
 		booking.ScheduledTime,
 		time.Now(),
 		booking.ID,
+		tenantID,
 	)
 
 	if err != nil {
@@ -660,7 +626,7 @@ func (r *BookingRepository) FindByIDWithDetails(id int) (*models.Booking, error)
 }
 
 // GetPendingApprovalBookings returns all bookings awaiting approval
-// SaaS: Now includes tenant_id and supports tenant filtering (tenantID=0 for all tenants)
+// Always filters by tenant_id (tenant_id=0 for Simple-Mode, >0 for SaaS-Mode)
 func (r *BookingRepository) GetPendingApprovalBookings(tenantID int) ([]*models.Booking, error) {
 	query := `
 		SELECT b.id, b.tenant_id, b.user_id, b.dog_id, b.date, b.scheduled_time,
@@ -672,17 +638,10 @@ func (r *BookingRepository) GetPendingApprovalBookings(tenantID int) ([]*models.
 		FROM bookings b
 		JOIN users u ON b.user_id = u.id
 		JOIN dogs d ON b.dog_id = d.id
-		WHERE b.approval_status = 'pending'
+		WHERE b.approval_status = 'pending' AND b.tenant_id = ?
+		ORDER BY b.date ASC, b.scheduled_time ASC
 	`
-	args := []interface{}{}
-
-	// SaaS: Filter by tenant if specified
-	if tenantID > 0 {
-		query += " AND b.tenant_id = ?"
-		args = append(args, tenantID)
-	}
-
-	query += " ORDER BY b.date ASC, b.scheduled_time ASC"
+	args := []interface{}{tenantID}
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -792,14 +751,15 @@ func (r *BookingRepository) GetPendingApprovalBookings(tenantID int) ([]*models.
 }
 
 // ApproveBooking approves a pending booking
-func (r *BookingRepository) ApproveBooking(bookingID int, adminID int) error {
+// SaaS: Filters by tenant_id for tenant isolation
+func (r *BookingRepository) ApproveBooking(bookingID int, tenantID int, adminID int) error {
 	query := `
 		UPDATE bookings
 		SET approval_status = 'approved', approved_by = ?, approved_at = ?
-		WHERE id = ? AND approval_status = 'pending'
+		WHERE id = ? AND tenant_id = ? AND approval_status = 'pending'
 	`
 
-	result, err := r.db.Exec(query, adminID, time.Now(), bookingID)
+	result, err := r.db.Exec(query, adminID, time.Now(), bookingID, tenantID)
 	if err != nil {
 		return err
 	}
@@ -816,7 +776,8 @@ func (r *BookingRepository) ApproveBooking(bookingID int, adminID int) error {
 }
 
 // RejectBooking rejects a pending booking
-func (r *BookingRepository) RejectBooking(bookingID int, adminID int, reason string) error {
+// SaaS: Filters by tenant_id for tenant isolation
+func (r *BookingRepository) RejectBooking(bookingID int, tenantID int, adminID int, reason string) error {
 	// Validate that reason is not empty
 	if reason == "" {
 		return fmt.Errorf("rejection reason is required")
@@ -825,10 +786,10 @@ func (r *BookingRepository) RejectBooking(bookingID int, adminID int, reason str
 	query := `
 		UPDATE bookings
 		SET approval_status = 'rejected', approved_by = ?, approved_at = ?, rejection_reason = ?, status = 'cancelled'
-		WHERE id = ? AND approval_status = 'pending'
+		WHERE id = ? AND tenant_id = ? AND approval_status = 'pending'
 	`
 
-	result, err := r.db.Exec(query, adminID, time.Now(), reason, bookingID)
+	result, err := r.db.Exec(query, adminID, time.Now(), reason, bookingID, tenantID)
 	if err != nil {
 		return err
 	}

@@ -16,13 +16,13 @@ func TestUserColorRepository_AddColorToUser(t *testing.T) {
 		colorID := testutil.SeedTestColorCategory(t, db, "add-color", "#111111", 10)
 		adminID := testutil.SeedTestUser(t, db, "admin@test.com", "Admin", "blue")
 
-		err := repo.AddColorToUser(1, userID, colorID, adminID) // tenantID = 1
+		err := repo.AddColorToUser(0, userID, colorID, adminID) // tenantID = 0
 		if err != nil {
 			t.Fatalf("AddColorToUser() failed: %v", err)
 		}
 
 		// Verify color was added
-		hasColor, _ := repo.HasColor(1, userID, colorID) // tenantID = 1
+		hasColor, _ := repo.HasColor(0, userID, colorID) // tenantID = 0
 		if !hasColor {
 			t.Error("User should have the color after adding")
 		}
@@ -34,13 +34,13 @@ func TestUserColorRepository_AddColorToUser(t *testing.T) {
 		adminID := testutil.SeedTestUser(t, db, "admin2@test.com", "Admin 2", "blue")
 
 		// First add
-		err := repo.AddColorToUser(1, userID, colorID, adminID) // tenantID = 1
+		err := repo.AddColorToUser(0, userID, colorID, adminID) // tenantID = 0
 		if err != nil {
 			t.Fatalf("First AddColorToUser() failed: %v", err)
 		}
 
 		// Second add should fail
-		err = repo.AddColorToUser(1, userID, colorID, adminID) // tenantID = 1
+		err = repo.AddColorToUser(0, userID, colorID, adminID) // tenantID = 0
 		if err == nil {
 			t.Error("Expected error for duplicate user-color assignment")
 		}
@@ -58,13 +58,13 @@ func TestUserColorRepository_RemoveColorFromUser(t *testing.T) {
 
 		testutil.SeedTestUserColor(t, db, userID, colorID)
 
-		err := repo.RemoveColorFromUser(1, userID, colorID) // tenantID = 1
+		err := repo.RemoveColorFromUser(0, userID, colorID) // tenantID = 0
 		if err != nil {
 			t.Fatalf("RemoveColorFromUser() failed: %v", err)
 		}
 
 		// Verify color was removed
-		hasColor, _ := repo.HasColor(1, userID, colorID) // tenantID = 1
+		hasColor, _ := repo.HasColor(0, userID, colorID) // tenantID = 0
 		if hasColor {
 			t.Error("User should not have the color after removing")
 		}
@@ -75,7 +75,7 @@ func TestUserColorRepository_RemoveColorFromUser(t *testing.T) {
 		colorID := testutil.SeedTestColorCategory(t, db, "not-assigned", "#444444", 40)
 
 		// User doesn't have this color, but remove should not error
-		err := repo.RemoveColorFromUser(1, userID, colorID) // tenantID = 1
+		err := repo.RemoveColorFromUser(0, userID, colorID) // tenantID = 0
 		if err != nil {
 			t.Fatalf("RemoveColorFromUser() should not error for non-assigned color: %v", err)
 		}
@@ -98,7 +98,7 @@ func TestUserColorRepository_GetUserColors(t *testing.T) {
 		testutil.SeedTestUserColor(t, db, userID, color2ID)
 		testutil.SeedTestUserColor(t, db, userID, color3ID)
 
-		colors, err := repo.GetUserColors(1, userID) // tenantID = 1
+		colors, err := repo.GetUserColors(0, userID) // tenantID = 0
 		if err != nil {
 			t.Fatalf("GetUserColors() failed: %v", err)
 		}
@@ -112,7 +112,7 @@ func TestUserColorRepository_GetUserColors(t *testing.T) {
 		// Use user without default colors for this test
 		userID := testutil.SeedTestUserWithoutColors(t, db, "user6@test.com", "Test User 6", "green")
 
-		colors, err := repo.GetUserColors(1, userID) // tenantID = 1
+		colors, err := repo.GetUserColors(0, userID) // tenantID = 0
 		if err != nil {
 			t.Fatalf("GetUserColors() failed: %v", err)
 		}
@@ -135,7 +135,7 @@ func TestUserColorRepository_HasColor(t *testing.T) {
 	testutil.SeedTestUserColor(t, db, userID, color1ID)
 
 	t.Run("user has color", func(t *testing.T) {
-		hasColor, err := repo.HasColor(1, userID, color1ID) // tenantID = 1
+		hasColor, err := repo.HasColor(0, userID, color1ID) // tenantID = 0
 		if err != nil {
 			t.Fatalf("HasColor() failed: %v", err)
 		}
@@ -146,7 +146,7 @@ func TestUserColorRepository_HasColor(t *testing.T) {
 	})
 
 	t.Run("user does not have color", func(t *testing.T) {
-		hasColor, err := repo.HasColor(1, userID, color2ID) // tenantID = 1
+		hasColor, err := repo.HasColor(0, userID, color2ID) // tenantID = 0
 		if err != nil {
 			t.Fatalf("HasColor() failed: %v", err)
 		}
@@ -171,7 +171,7 @@ func TestUserColorRepository_GetUserColorIDs(t *testing.T) {
 		testutil.SeedTestUserColor(t, db, userID, color1ID)
 		testutil.SeedTestUserColor(t, db, userID, color2ID)
 
-		colorIDs, err := repo.GetUserColorIDs(1, userID) // tenantID = 1
+		colorIDs, err := repo.GetUserColorIDs(0, userID) // tenantID = 0
 		if err != nil {
 			t.Fatalf("GetUserColorIDs() failed: %v", err)
 		}
@@ -199,7 +199,7 @@ func TestUserColorRepository_GetUserColorIDs(t *testing.T) {
 		// Use user without default colors for this test
 		userID := testutil.SeedTestUserWithoutColors(t, db, "user9@test.com", "Test User 9", "green")
 
-		colorIDs, err := repo.GetUserColorIDs(1, userID) // tenantID = 1
+		colorIDs, err := repo.GetUserColorIDs(0, userID) // tenantID = 0
 		if err != nil {
 			t.Fatalf("GetUserColorIDs() failed: %v", err)
 		}

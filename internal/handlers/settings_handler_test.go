@@ -69,8 +69,8 @@ func TestSettingsHandler_UpdateSetting(t *testing.T) {
 	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
 	userID := testutil.SeedTestUser(t, db, "user@example.com", "User", "green")
 
-	// Insert test setting
-	db.Exec("INSERT INTO system_settings (tenant_id, key, value) VALUES (1, ?, ?)", "booking_advance_days", "14")
+	// Insert test setting (tenant_id=0 to match SeedTestUser)
+	db.Exec("INSERT INTO system_settings (tenant_id, key, value) VALUES (0, ?, ?)", "booking_advance_days", "14")
 
 	t.Run("admin successfully updates setting", func(t *testing.T) {
 		reqBody := map[string]interface{}{
@@ -295,6 +295,9 @@ func TestSettingsHandler_GetLogo(t *testing.T) {
 	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
 
 	t.Run("returns default logo URL when no custom logo", func(t *testing.T) {
+		// Clear the logo setting first to test default behavior
+		db.Exec("UPDATE system_settings SET value = '' WHERE key = 'site_logo' AND tenant_id = 0")
+
 		req := httptest.NewRequest("GET", "/api/settings/logo", nil)
 		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
 		req = req.WithContext(ctx)
@@ -314,16 +317,16 @@ func TestSettingsHandler_GetLogo(t *testing.T) {
 			t.Fatal("Expected logo_url in response")
 		}
 
-		// SaaS-Mode (tenantID=1): Should be the placeholder logo
-		expectedDefault := "/assets/images/placeholders/logo-placeholder.svg"
+		// Simple-Mode (tenantID=0): Should be the Tierheim Goeppingen logo
+		expectedDefault := "https://www.tierheim-goeppingen.de/wp-content/uploads/2017/04/Logo_4c_homepagebanner3.png"
 		if logoURL != expectedDefault {
-			t.Errorf("Expected placeholder logo URL %s, got %s", expectedDefault, logoURL)
+			t.Errorf("Expected default logo URL %s, got %s", expectedDefault, logoURL)
 		}
 	})
 
 	t.Run("returns custom logo URL when uploaded", func(t *testing.T) {
 		// Update the setting to a custom path (with /uploads/ prefix as stored by UploadLogo)
-		db.Exec("UPDATE system_settings SET value = ? WHERE key = ? AND tenant_id = 1", "/uploads/settings/site_logo.jpg", "site_logo")
+		db.Exec("UPDATE system_settings SET value = ? WHERE key = ? AND tenant_id = 0", "/uploads/settings/site_logo.jpg", "site_logo")
 
 		// Create the actual logo file
 		settingsDir := filepath.Join(cfg.UploadDir, "settings")
@@ -358,7 +361,7 @@ func TestSettingsHandler_GetLogo(t *testing.T) {
 
 	t.Run("no authentication required", func(t *testing.T) {
 		// Reset to default
-		db.Exec("UPDATE system_settings SET value = ? WHERE key = ? AND tenant_id = 1",
+		db.Exec("UPDATE system_settings SET value = ? WHERE key = ? AND tenant_id = 0",
 			"https://www.tierheim-goeppingen.de/wp-content/uploads/2017/04/Logo_4c_homepagebanner3.png", "site_logo")
 
 		// Request without any auth context - but needs tenant context for multi-tenant
@@ -492,7 +495,7 @@ func TestSettingsHandler_ResetLogo(t *testing.T) {
 	os.MkdirAll(settingsDir, 0755)
 	logoPath := filepath.Join(settingsDir, "site_logo.jpg")
 	os.WriteFile(logoPath, []byte("custom logo content"), 0644)
-	db.Exec("UPDATE system_settings SET value = ? WHERE key = ? AND tenant_id = 1", "/uploads/settings/site_logo.jpg", "site_logo")
+	db.Exec("UPDATE system_settings SET value = ? WHERE key = ? AND tenant_id = 0", "/uploads/settings/site_logo.jpg", "site_logo")
 
 	t.Run("admin can reset logo to default", func(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/api/settings/logo", nil)
@@ -515,15 +518,15 @@ func TestSettingsHandler_ResetLogo(t *testing.T) {
 			t.Fatal("Expected logo_url in response")
 		}
 
-		// SaaS-Mode (tenantID=1): Should be the placeholder logo
-		expectedDefault := "/assets/images/placeholders/logo-placeholder.svg"
+		// Simple-Mode (tenantID=0): Should be the Tierheim Goeppingen logo
+		expectedDefault := "https://www.tierheim-goeppingen.de/wp-content/uploads/2017/04/Logo_4c_homepagebanner3.png"
 		if logoURL != expectedDefault {
-			t.Errorf("Expected placeholder URL %s, got %s", expectedDefault, logoURL)
+			t.Errorf("Expected default logo URL %s, got %s", expectedDefault, logoURL)
 		}
 
 		// Verify database updated
 		var dbValue string
-		db.QueryRow("SELECT value FROM system_settings WHERE key = ? AND tenant_id = 1", "site_logo").Scan(&dbValue)
+		db.QueryRow("SELECT value FROM system_settings WHERE key = ? AND tenant_id = 0", "site_logo").Scan(&dbValue)
 		if dbValue != expectedDefault {
 			t.Errorf("Database not reset to default, got value: %s", dbValue)
 		}
@@ -566,8 +569,11 @@ func TestSettingsHandler_LogoWorkflow(t *testing.T) {
 
 	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
 
-	// SaaS-Mode (tenantID=1): default is placeholder logo
-	defaultLogo := "/assets/images/placeholders/logo-placeholder.svg"
+	// Simple-Mode (tenantID=0): default is Tierheim Goeppingen logo
+	defaultLogo := "https://www.tierheim-goeppingen.de/wp-content/uploads/2017/04/Logo_4c_homepagebanner3.png"
+
+	// Clear logo setting to test default behavior
+	db.Exec("UPDATE system_settings SET value = '' WHERE key = 'site_logo' AND tenant_id = 0")
 
 	// Step 1: Get default logo
 	t.Run("Step 1: Get default logo", func(t *testing.T) {
@@ -685,8 +691,8 @@ func TestSettingsHandler_GetWhatsAppSettings(t *testing.T) {
 
 	t.Run("returns enabled with link when configured", func(t *testing.T) {
 		// Enable WhatsApp and set link
-		db.Exec("UPDATE system_settings SET value = ? WHERE key = ? AND tenant_id = 1", "true", "whatsapp_group_enabled")
-		db.Exec("UPDATE system_settings SET value = ? WHERE key = ? AND tenant_id = 1", "https://chat.whatsapp.com/ABC123", "whatsapp_group_link")
+		db.Exec("UPDATE system_settings SET value = ? WHERE key = ? AND tenant_id = 0", "true", "whatsapp_group_enabled")
+		db.Exec("UPDATE system_settings SET value = ? WHERE key = ? AND tenant_id = 0", "https://chat.whatsapp.com/ABC123", "whatsapp_group_link")
 
 		req := httptest.NewRequest("GET", "/api/settings/whatsapp", nil)
 		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)

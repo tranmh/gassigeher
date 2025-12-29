@@ -146,7 +146,7 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
 
 	for _, booking := range bookings {
 		// Cancel the booking
-		if err := h.bookingRepo.Cancel(booking.ID, &cancellationReason); err != nil {
+		if err := h.bookingRepo.Cancel(booking.ID, tenantID, &cancellationReason); err != nil {
 			fmt.Printf("Warning: Failed to cancel booking %d: %v\n", booking.ID, err)
 			continue
 		}
@@ -217,7 +217,8 @@ func (h *BlockedDateHandler) DeleteBlockedDate(w http.ResponseWriter, r *http.Re
 	}
 
 	// Double-check tenant ownership for defense-in-depth
-	if tenantID > 0 && blockedDate.TenantID != tenantID {
+	// (tenant_id=0 is valid for Simple-Mode, so always check tenant match)
+	if blockedDate.TenantID != tenantID {
 		respondError(w, http.StatusNotFound, "Blocked date not found")
 		return
 	}

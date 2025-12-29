@@ -29,7 +29,7 @@ func TestAuthHandler_Register(t *testing.T) {
 
 	// Set up a known registration password for testing
 	const testRegPassword = "TEST1234"
-	db.Exec(`UPDATE system_settings SET value = ? WHERE key = 'registration_password' AND tenant_id = 1`, testRegPassword)
+	db.Exec(`UPDATE system_settings SET value = ? WHERE key = 'registration_password' AND tenant_id = 0`, testRegPassword)
 
 	t.Run("successful registration", func(t *testing.T) {
 		reqBody := map[string]interface{}{
@@ -47,8 +47,8 @@ func TestAuthHandler_Register(t *testing.T) {
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/api/auth/register", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		// Add tenant context (tenantID = 1)
-		req = req.WithContext(context.WithValue(req.Context(), middleware.TenantIDKey, 1))
+		// Add tenant context (tenantID = 0)
+		req = req.WithContext(context.WithValue(req.Context(), middleware.TenantIDKey, 0))
 
 		rec := httptest.NewRecorder()
 		handler.Register(rec, req)
@@ -233,8 +233,8 @@ func TestAuthHandler_Register(t *testing.T) {
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/api/auth/register", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		// Add tenant context (tenantID = 1)
-		req = req.WithContext(context.WithValue(req.Context(), middleware.TenantIDKey, 1))
+		// Add tenant context (tenantID = 0)
+		req = req.WithContext(context.WithValue(req.Context(), middleware.TenantIDKey, 0))
 
 		rec := httptest.NewRecorder()
 		handler.Register(rec, req)
@@ -266,7 +266,7 @@ func TestAuthHandler_Register_AssignsDefaultColor(t *testing.T) {
 
 	// Set up a known registration password for testing
 	const testRegPassword = "TEST1234"
-	db.Exec(`UPDATE system_settings SET value = ? WHERE key = 'registration_password' AND tenant_id = 1`, testRegPassword)
+	db.Exec(`UPDATE system_settings SET value = ? WHERE key = 'registration_password' AND tenant_id = 0`, testRegPassword)
 
 	// Color categories are already seeded by migration 024 with IDs 1-7:
 	// 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau, 6=helllila, 7=dunkellila
@@ -287,8 +287,8 @@ func TestAuthHandler_Register_AssignsDefaultColor(t *testing.T) {
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/api/auth/register", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		// Add tenant context (tenantID = 1)
-		req = req.WithContext(context.WithValue(req.Context(), middleware.TenantIDKey, 1))
+		// Add tenant context (tenantID = 0)
+		req = req.WithContext(context.WithValue(req.Context(), middleware.TenantIDKey, 0))
 
 		rec := httptest.NewRecorder()
 		handler.Register(rec, req)
@@ -1099,13 +1099,13 @@ func contextWithUser(ctx context.Context, userID int, email string, isAdmin bool
 	ctx = context.WithValue(ctx, middleware.UserIDKey, userID)
 	ctx = context.WithValue(ctx, middleware.EmailKey, email)
 	ctx = context.WithValue(ctx, middleware.IsAdminKey, isAdmin)
-	ctx = context.WithValue(ctx, middleware.TenantIDKey, 1) // Use test tenant
+	ctx = context.WithValue(ctx, middleware.TenantIDKey, 0) // Use test tenant
 
 	// String keys (used by BookingHandler, etc.)
 	ctx = context.WithValue(ctx, "user_id", userID)
 	ctx = context.WithValue(ctx, "email", email)
 	ctx = context.WithValue(ctx, "is_admin", isAdmin)
-	ctx = context.WithValue(ctx, "tenant_id", 1)
+	ctx = context.WithValue(ctx, "tenant_id", 0)
 
 	return ctx
 }
@@ -1186,7 +1186,7 @@ func TestAuthHandler_Login_CentralAdminRedirect(t *testing.T) {
 				is_admin, is_super_admin, is_central_admin,
 				is_verified, is_active, terms_accepted_at, last_activity_at
 			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, 1, "Tenant", "User", "tenant@user.local", hashedPw2, 0, 0, 0, 1, 1, now2, now2)
+		`, 0, "Tenant", "User", "tenant@user.local", hashedPw2, 0, 0, 0, 1, 1, now2, now2)
 		if err != nil {
 			t.Fatalf("Failed to create tenant user: %v", err)
 		}
@@ -1198,8 +1198,8 @@ func TestAuthHandler_Login_CentralAdminRedirect(t *testing.T) {
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/api/auth/login", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		// Add tenant context (tenantID = 1)
-		req = req.WithContext(context.WithValue(req.Context(), middleware.TenantIDKey, 1))
+		// Add tenant context (tenantID = 0)
+		req = req.WithContext(context.WithValue(req.Context(), middleware.TenantIDKey, 0))
 
 		rr := httptest.NewRecorder()
 		handler.Login(rr, req)
@@ -1245,14 +1245,14 @@ func TestAuthHandler_Security_NoUserEnumeration(t *testing.T) {
 			is_admin, is_super_admin, is_central_admin,
 			is_verified, is_active, terms_accepted_at, last_activity_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, 1, "Existing", "User", "existing@user.local", hashedPw, 0, 0, 0, 1, 1, now, now)
+	`, 0, "Existing", "User", "existing@user.local", hashedPw, 0, 0, 0, 1, 1, now, now)
 	if err != nil {
 		t.Fatalf("Failed to create existing user: %v", err)
 	}
 
 	// Set up registration password
 	const testRegPassword = "TEST1234"
-	db.Exec(`INSERT OR REPLACE INTO system_settings (tenant_id, key, value) VALUES (1, 'registration_password', ?)`, testRegPassword)
+	db.Exec(`INSERT OR REPLACE INTO system_settings (tenant_id, key, value) VALUES (0, 'registration_password', ?)`, testRegPassword)
 
 	t.Run("registration with existing email returns success message not error", func(t *testing.T) {
 		reqBody := map[string]interface{}{
@@ -1270,7 +1270,7 @@ func TestAuthHandler_Security_NoUserEnumeration(t *testing.T) {
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/api/auth/register", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		req = req.WithContext(context.WithValue(req.Context(), middleware.TenantIDKey, 1))
+		req = req.WithContext(context.WithValue(req.Context(), middleware.TenantIDKey, 0))
 
 		rec := httptest.NewRecorder()
 		handler.Register(rec, req)
@@ -1317,7 +1317,7 @@ func TestAuthHandler_Security_NoUserEnumeration(t *testing.T) {
 		bodyNew, _ := json.Marshal(reqBodyNew)
 		reqNew := httptest.NewRequest("POST", "/api/auth/register", bytes.NewReader(bodyNew))
 		reqNew.Header.Set("Content-Type", "application/json")
-		reqNew = reqNew.WithContext(context.WithValue(reqNew.Context(), middleware.TenantIDKey, 1))
+		reqNew = reqNew.WithContext(context.WithValue(reqNew.Context(), middleware.TenantIDKey, 0))
 
 		recNew := httptest.NewRecorder()
 		handler.Register(recNew, reqNew)
@@ -1338,7 +1338,7 @@ func TestAuthHandler_Security_NoUserEnumeration(t *testing.T) {
 		bodyExisting, _ := json.Marshal(reqBodyExisting)
 		reqExisting := httptest.NewRequest("POST", "/api/auth/register", bytes.NewReader(bodyExisting))
 		reqExisting.Header.Set("Content-Type", "application/json")
-		reqExisting = reqExisting.WithContext(context.WithValue(reqExisting.Context(), middleware.TenantIDKey, 1))
+		reqExisting = reqExisting.WithContext(context.WithValue(reqExisting.Context(), middleware.TenantIDKey, 0))
 
 		recExisting := httptest.NewRecorder()
 		handler.Register(recExisting, reqExisting)

@@ -27,7 +27,7 @@ func TestIsHoliday_KnownHolidays(t *testing.T) {
 
 	for _, h := range holidays {
 		holiday := h
-		err := holidayRepo.CreateHoliday(1, &holiday) // tenantID = 1
+		err := holidayRepo.CreateHoliday(0, &holiday) // tenantID = 0
 		if err != nil {
 			t.Fatalf("Failed to seed holiday: %v", err)
 		}
@@ -47,7 +47,7 @@ func TestIsHoliday_KnownHolidays(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := service.IsHoliday(1, tc.date) // tenantID = 1
+			result, err := service.IsHoliday(0, tc.date) // tenantID = 0
 			if err != nil {
 				t.Fatalf("IsHoliday() error = %v", err)
 			}
@@ -67,10 +67,10 @@ func TestFetchAndCacheHolidays_APIIntegration(t *testing.T) {
 	service := NewHolidayService(holidayRepo, settingsRepo)
 
 	// Set state to BW (should already exist from migration)
-	_ = settingsRepo.Update(1, "feiertage_state", "BW") // tenantID = 1
+	_ = settingsRepo.Update(0, "feiertage_state", "BW") // tenantID = 0
 
 	// First fetch - should call API
-	err := service.FetchAndCacheHolidays(1, 2025) // tenantID = 1
+	err := service.FetchAndCacheHolidays(0, 2025) // tenantID = 0
 	if err != nil {
 		// If API is not reachable, skip this test
 		t.Skipf("API not reachable (this is OK for offline testing): %v", err)
@@ -87,7 +87,7 @@ func TestFetchAndCacheHolidays_APIIntegration(t *testing.T) {
 	}
 
 	// Verify holidays inserted
-	holidays, err := holidayRepo.GetHolidaysByYear(1, 2025) // tenantID = 1
+	holidays, err := holidayRepo.GetHolidaysByYear(0, 2025) // tenantID = 0
 	if err != nil {
 		t.Fatalf("Failed to get holidays: %v", err)
 	}
@@ -97,13 +97,13 @@ func TestFetchAndCacheHolidays_APIIntegration(t *testing.T) {
 
 	// Second fetch - should use cache (no API call)
 	// We can't easily verify no API call without mocking, but we can verify it succeeds
-	err = service.FetchAndCacheHolidays(1, 2025) // tenantID = 1
+	err = service.FetchAndCacheHolidays(0, 2025) // tenantID = 0
 	if err != nil {
 		t.Errorf("Cache fetch failed: %v", err)
 	}
 
 	// Verify holidays still present
-	holidays2, err := holidayRepo.GetHolidaysByYear(1, 2025) // tenantID = 1
+	holidays2, err := holidayRepo.GetHolidaysByYear(0, 2025) // tenantID = 0
 	if err != nil {
 		t.Fatalf("Failed to get holidays after cache fetch: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestGetHolidaysForYear_Filtering(t *testing.T) {
 	service := NewHolidayService(holidayRepo, settingsRepo)
 
 	// Disable API usage for this test
-	_ = settingsRepo.Update(1, "use_feiertage_api", "false") // tenantID = 1
+	_ = settingsRepo.Update(0, "use_feiertage_api", "false") // tenantID = 0
 
 	// Seed holidays for different years
 	holidays2025 := []models.CustomHoliday{
@@ -136,12 +136,12 @@ func TestGetHolidaysForYear_Filtering(t *testing.T) {
 
 	for _, h := range holidays2025 {
 		holiday := h
-		_ = holidayRepo.CreateHoliday(1, &holiday) // tenantID = 1
+		_ = holidayRepo.CreateHoliday(0, &holiday) // tenantID = 0
 	}
 
 	for _, h := range holidays2026 {
 		holiday := h
-		_ = holidayRepo.CreateHoliday(1, &holiday) // tenantID = 1
+		_ = holidayRepo.CreateHoliday(0, &holiday) // tenantID = 0
 	}
 
 	testCases := []struct {
@@ -156,7 +156,7 @@ func TestGetHolidaysForYear_Filtering(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.note, func(t *testing.T) {
-			holidays, err := service.GetHolidaysForYear(1, tc.year) // tenantID = 1
+			holidays, err := service.GetHolidaysForYear(0, tc.year) // tenantID = 0
 			if err != nil {
 				t.Fatalf("GetHolidaysForYear(%d) error = %v", tc.year, err)
 			}
@@ -176,7 +176,7 @@ func TestCacheExpiration(t *testing.T) {
 	settingsRepo := repository.NewSettingsRepository(db)
 
 	// Set cache days to a short duration for testing
-	_ = settingsRepo.Update(1, "feiertage_cache_days", "7") // tenantID = 1
+	_ = settingsRepo.Update(0, "feiertage_cache_days", "7") // tenantID = 0
 
 	// Create expired cache entry manually
 	expiresAt := time.Now().AddDate(0, 0, -1) // Yesterday (expired)
@@ -222,10 +222,10 @@ func TestIsHoliday_WithAPIEnabled(t *testing.T) {
 	service := NewHolidayService(holidayRepo, settingsRepo)
 
 	// Enable API usage
-	_ = settingsRepo.Update(1, "use_feiertage_api", "true") // tenantID = 1
+	_ = settingsRepo.Update(0, "use_feiertage_api", "true") // tenantID = 0
 
 	// Check a known holiday
-	result, err := service.IsHoliday(1, "2025-01-01") // tenantID = 1, Neujahrstag
+	result, err := service.IsHoliday(0, "2025-01-01") // tenantID = 0, Neujahrstag
 	if err != nil {
 		t.Skipf("API error (OK for offline testing): %v", err)
 		return
@@ -236,7 +236,7 @@ func TestIsHoliday_WithAPIEnabled(t *testing.T) {
 	}
 
 	// Check a non-holiday
-	result2, err := service.IsHoliday(1, "2025-01-15") // tenantID = 1
+	result2, err := service.IsHoliday(0, "2025-01-15") // tenantID = 0
 	if err != nil {
 		t.Fatalf("IsHoliday error: %v", err)
 	}

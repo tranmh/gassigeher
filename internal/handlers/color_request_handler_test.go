@@ -259,6 +259,6 @@ func contextWithUserForColor(ctx context.Context, userID int, email string, isAd
 	ctx = context.WithValue(ctx, middleware.EmailKey, email)
 	ctx = context.WithValue(ctx, middleware.IsAdminKey, isAdmin)
 	ctx = context.WithValue(ctx, middleware.IsSuperAdminKey, false)
-	ctx = context.WithValue(ctx, middleware.TenantIDKey, 1) // Use test tenant
+	ctx = context.WithValue(ctx, middleware.TenantIDKey, 0) // Use test tenant
 	return ctx
 }

@@ -21,7 +21,7 @@ func colorCtxSuperAdmin(ctx context.Context, userID int, email string) context.C
 	ctx = context.WithValue(ctx, middleware.EmailKey, email)
 	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
 	ctx = context.WithValue(ctx, middleware.IsSuperAdminKey, true)
-	ctx = context.WithValue(ctx, middleware.TenantIDKey, 1) // Use test tenant
+	ctx = context.WithValue(ctx, middleware.TenantIDKey, 0) // Use test tenant
 	return ctx
 }
 
@@ -31,7 +31,7 @@ func colorCtxAdmin(ctx context.Context, userID int, email string) context.Contex
 	ctx = context.WithValue(ctx, middleware.EmailKey, email)
 	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
 	ctx = context.WithValue(ctx, middleware.IsSuperAdminKey, false)
-	ctx = context.WithValue(ctx, middleware.TenantIDKey, 1) // Use test tenant
+	ctx = context.WithValue(ctx, middleware.TenantIDKey, 0) // Use test tenant
 	return ctx
 }
 
@@ -46,7 +46,7 @@ func TestColorCategoryHandler_ListColors(t *testing.T) {
 
 	t.Run("returns all colors - public endpoint", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/colors", nil)
-		ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 1) // Use test tenant
+		ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 0) // Use test tenant
 		req = req.WithContext(ctx)
 		rec := httptest.NewRecorder()
 
@@ -213,10 +213,10 @@ func TestColorCategoryHandler_DeleteColor(t *testing.T) {
 	t.Run("cannot delete color with dogs assigned", func(t *testing.T) {
 		colorID := testutil.SeedTestColorCategory(t, db, "has-dogs", "#444444", 300)
 
-		// Create a dog with this color
+		// Create a dog with this color (tenant_id=0 to match color's tenant)
 		now := testutil.Now()
 		_, err := db.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at)
-			VALUES (1, ?, ?, ?, ?, ?, 1, ?)`, "TestDog", "Mix", "medium", 3, colorID, now)
+			VALUES (0, ?, ?, ?, ?, ?, 1, ?)`, "TestDog", "Mix", "medium", 3, colorID, now)
 		if err != nil {
 			t.Fatalf("Failed to create test dog: %v", err)
 		}

@@ -36,7 +36,7 @@ func setupHolidayHandlerTest(t *testing.T) (*sql.DB, *HolidayHandler, func()) {
 
 // holidayTenantContext adds tenant context to a request
 func holidayTenantContext(req *http.Request) *http.Request {
-	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 1)
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 0)
 	return req.WithContext(ctx)
 }
 
@@ -70,7 +70,7 @@ func TestGetHolidays(t *testing.T) {
 
 	for _, holiday := range testHolidays {
 		h := holiday
-		if err := holidayRepo.CreateHoliday(1, &h); err != nil { // tenantID = 1
+		if err := holidayRepo.CreateHoliday(0, &h); err != nil { // tenantID = 0
 			t.Fatalf("Failed to create test holiday: %v", err)
 		}
 	}
@@ -243,7 +243,7 @@ func TestUpdateHoliday(t *testing.T) {
 		IsActive: true,
 		Source:   "admin",
 	}
-	if err := holidayRepo.CreateHoliday(1, testHoliday); err != nil { // tenantID = 1
+	if err := holidayRepo.CreateHoliday(0, testHoliday); err != nil { // tenantID = 0
 		t.Fatalf("Failed to create test holiday: %v", err)
 	}
 
@@ -346,10 +346,10 @@ func TestDeleteHoliday(t *testing.T) {
 		Source:   "api",
 	}
 
-	if err := holidayRepo.CreateHoliday(1, adminHoliday); err != nil { // tenantID = 1
+	if err := holidayRepo.CreateHoliday(0, adminHoliday); err != nil { // tenantID = 0
 		t.Fatalf("Failed to create admin holiday: %v", err)
 	}
-	if err := holidayRepo.CreateHoliday(1, apiHoliday); err != nil { // tenantID = 1
+	if err := holidayRepo.CreateHoliday(0, apiHoliday); err != nil { // tenantID = 0
 		t.Fatalf("Failed to create API holiday: %v", err)
 	}
 

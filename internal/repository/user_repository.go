@@ -30,17 +30,10 @@ func (r *UserRepository) Create(user *models.User) error {
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	// SaaS: Convert TenantID=0 to NULL for single-tenant mode
-	var tenantIDParam interface{}
-	if user.TenantID > 0 {
-		tenantIDParam = user.TenantID
-	} else {
-		tenantIDParam = nil
-	}
-
+	// tenant_id=0 is valid for Simple-Mode (non-SaaS)
 	result, err := r.db.Exec(
 		query,
-		tenantIDParam, // SaaS: Include tenant_id (NULL for single-tenant)
+		user.TenantID,
 		user.FirstName,
 		user.LastName,
 		user.Email,
@@ -81,17 +74,10 @@ func (r *UserRepository) CreateTx(tx *sql.Tx, user *models.User) error {
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	// SaaS: Convert TenantID=0 to NULL for single-tenant mode
-	var tenantIDParam interface{}
-	if user.TenantID > 0 {
-		tenantIDParam = user.TenantID
-	} else {
-		tenantIDParam = nil
-	}
-
+	// tenant_id=0 is valid for Simple-Mode (non-SaaS)
 	result, err := tx.Exec(
 		query,
-		tenantIDParam, // SaaS: Include tenant_id (NULL for single-tenant)
+		user.TenantID,
 		user.FirstName,
 		user.LastName,
 		user.Email,
@@ -122,40 +108,20 @@ func (r *UserRepository) CreateTx(tx *sql.Tx, user *models.User) error {
 }
 
 // FindByEmail finds a user by email within a tenant
-// SaaS: tenantID=0 searches globally (backward compatibility), otherwise filters by tenant
+// Always filters by tenant_id (tenant_id=0 for Simple-Mode, >0 for SaaS-Mode)
 func (r *UserRepository) FindByEmail(email string, tenantID int) (*models.User, error) {
-	var query string
-	var args []interface{}
-
-	if tenantID > 0 {
-		// SaaS mode: filter by tenant
-		query = `
-			SELECT id, tenant_id, first_name, last_name, email, phone, password_hash,
-			       is_admin, is_super_admin, is_central_admin, is_verified, is_active, is_deleted, must_change_password,
-			       verification_token, verification_token_expires, password_reset_token,
-			       password_reset_expires, profile_photo, anonymous_id,
-			       terms_accepted_at, last_activity_at, deactivated_at,
-			       deactivation_reason, reactivated_at, deleted_at,
-			       created_at, updated_at
-			FROM users
-			WHERE email = ? AND tenant_id = ? AND is_deleted = 0
-		`
-		args = []interface{}{email, tenantID}
-	} else {
-		// Single-tenant mode / Central Admin: no tenant filter
-		query = `
-			SELECT id, tenant_id, first_name, last_name, email, phone, password_hash,
-			       is_admin, is_super_admin, is_central_admin, is_verified, is_active, is_deleted, must_change_password,
-			       verification_token, verification_token_expires, password_reset_token,
-			       password_reset_expires, profile_photo, anonymous_id,
-			       terms_accepted_at, last_activity_at, deactivated_at,
-			       deactivation_reason, reactivated_at, deleted_at,
-			       created_at, updated_at
-			FROM users
-			WHERE email = ? AND is_deleted = 0
-		`
-		args = []interface{}{email}
-	}
+	query := `
+		SELECT id, tenant_id, first_name, last_name, email, phone, password_hash,
+		       is_admin, is_super_admin, is_central_admin, is_verified, is_active, is_deleted, must_change_password,
+		       verification_token, verification_token_expires, password_reset_token,
+		       password_reset_expires, profile_photo, anonymous_id,
+		       terms_accepted_at, last_activity_at, deactivated_at,
+		       deactivation_reason, reactivated_at, deleted_at,
+		       created_at, updated_at
+		FROM users
+		WHERE email = ? AND tenant_id = ? AND is_deleted = 0
+	`
+	args := []interface{}{email, tenantID}
 
 	user := &models.User{}
 	var firstName, lastName sql.NullString
@@ -302,8 +268,8 @@ func (r *UserRepository) FindByIDAndTenant(id int, tenantID int) (*models.User, 
 	if user == nil {
 		return nil, nil
 	}
-	// In SaaS mode (tenantID > 0), verify tenant membership
-	if tenantID > 0 && user.TenantID != tenantID {
+	// Verify tenant membership (works for both Simple-Mode tenant_id=0 and SaaS-Mode)
+	if user.TenantID != tenantID {
 		return nil, nil // User doesn't belong to this tenant
 	}
 	return user, nil
@@ -684,7 +650,7 @@ func (r *UserRepository) FindInactiveUsers(tenantID int, days int) ([]*models.Us
 }
 
 // FindAll finds all users with optional filters
-// SaaS: tenantID=0 returns all users (for cron jobs/global admin), otherwise filters by tenant
+// Always filters by tenant_id (tenant_id=0 for Simple-Mode, >0 for SaaS-Mode)
 func (r *UserRepository) FindAll(activeOnly *bool, tenantID int) ([]*models.User, error) {
 	query := `
 		SELECT id, tenant_id, first_name, last_name, email, phone, password_hash,
@@ -695,16 +661,10 @@ func (r *UserRepository) FindAll(activeOnly *bool, tenantID int) ([]*models.User
 		       deactivation_reason, reactivated_at, deleted_at,
 		       created_at, updated_at
 		FROM users
-		WHERE is_deleted = 0
+		WHERE is_deleted = 0 AND tenant_id = ?
 	`
 
-	args := []interface{}{}
-
-	// SaaS: Filter by tenant if specified
-	if tenantID > 0 {
-		query += " AND tenant_id = ?"
-		args = append(args, tenantID)
-	}
+	args := []interface{}{tenantID}
 
 	if activeOnly != nil {
 		if *activeOnly {

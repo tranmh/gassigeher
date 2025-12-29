@@ -22,7 +22,7 @@ func TestExperienceRequestRepository_Create(t *testing.T) {
 			Status:         "pending",
 		}
 
-		err := repo.Create(1, req) // tenantID = 1
+		err := repo.Create(0, req) // tenantID = 0
 		if err != nil {
 			t.Fatalf("Create() failed: %v", err)
 		}
@@ -43,7 +43,7 @@ func TestExperienceRequestRepository_FindByID(t *testing.T) {
 	t.Run("request exists", func(t *testing.T) {
 		reqID := testutil.SeedTestExperienceRequest(t, db, userID, "blue", "pending")
 
-		request, err := repo.FindByID(1, reqID) // tenantID = 1
+		request, err := repo.FindByID(0, reqID) // tenantID = 0
 		if err != nil {
 			t.Fatalf("FindByID() failed: %v", err)
 		}
@@ -58,7 +58,7 @@ func TestExperienceRequestRepository_FindByID(t *testing.T) {
 	})
 
 	t.Run("request not found", func(t *testing.T) {
-		request, _ := repo.FindByID(1, 99999) // tenantID = 1
+		request, _ := repo.FindByID(0, 99999) // tenantID = 0
 		if request != nil {
 			t.Error("Expected nil for non-existent ID")
 		}
@@ -81,7 +81,7 @@ func TestExperienceRequestRepository_FindByUserID(t *testing.T) {
 	testutil.SeedTestExperienceRequest(t, db, user2ID, "blue", "pending")
 
 	t.Run("user has multiple requests", func(t *testing.T) {
-		requests, err := repo.FindByUserID(1, user1ID) // tenantID = 1
+		requests, err := repo.FindByUserID(0, user1ID) // tenantID = 0
 		if err != nil {
 			t.Fatalf("FindByUserID() failed: %v", err)
 		}
@@ -94,7 +94,7 @@ func TestExperienceRequestRepository_FindByUserID(t *testing.T) {
 	t.Run("user has no requests", func(t *testing.T) {
 		user3ID := testutil.SeedTestUser(t, db, "user3@example.com", "User 3", "green")
 
-		requests, err := repo.FindByUserID(1, user3ID) // tenantID = 1
+		requests, err := repo.FindByUserID(0, user3ID) // tenantID = 0
 		if err != nil {
 			t.Fatalf("FindByUserID() failed: %v", err)
 		}
@@ -120,7 +120,7 @@ func TestExperienceRequestRepository_FindAllPending(t *testing.T) {
 	testutil.SeedTestExperienceRequest(t, db, user2ID, "blue", "denied")
 
 	t.Run("find only pending requests", func(t *testing.T) {
-		requests, err := repo.FindAllPending(1) // tenantID = 1
+		requests, err := repo.FindAllPending(0) // tenantID = 0
 		if err != nil {
 			t.Fatalf("FindAllPending() failed: %v", err)
 		}
@@ -150,13 +150,13 @@ func TestExperienceRequestRepository_Approve(t *testing.T) {
 		reqID := testutil.SeedTestExperienceRequest(t, db, userID, "blue", "pending")
 
 		message := "Well done!"
-		err := repo.Approve(1, reqID, adminID, &message) // tenantID = 1
+		err := repo.Approve(0, reqID, adminID, &message) // tenantID = 0
 		if err != nil {
 			t.Fatalf("Approve() failed: %v", err)
 		}
 
 		// Verify approval
-		request, _ := repo.FindByID(1, reqID) // tenantID = 1
+		request, _ := repo.FindByID(0, reqID) // tenantID = 0
 		if request.Status != "approved" {
 			t.Errorf("Expected status 'approved', got %s", request.Status)
 		}
@@ -184,13 +184,13 @@ func TestExperienceRequestRepository_Deny(t *testing.T) {
 		reqID := testutil.SeedTestExperienceRequest(t, db, userID, "blue", "pending")
 
 		message := "Need more experience"
-		err := repo.Deny(1, reqID, adminID, &message) // tenantID = 1
+		err := repo.Deny(0, reqID, adminID, &message) // tenantID = 0
 		if err != nil {
 			t.Fatalf("Deny() failed: %v", err)
 		}
 
 		// Verify denial
-		request, _ := repo.FindByID(1, reqID) // tenantID = 1
+		request, _ := repo.FindByID(0, reqID) // tenantID = 0
 		if request.Status != "denied" {
 			t.Errorf("Expected status 'denied', got %s", request.Status)
 		}
@@ -210,7 +210,7 @@ func TestExperienceRequestRepository_HasPendingRequest(t *testing.T) {
 	t.Run("user has pending request for level", func(t *testing.T) {
 		testutil.SeedTestExperienceRequest(t, db, userID, "blue", "pending")
 
-		hasPending, err := repo.HasPendingRequest(1, userID, "blue") // tenantID = 1
+		hasPending, err := repo.HasPendingRequest(0, userID, "blue") // tenantID = 0
 		if err != nil {
 			t.Fatalf("HasPendingRequest() failed: %v", err)
 		}
@@ -221,7 +221,7 @@ func TestExperienceRequestRepository_HasPendingRequest(t *testing.T) {
 	})
 
 	t.Run("user has no pending request for level", func(t *testing.T) {
-		hasPending, err := repo.HasPendingRequest(1, userID, "orange") // tenantID = 1
+		hasPending, err := repo.HasPendingRequest(0, userID, "orange") // tenantID = 0
 		if err != nil {
 			t.Fatalf("HasPendingRequest() failed: %v", err)
 		}
@@ -235,7 +235,7 @@ func TestExperienceRequestRepository_HasPendingRequest(t *testing.T) {
 		user2ID := testutil.SeedTestUser(t, db, "user2@example.com", "User 2", "green")
 		testutil.SeedTestExperienceRequest(t, db, user2ID, "blue", "approved")
 
-		hasPending, err := repo.HasPendingRequest(1, user2ID, "blue") // tenantID = 1
+		hasPending, err := repo.HasPendingRequest(0, user2ID, "blue") // tenantID = 0
 		if err != nil {
 			t.Fatalf("HasPendingRequest() failed: %v", err)
 		}

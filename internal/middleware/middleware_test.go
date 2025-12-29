@@ -720,7 +720,7 @@ func TestRequireTenant(t *testing.T) {
 		}
 	})
 
-	t.Run("tenant zero - rejected", func(t *testing.T) {
+	t.Run("tenant zero - allowed (Simple-Mode default tenant)", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/test", nil)
 		ctx := context.WithValue(req.Context(), TenantIDKey, 0)
 		req = req.WithContext(ctx)
@@ -728,8 +728,9 @@ func TestRequireTenant(t *testing.T) {
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusBadRequest {
-			t.Errorf("Expected status 400 with tenant=0, got %d", rec.Code)
+		// tenant_id=0 is valid for Simple-Mode (default tenant)
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200 with tenant=0 (Simple-Mode), got %d", rec.Code)
 		}
 	})
 }

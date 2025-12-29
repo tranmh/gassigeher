@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS demo_tenant_state (
 -- Users table (per-tenant)
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   first_name TEXT,
   last_name TEXT,
   email TEXT,
@@ -103,7 +103,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_one_super_admin_per_tenant ON users(COALES
 -- Color categories (per-tenant)
 CREATE TABLE IF NOT EXISTS color_categories (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   hex_code TEXT NOT NULL,
   pattern_icon TEXT,
@@ -118,7 +118,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_color_categories_tenant_name ON color_cate
 -- Dogs table (per-tenant)
 CREATE TABLE IF NOT EXISTS dogs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   breed TEXT NOT NULL,
   size TEXT CHECK(size IN ('small', 'medium', 'large')),
@@ -149,7 +149,7 @@ CREATE INDEX IF NOT EXISTS idx_dogs_featured ON dogs(is_featured);
 -- Bookings table (per-tenant)
 CREATE TABLE IF NOT EXISTS bookings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   dog_id INTEGER NOT NULL REFERENCES dogs(id) ON DELETE CASCADE,
   date DATE NOT NULL,
@@ -177,7 +177,7 @@ CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
 -- Blocked dates (per-tenant)
 CREATE TABLE IF NOT EXISTS blocked_dates (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   date DATE NOT NULL,
   dog_id INTEGER REFERENCES dogs(id) ON DELETE CASCADE,
   reason TEXT NOT NULL,
@@ -191,7 +191,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_blocked_dates_tenant_dog_date ON blocked_d
 -- System settings (per-tenant)
 CREATE TABLE IF NOT EXISTS system_settings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   key TEXT NOT NULL,
   value TEXT NOT NULL,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -201,7 +201,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_system_settings_tenant_key ON system_setti
 -- User colors junction table (per-tenant)
 CREATE TABLE IF NOT EXISTS user_colors (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   color_id INTEGER NOT NULL REFERENCES color_categories(id) ON DELETE RESTRICT,
   granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -215,7 +215,7 @@ CREATE INDEX IF NOT EXISTS idx_user_colors_color ON user_colors(color_id);
 -- Color requests (per-tenant)
 CREATE TABLE IF NOT EXISTS color_requests (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   color_id INTEGER NOT NULL REFERENCES color_categories(id),
   status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'denied')),
@@ -231,7 +231,7 @@ CREATE INDEX IF NOT EXISTS idx_color_requests_status ON color_requests(status);
 -- Experience requests (per-tenant)
 CREATE TABLE IF NOT EXISTS experience_requests (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   requested_level TEXT CHECK(requested_level IN ('blue', 'orange')),
   status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'denied')),
@@ -245,7 +245,7 @@ CREATE INDEX IF NOT EXISTS idx_experience_requests_tenant ON experience_requests
 -- Reactivation requests (per-tenant)
 CREATE TABLE IF NOT EXISTS reactivation_requests (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'denied')),
   admin_message TEXT,
@@ -259,7 +259,7 @@ CREATE INDEX IF NOT EXISTS idx_reactivation_pending ON reactivation_requests(sta
 -- Walk reports (per-tenant)
 CREATE TABLE IF NOT EXISTS walk_reports (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   booking_id INTEGER NOT NULL UNIQUE REFERENCES bookings(id) ON DELETE CASCADE,
   behavior_rating INTEGER NOT NULL CHECK(behavior_rating >= 1 AND behavior_rating <= 5),
   energy_level TEXT NOT NULL CHECK(energy_level IN ('low', 'medium', 'high')),
@@ -273,7 +273,7 @@ CREATE INDEX IF NOT EXISTS idx_walk_reports_booking_id ON walk_reports(booking_i
 -- Walk report photos (per-tenant)
 CREATE TABLE IF NOT EXISTS walk_report_photos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   walk_report_id INTEGER NOT NULL REFERENCES walk_reports(id) ON DELETE CASCADE,
   photo_path TEXT NOT NULL,
   photo_thumbnail TEXT NOT NULL,
@@ -286,7 +286,7 @@ CREATE INDEX IF NOT EXISTS idx_walk_report_photos_report_id ON walk_report_photo
 -- Booking time rules (per-tenant)
 CREATE TABLE IF NOT EXISTS booking_time_rules (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   day_type TEXT NOT NULL,
   rule_name TEXT NOT NULL,
   start_time TEXT NOT NULL,
@@ -301,7 +301,7 @@ CREATE INDEX IF NOT EXISTS idx_booking_time_rules_tenant ON booking_time_rules(t
 -- Custom holidays (per-tenant)
 CREATE TABLE IF NOT EXISTS custom_holidays (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   date TEXT NOT NULL,
   name TEXT NOT NULL,
   is_active INTEGER NOT NULL DEFAULT 1,
@@ -417,13 +417,17 @@ INSERT INTO pricing_plans (name, slug, max_dogs, price_monthly, price_yearly, is
   ('Free', 'free', 10, 0, 0, 1),
   ('Pro', 'pro', -1, 2900, 29000, 1);
 
--- Insert default color categories (global - tenant_id NULL means shared across all tenants)
+-- Insert default tenant (id=0) for Simple-Mode
+INSERT INTO tenants (id, slug, name, contact_email, status) VALUES
+  (0, 'default', 'Default', 'admin@localhost', 'active');
+
+-- Insert default color categories (tenant_id=0 for default/Simple-Mode tenant)
 INSERT INTO color_categories (id, tenant_id, name, hex_code, sort_order) VALUES
-  (1, NULL, 'Gruen', '#22c55e', 1),
-  (2, NULL, 'Gelb', '#eab308', 2),
-  (3, NULL, 'Orange', '#f97316', 3),
-  (4, NULL, 'Hellblau', '#38bdf8', 4),
-  (5, NULL, 'Dunkelblau', '#3b82f6', 5);
+  (1, 0, 'Gruen', '#22c55e', 1),
+  (2, 0, 'Gelb', '#eab308', 2),
+  (3, 0, 'Orange', '#f97316', 3),
+  (4, 0, 'Hellblau', '#38bdf8', 4),
+  (5, 0, 'Dunkelblau', '#3b82f6', 5);
 `,
 			"mysql": `
 -- Tenants table (central)
@@ -484,7 +488,7 @@ CREATE TABLE IF NOT EXISTS demo_tenant_state (
 -- Users table (per-tenant)
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  tenant_id INT,
+  tenant_id INT NOT NULL DEFAULT 0,
   first_name VARCHAR(100),
   last_name VARCHAR(100),
   email VARCHAR(255),
@@ -524,7 +528,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- Color categories (per-tenant)
 CREATE TABLE IF NOT EXISTS color_categories (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  tenant_id INT,
+  tenant_id INT NOT NULL DEFAULT 0,
   name VARCHAR(100) NOT NULL,
   hex_code VARCHAR(20) NOT NULL,
   pattern_icon VARCHAR(100),
@@ -540,7 +544,7 @@ CREATE TABLE IF NOT EXISTS color_categories (
 -- Dogs table (per-tenant)
 CREATE TABLE IF NOT EXISTS dogs (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  tenant_id INT,
+  tenant_id INT NOT NULL DEFAULT 0,
   name VARCHAR(100) NOT NULL,
   breed VARCHAR(100) NOT NULL,
   size ENUM('small', 'medium', 'large'),
@@ -573,7 +577,7 @@ CREATE TABLE IF NOT EXISTS dogs (
 -- Bookings table (per-tenant)
 CREATE TABLE IF NOT EXISTS bookings (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  tenant_id INT,
+  tenant_id INT NOT NULL DEFAULT 0,
   user_id INT NOT NULL,
   dog_id INT NOT NULL,
   date DATE NOT NULL,
@@ -605,7 +609,7 @@ CREATE TABLE IF NOT EXISTS bookings (
 -- Blocked dates (per-tenant)
 CREATE TABLE IF NOT EXISTS blocked_dates (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  tenant_id INT,
+  tenant_id INT NOT NULL DEFAULT 0,
   date DATE NOT NULL,
   dog_id INT,
   reason TEXT NOT NULL,
@@ -622,7 +626,7 @@ CREATE TABLE IF NOT EXISTS blocked_dates (
 -- System settings (per-tenant)
 CREATE TABLE IF NOT EXISTS system_settings (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  tenant_id INT,
+  tenant_id INT NOT NULL DEFAULT 0,
   ` + "`key`" + ` VARCHAR(100) NOT NULL,
   value TEXT NOT NULL,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -633,7 +637,7 @@ CREATE TABLE IF NOT EXISTS system_settings (
 -- User colors junction table (per-tenant)
 CREATE TABLE IF NOT EXISTS user_colors (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  tenant_id INT,
+  tenant_id INT NOT NULL DEFAULT 0,
   user_id INT NOT NULL,
   color_id INT NOT NULL,
   granted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -651,7 +655,7 @@ CREATE TABLE IF NOT EXISTS user_colors (
 -- Color requests (per-tenant)
 CREATE TABLE IF NOT EXISTS color_requests (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  tenant_id INT,
+  tenant_id INT NOT NULL DEFAULT 0,
   user_id INT NOT NULL,
   color_id INT NOT NULL,
   status ENUM('pending', 'approved', 'denied') DEFAULT 'pending',
@@ -671,7 +675,7 @@ CREATE TABLE IF NOT EXISTS color_requests (
 -- Experience requests (per-tenant)
 CREATE TABLE IF NOT EXISTS experience_requests (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  tenant_id INT,
+  tenant_id INT NOT NULL DEFAULT 0,
   user_id INT NOT NULL,
   requested_level ENUM('blue', 'orange'),
   status ENUM('pending', 'approved', 'denied') DEFAULT 'pending',
@@ -688,7 +692,7 @@ CREATE TABLE IF NOT EXISTS experience_requests (
 -- Reactivation requests (per-tenant)
 CREATE TABLE IF NOT EXISTS reactivation_requests (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  tenant_id INT,
+  tenant_id INT NOT NULL DEFAULT 0,
   user_id INT NOT NULL,
   status ENUM('pending', 'approved', 'denied') DEFAULT 'pending',
   admin_message TEXT,
@@ -705,7 +709,7 @@ CREATE TABLE IF NOT EXISTS reactivation_requests (
 -- Walk reports (per-tenant)
 CREATE TABLE IF NOT EXISTS walk_reports (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  tenant_id INT,
+  tenant_id INT NOT NULL DEFAULT 0,
   booking_id INT NOT NULL UNIQUE,
   behavior_rating INT NOT NULL,
   energy_level ENUM('low', 'medium', 'high') NOT NULL,
@@ -721,7 +725,7 @@ CREATE TABLE IF NOT EXISTS walk_reports (
 -- Walk report photos (per-tenant)
 CREATE TABLE IF NOT EXISTS walk_report_photos (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  tenant_id INT,
+  tenant_id INT NOT NULL DEFAULT 0,
   walk_report_id INT NOT NULL,
   photo_path VARCHAR(255) NOT NULL,
   photo_thumbnail VARCHAR(255) NOT NULL,
@@ -736,7 +740,7 @@ CREATE TABLE IF NOT EXISTS walk_report_photos (
 -- Booking time rules (per-tenant)
 CREATE TABLE IF NOT EXISTS booking_time_rules (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  tenant_id INT,
+  tenant_id INT NOT NULL DEFAULT 0,
   day_type VARCHAR(20) NOT NULL,
   rule_name VARCHAR(100) NOT NULL,
   start_time VARCHAR(10) NOT NULL,
@@ -752,7 +756,7 @@ CREATE TABLE IF NOT EXISTS booking_time_rules (
 -- Custom holidays (per-tenant)
 CREATE TABLE IF NOT EXISTS custom_holidays (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  tenant_id INT,
+  tenant_id INT NOT NULL DEFAULT 0,
   date VARCHAR(20) NOT NULL,
   name VARCHAR(255) NOT NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
@@ -876,13 +880,17 @@ INSERT INTO pricing_plans (name, slug, max_dogs, price_monthly, price_yearly, is
   ('Free', 'free', 10, 0, 0, 1),
   ('Pro', 'pro', -1, 2900, 29000, 1);
 
--- Insert default color categories
+-- Insert default tenant (id=0) for Simple-Mode
+INSERT INTO tenants (id, slug, name, contact_email, status) VALUES
+  (0, 'default', 'Default', 'admin@localhost', 'active');
+
+-- Insert default color categories (tenant_id=0 for default/Simple-Mode tenant)
 INSERT INTO color_categories (id, tenant_id, name, hex_code, sort_order) VALUES
-  (1, NULL, 'Gruen', '#22c55e', 1),
-  (2, NULL, 'Gelb', '#eab308', 2),
-  (3, NULL, 'Orange', '#f97316', 3),
-  (4, NULL, 'Hellblau', '#38bdf8', 4),
-  (5, NULL, 'Dunkelblau', '#3b82f6', 5);
+  (1, 0, 'Gruen', '#22c55e', 1),
+  (2, 0, 'Gelb', '#eab308', 2),
+  (3, 0, 'Orange', '#f97316', 3),
+  (4, 0, 'Hellblau', '#38bdf8', 4),
+  (5, 0, 'Dunkelblau', '#3b82f6', 5);
 `,
 			"postgres": `
 -- Tenants table (central)
@@ -941,7 +949,7 @@ CREATE TABLE IF NOT EXISTS demo_tenant_state (
 -- Users table (per-tenant)
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   first_name VARCHAR(100),
   last_name VARCHAR(100),
   email VARCHAR(255),
@@ -982,7 +990,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_one_super_admin_per_tenant ON users(COALES
 -- Color categories (per-tenant)
 CREATE TABLE IF NOT EXISTS color_categories (
   id SERIAL PRIMARY KEY,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   name VARCHAR(100) NOT NULL,
   hex_code VARCHAR(20) NOT NULL,
   pattern_icon VARCHAR(100),
@@ -997,7 +1005,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_color_categories_tenant_name ON color_cate
 -- Dogs table (per-tenant)
 CREATE TABLE IF NOT EXISTS dogs (
   id SERIAL PRIMARY KEY,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   name VARCHAR(100) NOT NULL,
   breed VARCHAR(100) NOT NULL,
   size VARCHAR(20) CHECK(size IN ('small', 'medium', 'large')),
@@ -1028,7 +1036,7 @@ CREATE INDEX IF NOT EXISTS idx_dogs_featured ON dogs(is_featured);
 -- Bookings table (per-tenant)
 CREATE TABLE IF NOT EXISTS bookings (
   id SERIAL PRIMARY KEY,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   dog_id INTEGER NOT NULL REFERENCES dogs(id) ON DELETE CASCADE,
   date DATE NOT NULL,
@@ -1056,7 +1064,7 @@ CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
 -- Blocked dates (per-tenant)
 CREATE TABLE IF NOT EXISTS blocked_dates (
   id SERIAL PRIMARY KEY,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   date DATE NOT NULL,
   dog_id INTEGER REFERENCES dogs(id) ON DELETE CASCADE,
   reason TEXT NOT NULL,
@@ -1070,7 +1078,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_blocked_dates_tenant_dog_date ON blocked_d
 -- System settings (per-tenant)
 CREATE TABLE IF NOT EXISTS system_settings (
   id SERIAL PRIMARY KEY,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   key VARCHAR(100) NOT NULL,
   value TEXT NOT NULL,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -1080,7 +1088,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_system_settings_tenant_key ON system_setti
 -- User colors junction table (per-tenant)
 CREATE TABLE IF NOT EXISTS user_colors (
   id SERIAL PRIMARY KEY,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   color_id INTEGER NOT NULL REFERENCES color_categories(id) ON DELETE RESTRICT,
   granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1094,7 +1102,7 @@ CREATE INDEX IF NOT EXISTS idx_user_colors_color ON user_colors(color_id);
 -- Color requests (per-tenant)
 CREATE TABLE IF NOT EXISTS color_requests (
   id SERIAL PRIMARY KEY,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   color_id INTEGER NOT NULL REFERENCES color_categories(id),
   status VARCHAR(20) DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'denied')),
@@ -1110,7 +1118,7 @@ CREATE INDEX IF NOT EXISTS idx_color_requests_status ON color_requests(status);
 -- Experience requests (per-tenant)
 CREATE TABLE IF NOT EXISTS experience_requests (
   id SERIAL PRIMARY KEY,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   requested_level VARCHAR(20) CHECK(requested_level IN ('blue', 'orange')),
   status VARCHAR(20) DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'denied')),
@@ -1124,7 +1132,7 @@ CREATE INDEX IF NOT EXISTS idx_experience_requests_tenant ON experience_requests
 -- Reactivation requests (per-tenant)
 CREATE TABLE IF NOT EXISTS reactivation_requests (
   id SERIAL PRIMARY KEY,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   status VARCHAR(20) DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'denied')),
   admin_message TEXT,
@@ -1138,7 +1146,7 @@ CREATE INDEX IF NOT EXISTS idx_reactivation_pending ON reactivation_requests(sta
 -- Walk reports (per-tenant)
 CREATE TABLE IF NOT EXISTS walk_reports (
   id SERIAL PRIMARY KEY,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   booking_id INTEGER NOT NULL UNIQUE REFERENCES bookings(id) ON DELETE CASCADE,
   behavior_rating INTEGER NOT NULL CHECK(behavior_rating >= 1 AND behavior_rating <= 5),
   energy_level VARCHAR(20) NOT NULL CHECK(energy_level IN ('low', 'medium', 'high')),
@@ -1152,7 +1160,7 @@ CREATE INDEX IF NOT EXISTS idx_walk_reports_booking_id ON walk_reports(booking_i
 -- Walk report photos (per-tenant)
 CREATE TABLE IF NOT EXISTS walk_report_photos (
   id SERIAL PRIMARY KEY,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   walk_report_id INTEGER NOT NULL REFERENCES walk_reports(id) ON DELETE CASCADE,
   photo_path VARCHAR(255) NOT NULL,
   photo_thumbnail VARCHAR(255) NOT NULL,
@@ -1165,7 +1173,7 @@ CREATE INDEX IF NOT EXISTS idx_walk_report_photos_report_id ON walk_report_photo
 -- Booking time rules (per-tenant)
 CREATE TABLE IF NOT EXISTS booking_time_rules (
   id SERIAL PRIMARY KEY,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   day_type VARCHAR(20) NOT NULL,
   rule_name VARCHAR(100) NOT NULL,
   start_time VARCHAR(10) NOT NULL,
@@ -1180,7 +1188,7 @@ CREATE INDEX IF NOT EXISTS idx_booking_time_rules_tenant ON booking_time_rules(t
 -- Custom holidays (per-tenant)
 CREATE TABLE IF NOT EXISTS custom_holidays (
   id SERIAL PRIMARY KEY,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
   date VARCHAR(20) NOT NULL,
   name VARCHAR(255) NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -1296,13 +1304,17 @@ INSERT INTO pricing_plans (name, slug, max_dogs, price_monthly, price_yearly, is
   ('Free', 'free', 10, 0, 0, TRUE),
   ('Pro', 'pro', -1, 2900, 29000, TRUE);
 
--- Insert default color categories
+-- Insert default tenant (id=0) for Simple-Mode
+INSERT INTO tenants (id, slug, name, contact_email, status) VALUES
+  (0, 'default', 'Default', 'admin@localhost', 'active');
+
+-- Insert default color categories (tenant_id=0 for default/Simple-Mode tenant)
 INSERT INTO color_categories (id, tenant_id, name, hex_code, sort_order) VALUES
-  (1, NULL, 'Gruen', '#22c55e', 1),
-  (2, NULL, 'Gelb', '#eab308', 2),
-  (3, NULL, 'Orange', '#f97316', 3),
-  (4, NULL, 'Hellblau', '#38bdf8', 4),
-  (5, NULL, 'Dunkelblau', '#3b82f6', 5);
+  (1, 0, 'Gruen', '#22c55e', 1),
+  (2, 0, 'Gelb', '#eab308', 2),
+  (3, 0, 'Orange', '#f97316', 3),
+  (4, 0, 'Hellblau', '#38bdf8', 4),
+  (5, 0, 'Dunkelblau', '#3b82f6', 5);
 `,
 		},
 	})

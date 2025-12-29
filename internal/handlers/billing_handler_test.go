@@ -33,7 +33,7 @@ func TestBillingHandler_GetSubscription(t *testing.T) {
 
 	t.Run("returns subscription for authenticated user", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/billing/subscription", nil)
-		req = req.WithContext(contextWithTenantID(req.Context(), 1))
+		req = req.WithContext(contextWithTenantID(req.Context(), 0))
 		w := httptest.NewRecorder()
 
 		handler.GetSubscription(w, req)
@@ -98,13 +98,13 @@ func TestBillingHandler_GetUsage(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	handler := NewBillingHandler(db, nil, nil)
 
-	// Seed some dogs for tenant 1
+	// Seed some dogs for tenant 0
 	testutil.SeedTestDog(t, db, "Max", "Labrador", "green")
 	testutil.SeedTestDog(t, db, "Bella", "Poodle", "green")
 
 	t.Run("returns usage for tenant", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/billing/usage", nil)
-		req = req.WithContext(contextWithTenantID(req.Context(), 1))
+		req = req.WithContext(contextWithTenantID(req.Context(), 0))
 		w := httptest.NewRecorder()
 
 		handler.GetUsage(w, req)
@@ -157,7 +157,7 @@ func TestBillingHandler_CreateCheckout(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/billing/checkout", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		// Must be admin to test Stripe check (admin auth happens first)
-		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 1, true))
+		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 0, true))
 		w := httptest.NewRecorder()
 
 		handler.CreateCheckout(w, req)
@@ -186,7 +186,7 @@ func TestBillingHandler_CancelSubscription(t *testing.T) {
 
 	t.Run("cancels subscription when admin", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/billing/cancel", nil)
-		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 1, true))
+		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 0, true))
 		w := httptest.NewRecorder()
 
 		handler.CancelSubscription(w, req)
@@ -212,7 +212,7 @@ func TestBillingHandler_CancelSubscription(t *testing.T) {
 	t.Run("SECURITY: non-admin cannot cancel subscription", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/billing/cancel", nil)
 		// User has tenant access but is NOT an admin
-		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 1, false))
+		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 0, false))
 		w := httptest.NewRecorder()
 
 		handler.CancelSubscription(w, req)
@@ -260,7 +260,7 @@ func TestBillingHandler_CreateCheckout_AdminRequired(t *testing.T) {
 	t.Run("SECURITY: non-admin cannot create checkout", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/billing/checkout", nil)
 		// User has tenant access but is NOT an admin
-		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 1, false))
+		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 0, false))
 		w := httptest.NewRecorder()
 
 		handler.CreateCheckout(w, req)
@@ -284,7 +284,7 @@ func TestBillingHandler_CreateCheckout_BillingCycleValidation(t *testing.T) {
 		body := `{"plan_slug": "pro", "billing_cycle": "invalid_cycle"}`
 		req := httptest.NewRequest(http.MethodPost, "/api/billing/checkout", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 1, true))
+		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 0, true))
 		w := httptest.NewRecorder()
 
 		handler.CreateCheckout(w, req)
@@ -318,7 +318,7 @@ func TestBillingHandler_CreateBillingPortal(t *testing.T) {
 
 	t.Run("returns forbidden when non-admin", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/billing/portal", nil)
-		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 1, false))
+		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 0, false))
 		w := httptest.NewRecorder()
 
 		handler.CreateBillingPortal(w, req)
@@ -330,7 +330,7 @@ func TestBillingHandler_CreateBillingPortal(t *testing.T) {
 
 	t.Run("returns service unavailable when Stripe not configured", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/billing/portal", nil)
-		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 1, true))
+		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 0, true))
 		w := httptest.NewRecorder()
 
 		handler.CreateBillingPortal(w, req)
@@ -414,7 +414,7 @@ func TestBillingHandler_CreateCheckout_PlanSlugValidation(t *testing.T) {
 		body := `{"plan_slug": "", "billing_cycle": "monthly"}`
 		req := httptest.NewRequest(http.MethodPost, "/api/billing/checkout", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 1, true))
+		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 0, true))
 		w := httptest.NewRecorder()
 
 		handler.CreateCheckout(w, req)
@@ -430,7 +430,7 @@ func TestBillingHandler_CreateCheckout_PlanSlugValidation(t *testing.T) {
 		body := `{"plan_slug": "nonexistent_plan", "billing_cycle": "monthly"}`
 		req := httptest.NewRequest(http.MethodPost, "/api/billing/checkout", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 1, true))
+		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 0, true))
 		w := httptest.NewRecorder()
 
 		handler.CreateCheckout(w, req)
@@ -446,7 +446,7 @@ func TestBillingHandler_CreateCheckout_PlanSlugValidation(t *testing.T) {
 		body := `{"plan_slug": "pro", "billing_cycle": "monthly"}`
 		req := httptest.NewRequest(http.MethodPost, "/api/billing/checkout", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 1, true))
+		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 0, true))
 		w := httptest.NewRecorder()
 
 		handler.CreateCheckout(w, req)
@@ -461,7 +461,7 @@ func TestBillingHandler_CreateCheckout_PlanSlugValidation(t *testing.T) {
 		body := `{"plan_slug": "pro", "billing_cycle": "yearly"}`
 		req := httptest.NewRequest(http.MethodPost, "/api/billing/checkout", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 1, true))
+		req = req.WithContext(contextWithTenantAndAdmin(req.Context(), 0, true))
 		w := httptest.NewRecorder()
 
 		handler.CreateCheckout(w, req)
@@ -479,11 +479,11 @@ func TestBillingHandler_GetUsage_ShowsOverLimitWarning(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	handler := NewBillingHandler(db, nil, nil)
 
-	// Create 15 dogs for tenant 1 (over the 10 dog limit for Free plan)
+	// Create 15 dogs for tenant 0 (over the 10 dog limit for Free plan)
 	for i := 0; i < 15; i++ {
 		_, err := db.Exec(`
 			INSERT INTO dogs (tenant_id, name, breed, size, age, is_available)
-			VALUES (1, ?, 'Test Breed', 'medium', 3, 1)
+			VALUES (0, ?, 'Test Breed', 'medium', 3, 1)
 		`, "Dog"+string(rune('A'+i)))
 		if err != nil {
 			t.Fatalf("Failed to create dog: %v", err)
@@ -492,7 +492,7 @@ func TestBillingHandler_GetUsage_ShowsOverLimitWarning(t *testing.T) {
 
 	t.Run("shows over_limit true when dogs exceed limit", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/billing/usage", nil)
-		req = req.WithContext(contextWithTenantID(req.Context(), 1))
+		req = req.WithContext(contextWithTenantID(req.Context(), 0))
 		w := httptest.NewRecorder()
 
 		handler.GetUsage(w, req)
@@ -523,16 +523,16 @@ func TestBillingHandler_GetUsage_ShowsOverLimitWarning(t *testing.T) {
 
 	t.Run("shows over_limit false when within limit", func(t *testing.T) {
 		// Delete some dogs to get under limit
-		_, _ = db.Exec(`DELETE FROM dogs WHERE tenant_id = 1`)
+		_, _ = db.Exec(`DELETE FROM dogs WHERE tenant_id = 0`)
 		for i := 0; i < 5; i++ {
 			_, _ = db.Exec(`
 				INSERT INTO dogs (tenant_id, name, breed, size, age, is_available)
-				VALUES (1, ?, 'Test Breed', 'medium', 3, 1)
+				VALUES (0, ?, 'Test Breed', 'medium', 3, 1)
 			`, "Dog"+string(rune('A'+i)))
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/api/billing/usage", nil)
-		req = req.WithContext(contextWithTenantID(req.Context(), 1))
+		req = req.WithContext(contextWithTenantID(req.Context(), 0))
 		w := httptest.NewRecorder()
 
 		handler.GetUsage(w, req)

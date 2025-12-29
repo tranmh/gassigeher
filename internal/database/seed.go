@@ -21,6 +21,37 @@ type TestUser struct {
 	Level     string
 }
 
+// EnsureDefaultTenant creates the default tenant (id=0) for Simple-Mode
+// This tenant is used when not running in SaaS mode (no BASE_DOMAIN set)
+// All tenant_id columns default to 0, referencing this tenant
+// MUST be called before any other seed operations to satisfy foreign key constraints
+func EnsureDefaultTenant(db *sql.DB) error {
+	// Check if default tenant already exists
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM tenants WHERE id = 0").Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to check default tenant: %w", err)
+	}
+
+	if count > 0 {
+		return nil // Default tenant already exists
+	}
+
+	// Create default tenant with id=0
+	// We use a direct SQL insert with explicit id=0
+	now := time.Now()
+	_, err = db.Exec(`
+		INSERT INTO tenants (id, slug, name, contact_email, status, created_at, updated_at)
+		VALUES (0, 'default', 'Default Tenant', 'default@localhost', 'active', ?, ?)
+	`, now, now)
+	if err != nil {
+		return fmt.Errorf("failed to create default tenant: %w", err)
+	}
+
+	log.Println("✓ Created default tenant (id=0) for Simple-Mode")
+	return nil
+}
+
 // SeedDatabase generates initial seed data for first-time installations
 // Only runs if users table is empty
 // Set SKIP_SEED=true to skip (useful for E2E tests that manage their own data)
@@ -30,6 +61,11 @@ func SeedDatabase(db *sql.DB, superAdminEmail string) error {
 	if os.Getenv("SKIP_SEED") == "true" {
 		log.Println("SKIP_SEED=true, skipping seed data generation")
 		return nil
+	}
+
+	// 0.5. Ensure default tenant exists (for foreign key constraints)
+	if err := EnsureDefaultTenant(db); err != nil {
+		return fmt.Errorf("failed to ensure default tenant: %w", err)
 	}
 
 	// 1. Check if users table is empty

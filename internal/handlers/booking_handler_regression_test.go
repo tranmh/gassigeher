@@ -40,25 +40,16 @@ func setupRegressionTest(t *testing.T) (*sql.DB, func()) {
 		t.Fatalf("Failed to run migrations: %v", err)
 	}
 
-	// Create test tenant first
+	// Default tenant (id=0) is already created by migrations/seed
+	// Just use timestamp for test data
 	now := time.Now().Format("2006-01-02 15:04:05")
-	_, err = db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, federal_state, created_at, updated_at)
-		VALUES (1, 'test-tenant', 'Test Tenant', 'active', 'test@example.com', 'BW', ?, ?)`, now, now)
-	if err != nil {
-		t.Fatalf("Failed to create test tenant: %v", err)
-	}
 
-	// Update default seed data to belong to test tenant
-	db.Exec(`UPDATE color_categories SET tenant_id = 1 WHERE tenant_id IS NULL`)
-	db.Exec(`UPDATE booking_time_rules SET tenant_id = 1 WHERE tenant_id IS NULL`)
-	db.Exec(`UPDATE system_settings SET tenant_id = 1 WHERE tenant_id IS NULL`)
-
-	// Seed test users and dogs with timestamps (reuse 'now' string variable from above)
+	// Seed test users and dogs with timestamps (all using tenant_id=0)
 	result, err := db.Exec(`INSERT INTO users (id, tenant_id, first_name, last_name, email, password_hash, is_active, is_verified, created_at, last_activity_at, terms_accepted_at)
 		VALUES
-		(1, 1, 'Green', 'User', 'green@test.com', 'hash', 1, 1, ?, ?, ?),
-		(2, 1, 'Blue', 'User', 'blue@test.com', 'hash', 1, 1, ?, ?, ?),
-		(3, 1, 'Orange', 'User', 'orange@test.com', 'hash', 1, 1, ?, ?, ?)`,
+		(1, 0, 'Green', 'User', 'green@test.com', 'hash', 1, 1, ?, ?, ?),
+		(2, 0, 'Blue', 'User', 'blue@test.com', 'hash', 1, 1, ?, ?, ?),
+		(3, 0, 'Orange', 'User', 'orange@test.com', 'hash', 1, 1, ?, ?, ?)`,
 		now, now, now, now, now, now, now, now, now)
 	if err != nil {
 		t.Fatalf("Failed to seed users: %v", err)
@@ -70,19 +61,19 @@ func setupRegressionTest(t *testing.T) (*sql.DB, func()) {
 	// Seed user_colors for the color system (with tenant_id)
 	// Color IDs: 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau
 	// Green user (ID 1) gets only color 1 (gruen)
-	db.Exec(`INSERT INTO user_colors (tenant_id, user_id, color_id) VALUES (1, 1, 1)`)
+	db.Exec(`INSERT INTO user_colors (tenant_id, user_id, color_id) VALUES (0, 1, 1)`)
 	// Blue user (ID 2) gets all main colors (1-5)
-	db.Exec(`INSERT INTO user_colors (tenant_id, user_id, color_id) VALUES (1, 2, 1), (1, 2, 2), (1, 2, 3), (1, 2, 4), (1, 2, 5)`)
+	db.Exec(`INSERT INTO user_colors (tenant_id, user_id, color_id) VALUES (0, 2, 1), (0, 2, 2), (0, 2, 3), (0, 2, 4), (0, 2, 5)`)
 	// Orange user (ID 3) gets colors 1, 2, 3
-	db.Exec(`INSERT INTO user_colors (tenant_id, user_id, color_id) VALUES (1, 3, 1), (1, 3, 2), (1, 3, 3)`)
+	db.Exec(`INSERT INTO user_colors (tenant_id, user_id, color_id) VALUES (0, 3, 1), (0, 3, 2), (0, 3, 3)`)
 
 	// Seed dogs with color_id (with tenant_id)
 	result, err = db.Exec(`INSERT INTO dogs (id, tenant_id, name, breed, size, age, color_id, is_available, created_at, updated_at)
 		VALUES
-		(1, 1, 'Green Dog', 'Labrador', 'medium', 5, 1, 1, ?, ?),
-		(2, 1, 'Blue Dog', 'German Shepherd', 'large', 6, 5, 1, ?, ?),
-		(3, 1, 'Orange Dog', 'Husky', 'large', 7, 3, 1, ?, ?),
-		(4, 1, 'Unavailable Dog', 'Beagle', 'small', 4, 1, 0, ?, ?)`,
+		(1, 0, 'Green Dog', 'Labrador', 'medium', 5, 1, 1, ?, ?),
+		(2, 0, 'Blue Dog', 'German Shepherd', 'large', 6, 5, 1, ?, ?),
+		(3, 0, 'Orange Dog', 'Husky', 'large', 7, 3, 1, ?, ?),
+		(4, 0, 'Unavailable Dog', 'Beagle', 'small', 4, 1, 0, ?, ?)`,
 		now, now, now, now, now, now, now, now)
 	if err != nil {
 		t.Fatalf("Failed to seed dogs: %v", err)
@@ -91,42 +82,26 @@ func setupRegressionTest(t *testing.T) (*sql.DB, func()) {
 		t.Fatalf("Expected 4 dogs inserted, got %d", rowsAffected)
 	}
 
-	// Seed system settings (INSERT instead of UPDATE - table is empty after migrations)
-	_, err = db.Exec(`INSERT INTO system_settings (tenant_id, key, value, updated_at) VALUES
-		(1, 'booking_advance_days', '14', ?),
-		(1, 'cancellation_notice_hours', '12', ?),
-		(1, 'auto_deactivation_days', '365', ?),
-		(1, 'morning_walk_requires_approval', 'true', ?),
-		(1, 'use_feiertage_api', 'false', ?),
-		(1, 'feiertage_state', 'BW', ?),
-		(1, 'booking_time_granularity', '15', ?),
-		(1, 'feiertage_cache_days', '7', ?),
-		(1, 'site_logo', '', ?),
-		(1, 'registration_password', 'TEST1234', ?),
-		(1, 'whatsapp_group_enabled', 'false', ?),
-		(1, 'whatsapp_group_link', '', ?),
-		(1, 'default_color_for_new_users', '1', ?)`,
-		now, now, now, now, now, now, now, now, now, now, now, now, now)
+	// Insert booking time rules for tenant 0
+	_, err = db.Exec(`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked, created_at, updated_at) VALUES
+		(0, 'weekday', 'Vormittag', '08:30', '12:00', 0, ?, ?),
+		(0, 'weekday', 'Mittagspause', '12:00', '14:00', 1, ?, ?),
+		(0, 'weekday', 'Nachmittag', '14:00', '17:00', 0, ?, ?),
+		(0, 'weekday', 'Fütterungszeit', '17:00', '18:00', 1, ?, ?),
+		(0, 'weekday', 'Abend', '18:00', '19:00', 0, ?, ?),
+		(0, 'weekend', 'Vormittag', '09:00', '12:00', 0, ?, ?),
+		(0, 'weekend', 'Nachmittag', '14:00', '17:00', 0, ?, ?),
+		(0, 'holiday', 'Vormittag', '10:00', '12:00', 0, ?, ?),
+		(0, 'holiday', 'Nachmittag', '14:00', '16:00', 0, ?, ?)
+	`, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now)
 	if err != nil {
-		t.Fatalf("Failed to seed system settings: %v", err)
+		t.Fatalf("Failed to insert booking time rules: %v", err)
 	}
 
-	// Seed booking time rules (INSERT - table is empty after migrations)
-	_, err = db.Exec(`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked, created_at, updated_at) VALUES
-		(1, 'weekday', 'Vormittag', '08:30', '12:00', 0, ?, ?),
-		(1, 'weekday', 'Mittagspause', '12:00', '14:00', 1, ?, ?),
-		(1, 'weekday', 'Nachmittag', '14:00', '17:00', 0, ?, ?),
-		(1, 'weekday', 'Fütterungszeit', '17:00', '18:00', 1, ?, ?),
-		(1, 'weekday', 'Abend', '18:00', '19:00', 0, ?, ?),
-		(1, 'weekend', 'Vormittag', '09:00', '12:00', 0, ?, ?),
-		(1, 'weekend', 'Mittagspause', '12:00', '14:00', 1, ?, ?),
-		(1, 'weekend', 'Nachmittag', '14:00', '17:00', 0, ?, ?),
-		(1, 'holiday', 'Vormittag', '09:00', '12:00', 0, ?, ?),
-		(1, 'holiday', 'Mittagspause', '12:00', '14:00', 1, ?, ?),
-		(1, 'holiday', 'Nachmittag', '14:00', '16:00', 0, ?, ?)`,
-		now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now)
+	// Update registration_password for test purposes
+	_, err = db.Exec(`UPDATE system_settings SET value = ? WHERE tenant_id = 0 AND key = 'registration_password'`, "TEST1234")
 	if err != nil {
-		t.Fatalf("Failed to seed booking time rules: %v", err)
+		t.Fatalf("Failed to update registration password: %v", err)
 	}
 
 	cleanup := func() {
@@ -142,7 +117,7 @@ func createTestContext(userID int, isAdmin bool) context.Context {
 	ctx = context.WithValue(ctx, middleware.UserIDKey, userID)
 	ctx = context.WithValue(ctx, middleware.IsAdminKey, isAdmin)
 	ctx = context.WithValue(ctx, middleware.EmailKey, fmt.Sprintf("user%d@test.com", userID))
-	ctx = context.WithValue(ctx, middleware.TenantIDKey, 1) // Use test tenant
+	ctx = context.WithValue(ctx, middleware.TenantIDKey, 0) // Use test tenant
 	return ctx
 }
 
@@ -323,7 +298,7 @@ func TestRegression_DateRestrictions(t *testing.T) {
 	// Create a blocked date (with tenant_id)
 	blockedDate := time.Now().AddDate(0, 0, 10).Format("2006-01-02")
 	if err := handler.blockedDateRepo.Create(&models.BlockedDate{
-		TenantID:  1,
+		TenantID:  0,
 		Date:      blockedDate,
 		Reason:    "Test block",
 		CreatedBy: 1, // Admin user
@@ -334,7 +309,7 @@ func TestRegression_DateRestrictions(t *testing.T) {
 	// Create an existing booking for double-booking test (with tenant_id)
 	existingBookingDate := time.Now().AddDate(0, 0, 7).Format("2006-01-02")
 	if err := handler.bookingRepo.Create(&models.Booking{
-		TenantID:      1,
+		TenantID:      0,
 		UserID:        2,
 		DogID:         1,
 		Date:          existingBookingDate,
@@ -432,7 +407,7 @@ func TestRegression_BlockedDates(t *testing.T) {
 			testFunc: func(t *testing.T) {
 				date := time.Now().AddDate(0, 0, 15).Format("2006-01-02")
 				err := blockedDateRepo.Create(&models.BlockedDate{
-					TenantID:  1,
+					TenantID:  0,
 					Date:      date,
 					Reason:    "Staff training",
 					CreatedBy: 1, // Admin user
@@ -442,7 +417,7 @@ func TestRegression_BlockedDates(t *testing.T) {
 				}
 
 				// Verify it was created
-				isBlocked, _ := blockedDateRepo.IsBlocked(date, 1) // tenantID = 1
+				isBlocked, _ := blockedDateRepo.IsBlocked(date, 0) // tenantID = 0
 				if !isBlocked {
 					t.Error("Date should be blocked")
 				}
@@ -454,26 +429,26 @@ func TestRegression_BlockedDates(t *testing.T) {
 			testFunc: func(t *testing.T) {
 				date := time.Now().AddDate(0, 0, 16).Format("2006-01-02")
 				blockedDateRepo.Create(&models.BlockedDate{
-					TenantID:  1,
+					TenantID:  0,
 					Date:      date,
 					Reason:    "Temporary",
 					CreatedBy: 1, // Admin user
 				})
 
 				// Find it to get ID
-				blockedDateObj, err := blockedDateRepo.FindByDate(date, 1) // tenantID = 1
+				blockedDateObj, err := blockedDateRepo.FindByDate(date, 0) // tenantID = 0
 				if err != nil {
 					t.Fatalf("Could not find blocked date: %v", err)
 				}
 
-				// Delete it (tenantID = 1 for test)
-				err = blockedDateRepo.Delete(blockedDateObj.ID, 1)
+				// Delete it (tenantID = 0 for test)
+				err = blockedDateRepo.Delete(blockedDateObj.ID, 0)
 				if err != nil {
 					t.Errorf("Should be able to delete blocked date: %v", err)
 				}
 
 				// Verify it was deleted
-				isBlocked, _ := blockedDateRepo.IsBlocked(date, 1) // tenantID = 1
+				isBlocked, _ := blockedDateRepo.IsBlocked(date, 0) // tenantID = 0
 				if isBlocked {
 					t.Error("Date should not be blocked after deletion")
 				}
@@ -487,11 +462,11 @@ func TestRegression_BlockedDates(t *testing.T) {
 				date1 := time.Now().AddDate(0, 0, 17).Format("2006-01-02")
 				date2 := time.Now().AddDate(0, 0, 18).Format("2006-01-02")
 
-				blockedDateRepo.Create(&models.BlockedDate{TenantID: 1, Date: date1, Reason: "Reason 1", CreatedBy: 1})
-				blockedDateRepo.Create(&models.BlockedDate{TenantID: 1, Date: date2, Reason: "Reason 2", CreatedBy: 1})
+				blockedDateRepo.Create(&models.BlockedDate{TenantID: 0, Date: date1, Reason: "Reason 1", CreatedBy: 1})
+				blockedDateRepo.Create(&models.BlockedDate{TenantID: 0, Date: date2, Reason: "Reason 2", CreatedBy: 1})
 
 				// Get all blocked dates
-				blockedDates, err := blockedDateRepo.FindAll(1) // tenantID = 1
+				blockedDates, err := blockedDateRepo.FindAll(0) // tenantID = 0
 				if err != nil {
 					t.Errorf("Should be able to retrieve blocked dates: %v", err)
 				}
@@ -524,7 +499,7 @@ func TestRegression_UserDashboard(t *testing.T) {
 
 	// Upcoming booking
 	bookingRepo.Create(&models.Booking{
-		TenantID:       1,
+		TenantID:       0,
 		UserID:         1,
 		DogID:          1,
 		Date:           futureDate,
@@ -535,7 +510,7 @@ func TestRegression_UserDashboard(t *testing.T) {
 
 	// Completed booking
 	bookingRepo.Create(&models.Booking{
-		TenantID:       1,
+		TenantID:       0,
 		UserID:         1,
 		DogID:          1,
 		Date:           pastDate,
@@ -572,7 +547,7 @@ func TestRegression_UserDashboard(t *testing.T) {
 				}
 
 				bookingID := bookings[0].ID
-				err := bookingRepo.Cancel(bookingID, nil)
+				err := bookingRepo.Cancel(bookingID, 0, nil)
 				if err != nil {
 					t.Errorf("Should be able to cancel booking: %v", err)
 				}

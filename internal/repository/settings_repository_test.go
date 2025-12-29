@@ -12,10 +12,10 @@ func TestSettingsRepository_Get(t *testing.T) {
 	repo := NewSettingsRepository(db)
 
 	// Insert test setting
-	db.Exec(`INSERT INTO system_settings (tenant_id, key, value) VALUES (1, ?, ?)`, "test_setting", "test_value")
+	db.Exec(`INSERT INTO system_settings (tenant_id, key, value) VALUES (0, ?, ?)`, "test_setting", "test_value")
 
 	t.Run("setting exists", func(t *testing.T) {
-		setting, err := repo.Get(1, "test_setting") // tenantID = 1
+		setting, err := repo.Get(0, "test_setting") // tenantID = 0
 		if err != nil {
 			t.Fatalf("Get() failed: %v", err)
 		}
@@ -30,7 +30,7 @@ func TestSettingsRepository_Get(t *testing.T) {
 	})
 
 	t.Run("setting not found", func(t *testing.T) {
-		setting, err := repo.Get(1, "non_existent_setting") // tenantID = 1
+		setting, err := repo.Get(0, "non_existent_setting") // tenantID = 0
 		if setting != nil {
 			t.Error("Expected nil for non-existent setting")
 		}
@@ -40,7 +40,7 @@ func TestSettingsRepository_Get(t *testing.T) {
 	})
 
 	t.Run("empty key", func(t *testing.T) {
-		setting, err := repo.Get(1, "") // tenantID = 1
+		setting, err := repo.Get(0, "") // tenantID = 0
 		if setting != nil {
 			t.Error("Expected nil for empty key")
 		}
@@ -56,12 +56,12 @@ func TestSettingsRepository_GetAll(t *testing.T) {
 	repo := NewSettingsRepository(db)
 
 	// Insert test settings
-	db.Exec(`INSERT INTO system_settings (tenant_id, key, value) VALUES (1, ?, ?)`, "booking_advance_days", "14")
-	db.Exec(`INSERT INTO system_settings (tenant_id, key, value) VALUES (1, ?, ?)`, "cancellation_notice_hours", "12")
-	db.Exec(`INSERT INTO system_settings (tenant_id, key, value) VALUES (1, ?, ?)`, "auto_deactivation_days", "365")
+	db.Exec(`INSERT INTO system_settings (tenant_id, key, value) VALUES (0, ?, ?)`, "booking_advance_days", "14")
+	db.Exec(`INSERT INTO system_settings (tenant_id, key, value) VALUES (0, ?, ?)`, "cancellation_notice_hours", "12")
+	db.Exec(`INSERT INTO system_settings (tenant_id, key, value) VALUES (0, ?, ?)`, "auto_deactivation_days", "365")
 
 	t.Run("get all settings", func(t *testing.T) {
-		settings, err := repo.GetAll(1) // tenantID = 1
+		settings, err := repo.GetAll(0) // tenantID = 0
 		if err != nil {
 			t.Fatalf("GetAll() failed: %v", err)
 		}
@@ -94,7 +94,7 @@ func TestSettingsRepository_GetAll(t *testing.T) {
 		db2 := testutil.SetupTestDB(t)
 		repo2 := NewSettingsRepository(db2)
 
-		settings, err := repo2.GetAll(1) // tenantID = 1
+		settings, err := repo2.GetAll(0) // tenantID = 0
 		if err != nil {
 			t.Fatalf("GetAll() failed: %v", err)
 		}
@@ -115,23 +115,23 @@ func TestSettingsRepository_Update(t *testing.T) {
 	repo := NewSettingsRepository(db)
 
 	// Insert initial setting
-	db.Exec(`INSERT INTO system_settings (tenant_id, key, value) VALUES (1, ?, ?)`, "booking_advance_days", "14")
+	db.Exec(`INSERT INTO system_settings (tenant_id, key, value) VALUES (0, ?, ?)`, "booking_advance_days", "14")
 
 	t.Run("update existing setting", func(t *testing.T) {
-		err := repo.Update(1, "booking_advance_days", "21") // tenantID = 1
+		err := repo.Update(0, "booking_advance_days", "21") // tenantID = 0
 		if err != nil {
 			t.Fatalf("Update() failed: %v", err)
 		}
 
 		// Verify update
-		setting, _ := repo.Get(1, "booking_advance_days") // tenantID = 1
+		setting, _ := repo.Get(0, "booking_advance_days") // tenantID = 0
 		if setting.Value != "21" {
 			t.Errorf("Expected value '21', got %s", setting.Value)
 		}
 	})
 
 	t.Run("update non-existent setting returns error", func(t *testing.T) {
-		err := repo.Update(1, "non_existent_setting", "new_value") // tenantID = 1
+		err := repo.Update(0, "non_existent_setting", "new_value") // tenantID = 0
 		if err == nil {
 			t.Error("Expected error when updating non-existent setting")
 		}
@@ -140,15 +140,15 @@ func TestSettingsRepository_Update(t *testing.T) {
 
 	t.Run("update with empty value", func(t *testing.T) {
 		// First create the setting
-		db.Exec(`INSERT INTO system_settings (tenant_id, key, value) VALUES (1, ?, ?)`, "test_key", "initial")
+		db.Exec(`INSERT INTO system_settings (tenant_id, key, value) VALUES (0, ?, ?)`, "test_key", "initial")
 
-		err := repo.Update(1, "test_key", "") // tenantID = 1
+		err := repo.Update(0, "test_key", "") // tenantID = 0
 		if err != nil {
 			t.Fatalf("Update with empty value failed: %v", err)
 		}
 
 		// Verify empty value was set
-		setting, _ := repo.Get(1, "test_key") // tenantID = 1
+		setting, _ := repo.Get(0, "test_key") // tenantID = 0
 		if setting == nil {
 			t.Error("Expected setting to exist")
 		} else if setting.Value != "" {

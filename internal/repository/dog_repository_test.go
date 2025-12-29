@@ -516,7 +516,7 @@ func TestDogRepository_Delete(t *testing.T) {
 	t.Run("successful deletion", func(t *testing.T) {
 		dogID := testutil.SeedTestDog(t, db, "Bella", "Labrador", "green")
 
-		err := repo.Delete(dogID)
+		err := repo.Delete(dogID, 0)
 		if err != nil {
 			t.Fatalf("Delete() failed: %v", err)
 		}
@@ -529,7 +529,7 @@ func TestDogRepository_Delete(t *testing.T) {
 	})
 
 	t.Run("delete non-existent dog", func(t *testing.T) {
-		err := repo.Delete(99999)
+		err := repo.Delete(99999, 0)
 		// Should not error or should handle gracefully
 		if err != nil {
 			t.Logf("Delete non-existent dog returned: %v", err)
@@ -545,7 +545,7 @@ func TestDogRepository_Delete(t *testing.T) {
 		testutil.SeedTestBooking(t, db, userID, dogID, futureDate, "09:00", "scheduled")
 
 		// Try to delete dog
-		err := repo.Delete(dogID)
+		err := repo.Delete(dogID, 0)
 
 		if err == nil {
 			t.Error("Expected error when deleting dog with future bookings, got nil")
@@ -567,7 +567,7 @@ func TestDogRepository_Delete(t *testing.T) {
 		testutil.SeedTestBooking(t, db, userID, dogID, pastDate, "16:00", "completed")
 
 		// Should be able to delete dog with past bookings only
-		err := repo.Delete(dogID)
+		err := repo.Delete(dogID, 0)
 		if err != nil {
 			t.Fatalf("Delete() should succeed with only past bookings, got error: %v", err)
 		}
@@ -589,7 +589,7 @@ func TestDogRepository_ToggleAvailability(t *testing.T) {
 		dogID := testutil.SeedTestDog(t, db, "Bella", "Labrador", "green")
 
 		reason := "Sick"
-		err := repo.ToggleAvailability(dogID, false, &reason)
+		err := repo.ToggleAvailability(dogID, 0, false, &reason)
 		if err != nil {
 			t.Fatalf("ToggleAvailability() failed: %v", err)
 		}
@@ -612,10 +612,10 @@ func TestDogRepository_ToggleAvailability(t *testing.T) {
 
 		// First make unavailable
 		reason := "Test"
-		repo.ToggleAvailability(dogID, false, &reason)
+		repo.ToggleAvailability(dogID, 0, false, &reason)
 
 		// Then make available
-		err := repo.ToggleAvailability(dogID, true, nil)
+		err := repo.ToggleAvailability(dogID, 0, true, nil)
 		if err != nil {
 			t.Fatalf("ToggleAvailability(true) failed: %v", err)
 		}
@@ -642,7 +642,7 @@ func TestDogRepository_GetBreeds(t *testing.T) {
 		testutil.SeedTestDog(t, db, "Max", "Beagle", "blue")
 		testutil.SeedTestDog(t, db, "Rocky", "Labrador", "green") // Duplicate breed
 
-		breeds, err := repo.GetBreeds()
+		breeds, err := repo.GetBreeds(0)
 		if err != nil {
 			t.Fatalf("GetBreeds() failed: %v", err)
 		}
@@ -677,7 +677,7 @@ func TestDogRepository_GetBreeds(t *testing.T) {
 		db2 := testutil.SetupTestDB(t)
 		repo2 := NewDogRepository(db2)
 
-		breeds, err := repo2.GetBreeds()
+		breeds, err := repo2.GetBreeds(0)
 		if err != nil {
 			t.Fatalf("GetBreeds() on empty database failed: %v", err)
 		}
@@ -820,19 +820,19 @@ func TestDogRepository_CountByTenant(t *testing.T) {
 	repo := NewDogRepository(db)
 
 	t.Run("count dogs for tenant with dogs", func(t *testing.T) {
-		// Create 3 dogs for tenant 1 (default tenant from SetupTestDB)
+		// Create 3 dogs for tenant 0 (default tenant from SetupTestDB)
 		testutil.SeedTestDog(t, db, "Bella", "Labrador", "green")
 		testutil.SeedTestDog(t, db, "Max", "Beagle", "blue")
 		testutil.SeedTestDog(t, db, "Rocky", "Shepherd", "orange")
 
-		// Test count for tenant 1
-		count, err := repo.CountByTenant(1)
+		// Test count for tenant 0
+		count, err := repo.CountByTenant(0)
 		if err != nil {
 			t.Fatalf("CountByTenant() failed: %v", err)
 		}
 
 		if count != 3 {
-			t.Errorf("Expected 3 dogs for tenant 1, got %d", count)
+			t.Errorf("Expected 3 dogs for tenant 0, got %d", count)
 		}
 	})
 
@@ -841,14 +841,14 @@ func TestDogRepository_CountByTenant(t *testing.T) {
 		db2 := testutil.SetupTestDB(t)
 		repo2 := NewDogRepository(db2)
 
-		// Tenant 1 exists but has no dogs
-		count, err := repo2.CountByTenant(1)
+		// Tenant 0 exists but has no dogs
+		count, err := repo2.CountByTenant(0)
 		if err != nil {
 			t.Fatalf("CountByTenant() failed: %v", err)
 		}
 
 		if count != 0 {
-			t.Errorf("Expected 0 dogs for tenant 1, got %d", count)
+			t.Errorf("Expected 0 dogs for tenant 0, got %d", count)
 		}
 	})
 
@@ -857,7 +857,7 @@ func TestDogRepository_CountByTenant(t *testing.T) {
 		db3 := testutil.SetupTestDB(t)
 		repo3 := NewDogRepository(db3)
 
-		// Create a dog for tenant 1
+		// Create a dog for tenant 0
 		testutil.SeedTestDog(t, db3, "Bella", "Labrador", "green")
 
 		// Count for non-existent tenant 999
@@ -876,32 +876,34 @@ func TestDogRepository_CountByTenant(t *testing.T) {
 		db4 := testutil.SetupTestDB(t)
 		repo4 := NewDogRepository(db4)
 
-		// Create tenant 2
+		// Tenant 1 is already created by SetupTestDB
 		now := testutil.Now()
-		_, err := db4.Exec(`
-			INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
-			VALUES (2, 'tenant-2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)
-		`, now, now)
-		if err != nil {
-			t.Fatalf("Failed to create tenant 2: %v", err)
-		}
 
-		// Create 3 dogs for tenant 1
+		// Create 3 dogs for tenant 0
 		testutil.SeedTestDog(t, db4, "Bella", "Labrador", "green")
 		testutil.SeedTestDog(t, db4, "Max", "Beagle", "blue")
 		testutil.SeedTestDog(t, db4, "Rocky", "Shepherd", "orange")
 
-		// Create 2 dogs for tenant 2 (directly via SQL since SeedTestDog uses tenant_id=1)
+		// Create 2 dogs for tenant 1 (directly via SQL since SeedTestDog uses tenant_id=0)
 		// Reuse the 'now' string variable from above for SQL timestamp
-		_, err = db4.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at) VALUES (2, ?, ?, ?, ?, ?, 1, ?)`,
+		_, err := db4.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at) VALUES (1, ?, ?, ?, ?, ?, 1, ?)`,
 			"Luna", "Poodle", "small", 3, 1, now)
 		if err != nil {
-			t.Fatalf("Failed to create dog for tenant 2: %v", err)
+			t.Fatalf("Failed to create dog for tenant 1: %v", err)
 		}
-		_, err = db4.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at) VALUES (2, ?, ?, ?, ?, ?, 1, ?)`,
+		_, err = db4.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at) VALUES (1, ?, ?, ?, ?, ?, 1, ?)`,
 			"Charlie", "Husky", "large", 4, 5, now)
 		if err != nil {
-			t.Fatalf("Failed to create dog for tenant 2: %v", err)
+			t.Fatalf("Failed to create dog for tenant 1: %v", err)
+		}
+
+		// Count for tenant 0
+		count0, err := repo4.CountByTenant(0)
+		if err != nil {
+			t.Fatalf("CountByTenant(0) failed: %v", err)
+		}
+		if count0 != 3 {
+			t.Errorf("Expected 3 dogs for tenant 0, got %d", count0)
 		}
 
 		// Count for tenant 1
@@ -909,17 +911,8 @@ func TestDogRepository_CountByTenant(t *testing.T) {
 		if err != nil {
 			t.Fatalf("CountByTenant(1) failed: %v", err)
 		}
-		if count1 != 3 {
-			t.Errorf("Expected 3 dogs for tenant 1, got %d", count1)
-		}
-
-		// Count for tenant 2
-		count2, err := repo4.CountByTenant(2)
-		if err != nil {
-			t.Fatalf("CountByTenant(2) failed: %v", err)
-		}
-		if count2 != 2 {
-			t.Errorf("Expected 2 dogs for tenant 2, got %d", count2)
+		if count1 != 2 {
+			t.Errorf("Expected 2 dogs for tenant 1, got %d", count1)
 		}
 	})
 }

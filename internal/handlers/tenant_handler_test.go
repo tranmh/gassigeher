@@ -234,10 +234,10 @@ func TestTenantHandler_Register_RejectsDuplicateSlug(t *testing.T) {
 	}
 	handler := NewTenantHandler(db, cfg)
 
-	// Note: test-tenant already exists from SetupTestDB
+	// Note: tenant-1 already exists from SetupTestDB
 	reqBody := map[string]string{
 		"organization_name": "Duplicate Org",
-		"slug":              "test-tenant", // Already exists
+		"slug":              "tenant-1", // Already exists (created by SetupTestDB)
 		"contact_email":     "test@example.com",
 		"city":              "Berlin",
 		"postal_code":       "10115",
@@ -288,8 +288,8 @@ func TestTenantHandler_CheckSlug(t *testing.T) {
 	})
 
 	t.Run("returns unavailable for existing slug", func(t *testing.T) {
-		// test-tenant exists from SetupTestDB
-		req := httptest.NewRequest("GET", "/api/tenants/check-slug?slug=test-tenant", nil)
+		// tenant-1 exists from SetupTestDB
+		req := httptest.NewRequest("GET", "/api/tenants/check-slug?slug=tenant-1", nil)
 
 		rec := httptest.NewRecorder()
 		handler.CheckSlug(rec, req)
@@ -387,8 +387,8 @@ func TestTenantHandler_GetCurrentTenant(t *testing.T) {
 		var tenant map[string]interface{}
 		json.Unmarshal(rec.Body.Bytes(), &tenant)
 
-		if tenant["slug"] != "test-tenant" {
-			t.Errorf("Expected slug 'test-tenant', got %v", tenant["slug"])
+		if tenant["slug"] != "tenant-1" {
+			t.Errorf("Expected slug 'tenant-1', got %v", tenant["slug"])
 		}
 	})
 

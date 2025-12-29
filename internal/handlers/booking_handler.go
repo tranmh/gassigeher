@@ -185,7 +185,7 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check for double-booking (tenant-aware for defense-in-depth)
-	isDoubleBooked, err := h.bookingRepo.CheckDoubleBookingForTenant(tenantID, req.DogID, req.Date, req.ScheduledTime)
+	isDoubleBooked, err := h.bookingRepo.CheckDoubleBooking(tenantID, req.DogID, req.Date, req.ScheduledTime)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check availability")
 		return
@@ -326,7 +326,7 @@ func (h *BookingHandler) GetBooking(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
@@ -368,7 +368,7 @@ func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// SaaS: Require valid tenant context (SECURITY FIX: tenantID=0 bypass vulnerability)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
@@ -462,7 +462,7 @@ func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Cancel booking
-	if err := h.bookingRepo.Cancel(id, req.Reason); err != nil {
+	if err := h.bookingRepo.Cancel(id, tenantID, req.Reason); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to cancel booking")
 		return
 	}
@@ -535,7 +535,7 @@ func (h *BookingHandler) AddNotes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Add notes
-	if err := h.bookingRepo.AddNotes(id, req.Notes); err != nil {
+	if err := h.bookingRepo.AddNotes(id, tenantID, req.Notes); err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -559,7 +559,7 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// SaaS: Require valid tenant context (SECURITY FIX: tenantID=0 bypass vulnerability)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
@@ -615,7 +615,7 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check for double-booking at new time (tenant-aware for defense-in-depth)
-	isDoubleBooked, err := h.bookingRepo.CheckDoubleBookingForTenant(tenantID, booking.DogID, req.Date, req.ScheduledTime)
+	isDoubleBooked, err := h.bookingRepo.CheckDoubleBooking(tenantID, booking.DogID, req.Date, req.ScheduledTime)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to check availability")
 		return
@@ -629,7 +629,7 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 	booking.Date = req.Date
 	booking.ScheduledTime = req.ScheduledTime
 
-	if err := h.bookingRepo.Update(booking); err != nil {
+	if err := h.bookingRepo.Update(booking, tenantID); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to move booking")
 		return
 	}
@@ -783,7 +783,7 @@ func (h *BookingHandler) ApprovePendingBooking(w http.ResponseWriter, r *http.Re
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// SaaS SECURITY: Require valid tenant context (block tenantID=0 bypass)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
@@ -814,7 +814,7 @@ func (h *BookingHandler) ApprovePendingBooking(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	if err := h.bookingRepo.ApproveBooking(id, adminID); err != nil {
+	if err := h.bookingRepo.ApproveBooking(id, tenantID, adminID); err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -853,7 +853,7 @@ func (h *BookingHandler) RejectPendingBooking(w http.ResponseWriter, r *http.Req
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// SaaS: Require valid tenant context (SECURITY FIX: tenantID=0 bypass vulnerability)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
@@ -903,7 +903,7 @@ func (h *BookingHandler) RejectPendingBooking(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := h.bookingRepo.RejectBooking(id, adminID, req.Reason); err != nil {
+	if err := h.bookingRepo.RejectBooking(id, tenantID, adminID, req.Reason); err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

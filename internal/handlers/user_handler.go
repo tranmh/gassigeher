@@ -488,7 +488,8 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// SaaS SECURITY: Verify user belongs to the requesting tenant
-	if tenantID > 0 && user.TenantID != tenantID {
+	// (tenant_id=0 is valid for Simple-Mode, so always check tenant match)
+	if user.TenantID != tenantID {
 		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "User not found")
 		return
@@ -554,7 +555,8 @@ func (h *UserHandler) DeactivateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// SaaS SECURITY: Verify user belongs to the requesting tenant
-	if tenantID > 0 && user.TenantID != tenantID {
+	// (tenant_id=0 is valid for Simple-Mode, so always check tenant match)
+	if user.TenantID != tenantID {
 		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "User not found")
 		return
@@ -605,7 +607,8 @@ func (h *UserHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// SaaS SECURITY: Verify user belongs to the requesting tenant
-	if tenantID > 0 && user.TenantID != tenantID {
+	// (tenant_id=0 is valid for Simple-Mode, so always check tenant match)
+	if user.TenantID != tenantID {
 		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "User not found")
 		return
@@ -659,7 +662,8 @@ func (h *UserHandler) PromoteToAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// SaaS SECURITY: Verify user belongs to the requesting tenant
-	if tenantID > 0 && targetUser.TenantID != tenantID {
+	// (tenant_id=0 is valid for Simple-Mode, so always check tenant match)
+	if targetUser.TenantID != tenantID {
 		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "User not found")
 		return
@@ -730,7 +734,8 @@ func (h *UserHandler) DemoteAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// SaaS SECURITY: Verify user belongs to the requesting tenant
-	if tenantID > 0 && targetUser.TenantID != tenantID {
+	// (tenant_id=0 is valid for Simple-Mode, so always check tenant match)
+	if targetUser.TenantID != tenantID {
 		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "User not found")
 		return
@@ -967,7 +972,8 @@ func (h *UserHandler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// SaaS SECURITY: Verify user belongs to the requesting tenant
-	if tenantID > 0 && targetUser.TenantID != tenantID {
+	// (tenant_id=0 is valid for Simple-Mode, so always check tenant match)
+	if targetUser.TenantID != tenantID {
 		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "User not found")
 		return
@@ -1184,7 +1190,8 @@ func (h *UserHandler) AdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// SaaS SECURITY: Verify user belongs to the requesting tenant
-	if tenantID > 0 && targetUser.TenantID != tenantID {
+	// (tenant_id=0 is valid for Simple-Mode, so always check tenant match)
+	if targetUser.TenantID != tenantID {
 		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "Benutzer nicht gefunden")
 		return

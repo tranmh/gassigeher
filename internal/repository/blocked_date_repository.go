@@ -29,16 +29,9 @@ func (r *BlockedDateRepository) Create(blockedDate *models.BlockedDate) error {
 
 	now := time.Now()
 
-	// SaaS: Convert TenantID=0 to NULL for single-tenant mode
-	var tenantIDParam interface{}
-	if blockedDate.TenantID > 0 {
-		tenantIDParam = blockedDate.TenantID
-	} else {
-		tenantIDParam = nil
-	}
-
+	// tenant_id=0 is valid for Simple-Mode (non-SaaS)
 	result, err := r.db.Exec(query,
-		tenantIDParam,
+		blockedDate.TenantID,
 		blockedDate.Date,
 		blockedDate.DogID, // Can be nil for global block
 		blockedDate.Reason,
@@ -80,11 +73,9 @@ func (r *BlockedDateRepository) FindAll(tenantID int) ([]*models.BlockedDate, er
 	`
 	args := []interface{}{}
 
-	// SaaS: Filter by tenant if specified
-	if tenantID > 0 {
-		query += " AND bd.tenant_id = ?"
-		args = append(args, tenantID)
-	}
+	// SaaS: Always filter by tenant (tenant_id=0 is valid for Simple-Mode)
+	query += " AND bd.tenant_id = ?"
+	args = append(args, tenantID)
 
 	query += " ORDER BY bd.date ASC, bd.dog_id ASC"
 
@@ -138,11 +129,9 @@ func (r *BlockedDateRepository) FindByDate(date string, tenantID int) (*models.B
 	`
 	args := []interface{}{date}
 
-	// SaaS: Filter by tenant if specified
-	if tenantID > 0 {
-		query += " AND tenant_id = ?"
-		args = append(args, tenantID)
-	}
+	// SaaS: Always filter by tenant (tenant_id=0 is valid for Simple-Mode)
+	query += " AND tenant_id = ?"
+	args = append(args, tenantID)
 
 	blockedDate := &models.BlockedDate{}
 	var tenantIDNull sql.NullInt64
@@ -193,11 +182,9 @@ func (r *BlockedDateRepository) FindByDateAndDog(date string, dogID *int, tenant
 		args = []interface{}{date, *dogID}
 	}
 
-	// SaaS: Filter by tenant if specified
-	if tenantID > 0 {
-		query += " AND tenant_id = ?"
-		args = append(args, tenantID)
-	}
+	// SaaS: Always filter by tenant (tenant_id=0 is valid for Simple-Mode)
+	query += " AND tenant_id = ?"
+	args = append(args, tenantID)
 
 	blockedDate := &models.BlockedDate{}
 	var tenantIDNull sql.NullInt64
@@ -236,11 +223,9 @@ func (r *BlockedDateRepository) FindByID(id int, tenantID int) (*models.BlockedD
 	`
 	args := []interface{}{id}
 
-	// SaaS: Filter by tenant if specified (for security)
-	if tenantID > 0 {
-		query += " AND tenant_id = ?"
-		args = append(args, tenantID)
-	}
+	// SaaS: Always filter by tenant (tenant_id=0 is valid for Simple-Mode)
+	query += " AND tenant_id = ?"
+	args = append(args, tenantID)
 
 	blockedDate := &models.BlockedDate{}
 	var tenantIDNull sql.NullInt64
@@ -275,15 +260,9 @@ func (r *BlockedDateRepository) Delete(id int, tenantID int) error {
 	var query string
 	var args []interface{}
 
-	if tenantID > 0 {
-		// SaaS mode: enforce tenant isolation in the query itself
-		query = `DELETE FROM blocked_dates WHERE id = ? AND tenant_id = ?`
-		args = []interface{}{id, tenantID}
-	} else {
-		// Simple mode: no tenant filtering
-		query = `DELETE FROM blocked_dates WHERE id = ?`
-		args = []interface{}{id}
-	}
+	// Always filter by tenant_id (tenant_id=0 is valid for Simple-Mode)
+	query = `DELETE FROM blocked_dates WHERE id = ? AND tenant_id = ?`
+	args = []interface{}{id, tenantID}
 
 	result, err := r.db.Exec(query, args...)
 	if err != nil {
@@ -304,16 +283,10 @@ func (r *BlockedDateRepository) Delete(id int, tenantID int) error {
 
 // IsBlocked checks if a date is globally blocked (dog_id IS NULL)
 // For backward compatibility - checks only global blocks
-// SaaS: Now supports tenant filtering (tenantID=0 for all tenants)
+// SaaS: Always filters by tenant (tenant_id=0 is valid for Simple-Mode)
 func (r *BlockedDateRepository) IsBlocked(date string, tenantID int) (bool, error) {
-	query := `SELECT COUNT(*) FROM blocked_dates WHERE date = ? AND dog_id IS NULL`
-	args := []interface{}{date}
-
-	// SaaS: Filter by tenant if specified
-	if tenantID > 0 {
-		query += " AND tenant_id = ?"
-		args = append(args, tenantID)
-	}
+	query := `SELECT COUNT(*) FROM blocked_dates WHERE date = ? AND dog_id IS NULL AND tenant_id = ?`
+	args := []interface{}{date, tenantID}
 
 	var count int
 	err := r.db.QueryRow(query, args...).Scan(&count)
@@ -326,19 +299,13 @@ func (r *BlockedDateRepository) IsBlocked(date string, tenantID int) (bool, erro
 
 // IsBlockedForDog checks if a date is blocked for a specific dog
 // Returns true if there's a global block (dog_id IS NULL) OR a dog-specific block
-// SaaS: Now supports tenant filtering (tenantID=0 for all tenants)
+// SaaS: Always filters by tenant (tenant_id=0 is valid for Simple-Mode)
 func (r *BlockedDateRepository) IsBlockedForDog(date string, dogID int, tenantID int) (bool, error) {
 	query := `
 		SELECT COUNT(*) FROM blocked_dates
-		WHERE date = ? AND (dog_id IS NULL OR dog_id = ?)
+		WHERE date = ? AND (dog_id IS NULL OR dog_id = ?) AND tenant_id = ?
 	`
-	args := []interface{}{date, dogID}
-
-	// SaaS: Filter by tenant if specified
-	if tenantID > 0 {
-		query += " AND tenant_id = ?"
-		args = append(args, tenantID)
-	}
+	args := []interface{}{date, dogID, tenantID}
 
 	var count int
 	err := r.db.QueryRow(query, args...).Scan(&count)
@@ -352,16 +319,10 @@ func (r *BlockedDateRepository) IsBlockedForDog(date string, dogID int, tenantID
 // GetBlockedDogsForDate returns list of dog IDs blocked for a specific date
 // Returns globalBlock=true if date is globally blocked (all dogs)
 // Returns specific dogIDs if only certain dogs are blocked
-// SaaS: Now supports tenant filtering (tenantID=0 for all tenants)
+// SaaS: Always filters by tenant (tenant_id=0 is valid for Simple-Mode)
 func (r *BlockedDateRepository) GetBlockedDogsForDate(date string, tenantID int) (globalBlock bool, dogIDs []int, err error) {
-	query := `SELECT dog_id FROM blocked_dates WHERE date = ?`
-	args := []interface{}{date}
-
-	// SaaS: Filter by tenant if specified
-	if tenantID > 0 {
-		query += " AND tenant_id = ?"
-		args = append(args, tenantID)
-	}
+	query := `SELECT dog_id FROM blocked_dates WHERE date = ? AND tenant_id = ?`
+	args := []interface{}{date, tenantID}
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {

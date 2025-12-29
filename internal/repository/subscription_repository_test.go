@@ -97,16 +97,16 @@ func TestSubscriptionRepository_GetSubscriptionByTenant(t *testing.T) {
 	repo := NewSubscriptionRepository(db)
 
 	t.Run("returns subscription for tenant", func(t *testing.T) {
-		// Test tenant 1 is created by SetupTestDB
-		sub, err := repo.GetSubscriptionByTenant(1)
+		// Test tenant 0 is created by SetupTestDB (default tenant for Simple-Mode)
+		sub, err := repo.GetSubscriptionByTenant(0)
 		if err != nil {
 			t.Fatalf("GetSubscriptionByTenant() error: %v", err)
 		}
 		if sub == nil {
 			t.Fatal("Expected subscription, got nil")
 		}
-		if sub.TenantID != 1 {
-			t.Errorf("Subscription TenantID = %d, want 1", sub.TenantID)
+		if sub.TenantID != 0 {
+			t.Errorf("Subscription TenantID = %d, want 0", sub.TenantID)
 		}
 		if sub.Status != models.SubscriptionStatusActive {
 			t.Errorf("Subscription Status = %s, want 'active'", sub.Status)
@@ -173,10 +173,10 @@ func TestSubscriptionRepository_UpdateSubscription(t *testing.T) {
 	repo := NewSubscriptionRepository(db)
 
 	t.Run("updates subscription status", func(t *testing.T) {
-		// Get existing subscription for tenant 1
-		sub, _ := repo.GetSubscriptionByTenant(1)
+		// Get existing subscription for tenant 0 (default tenant)
+		sub, _ := repo.GetSubscriptionByTenant(0)
 		if sub == nil {
-			t.Fatal("No subscription found for tenant 1")
+			t.Fatal("No subscription found for tenant 0")
 		}
 
 		// Update to Pro plan
@@ -190,7 +190,7 @@ func TestSubscriptionRepository_UpdateSubscription(t *testing.T) {
 		}
 
 		// Verify update
-		updated, _ := repo.GetSubscriptionByTenant(1)
+		updated, _ := repo.GetSubscriptionByTenant(0)
 		if updated.PlanID != 2 {
 			t.Errorf("Updated PlanID = %d, want 2", updated.PlanID)
 		}
@@ -206,7 +206,7 @@ func TestSubscriptionRepository_GetTenantDogLimit(t *testing.T) {
 	repo := NewSubscriptionRepository(db)
 
 	t.Run("returns 10 for free tenant", func(t *testing.T) {
-		limit, err := repo.GetTenantDogLimit(1)
+		limit, err := repo.GetTenantDogLimit(0)
 		if err != nil {
 			t.Fatalf("GetTenantDogLimit() error: %v", err)
 		}
@@ -216,8 +216,8 @@ func TestSubscriptionRepository_GetTenantDogLimit(t *testing.T) {
 	})
 
 	t.Run("returns -1 for pro tenant", func(t *testing.T) {
-		// Update tenant 1 to Pro
-		sub, err := repo.GetSubscriptionByTenant(1)
+		// Update tenant 0 to Pro
+		sub, err := repo.GetSubscriptionByTenant(0)
 		if err != nil {
 			t.Fatalf("GetSubscriptionByTenant() error: %v", err)
 		}
@@ -230,7 +230,7 @@ func TestSubscriptionRepository_GetTenantDogLimit(t *testing.T) {
 			t.Fatalf("UpdateSubscription() error: %v", err)
 		}
 
-		limit, err := repo.GetTenantDogLimit(1)
+		limit, err := repo.GetTenantDogLimit(0)
 		if err != nil {
 			t.Fatalf("GetTenantDogLimit() error: %v", err)
 		}
@@ -256,20 +256,20 @@ func TestSubscriptionRepository_CancelSubscription_ResetsToPlanFree(t *testing.T
 	db := testutil.SetupTestDB(t)
 	repo := NewSubscriptionRepository(db)
 
-	// First, delete any existing subscription for tenant 1
-	_, _ = db.Exec(`DELETE FROM tenant_subscriptions WHERE tenant_id = 1`)
+	// First, delete any existing subscription for tenant 0 (default tenant)
+	_, _ = db.Exec(`DELETE FROM tenant_subscriptions WHERE tenant_id = 0`)
 
-	// Create a Pro subscription for tenant 1 (tenant 1 exists from SetupTestDB)
+	// Create a Pro subscription for tenant 0 (default tenant from SetupTestDB)
 	_, err := db.Exec(`
 		INSERT INTO tenant_subscriptions (tenant_id, plan_id, status, created_at, updated_at)
-		VALUES (1, 2, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		VALUES (0, 2, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 	`)
 	if err != nil {
 		t.Fatalf("Failed to create Pro subscription: %v", err)
 	}
 
 	// Verify it's Pro
-	sub, err := repo.GetSubscriptionByTenant(1)
+	sub, err := repo.GetSubscriptionByTenant(0)
 	if err != nil {
 		t.Fatalf("GetSubscriptionByTenant() error: %v", err)
 	}
@@ -281,13 +281,13 @@ func TestSubscriptionRepository_CancelSubscription_ResetsToPlanFree(t *testing.T
 	}
 
 	// Cancel subscription
-	err = repo.CancelSubscription(1, "test cancellation")
+	err = repo.CancelSubscription(0, "test cancellation")
 	if err != nil {
 		t.Fatalf("CancelSubscription() error: %v", err)
 	}
 
 	// Verify plan_id is reset to Free (1)
-	sub, err = repo.GetSubscriptionByTenant(1)
+	sub, err = repo.GetSubscriptionByTenant(0)
 	if err != nil {
 		t.Fatalf("GetSubscriptionByTenant() after cancel error: %v", err)
 	}

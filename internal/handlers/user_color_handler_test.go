@@ -17,7 +17,7 @@ import (
 // getColorIDByName looks up a color ID by name for tenant 1
 func getColorIDByName(t *testing.T, db *sql.DB, colorName string) int {
 	var colorID int
-	err := db.QueryRow(`SELECT id FROM color_categories WHERE tenant_id = 1 AND LOWER(name) = LOWER(?)`, colorName).Scan(&colorID)
+	err := db.QueryRow(`SELECT id FROM color_categories WHERE tenant_id = 0 AND LOWER(name) = LOWER(?)`, colorName).Scan(&colorID)
 	if err != nil {
 		t.Fatalf("Failed to get color ID for %s: %v", colorName, err)
 	}
@@ -39,7 +39,7 @@ func TestUserColorHandler_GetUserColors(t *testing.T) {
 	t.Run("returns user colors as admin", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/admin/users/"+strconv.Itoa(regularUserID)+"/colors", nil)
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(regularUserID)})
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true) // tenant_id=0 matches SeedTestUser
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -61,7 +61,7 @@ func TestUserColorHandler_GetUserColors(t *testing.T) {
 	t.Run("returns 403 for non-admin", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/admin/users/"+strconv.Itoa(regularUserID)+"/colors", nil)
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(regularUserID)})
-		ctx := contextWithTenant(req.Context(), 1, regularUserID, false) // Not admin
+		ctx := contextWithTenant(req.Context(), 0, regularUserID, false) // Not admin
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -75,7 +75,7 @@ func TestUserColorHandler_GetUserColors(t *testing.T) {
 	t.Run("returns 404 for non-existent user", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/admin/users/99999/colors", nil)
 		req = mux.SetURLVars(req, map[string]string{"id": "99999"})
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -89,7 +89,7 @@ func TestUserColorHandler_GetUserColors(t *testing.T) {
 	t.Run("returns 400 for invalid user ID", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/admin/users/invalid/colors", nil)
 		req = mux.SetURLVars(req, map[string]string{"id": "invalid"})
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -121,7 +121,7 @@ func TestUserColorHandler_AddColorToUser(t *testing.T) {
 		req := httptest.NewRequest("POST", "/api/admin/users/"+strconv.Itoa(userID)+"/colors", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(userID)})
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -147,7 +147,7 @@ func TestUserColorHandler_AddColorToUser(t *testing.T) {
 		req := httptest.NewRequest("POST", "/api/admin/users/"+strconv.Itoa(userID)+"/colors", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(userID)})
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -166,7 +166,7 @@ func TestUserColorHandler_AddColorToUser(t *testing.T) {
 		req := httptest.NewRequest("POST", "/api/admin/users/"+strconv.Itoa(userID)+"/colors", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(userID)})
-		ctx := contextWithTenant(req.Context(), 1, userID, false) // Not admin
+		ctx := contextWithTenant(req.Context(), 0, userID, false) // Not admin
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -184,7 +184,7 @@ func TestUserColorHandler_AddColorToUser(t *testing.T) {
 		req := httptest.NewRequest("POST", "/api/admin/users/"+strconv.Itoa(userID)+"/colors", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(userID)})
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -202,7 +202,7 @@ func TestUserColorHandler_AddColorToUser(t *testing.T) {
 		req := httptest.NewRequest("POST", "/api/admin/users/"+strconv.Itoa(userID)+"/colors", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(userID)})
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -237,7 +237,7 @@ func TestUserColorHandler_RemoveColorFromUser(t *testing.T) {
 
 		req := httptest.NewRequest("DELETE", "/api/admin/users/"+strconv.Itoa(userID)+"/colors/"+strconv.Itoa(colorID), nil)
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(userID), "colorId": strconv.Itoa(colorID)})
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -257,7 +257,7 @@ func TestUserColorHandler_RemoveColorFromUser(t *testing.T) {
 	t.Run("returns 404 if user doesn't have color", func(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/api/admin/users/"+strconv.Itoa(userID)+"/colors/99", nil)
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(userID), "colorId": "99"})
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -271,7 +271,7 @@ func TestUserColorHandler_RemoveColorFromUser(t *testing.T) {
 	t.Run("returns 403 for non-admin", func(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/api/admin/users/"+strconv.Itoa(userID)+"/colors/1", nil)
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(userID), "colorId": "1"})
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -304,7 +304,7 @@ func TestUserColorHandler_SetUserColors(t *testing.T) {
 		req := httptest.NewRequest("PUT", "/api/admin/users/"+strconv.Itoa(userID)+"/colors", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(userID)})
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -329,7 +329,7 @@ func TestUserColorHandler_SetUserColors(t *testing.T) {
 		req := httptest.NewRequest("PUT", "/api/admin/users/"+strconv.Itoa(userID)+"/colors", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(userID)})
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -355,7 +355,7 @@ func TestUserColorHandler_SetUserColors(t *testing.T) {
 		req := httptest.NewRequest("PUT", "/api/admin/users/"+strconv.Itoa(userID)+"/colors", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(userID)})
-		ctx := contextWithTenant(req.Context(), 1, userID, false)
+		ctx := contextWithTenant(req.Context(), 0, userID, false)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -374,7 +374,7 @@ func TestUserColorHandler_SetUserColors(t *testing.T) {
 		req := httptest.NewRequest("PUT", "/api/admin/users/"+strconv.Itoa(userID)+"/colors", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(userID)})
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -392,7 +392,7 @@ func TestUserColorHandler_SetUserColors(t *testing.T) {
 		req := httptest.NewRequest("PUT", "/api/admin/users/99999/colors", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req = mux.SetURLVars(req, map[string]string{"id": "99999"})
-		ctx := contextWithTenant(req.Context(), 1, adminID, true)
+		ctx := contextWithTenant(req.Context(), 0, adminID, true)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()

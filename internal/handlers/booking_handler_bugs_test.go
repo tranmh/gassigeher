@@ -111,7 +111,7 @@ func TestListBookings_BUG_InvalidDogIDSilentlyIgnored(t *testing.T) {
 	req := httptest.NewRequest("GET", "/api/v1/bookings?dog_id=invalid", nil)
 
 	ctx := context.WithValue(req.Context(), middleware.UserIDKey, 1)
-	ctx = context.WithValue(ctx, middleware.TenantIDKey, 1)
+	ctx = context.WithValue(ctx, middleware.TenantIDKey, 0)
 	req = req.WithContext(ctx)
 
 	rec := httptest.NewRecorder()

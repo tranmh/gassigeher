@@ -38,17 +38,10 @@ func (r *DogRepository) CreateTx(tx *sql.Tx, dog *models.Dog) error {
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	// SaaS: Convert TenantID=0 to NULL for single-tenant mode
-	var tenantIDParam interface{}
-	if dog.TenantID > 0 {
-		tenantIDParam = dog.TenantID
-	} else {
-		tenantIDParam = nil
-	}
-
+	// tenant_id=0 is valid for Simple-Mode (non-SaaS)
 	result, err := tx.Exec(
 		query,
-		tenantIDParam,
+		dog.TenantID,
 		dog.Name,
 		dog.Breed,
 		dog.Size,
@@ -92,17 +85,10 @@ func (r *DogRepository) Create(dog *models.Dog) error {
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	// SaaS: Convert TenantID=0 to NULL for single-tenant mode
-	var tenantIDParam interface{}
-	if dog.TenantID > 0 {
-		tenantIDParam = dog.TenantID
-	} else {
-		tenantIDParam = nil
-	}
-
+	// tenant_id=0 is valid for Simple-Mode (non-SaaS)
 	result, err := r.db.Exec(
 		query,
-		tenantIDParam,
+		dog.TenantID,
 		dog.Name,
 		dog.Breed,
 		dog.Size,
@@ -200,15 +186,15 @@ func (r *DogRepository) FindByIDAndTenant(id int, tenantID int) (*models.Dog, er
 	if dog == nil {
 		return nil, nil
 	}
-	// In SaaS mode (tenantID > 0), verify tenant membership
-	if tenantID > 0 && dog.TenantID != tenantID {
+	// Verify tenant membership (works for both Simple-Mode tenant_id=0 and SaaS-Mode)
+	if dog.TenantID != tenantID {
 		return nil, nil // Dog doesn't belong to this tenant
 	}
 	return dog, nil
 }
 
 // FindAll finds all dogs with optional filtering
-// SaaS: tenantID=0 returns all dogs (for global admin), otherwise filters by tenant
+// Always filters by tenant_id (tenant_id=0 for Simple-Mode, >0 for SaaS-Mode)
 func (r *DogRepository) FindAll(filter *models.DogFilterRequest, tenantID int) ([]*models.Dog, error) {
 	query := `
 		SELECT id, tenant_id, name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
@@ -216,16 +202,10 @@ func (r *DogRepository) FindAll(filter *models.DogFilterRequest, tenantID int) (
 		       default_morning_time, default_evening_time, is_available, is_featured,
 		       external_link, unavailable_reason, unavailable_since, created_at, updated_at
 		FROM dogs
-		WHERE 1=1
+		WHERE tenant_id = ?
 	`
 
-	args := []interface{}{}
-
-	// SaaS: Filter by tenant if specified
-	if tenantID > 0 {
-		query += " AND tenant_id = ?"
-		args = append(args, tenantID)
-	}
+	args := []interface{}{tenantID}
 
 	// Apply filters
 	if filter != nil {
@@ -333,7 +313,7 @@ func (r *DogRepository) FindAll(filter *models.DogFilterRequest, tenantID int) (
 
 // GetFeatured returns up to 3 randomly selected featured dogs that are available
 // If more than 3 dogs are featured, a random selection of 3 is returned
-// SaaS: tenantID=0 returns featured dogs across all tenants
+// Always filters by tenant_id (tenant_id=0 for Simple-Mode, >0 for SaaS-Mode)
 func (r *DogRepository) GetFeatured(tenantID int) ([]*models.Dog, error) {
 	query := `
 		SELECT id, tenant_id, name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
@@ -341,15 +321,11 @@ func (r *DogRepository) GetFeatured(tenantID int) ([]*models.Dog, error) {
 		       default_morning_time, default_evening_time, is_available, is_featured,
 		       external_link, unavailable_reason, unavailable_since, created_at, updated_at
 		FROM dogs
-		WHERE is_featured = 1 AND is_available = 1
+		WHERE is_featured = 1 AND is_available = 1 AND tenant_id = ?
+		ORDER BY name ASC
 	`
 
-	args := []interface{}{}
-	if tenantID > 0 {
-		query += " AND tenant_id = ?"
-		args = append(args, tenantID)
-	}
-	query += " ORDER BY name ASC"
+	args := []interface{}{tenantID}
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -413,10 +389,11 @@ func (r *DogRepository) GetFeatured(tenantID int) ([]*models.Dog, error) {
 }
 
 // SetFeatured sets the featured status for a dog
-func (r *DogRepository) SetFeatured(id int, isFeatured bool) error {
-	query := `UPDATE dogs SET is_featured = ?, updated_at = ? WHERE id = ?`
+// SaaS: Filters by tenant_id for tenant isolation
+func (r *DogRepository) SetFeatured(id int, tenantID int, isFeatured bool) error {
+	query := `UPDATE dogs SET is_featured = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`
 
-	_, err := r.db.Exec(query, isFeatured, time.Now(), id)
+	_, err := r.db.Exec(query, isFeatured, time.Now(), id, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to set featured status: %w", err)
 	}
@@ -424,12 +401,13 @@ func (r *DogRepository) SetFeatured(id int, isFeatured bool) error {
 	return nil
 }
 
-// CountFeatured returns the number of featured dogs
-func (r *DogRepository) CountFeatured() (int, error) {
-	query := `SELECT COUNT(*) FROM dogs WHERE is_featured = 1`
+// CountFeatured returns the number of featured dogs for a tenant
+// SaaS: Filters by tenant_id for tenant isolation
+func (r *DogRepository) CountFeatured(tenantID int) (int, error) {
+	query := `SELECT COUNT(*) FROM dogs WHERE is_featured = 1 AND tenant_id = ?`
 
 	var count int
-	err := r.db.QueryRow(query).Scan(&count)
+	err := r.db.QueryRow(query, tenantID).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count featured dogs: %w", err)
 	}
@@ -490,16 +468,10 @@ func (r *DogRepository) CreateWithLimitCheck(dog *models.Dog, limit int) error {
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	var tenantIDParam interface{}
-	if dog.TenantID > 0 {
-		tenantIDParam = dog.TenantID
-	} else {
-		tenantIDParam = nil
-	}
-
+	// tenant_id=0 is valid for Simple-Mode (non-SaaS)
 	result, err := tx.Exec(
 		query,
-		tenantIDParam,
+		dog.TenantID,
 		dog.Name,
 		dog.Breed,
 		dog.Size,
@@ -595,17 +567,18 @@ func (r *DogRepository) Update(dog *models.Dog) error {
 }
 
 // Delete deletes a dog (only if no future bookings exist)
-func (r *DogRepository) Delete(id int) error {
+// SaaS: Filters by tenant_id for tenant isolation
+func (r *DogRepository) Delete(id int, tenantID int) error {
 	// Check for future bookings
 	// Use Go time instead of database-specific date('now') for portability
 	currentDate := time.Now().Format("2006-01-02")
 	checkQuery := `
 		SELECT COUNT(*) FROM bookings
-		WHERE dog_id = ? AND date >= ? AND status = 'scheduled'
+		WHERE dog_id = ? AND tenant_id = ? AND date >= ? AND status = 'scheduled'
 	`
 
 	var count int
-	err := r.db.QueryRow(checkQuery, id, currentDate).Scan(&count)
+	err := r.db.QueryRow(checkQuery, id, tenantID, currentDate).Scan(&count)
 	if err != nil {
 		return fmt.Errorf("failed to check bookings: %w", err)
 	}
@@ -615,8 +588,8 @@ func (r *DogRepository) Delete(id int) error {
 	}
 
 	// Delete the dog
-	deleteQuery := `DELETE FROM dogs WHERE id = ?`
-	_, err = r.db.Exec(deleteQuery, id)
+	deleteQuery := `DELETE FROM dogs WHERE id = ? AND tenant_id = ?`
+	_, err = r.db.Exec(deleteQuery, id, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to delete dog: %w", err)
 	}
@@ -625,10 +598,11 @@ func (r *DogRepository) Delete(id int) error {
 }
 
 // ForceDelete deletes a dog and cancels all future bookings
-func (r *DogRepository) ForceDelete(id int) error {
+// SaaS: Filters by tenant_id for tenant isolation
+func (r *DogRepository) ForceDelete(id int, tenantID int) error {
 	// Delete the dog (bookings will remain but dog will be gone)
-	deleteQuery := `DELETE FROM dogs WHERE id = ?`
-	_, err := r.db.Exec(deleteQuery, id)
+	deleteQuery := `DELETE FROM dogs WHERE id = ? AND tenant_id = ?`
+	_, err := r.db.Exec(deleteQuery, id, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to delete dog: %w", err)
 	}
@@ -710,7 +684,8 @@ func (r *DogRepository) GetFutureBookings(dogID int) ([]*models.Booking, error) 
 }
 
 // ToggleAvailability toggles a dog's availability status
-func (r *DogRepository) ToggleAvailability(id int, isAvailable bool, reason *string) error {
+// SaaS: Filters by tenant_id for tenant isolation
+func (r *DogRepository) ToggleAvailability(id int, tenantID int, isAvailable bool, reason *string) error {
 	var query string
 	var args []interface{}
 
@@ -722,9 +697,9 @@ func (r *DogRepository) ToggleAvailability(id int, isAvailable bool, reason *str
 				unavailable_reason = NULL,
 				unavailable_since = NULL,
 				updated_at = ?
-			WHERE id = ?
+			WHERE id = ? AND tenant_id = ?
 		`
-		args = []interface{}{time.Now(), id}
+		args = []interface{}{time.Now(), id, tenantID}
 	} else {
 		// Mark as unavailable
 		query = `
@@ -733,10 +708,10 @@ func (r *DogRepository) ToggleAvailability(id int, isAvailable bool, reason *str
 				unavailable_reason = ?,
 				unavailable_since = ?,
 				updated_at = ?
-			WHERE id = ?
+			WHERE id = ? AND tenant_id = ?
 		`
 		now := time.Now()
-		args = []interface{}{reason, now, now, id}
+		args = []interface{}{reason, now, now, id, tenantID}
 	}
 
 	_, err := r.db.Exec(query, args...)
@@ -747,11 +722,12 @@ func (r *DogRepository) ToggleAvailability(id int, isAvailable bool, reason *str
 	return nil
 }
 
-// GetBreeds returns a list of unique breeds
-func (r *DogRepository) GetBreeds() ([]string, error) {
-	query := `SELECT DISTINCT breed FROM dogs ORDER BY breed ASC`
+// GetBreeds returns a list of unique breeds for a tenant
+// SaaS: Filters by tenant_id for tenant isolation
+func (r *DogRepository) GetBreeds(tenantID int) ([]string, error) {
+	query := `SELECT DISTINCT breed FROM dogs WHERE tenant_id = ? ORDER BY breed ASC`
 
-	rows, err := r.db.Query(query)
+	rows, err := r.db.Query(query, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get breeds: %w", err)
 	}

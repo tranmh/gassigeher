@@ -49,7 +49,7 @@ func NewBillingHandler(db *sql.DB, cfg *config.Config, stripeService *services.S
 // GET /api/billing/subscription
 func (h *BillingHandler) GetSubscription(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusUnauthorized, "Nicht autorisiert")
 		return
 	}
@@ -125,7 +125,7 @@ func (h *BillingHandler) GetPlans(w http.ResponseWriter, r *http.Request) {
 // GET /api/billing/usage
 func (h *BillingHandler) GetUsage(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusUnauthorized, "Nicht autorisiert")
 		return
 	}
@@ -174,7 +174,7 @@ type CreateCheckoutRequest struct {
 // POST /api/billing/checkout
 func (h *BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusUnauthorized, "Nicht autorisiert")
 		return
 	}
@@ -343,7 +343,7 @@ func (h *BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) 
 // POST /api/billing/portal
 func (h *BillingHandler) CreateBillingPortal(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusUnauthorized, "Nicht autorisiert")
 		return
 	}
@@ -396,7 +396,7 @@ type CancelSubscriptionRequest struct {
 // POST /api/billing/cancel
 func (h *BillingHandler) CancelSubscription(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusUnauthorized, "Nicht autorisiert")
 		return
 	}
@@ -843,7 +843,7 @@ func (h *BillingHandler) TestUpgrade(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusUnauthorized, "Nicht autorisiert")
 		return
 	}
@@ -933,7 +933,7 @@ func (h *BillingHandler) TestUpgrade(w http.ResponseWriter, r *http.Request) {
 // GET /api/billing/invoices
 func (h *BillingHandler) GetInvoices(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusUnauthorized, "Nicht autorisiert")
 		return
 	}
@@ -955,7 +955,7 @@ func (h *BillingHandler) GetInvoices(w http.ResponseWriter, r *http.Request) {
 // GET /api/billing/invoices/{id}
 func (h *BillingHandler) GetInvoice(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusUnauthorized, "Nicht autorisiert")
 		return
 	}
@@ -993,7 +993,7 @@ func (h *BillingHandler) GetInvoice(w http.ResponseWriter, r *http.Request) {
 // GET /api/billing/invoices/{id}/pdf
 func (h *BillingHandler) DownloadInvoicePDF(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
-	if !ok || tenantID == 0 {
+	if !ok {
 		respondError(w, http.StatusUnauthorized, "Nicht autorisiert")
 		return
 	}

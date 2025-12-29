@@ -407,15 +407,15 @@ func TestDogHandler_CreateDog_SetsTenantID(t *testing.T) {
 
 		if tenantID == nil {
 			t.Error("Expected dog to have tenant_id set, but it was NULL")
-		} else if *tenantID != 1 {
-			t.Errorf("Expected dog tenant_id to be 1, got %d", *tenantID)
+		} else if *tenantID != 0 {
+			t.Errorf("Expected dog tenant_id to be 0, got %d", *tenantID)
 		}
 
 		// Also verify tenant_id is returned in the response
 		if response["tenant_id"] == nil {
 			t.Error("Expected tenant_id in response, but it was nil")
-		} else if int(response["tenant_id"].(float64)) != 1 {
-			t.Errorf("Expected tenant_id 1 in response, got %v", response["tenant_id"])
+		} else if int(response["tenant_id"].(float64)) != 0 {
+			t.Errorf("Expected tenant_id 0 in response, got %v", response["tenant_id"])
 		}
 	})
 }
@@ -1025,20 +1025,21 @@ func TestDogHandler_GetBreeds(t *testing.T) {
 func TestCreateDog_ProTierUnlimited(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 
-	// Upgrade tenant 1 to Pro plan (plan_id = 2, which has max_dogs = -1 for unlimited)
-	_, err := db.Exec(`UPDATE tenant_subscriptions SET plan_id = 2 WHERE tenant_id = 1`)
+	// Upgrade tenant 0 (Simple-Mode default) to Pro plan (plan_id = 2, which has max_dogs = -1 for unlimited)
+	_, err := db.Exec(`UPDATE tenant_subscriptions SET plan_id = 2 WHERE tenant_id = 0`)
 	if err != nil {
 		t.Fatalf("Failed to upgrade tenant to Pro: %v", err)
 	}
 
 	handler := NewDogHandler(db, &config.Config{UploadDir: t.TempDir()})
 
-	// Create 10 dogs to reach what would be the "free tier limit"
+	// Create 10 dogs for tenant 0 to reach what would be the "free tier limit"
 	for i := 0; i < 10; i++ {
 		body := fmt.Sprintf(`{"name":"Dog%d","breed":"Lab","size":"medium","age":3,"color_id":1}`, i)
 		req := httptest.NewRequest(http.MethodPost, "/api/dogs", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		req = req.WithContext(contextWithTenantAndUser(req.Context(), 1, 1))
+		// Use tenant 0 (the one upgraded to Pro)
+		req = req.WithContext(contextWithTenantAndUser(req.Context(), 0, 1))
 		w := httptest.NewRecorder()
 		handler.CreateDog(w, req)
 		if w.Code != http.StatusCreated {
@@ -1047,11 +1048,11 @@ func TestCreateDog_ProTierUnlimited(t *testing.T) {
 	}
 
 	// Pro tier tenant should be able to create 11th dog (unlimited)
-	// BUG: Currently returns 409 Conflict because code uses hardcoded FreeTierDogLimit=10
 	body := `{"name":"Dog11","breed":"Lab","size":"medium","age":3,"color_id":1}`
 	req := httptest.NewRequest(http.MethodPost, "/api/dogs", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req = req.WithContext(contextWithTenantAndUser(req.Context(), 1, 1))
+	// Use tenant 0 (the one upgraded to Pro)
+	req = req.WithContext(contextWithTenantAndUser(req.Context(), 0, 1))
 	w := httptest.NewRecorder()
 
 	handler.CreateDog(w, req)
@@ -1074,6 +1075,7 @@ func TestDogHandler_CrossTenantIsolation(t *testing.T) {
 	}
 	handler := NewDogHandler(db, cfg)
 
+	// Tenant 0 and 1 already exist from SetupTestDB
 	// Create tenant 2
 	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
 		VALUES (2, 'tenant-2', 'Tenant 2', 'active', 'tenant2@example.com', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
@@ -1081,8 +1083,9 @@ func TestDogHandler_CrossTenantIsolation(t *testing.T) {
 		t.Fatalf("Failed to create tenant 2: %v", err)
 	}
 
-	// Create a dog belonging to tenant 1 (original test tenant)
+	// Create a dog belonging to tenant 1 (SeedTestDog uses tenant 0, so we update it)
 	dogID := testutil.SeedTestDog(t, db, "Tenant1Dog", "Labrador", "green")
+	db.Exec("UPDATE dogs SET tenant_id = 1 WHERE id = ?", dogID)
 
 	// Verify dog belongs to tenant 1
 	var tenantID int
@@ -1348,7 +1351,8 @@ func TestDogHandler_UpdateDog_InputLengthValidation(t *testing.T) {
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/dogs/%d", dogID), strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
 		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dogID)})
-		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		// Use tenant_id=0 to match the dog's tenant (created by SeedTestDog)
+		ctx := contextWithTenantAndUser(req.Context(), 0, adminID)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -1472,7 +1476,8 @@ func TestDogHandler_UpdateDog_XSSSanitization(t *testing.T) {
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/dogs/%d", dogID), strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
 		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dogID)})
-		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		// Use tenant_id=0 to match the dog's tenant (created by SeedTestDog)
+		ctx := contextWithTenantAndUser(req.Context(), 0, adminID)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -1507,7 +1512,8 @@ func TestDogHandler_CreateDog_CategoryMapsToColorID(t *testing.T) {
 		reqBody := `{"name":"Test Dog","breed":"Labrador","size":"medium","age":3,"category":"green"}`
 		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
-		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		// Use tenant_id=0 (Simple-Mode) where color categories are seeded
+		ctx := contextWithTenantAndUser(req.Context(), 0, adminID)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -1531,7 +1537,8 @@ func TestDogHandler_CreateDog_CategoryMapsToColorID(t *testing.T) {
 		reqBody := `{"name":"Orange Dog","breed":"Beagle","size":"small","age":2,"category":"orange"}`
 		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
-		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		// Use tenant_id=0 (Simple-Mode) where color categories are seeded
+		ctx := contextWithTenantAndUser(req.Context(), 0, adminID)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -1554,7 +1561,8 @@ func TestDogHandler_CreateDog_CategoryMapsToColorID(t *testing.T) {
 		reqBody := `{"name":"Blue Dog","breed":"Shepherd","size":"large","age":4,"category":"blue"}`
 		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
-		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
+		// Use tenant_id=0 (Simple-Mode) where color categories are seeded
+		ctx := contextWithTenantAndUser(req.Context(), 0, adminID)
 		req = req.WithContext(ctx)
 
 		rec := httptest.NewRecorder()
@@ -1575,11 +1583,10 @@ func TestDogHandler_CreateDog_CategoryMapsToColorID(t *testing.T) {
 }
 
 // =============================================================================
-// CRITICAL SECURITY TEST: Zero-tenant-ID Bypass Vulnerability (TDD RED Phase)
+// CRITICAL SECURITY TEST: Cross-tenant access from default tenant (TDD RED Phase)
 // =============================================================================
-// BUG: When tenantID == 0 in context (missing tenant), handlers skip tenant check
-// The check `if tenantID > 0 && dog.TenantID != tenantID` is bypassed when tenantID == 0
-// This allows ANY user to access ALL dogs across ALL tenants
+// Test that users from tenant 0 (default) cannot access dogs from tenant 1
+// This validates tenant isolation even when tenant_id=0 is a valid tenant
 func TestDogHandler_ZeroTenantID_Bypass(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	cfg := &config.Config{
@@ -1588,8 +1595,11 @@ func TestDogHandler_ZeroTenantID_Bypass(t *testing.T) {
 	}
 	handler := NewDogHandler(db, cfg)
 
-	// Create a dog belonging to tenant 1
+	// Tenant 0 and 1 already exist from SetupTestDB
+
+	// Create a dog belonging to tenant 1 (not the default tenant 0)
 	dogID := testutil.SeedTestDog(t, db, "SecureDog", "Labrador", "green")
+	db.Exec("UPDATE dogs SET tenant_id = 1 WHERE id = ?", dogID)
 
 	// Verify dog belongs to tenant 1
 	var tenantID int
@@ -1650,10 +1660,12 @@ func TestDogHandler_ZeroTenantID_Bypass(t *testing.T) {
 	t.Run("SECURITY: zero tenant_id should NOT allow DELETE", func(t *testing.T) {
 		// Create a dog specifically for this delete test
 		deleteDogID := testutil.SeedTestDog(t, db, "DeleteBypassTest", "Beagle", "blue")
+		// IMPORTANT: Change dog's tenant to 1 so tenant_id=0 shouldn't be able to delete it
+		db.Exec("UPDATE dogs SET tenant_id = 1 WHERE id = ?", deleteDogID)
 
 		req := httptest.NewRequest("DELETE", "/api/dogs/"+fmt.Sprintf("%d", deleteDogID), nil)
 		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", deleteDogID)})
-		// Context with tenantID = 0
+		// Context with tenantID = 0 (trying to cross-tenant delete)
 		ctx := contextWithTenantAndUser(req.Context(), 0, 999)
 		req = req.WithContext(ctx)
 
