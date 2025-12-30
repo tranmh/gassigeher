@@ -763,6 +763,10 @@ func main() {
 	cronService.Stop()
 	log.Println("Cron service stopped")
 
+	// BUG FIX: Stop AuthHandler's BruteForceService goroutine to prevent leak
+	authHandler.Close()
+	log.Println("Auth handler cleanup completed")
+
 	// Create context with timeout for shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

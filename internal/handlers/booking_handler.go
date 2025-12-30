@@ -197,7 +197,7 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate booking time (check if time is allowed/blocked)
-	if err := h.bookingTimeService.ValidateBookingTime(tenantID, req.Date, req.ScheduledTime); err != nil {
+	if err := h.bookingTimeService.ValidateBookingTime(r.Context(), tenantID, req.Date, req.ScheduledTime); err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}

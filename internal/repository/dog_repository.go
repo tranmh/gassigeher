@@ -510,6 +510,7 @@ func (r *DogRepository) CreateWithLimitCheck(dog *models.Dog, limit int) error {
 }
 
 // Update updates a dog
+// SaaS: Filters by tenant_id for tenant isolation (BUG FIX: added tenant_id to WHERE clause)
 func (r *DogRepository) Update(dog *models.Dog) error {
 	query := `
 		UPDATE dogs SET
@@ -532,10 +533,10 @@ func (r *DogRepository) Update(dog *models.Dog) error {
 			unavailable_reason = ?,
 			unavailable_since = ?,
 			updated_at = ?
-		WHERE id = ?
+		WHERE id = ? AND tenant_id = ?
 	`
 
-	_, err := r.db.Exec(
+	result, err := r.db.Exec(
 		query,
 		dog.Name,
 		dog.Breed,
@@ -557,10 +558,20 @@ func (r *DogRepository) Update(dog *models.Dog) error {
 		dog.UnavailableSince,
 		time.Now(),
 		dog.ID,
+		dog.TenantID,
 	)
 
 	if err != nil {
 		return fmt.Errorf("failed to update dog: %w", err)
+	}
+
+	// Verify update actually happened (0 rows = dog not found or tenant mismatch)
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to verify update: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("dog not found or access denied")
 	}
 
 	return nil

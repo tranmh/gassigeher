@@ -91,6 +91,23 @@ func (h *ColorRequestHandler) CreateRequest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// BUG FIX: Check if user already requested this specific color (prevents spam after denial)
+	existingRequest, err := h.requestRepo.FindByUserAndColor(tenantID, userID, req.ColorID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to check existing requests")
+		return
+	}
+	if existingRequest != nil {
+		if existingRequest.Status == "pending" {
+			respondError(w, http.StatusConflict, "You already have a pending request for this color")
+			return
+		} else if existingRequest.Status == "denied" {
+			respondError(w, http.StatusConflict, "Your request for this color was previously denied. Please contact an admin if you believe this was an error.")
+			return
+		}
+		// If status is "approved", the earlier check (hasColor) should have caught it
+	}
+
 	// Create the request
 	colorRequest := &models.ColorRequest{
 		UserID:  userID,

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -30,7 +31,8 @@ func NewHolidayService(holidayRepo *repository.HolidayRepository, settingsRepo *
 }
 
 // FetchAndCacheHolidays fetches holidays from API and stores in DB for a tenant
-func (s *HolidayService) FetchAndCacheHolidays(tenantID int, year int) error {
+// BUG FIX: Added context parameter for cancellation support
+func (s *HolidayService) FetchAndCacheHolidays(ctx context.Context, tenantID int, year int) error {
 	// Get state from settings
 	state := "BW" // Default
 	if setting, err := s.settingsRepo.Get(tenantID, "feiertage_state"); err == nil && setting != nil && setting.Value != "" {
@@ -47,8 +49,17 @@ func (s *HolidayService) FetchAndCacheHolidays(tenantID int, year int) error {
 	// Cache miss - fetch from API (with 10s timeout)
 	url := fmt.Sprintf("https://feiertage-api.de/api/?jahr=%d&nur_land=%s", year, state)
 
-	resp, err := httpClient.Get(url)
+	// BUG FIX: Use context-aware request for cancellation support
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		if ctx.Err() != nil {
+			return fmt.Errorf("request cancelled: %w", ctx.Err())
+		}
 		return fmt.Errorf("failed to fetch holidays: %w", err)
 	}
 	defer resp.Body.Close()
@@ -113,7 +124,8 @@ func (s *HolidayService) FetchAndCacheHolidays(tenantID int, year int) error {
 }
 
 // IsHoliday checks if a date is a holiday for a tenant
-func (s *HolidayService) IsHoliday(tenantID int, date string) (bool, error) {
+// BUG FIX: Added context parameter for cancellation support
+func (s *HolidayService) IsHoliday(ctx context.Context, tenantID int, date string) (bool, error) {
 	// Validate date format first
 	dateObj, err := time.Parse("2006-01-02", date)
 	if err != nil {
@@ -124,7 +136,7 @@ func (s *HolidayService) IsHoliday(tenantID int, date string) (bool, error) {
 	if setting, err := s.settingsRepo.Get(tenantID, "use_feiertage_api"); err == nil && setting != nil && setting.Value == "true" {
 		// Ensure holidays are cached for this year (log but don't fail on error)
 		year := dateObj.Year()
-		if err := s.FetchAndCacheHolidays(tenantID, year); err != nil {
+		if err := s.FetchAndCacheHolidays(ctx, tenantID, year); err != nil {
 			fmt.Printf("Warning: Failed to fetch holidays for tenant %d, year %d: %v\n", tenantID, year, err)
 		}
 	}
@@ -134,10 +146,11 @@ func (s *HolidayService) IsHoliday(tenantID int, date string) (bool, error) {
 }
 
 // GetHolidaysForYear returns all holidays in a year for a tenant
-func (s *HolidayService) GetHolidaysForYear(tenantID int, year int) ([]models.CustomHoliday, error) {
+// BUG FIX: Added context parameter for cancellation support
+func (s *HolidayService) GetHolidaysForYear(ctx context.Context, tenantID int, year int) ([]models.CustomHoliday, error) {
 	// Fetch and cache if API enabled (log but don't fail on error)
 	if setting, err := s.settingsRepo.Get(tenantID, "use_feiertage_api"); err == nil && setting != nil && setting.Value == "true" {
-		if err := s.FetchAndCacheHolidays(tenantID, year); err != nil {
+		if err := s.FetchAndCacheHolidays(ctx, tenantID, year); err != nil {
 			fmt.Printf("Warning: Failed to fetch holidays for tenant %d, year %d: %v\n", tenantID, year, err)
 		}
 	}

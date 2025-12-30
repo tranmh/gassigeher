@@ -1102,3 +1102,76 @@ func TestDogRepository_CreateWithLimitCheck_RaceCondition(t *testing.T) {
 		t.Errorf("Expected exactly %d dogs after race condition test, got %d", dogLimit, finalCount)
 	}
 }
+
+// TestDogRepository_Update_TenantIsolation tests that Update enforces tenant isolation
+// BUG FIX: Update should filter by tenant_id to prevent cross-tenant modifications
+func TestDogRepository_Update_TenantIsolation(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewDogRepository(db)
+
+	// Create a dog in tenant 1
+	tenant1ID := 1
+	dog := &models.Dog{
+		TenantID:    tenant1ID,
+		Name:        "Tenant1Dog",
+		Breed:       "Labrador",
+		Size:        "large",
+		Age:         3,
+		IsAvailable: true,
+	}
+	err := repo.Create(dog)
+	if err != nil {
+		t.Fatalf("Failed to create dog: %v", err)
+	}
+	originalDogID := dog.ID
+
+	// Verify the dog was created in tenant 1
+	var checkTenantID int
+	err = db.QueryRow("SELECT tenant_id FROM dogs WHERE id = ?", originalDogID).Scan(&checkTenantID)
+	if err != nil {
+		t.Fatalf("Failed to verify dog tenant: %v", err)
+	}
+	if checkTenantID != tenant1ID {
+		t.Fatalf("Dog should be in tenant %d, got %d", tenant1ID, checkTenantID)
+	}
+
+	// Now try to update the dog but with a DIFFERENT tenant_id in the struct
+	// This simulates a cross-tenant attack where attacker knows the dog ID
+	// but tries to update it from a different tenant context
+	attackerTenantID := 999
+	maliciousDog := &models.Dog{
+		ID:          originalDogID, // Same dog ID
+		TenantID:    attackerTenantID, // Different tenant!
+		Name:        "HACKED",
+		Breed:       "HACKED",
+		Size:        "large",
+		Age:         99,
+		IsAvailable: false,
+	}
+
+	// The Update should either:
+	// 1. Fail because tenant_id doesn't match, OR
+	// 2. Return error, OR
+	// 3. Not update any rows (RowsAffected = 0)
+	err = repo.Update(maliciousDog)
+
+	// Check if the original dog's name was changed
+	var currentName string
+	err = db.QueryRow("SELECT name FROM dogs WHERE id = ?", originalDogID).Scan(&currentName)
+	if err != nil {
+		t.Fatalf("Failed to check dog name: %v", err)
+	}
+
+	// BUG: If currentName is "HACKED", the tenant isolation is broken
+	if currentName == "HACKED" {
+		t.Errorf("SECURITY BUG: Cross-tenant update succeeded! "+
+			"Dog in tenant %d was modified by request with tenant %d. "+
+			"Update() must include 'AND tenant_id = ?' in WHERE clause.",
+			tenant1ID, attackerTenantID)
+	}
+
+	// The name should still be the original
+	if currentName != "Tenant1Dog" {
+		t.Errorf("Expected dog name to remain 'Tenant1Dog', got '%s'", currentName)
+	}
+}

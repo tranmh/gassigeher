@@ -109,6 +109,11 @@ func (r *ReactivationRequestRepository) FindAllPending(tenantID int) ([]*models.
 		requests = append(requests, request)
 	}
 
+	// BUG FIX: Check for errors during iteration
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating pending reactivation requests: %w", err)
+	}
+
 	return requests, nil
 }
 
@@ -195,6 +200,11 @@ func (r *ReactivationRequestRepository) FindByUserID(tenantID int, userID int) (
 			return nil, fmt.Errorf("failed to scan reactivation request: %w", err)
 		}
 		requests = append(requests, request)
+	}
+
+	// BUG FIX: Check for errors during iteration
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating reactivation requests: %w", err)
 	}
 
 	return requests, nil

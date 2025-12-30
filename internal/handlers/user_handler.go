@@ -1314,6 +1314,10 @@ func (h *UserHandler) ExportMyData(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 		}
+		// BUG FIX: Check for errors during iteration
+		if err := rows.Err(); err != nil {
+			log.Printf("ERROR: Failed to iterate bookings for user %d: %v", userID, err)
+		}
 	}
 	export["bookings"] = bookings
 	export["booking_count"] = len(bookings)
@@ -1357,6 +1361,10 @@ func (h *UserHandler) ExportMyData(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 		}
+		// BUG FIX: Check for errors during iteration
+		if err := rows.Err(); err != nil {
+			log.Printf("ERROR: Failed to iterate walk reports for user %d: %v", userID, err)
+		}
 	}
 	export["walk_reports"] = walkReports
 
@@ -1391,6 +1399,10 @@ func (h *UserHandler) ExportMyData(w http.ResponseWriter, r *http.Request) {
 					"updated_at":      req.UpdatedAt,
 				})
 			}
+		}
+		// BUG FIX: Check for errors during iteration
+		if err := rows.Err(); err != nil {
+			log.Printf("ERROR: Failed to iterate experience requests for user %d: %v", userID, err)
 		}
 	}
 	export["experience_requests"] = experienceRequests
@@ -1430,6 +1442,10 @@ func (h *UserHandler) ExportMyData(w http.ResponseWriter, r *http.Request) {
 					"hex_code":    req.HexCode,
 				})
 			}
+		}
+		// BUG FIX: Check for errors during iteration
+		if err := rows.Err(); err != nil {
+			log.Printf("ERROR: Failed to iterate color requests for user %d: %v", userID, err)
 		}
 	}
 	export["color_requests"] = colorRequests

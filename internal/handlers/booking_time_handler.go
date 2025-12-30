@@ -39,7 +39,7 @@ func (h *BookingTimeHandler) GetAvailableSlots(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	slots, err := h.bookingTimeService.GetAvailableTimeSlots(tenantID, date)
+	slots, err := h.bookingTimeService.GetAvailableTimeSlots(r.Context(), tenantID, date)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
@@ -85,7 +85,7 @@ func (h *BookingTimeHandler) GetRulesForDate(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	rules, err := h.bookingTimeService.GetRulesForDate(tenantID, date)
+	rules, err := h.bookingTimeService.GetRulesForDate(r.Context(), tenantID, date)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return

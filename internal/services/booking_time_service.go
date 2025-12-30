@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -28,7 +29,8 @@ func NewBookingTimeService(
 }
 
 // ValidateBookingTime validates if a time slot is allowed for a tenant
-func (s *BookingTimeService) ValidateBookingTime(tenantID int, date string, scheduledTime string) error {
+// BUG FIX: Added context parameter for cancellation support
+func (s *BookingTimeService) ValidateBookingTime(ctx context.Context, tenantID int, date string, scheduledTime string) error {
 	// Parse date
 	dateObj, err := time.Parse("2006-01-02", date)
 	if err != nil {
@@ -42,7 +44,7 @@ func (s *BookingTimeService) ValidateBookingTime(tenantID int, date string, sche
 	}
 
 	// Determine day type
-	dayType, err := s.getDayType(tenantID, date, dateObj)
+	dayType, err := s.getDayType(ctx, tenantID, date, dateObj)
 	if err != nil {
 		return err
 	}
@@ -84,7 +86,8 @@ func (s *BookingTimeService) ValidateBookingTime(tenantID int, date string, sche
 }
 
 // GetAvailableTimeSlots returns all available time slots for a date within a tenant
-func (s *BookingTimeService) GetAvailableTimeSlots(tenantID int, date string) ([]string, error) {
+// BUG FIX: Added context parameter for cancellation support
+func (s *BookingTimeService) GetAvailableTimeSlots(ctx context.Context, tenantID int, date string) ([]string, error) {
 	// Parse date
 	dateObj, err := time.Parse("2006-01-02", date)
 	if err != nil {
@@ -92,7 +95,7 @@ func (s *BookingTimeService) GetAvailableTimeSlots(tenantID int, date string) ([
 	}
 
 	// Determine day type
-	dayType, err := s.getDayType(tenantID, date, dateObj)
+	dayType, err := s.getDayType(ctx, tenantID, date, dateObj)
 	if err != nil {
 		return nil, err
 	}
@@ -160,9 +163,10 @@ func (s *BookingTimeService) RequiresApproval(tenantID int, scheduledTime string
 }
 
 // getDayType determines if date is weekday, weekend, or holiday for a tenant
-func (s *BookingTimeService) getDayType(tenantID int, date string, dateObj time.Time) (string, error) {
+// BUG FIX: Added context parameter for cancellation support
+func (s *BookingTimeService) getDayType(ctx context.Context, tenantID int, date string, dateObj time.Time) (string, error) {
 	// Check if holiday
-	isHoliday, err := s.holidayService.IsHoliday(tenantID, date)
+	isHoliday, err := s.holidayService.IsHoliday(ctx, tenantID, date)
 	if err != nil {
 		return "", err
 	}
@@ -181,13 +185,14 @@ func (s *BookingTimeService) getDayType(tenantID int, date string, dateObj time.
 }
 
 // GetRulesForDate returns applicable rules for a specific date within a tenant
-func (s *BookingTimeService) GetRulesForDate(tenantID int, date string) ([]models.BookingTimeRule, error) {
+// BUG FIX: Added context parameter for cancellation support
+func (s *BookingTimeService) GetRulesForDate(ctx context.Context, tenantID int, date string) ([]models.BookingTimeRule, error) {
 	dateObj, err := time.Parse("2006-01-02", date)
 	if err != nil {
 		return nil, err
 	}
 
-	dayType, err := s.getDayType(tenantID, date, dateObj)
+	dayType, err := s.getDayType(ctx, tenantID, date, dateObj)
 	if err != nil {
 		return nil, err
 	}

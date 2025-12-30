@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -39,7 +40,7 @@ func TestValidateBookingTime_WeekdayAllowed(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := service.ValidateBookingTime(0, tc.date, tc.time) // tenantID = 0
+			err := service.ValidateBookingTime(context.Background(), 0, tc.date, tc.time) // tenantID = 0
 			if (err != nil) != tc.wantErr {
 				t.Errorf("ValidateBookingTime() error = %v, wantErr %v", err, tc.wantErr)
 			}
@@ -73,7 +74,7 @@ func TestValidateBookingTime_WeekdayBlocked(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := service.ValidateBookingTime(0, tc.date, tc.time) // tenantID = 0
+			err := service.ValidateBookingTime(context.Background(), 0, tc.date, tc.time) // tenantID = 0
 			if err == nil {
 				t.Error("Expected error, got nil")
 				return
@@ -112,7 +113,7 @@ func TestValidateBookingTime_WeekendTimes(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := service.ValidateBookingTime(0, tc.date, tc.time) // tenantID = 0
+			err := service.ValidateBookingTime(context.Background(), 0, tc.date, tc.time) // tenantID = 0
 			if (err != nil) != tc.wantErr {
 				t.Errorf("ValidateBookingTime() error = %v, wantErr %v", err, tc.wantErr)
 			}
@@ -156,7 +157,7 @@ func TestValidateBookingTime_HolidayTimes(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := service.ValidateBookingTime(0, tc.date, tc.time) // tenantID = 0
+			err := service.ValidateBookingTime(context.Background(), 0, tc.date, tc.time) // tenantID = 0
 			if (err != nil) != tc.wantErr {
 				t.Errorf("ValidateBookingTime() error = %v, wantErr %v", err, tc.wantErr)
 			}
@@ -175,7 +176,7 @@ func TestGetAvailableTimeSlots_Granularity(t *testing.T) {
 	service := NewBookingTimeService(bookingTimeRepo, holidayService, settingsRepo)
 
 	// Test weekday
-	slots, err := service.GetAvailableTimeSlots(0, "2025-01-27") // tenantID = 0, Monday
+	slots, err := service.GetAvailableTimeSlots(context.Background(), 0, "2025-01-27") // tenantID = 0, Monday
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -287,7 +288,7 @@ func TestGetDayType(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Use GetRulesForDate to test day type indirectly
-			rules, err := service.GetRulesForDate(0, tc.date) // tenantID = 0
+			rules, err := service.GetRulesForDate(context.Background(), 0, tc.date) // tenantID = 0
 			if err != nil {
 				t.Fatalf("GetRulesForDate() error = %v", err)
 			}
@@ -337,7 +338,7 @@ func BenchmarkGetAvailableTimeSlots(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = service.GetAvailableTimeSlots(0, "2025-01-27") // tenantID = 0
+		_, _ = service.GetAvailableTimeSlots(context.Background(), 0, "2025-01-27") // tenantID = 0
 	}
 }
 
@@ -358,7 +359,7 @@ func BenchmarkGetAvailableTimeSlots_Weekend(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = service.GetAvailableTimeSlots(0, "2025-01-25") // tenantID = 0, Saturday
+		_, _ = service.GetAvailableTimeSlots(context.Background(), 0, "2025-01-25") // tenantID = 0, Saturday
 	}
 }
 
@@ -380,7 +381,7 @@ func BenchmarkValidateBookingTime(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = service.ValidateBookingTime(0, "2025-01-27", "15:00") // tenantID = 0
+		_ = service.ValidateBookingTime(context.Background(), 0, "2025-01-27", "15:00") // tenantID = 0
 	}
 }
 
@@ -412,7 +413,7 @@ func BenchmarkValidateBookingTime_WithHolidayCheck(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = service.ValidateBookingTime(0, "2025-01-27", "15:00") // tenantID = 0
+		_ = service.ValidateBookingTime(context.Background(), 0, "2025-01-27", "15:00") // tenantID = 0
 	}
 }
 
@@ -430,7 +431,7 @@ func TestValidateBookingTime_Performance(t *testing.T) {
 	// Validate 100 bookings and measure time
 	start := time.Now()
 	for i := 0; i < 100; i++ {
-		_ = service.ValidateBookingTime(0, "2025-01-27", "15:00") // tenantID = 0
+		_ = service.ValidateBookingTime(context.Background(), 0, "2025-01-27", "15:00") // tenantID = 0
 	}
 	elapsed := time.Since(start)
 
@@ -457,7 +458,7 @@ func TestGetAvailableTimeSlots_Performance(t *testing.T) {
 	// Generate slots 100 times and measure time
 	start := time.Now()
 	for i := 0; i < 100; i++ {
-		_, _ = service.GetAvailableTimeSlots(0, "2025-01-27") // tenantID = 0
+		_, _ = service.GetAvailableTimeSlots(context.Background(), 0, "2025-01-27") // tenantID = 0
 	}
 	elapsed := time.Since(start)
 

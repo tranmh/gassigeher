@@ -165,10 +165,13 @@ func (s *FeatureFlagService) UpdateFlag(id int, req *models.UpdateFeatureFlagReq
 	}
 
 	// Invalidate all cache entries for this flag
+	// BUG FIX: Use exact key match with delimiter to avoid false positives
+	// Cache keys are formatted as "flagKey:tenantID", so we match "flagKey:" prefix
+	keyPrefix := flag.Key + ":"
 	s.mu.Lock()
 	for k := range s.cache {
-		// Remove all entries starting with this flag key
-		if len(k) >= len(flag.Key) && k[:len(flag.Key)] == flag.Key {
+		// Remove all entries with exact flag key (match "flagKey:" prefix)
+		if len(k) >= len(keyPrefix) && k[:len(keyPrefix)] == keyPrefix {
 			delete(s.cache, k)
 		}
 	}
@@ -188,9 +191,11 @@ func (s *FeatureFlagService) DeleteFlag(id int) error {
 	}
 
 	// Invalidate cache for this flag
+	// BUG FIX: Use exact key match with delimiter to avoid false positives
+	keyPrefix := flag.Key + ":"
 	s.mu.Lock()
 	for k := range s.cache {
-		if len(k) >= len(flag.Key) && k[:len(flag.Key)] == flag.Key {
+		if len(k) >= len(keyPrefix) && k[:len(keyPrefix)] == keyPrefix {
 			delete(s.cache, k)
 		}
 	}

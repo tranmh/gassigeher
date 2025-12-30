@@ -45,6 +45,14 @@ func NewAuthHandler(db *sql.DB, cfg *config.Config) *AuthHandler {
 	}
 }
 
+// Close releases resources held by AuthHandler
+// BUG FIX: Stop BruteForceService goroutine to prevent leak on shutdown
+func (h *AuthHandler) Close() {
+	if h.bruteForceService != nil {
+		h.bruteForceService.Stop()
+	}
+}
+
 // Register handles user registration
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req models.RegisterRequest

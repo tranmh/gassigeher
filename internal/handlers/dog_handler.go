@@ -618,15 +618,11 @@ func (h *DogHandler) UploadDogPhoto(w http.ResponseWriter, r *http.Request) {
 	// Reset file reader position after MIME check
 	file.Seek(0, 0)
 
-	// Delete old photos if they exist (before processing new ones)
+	// BUG FIX: Capture old photo path BEFORE processing new photo
+	// We'll delete old photos AFTER successfully processing the new one
+	var oldPhotoPath string
 	if dog.Photo != nil && *dog.Photo != "" {
-		// Use ImageService to delete both full and thumbnail
-		// This handles the new naming scheme (dog_{id}_full.jpg, dog_{id}_thumb.jpg)
-		h.imageService.DeleteDogPhotos(id)
-
-		// Also try to delete old photo with original naming scheme (backward compatibility)
-		oldPath := filepath.Join(h.config.UploadDir, *dog.Photo)
-		os.Remove(oldPath) // Ignore errors if file doesn't exist
+		oldPhotoPath = *dog.Photo
 	}
 
 	var fullPath, thumbPath string
@@ -687,6 +683,16 @@ func (h *DogHandler) UploadDogPhoto(w http.ResponseWriter, r *http.Request) {
 		}
 		respondError(w, http.StatusInternalServerError, "Failed to update dog")
 		return
+	}
+
+	// BUG FIX: Delete old photos ONLY after successfully processing and saving new photo
+	// This prevents data loss if new photo processing fails
+	// Note: If the old photo used the new naming scheme (dog_{id}_full.jpg), it has already
+	// been overwritten by the new photo. We only need to clean up photos with old naming scheme.
+	if oldPhotoPath != "" && oldPhotoPath != fullPath {
+		// Only delete if old path differs from new path (old naming scheme)
+		oldFullPath := filepath.Join(h.config.UploadDir, oldPhotoPath)
+		os.Remove(oldFullPath) // Ignore errors if file doesn't exist
 	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{

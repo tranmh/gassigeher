@@ -75,6 +75,11 @@ func (r *SettingsRepository) GetAll(tenantID int) ([]*models.SystemSetting, erro
 		settings = append(settings, setting)
 	}
 
+	// BUG FIX: Check for errors during iteration
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating settings: %w", err)
+	}
+
 	return settings, nil
 }
 

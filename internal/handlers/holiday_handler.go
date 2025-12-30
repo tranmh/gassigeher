@@ -44,7 +44,7 @@ func (h *HolidayHandler) GetHolidays(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	holidays, err := h.holidayService.GetHolidaysForYear(tenantID, year)
+	holidays, err := h.holidayService.GetHolidaysForYear(r.Context(), tenantID, year)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to load holidays")
 		return

@@ -185,8 +185,12 @@ func (h *ReactivationRequestHandler) ApproveRequest(w http.ResponseWriter, r *ht
 	}
 
 	// Send email notification
-	if user.Email != nil && h.emailService != nil {
-		go h.emailService.SendAccountReactivated(*user.Email, user.FirstName, req.Message)
+	// BUG FIX: Capture values before goroutine to avoid race conditions
+	if h.emailService != nil && user.Email != nil {
+		emailAddr := *user.Email
+		firstName := user.FirstName
+		message := req.Message
+		go h.emailService.SendAccountReactivated(emailAddr, firstName, message)
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"message": "Request approved and user reactivated"})
@@ -249,8 +253,12 @@ func (h *ReactivationRequestHandler) DenyRequest(w http.ResponseWriter, r *http.
 	}
 
 	// Send email notification
-	if user.Email != nil && h.emailService != nil {
-		go h.emailService.SendReactivationDenied(*user.Email, user.FirstName, req.Message)
+	// BUG FIX: Capture values before goroutine to avoid race conditions
+	if h.emailService != nil && user.Email != nil {
+		emailAddr := *user.Email
+		firstName := user.FirstName
+		message := req.Message
+		go h.emailService.SendReactivationDenied(emailAddr, firstName, message)
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"message": "Request denied"})

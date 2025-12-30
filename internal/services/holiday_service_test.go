@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -47,7 +48,7 @@ func TestIsHoliday_KnownHolidays(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := service.IsHoliday(0, tc.date) // tenantID = 0
+			result, err := service.IsHoliday(context.Background(), 0, tc.date) // tenantID = 0
 			if err != nil {
 				t.Fatalf("IsHoliday() error = %v", err)
 			}
@@ -70,7 +71,7 @@ func TestFetchAndCacheHolidays_APIIntegration(t *testing.T) {
 	_ = settingsRepo.Update(0, "feiertage_state", "BW") // tenantID = 0
 
 	// First fetch - should call API
-	err := service.FetchAndCacheHolidays(0, 2025) // tenantID = 0
+	err := service.FetchAndCacheHolidays(context.Background(), 0, 2025) // tenantID = 0
 	if err != nil {
 		// If API is not reachable, skip this test
 		t.Skipf("API not reachable (this is OK for offline testing): %v", err)
@@ -97,7 +98,7 @@ func TestFetchAndCacheHolidays_APIIntegration(t *testing.T) {
 
 	// Second fetch - should use cache (no API call)
 	// We can't easily verify no API call without mocking, but we can verify it succeeds
-	err = service.FetchAndCacheHolidays(0, 2025) // tenantID = 0
+	err = service.FetchAndCacheHolidays(context.Background(), 0, 2025) // tenantID = 0
 	if err != nil {
 		t.Errorf("Cache fetch failed: %v", err)
 	}
@@ -156,7 +157,7 @@ func TestGetHolidaysForYear_Filtering(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.note, func(t *testing.T) {
-			holidays, err := service.GetHolidaysForYear(0, tc.year) // tenantID = 0
+			holidays, err := service.GetHolidaysForYear(context.Background(), 0, tc.year) // tenantID = 0
 			if err != nil {
 				t.Fatalf("GetHolidaysForYear(%d) error = %v", tc.year, err)
 			}
@@ -225,7 +226,7 @@ func TestIsHoliday_WithAPIEnabled(t *testing.T) {
 	_ = settingsRepo.Update(0, "use_feiertage_api", "true") // tenantID = 0
 
 	// Check a known holiday
-	result, err := service.IsHoliday(0, "2025-01-01") // tenantID = 0, Neujahrstag
+	result, err := service.IsHoliday(context.Background(), 0, "2025-01-01") // tenantID = 0, Neujahrstag
 	if err != nil {
 		t.Skipf("API error (OK for offline testing): %v", err)
 		return
@@ -236,7 +237,7 @@ func TestIsHoliday_WithAPIEnabled(t *testing.T) {
 	}
 
 	// Check a non-holiday
-	result2, err := service.IsHoliday(0, "2025-01-15") // tenantID = 0
+	result2, err := service.IsHoliday(context.Background(), 0, "2025-01-15") // tenantID = 0
 	if err != nil {
 		t.Fatalf("IsHoliday error: %v", err)
 	}

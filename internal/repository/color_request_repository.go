@@ -209,6 +209,11 @@ func (r *ColorRequestRepository) FindByUserID(tenantID int, userID int) ([]*mode
 		requests = append(requests, request)
 	}
 
+	// BUG FIX: Check for errors during iteration
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating color requests: %w", err)
+	}
+
 	return requests, nil
 }
 
@@ -289,6 +294,11 @@ func (r *ColorRequestRepository) FindAllPending(tenantID int) ([]*models.ColorRe
 		requests = append(requests, request)
 	}
 
+	// BUG FIX: Check for errors during iteration
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating pending color requests: %w", err)
+	}
+
 	return requests, nil
 }
 
@@ -358,4 +368,39 @@ func (r *ColorRequestRepository) HasPendingRequestForColor(tenantID int, userID 
 	}
 
 	return count > 0, nil
+}
+
+// FindByUserAndColor finds the most recent request by user for a specific color
+// BUG FIX: Added to prevent users from spamming the same color request after denial
+func (r *ColorRequestRepository) FindByUserAndColor(tenantID int, userID int, colorID int) (*models.ColorRequest, error) {
+	query := `
+		SELECT id, tenant_id, user_id, color_id, status, admin_message, reviewed_by, reviewed_at, created_at
+		FROM color_requests
+		WHERE user_id = ? AND color_id = ? AND tenant_id = ?
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+
+	request := &models.ColorRequest{}
+	err := r.db.QueryRow(query, userID, colorID, tenantID).Scan(
+		&request.ID,
+		&request.TenantID,
+		&request.UserID,
+		&request.ColorID,
+		&request.Status,
+		&request.AdminMessage,
+		&request.ReviewedBy,
+		&request.ReviewedAt,
+		&request.CreatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to find color request by user and color: %w", err)
+	}
+
+	return request, nil
 }
