@@ -131,6 +131,99 @@ func (r *MarketingRepository) DeleteCampaign(id int) error {
 	return err
 }
 
+// ClaimFOMOSlot attempts to atomically claim a slot from an active FOMO campaign.
+// Returns the campaign and config if successful, nil if no slots available.
+// Uses optimistic locking with retry to handle concurrent slot claims safely.
+func (r *MarketingRepository) ClaimFOMOSlot() (*models.MarketingCampaign, *models.FOMOConfig, error) {
+	// Retry loop for optimistic locking (handles concurrent claims)
+	for attempts := 0; attempts < 3; attempts++ {
+		// Get active FOMO campaign
+		campaign, err := r.GetActiveCampaignByType("fomo_countdown")
+		if err != nil {
+			return nil, nil, err
+		}
+		if campaign == nil {
+			return nil, nil, nil // No active FOMO campaign
+		}
+
+		// Parse config
+		config, err := campaign.GetFOMOConfig()
+		if err != nil {
+			return nil, nil, err
+		}
+		if config == nil || config.RemainingSlots <= 0 {
+			return nil, nil, nil // No slots available
+		}
+
+		// Store original value for optimistic lock
+		originalSlots := config.RemainingSlots
+
+		// Decrement remaining slots
+		config.RemainingSlots--
+
+		// Auto-deactivate campaign if no more slots
+		if config.RemainingSlots <= 0 {
+			campaign.IsActive = false
+		}
+
+		// Update config on campaign
+		if err := campaign.SetFOMOConfig(config); err != nil {
+			return nil, nil, err
+		}
+
+		// Try to update with optimistic locking
+		updated, err := r.UpdateCampaignOptimistic(campaign, originalSlots)
+		if err != nil {
+			return nil, nil, err
+		}
+		if updated {
+			return campaign, config, nil
+		}
+		// Concurrent update detected, retry
+	}
+
+	// Failed after max retries (rare edge case)
+	return nil, nil, nil
+}
+
+// UpdateCampaignOptimistic updates a campaign only if remaining_slots matches expected value.
+// Returns true if update succeeded, false if concurrent modification detected.
+// This implements optimistic locking to prevent race conditions in slot claiming.
+func (r *MarketingRepository) UpdateCampaignOptimistic(c *models.MarketingCampaign, expectedSlots int) (bool, error) {
+	var startDateFormatted, endDateFormatted *string
+	if c.StartDate != nil {
+		s := FormatTimestamp(*c.StartDate)
+		startDateFormatted = &s
+	}
+	if c.EndDate != nil {
+		e := FormatTimestamp(*c.EndDate)
+		endDateFormatted = &e
+	}
+
+	// Use LIKE patterns to check remaining_slots value in JSON config
+	// Must match exact number to avoid false positives (e.g., 30 matching 300)
+	// JSON can have: "remaining_slots":30, or "remaining_slots":30}
+	patternWithComma := fmt.Sprintf("%%\"remaining_slots\":%d,%%", expectedSlots)
+	patternWithBrace := fmt.Sprintf("%%\"remaining_slots\":%d}%%", expectedSlots)
+
+	query := `UPDATE marketing_campaigns
+			  SET name = ?, description = ?, config = ?, is_active = ?, start_date = ?, end_date = ?, updated_at = ?
+			  WHERE id = ? AND (config LIKE ? OR config LIKE ?)`
+
+	result, err := r.db.Exec(query, c.Name, c.Description, c.Config, c.IsActive,
+		startDateFormatted, endDateFormatted, FormatTimestamp(time.Now()), c.ID, patternWithComma, patternWithBrace)
+	if err != nil {
+		return false, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+
+	return rowsAffected > 0, nil
+}
+
 // ========== Referral Codes ==========
 
 // ListReferralCodes returns all referral codes

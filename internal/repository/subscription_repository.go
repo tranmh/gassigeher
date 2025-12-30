@@ -482,3 +482,78 @@ func (r *SubscriptionRepository) IncrementFreeMonths(tenantID int, months int, s
 
 	return nil
 }
+
+// CreateFreeProSubscription creates or upgrades a subscription to Pro with free months.
+// Used for FOMO early-adopter benefits - grants Pro plan without payment required.
+func (r *SubscriptionRepository) CreateFreeProSubscription(tenantID int, freeMonths int, source string) error {
+	now := time.Now()
+	// Calculate trial end date (freeMonths * 30 days)
+	trialEndsAt := now.AddDate(0, 0, freeMonths*30)
+
+	// Check if subscription already exists
+	existingSub, err := r.GetSubscriptionByTenant(tenantID)
+	if err != nil {
+		return fmt.Errorf("failed to check existing subscription: %w", err)
+	}
+
+	if existingSub != nil {
+		// Update existing subscription to Pro with free months
+		query := `
+			UPDATE tenant_subscriptions SET
+				plan_id = ?,
+				status = ?,
+				free_months_remaining = ?,
+				free_months_granted = ?,
+				free_months_source = ?,
+				trial_ends_at = ?,
+				current_period_end = ?,
+				updated_at = ?
+			WHERE tenant_id = ?
+		`
+		_, err := r.db.Exec(
+			query,
+			models.ProPlanID,
+			models.SubscriptionStatusActive,
+			freeMonths,
+			freeMonths,
+			source,
+			FormatTimestamp(trialEndsAt),
+			FormatTimestamp(trialEndsAt),
+			FormatTimestamp(now),
+			tenantID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to upgrade subscription to Pro: %w", err)
+		}
+		return nil
+	}
+
+	// Create new Pro subscription with free months
+	query := `
+		INSERT INTO tenant_subscriptions (
+			tenant_id, plan_id, status,
+			free_months_remaining, free_months_granted, free_months_source,
+			trial_ends_at, current_period_start, current_period_end,
+			created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+	_, err = r.db.Exec(
+		query,
+		tenantID,
+		models.ProPlanID,
+		models.SubscriptionStatusActive,
+		freeMonths,
+		freeMonths,
+		source,
+		FormatTimestamp(trialEndsAt),
+		FormatTimestamp(now),
+		FormatTimestamp(trialEndsAt),
+		FormatTimestamp(now),
+		FormatTimestamp(now),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create Pro subscription: %w", err)
+	}
+
+	return nil
+}

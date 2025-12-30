@@ -27,6 +27,10 @@ const DefaultFreeTierDogLimit = 10
 // This should match the ID seeded in database migrations
 const FreePlanID = 1
 
+// ProPlanID is the ID of the pro plan in the pricing_plans table
+// This should match the ID seeded in database migrations
+const ProPlanID = 2
+
 // PricingPlan represents a subscription pricing plan
 type PricingPlan struct {
 	ID           int       `json:"id"`

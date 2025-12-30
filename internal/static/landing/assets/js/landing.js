@@ -465,12 +465,30 @@ function initFOMOBanner() {
                 const remaining = config.remaining_slots || 0;
                 const total = config.total_slots || 0;
 
-                // Build message with slot info
-                let message = config.message || 'Begrenztes Angebot!';
-                message = message.replace('{remaining_slots}', remaining);
-                message = message.replace('{total_slots}', total);
+                // Check if this is a free Pro months benefit
+                const hasBenefit = config.benefit_type === 'free_pro_months' && config.benefit_months > 0;
 
-                messageEl.textContent = message;
+                if (hasBenefit) {
+                    // Show prominent benefit banner
+                    const benefitMonths = config.benefit_months;
+                    const benefitText = benefitMonths === 12 ? '1 Jahr' : `${benefitMonths} Monate`;
+
+                    // Create enhanced banner content
+                    messageEl.innerHTML = `
+                        <span class="fomo-highlight">Startangebot:</span>
+                        <span class="fomo-benefit">Pro-Version ${benefitText} kostenlos!</span>
+                        <span class="fomo-slots">Noch ${remaining} von ${total} Plätzen verfügbar</span>
+                    `;
+
+                    banner.classList.add('fomo-banner-benefit');
+                } else {
+                    // Standard message display
+                    let message = config.message || 'Begrenztes Angebot!';
+                    message = message.replace('{remaining_slots}', remaining);
+                    message = message.replace('{total_slots}', total);
+                    messageEl.textContent = message;
+                }
+
                 ctaEl.textContent = config.cta_text || 'Jetzt registrieren';
                 if (config.cta_link) {
                     ctaEl.href = config.cta_link;

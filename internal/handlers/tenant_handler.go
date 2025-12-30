@@ -95,6 +95,7 @@ type TenantHandler struct {
 	tenantRepo          *repository.TenantRepository
 	userRepo            *repository.UserRepository
 	marketingRepo       *repository.MarketingRepository
+	subscriptionRepo    *repository.SubscriptionRepository
 	authService         *services.AuthService
 	provisioningService *services.ProvisioningService
 	emailService        *services.EmailService
@@ -110,6 +111,7 @@ func NewTenantHandler(db *sql.DB, cfg *config.Config) *TenantHandler {
 		tenantRepo:          repository.NewTenantRepository(db),
 		userRepo:            repository.NewUserRepository(db),
 		marketingRepo:       repository.NewMarketingRepository(db),
+		subscriptionRepo:    repository.NewSubscriptionRepository(db),
 		authService:         services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours),
 		provisioningService: services.NewProvisioningService(db),
 		emailService:        emailService,
@@ -321,6 +323,9 @@ func (h *TenantHandler) Register(w http.ResponseWriter, r *http.Request) {
 	if req.ReferralCode != "" {
 		go h.processReferralCode(req.ReferralCode, tenantID)
 	}
+
+	// 6. Check and claim FOMO early-adopter benefit (non-blocking)
+	go h.claimFOMOBenefit(tenantID)
 
 	// Send welcome email (in background)
 	if h.emailService != nil {
@@ -824,6 +829,37 @@ func (h *TenantHandler) processReferralCode(code string, refereeTenantID int) {
 	}
 
 	log.Printf("Successfully applied referral code '%s' for tenant %d", code, refereeTenantID)
+}
+
+// claimFOMOBenefit checks for active FOMO campaigns and grants early-adopter benefits.
+// This is called in a goroutine and should not block registration.
+// If a FOMO campaign with remaining slots exists, it claims a slot and grants the benefit.
+func (h *TenantHandler) claimFOMOBenefit(tenantID int) {
+	// Try to claim a slot from active FOMO campaign
+	campaign, config, err := h.marketingRepo.ClaimFOMOSlot()
+	if err != nil {
+		log.Printf("Error claiming FOMO slot for tenant %d: %v", tenantID, err)
+		return
+	}
+	if campaign == nil || config == nil {
+		// No active FOMO campaign or no slots available
+		return
+	}
+
+	// Check if benefit is free Pro months
+	if config.BenefitType == "free_pro_months" && config.BenefitMonths > 0 {
+		// Grant free Pro subscription
+		err := h.subscriptionRepo.CreateFreeProSubscription(tenantID, config.BenefitMonths, "fomo_early_adopter")
+		if err != nil {
+			// CRITICAL: Slot was claimed but benefit grant failed!
+			// Admin should manually grant Pro to this tenant
+			log.Printf("CRITICAL: FOMO slot claimed but failed to grant Pro to tenant %d: %v (campaign: %s, slots remaining: %d)",
+				tenantID, err, campaign.Name, config.RemainingSlots)
+			return
+		}
+		log.Printf("Granted %d free Pro months to tenant %d via FOMO campaign '%s' (slots remaining: %d)",
+			config.BenefitMonths, tenantID, campaign.Name, config.RemainingSlots)
+	}
 }
 
 // ExportTenantData exports all tenant data for GDPR compliance

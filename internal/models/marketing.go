@@ -21,11 +21,14 @@ type MarketingCampaign struct {
 
 // FOMOConfig holds configuration for FOMO countdown campaigns
 type FOMOConfig struct {
-	TotalSlots     int    `json:"total_slots"`     // e.g., 10 free Pro slots
+	TotalSlots     int    `json:"total_slots"`     // e.g., 30 free Pro slots
 	RemainingSlots int    `json:"remaining_slots"` // Updated as slots are claimed
 	Message        string `json:"message"`         // e.g., "Nur noch X Plätze kostenlos!"
 	CTAText        string `json:"cta_text"`        // Call to action text
 	CTALink        string `json:"cta_link"`        // Link for CTA button
+	// Benefit granted to early tenants who claim a slot
+	BenefitType   string `json:"benefit_type,omitempty"`   // "free_pro_months" for free Pro subscription
+	BenefitMonths int    `json:"benefit_months,omitempty"` // Number of free months (e.g., 12 for 1 year)
 }
 
 // GetFOMOConfig parses the JSON config into FOMOConfig
