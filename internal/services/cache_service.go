@@ -96,9 +96,17 @@ func (c *CacheService) SetWithTTL(key string, value interface{}, ttl time.Durati
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Check if we need to evict entries
-	if c.maxEntries > 0 && len(c.data) >= c.maxEntries {
-		c.evictOldest()
+	// BUG FIX: Check if key already exists - updates don't need eviction
+	_, exists := c.data[key]
+
+	// Only evict if we're adding a NEW key and at capacity
+	// Use loop to ensure we're strictly below maxEntries before adding
+	if !exists && c.maxEntries > 0 {
+		for len(c.data) >= c.maxEntries {
+			if !c.evictOldest() {
+				break // No more entries to evict
+			}
+		}
 	}
 
 	now := time.Now()
@@ -240,7 +248,8 @@ func (c *CacheService) GetHitRate() float64 {
 }
 
 // evictOldest removes the oldest entry (must be called with lock held)
-func (c *CacheService) evictOldest() {
+// BUG FIX: Returns bool to indicate if an entry was actually evicted
+func (c *CacheService) evictOldest() bool {
 	var oldestKey string
 	var oldestTime time.Time
 
@@ -254,7 +263,9 @@ func (c *CacheService) evictOldest() {
 	if oldestKey != "" {
 		delete(c.data, oldestKey)
 		c.stats.Evictions++
+		return true
 	}
+	return false
 }
 
 // runCleanup periodically removes expired entries

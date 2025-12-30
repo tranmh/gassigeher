@@ -374,6 +374,66 @@ func TestCacheService_EvictsOldestWhenFull(t *testing.T) {
 	}
 }
 
+// TestCacheService_MaxEntriesStrictlyEnforced tests that cache never exceeds maxEntries
+// BUG FIX: evictOldest() only removed 1 entry, but we need to ensure strict limit
+func TestCacheService_MaxEntriesStrictlyEnforced(t *testing.T) {
+	maxEntries := 5
+	cache := NewCacheService(CacheConfig{
+		DefaultTTL:      1 * time.Minute,
+		MaxEntries:      maxEntries,
+		CleanupInterval: 0,
+	})
+	defer cache.Close()
+
+	// Add more entries than maxEntries allows
+	for i := 0; i < 20; i++ {
+		key := "key" + itoa(i)
+		cache.Set(key, "value")
+	}
+
+	// Cache size should never exceed maxEntries
+	stats := cache.GetStats()
+	if stats.EntryCount > maxEntries {
+		t.Errorf("Cache exceeded maxEntries: got %d, max %d", stats.EntryCount, maxEntries)
+	}
+}
+
+// TestCacheService_MaxEntriesWithUpdates tests that updating existing keys doesn't break limits
+func TestCacheService_MaxEntriesWithUpdates(t *testing.T) {
+	maxEntries := 3
+	cache := NewCacheService(CacheConfig{
+		DefaultTTL:      1 * time.Minute,
+		MaxEntries:      maxEntries,
+		CleanupInterval: 0,
+	})
+	defer cache.Close()
+
+	// Fill cache to max
+	cache.Set("key1", "value1")
+	cache.Set("key2", "value2")
+	cache.Set("key3", "value3")
+
+	// Update existing key (should NOT trigger eviction)
+	cache.Set("key2", "updated_value2")
+
+	// All keys should still exist
+	if cache.Get("key1") == nil {
+		t.Error("key1 should still exist after update")
+	}
+	if cache.Get("key2") != "updated_value2" {
+		t.Error("key2 should have updated value")
+	}
+	if cache.Get("key3") == nil {
+		t.Error("key3 should still exist after update")
+	}
+
+	// Entry count should still be at max
+	stats := cache.GetStats()
+	if stats.EntryCount != maxEntries {
+		t.Errorf("EntryCount = %d, want %d", stats.EntryCount, maxEntries)
+	}
+}
+
 // ============================================================================
 // Close Tests
 // ============================================================================

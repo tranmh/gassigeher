@@ -105,3 +105,46 @@ func TestBruteForceService_FailureCount(t *testing.T) {
 		t.Errorf("Expected 2 failures, got %d", count)
 	}
 }
+
+// TestBruteForceService_StopIsIdempotent tests that Stop() can be called multiple times
+// without panicking (BUG FIX: double-close panic prevention)
+func TestBruteForceService_StopIsIdempotent(t *testing.T) {
+	svc := NewBruteForceService()
+
+	// First Stop() should work
+	svc.Stop()
+
+	// Second Stop() should NOT panic (currently it does without sync.Once)
+	// This is a regression test for the double-close bug
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Stop() panicked on second call: %v", r)
+		}
+	}()
+
+	svc.Stop() // Should not panic
+	svc.Stop() // Third call should also not panic
+}
+
+// TestBruteForceService_StopWaitsForGoroutine tests that Stop() waits for cleanup goroutine
+func TestBruteForceService_StopWaitsForGoroutine(t *testing.T) {
+	svc := NewBruteForceService()
+
+	// Record some data so cleanup goroutine has work
+	svc.RecordFailure("test@example.com:1.2.3.4")
+
+	// Stop should complete and not leave goroutine running
+	done := make(chan bool)
+	go func() {
+		svc.Stop()
+		done <- true
+	}()
+
+	// Should complete quickly (not hang forever)
+	select {
+	case <-done:
+		// Good - Stop() completed
+	case <-time.After(1 * time.Second):
+		t.Error("Stop() took too long - possible goroutine deadlock")
+	}
+}

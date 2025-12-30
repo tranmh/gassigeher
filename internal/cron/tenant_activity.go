@@ -190,10 +190,10 @@ func (c *TenantActivityChecker) CheckAndFlagInactiveTenants() error {
 	}
 
 	// Flag inactive tenants in the database
-	// Update inactivity_flagged_at timestamp (if column exists)
+	// BUG FIX: Update inactivity_flagged_at (not just updated_at)
 	flagQuery := `
 		UPDATE tenants
-		SET updated_at = ?
+		SET inactivity_flagged_at = ?
 		WHERE id = ? AND status = 'active'
 	`
 	now := time.Now()

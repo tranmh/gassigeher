@@ -13,6 +13,8 @@ type BruteForceService struct {
 	lockoutBase time.Duration // Base lockout duration
 	maxLockout  time.Duration // Maximum lockout duration
 	stopChan    chan struct{} // Channel to signal cleanup goroutine to stop
+	stopOnce    sync.Once     // BUG FIX: Prevent double-close panic
+	wg          sync.WaitGroup // BUG FIX: Wait for goroutine to finish
 }
 
 // FailureRecord tracks login failures for a specific key (email:ip)
@@ -32,15 +34,20 @@ func NewBruteForceService() *BruteForceService {
 		stopChan:    make(chan struct{}),
 	}
 
-	// Start cleanup goroutine
+	// Start cleanup goroutine with WaitGroup tracking
+	bfs.wg.Add(1)
 	go bfs.cleanupStaleEntries()
 
 	return bfs
 }
 
 // Stop stops the cleanup goroutine and releases resources
+// BUG FIX: Safe to call multiple times (idempotent via sync.Once)
 func (s *BruteForceService) Stop() {
-	close(s.stopChan)
+	s.stopOnce.Do(func() {
+		close(s.stopChan)
+	})
+	s.wg.Wait() // Wait for goroutine to finish
 }
 
 // RecordFailure records a failed login attempt and returns lockout duration (0 if not locked)
@@ -118,6 +125,8 @@ func (s *BruteForceService) GetFailureCount(key string) int {
 
 // cleanupStaleEntries removes old failure records that haven't been updated in 2 hours
 func (s *BruteForceService) cleanupStaleEntries() {
+	defer s.wg.Done() // BUG FIX: Signal WaitGroup when goroutine exits
+
 	ticker := time.NewTicker(30 * time.Minute)
 	defer ticker.Stop()
 
