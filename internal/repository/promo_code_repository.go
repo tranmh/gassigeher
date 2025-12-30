@@ -297,13 +297,34 @@ func (r *PromoCodeRepository) Delete(id int) error {
 	return nil
 }
 
-// IncrementUsesCount increments the uses count for a promo code
+// ErrPromoCodeMaxUsesReached is returned when a promo code has reached its max_uses limit
+var ErrPromoCodeMaxUsesReached = fmt.Errorf("promo code has reached max uses")
+
+// IncrementUsesCount atomically increments the uses count for a promo code
+// BUG #5 FIX: Only increments if under max_uses limit (or unlimited when max_uses is NULL)
+// This prevents race conditions where multiple concurrent requests could exceed the limit
 func (r *PromoCodeRepository) IncrementUsesCount(id int) error {
-	query := `UPDATE promo_codes SET uses_count = uses_count + 1, updated_at = ? WHERE id = ?`
-	_, err := r.db.Exec(query, FormatTimestamp(time.Now()), id)
+	// Atomic conditional update: only increment if under limit
+	query := `UPDATE promo_codes
+		SET uses_count = uses_count + 1, updated_at = ?
+		WHERE id = ?
+		AND (max_uses IS NULL OR uses_count < max_uses)`
+
+	result, err := r.db.Exec(query, FormatTimestamp(time.Now()), id)
 	if err != nil {
 		return fmt.Errorf("failed to increment promo code uses: %w", err)
 	}
+
+	// Check if update actually happened
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rows == 0 {
+		// Either promo code doesn't exist, or max_uses reached
+		return ErrPromoCodeMaxUsesReached
+	}
+
 	return nil
 }
 

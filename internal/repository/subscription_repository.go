@@ -440,7 +440,23 @@ func (r *SubscriptionRepository) GetSubscriptionByStripeID(stripeSubscriptionID 
 
 // IncrementFreeMonths atomically adds free months to a tenant's subscription
 // This prevents race conditions when multiple goroutines update the same subscription
+//
+// SECURITY: This method validates input parameters to prevent abuse:
+// - tenantID must be positive (SaaS mode requires valid tenant)
+// - months must be between 1 and 120 (reasonable bounds)
+// - Callers should validate tenant ownership before calling
 func (r *SubscriptionRepository) IncrementFreeMonths(tenantID int, months int, source string) error {
+	// BUG #4 FIX: Validate input parameters
+	if tenantID < 0 {
+		return fmt.Errorf("invalid tenant_id: %d (must be non-negative)", tenantID)
+	}
+	if months <= 0 {
+		return fmt.Errorf("invalid months: %d (must be positive)", months)
+	}
+	if months > 120 {
+		return fmt.Errorf("invalid months: %d (exceeds maximum of 120)", months)
+	}
+
 	query := `
 		UPDATE tenant_subscriptions
 		SET free_months_remaining = COALESCE(free_months_remaining, 0) + ?,

@@ -241,10 +241,35 @@ func (r *MarketingRepository) UpdateReferralCode(c *models.ReferralCode) error {
 	return err
 }
 
-// IncrementReferralCodeUses increments the use count
+// ErrReferralCodeMaxUsesReached is returned when a referral code has reached its max_uses limit
+var ErrReferralCodeMaxUsesReached = fmt.Errorf("referral code has reached max uses")
+
+// IncrementReferralCodeUses atomically increments the use count for a referral code
+// BUG #6 FIX: Only increments if under max_uses limit (or unlimited when max_uses is NULL)
+// This prevents race conditions where multiple concurrent requests could exceed the limit
 func (r *MarketingRepository) IncrementReferralCodeUses(id int) error {
-	_, err := r.db.Exec("UPDATE referral_codes SET uses_count = uses_count + 1, updated_at = ? WHERE id = ?", FormatTimestamp(time.Now()), id)
-	return err
+	// Atomic conditional update: only increment if under limit
+	query := `UPDATE referral_codes
+		SET uses_count = uses_count + 1, updated_at = ?
+		WHERE id = ?
+		AND (max_uses IS NULL OR uses_count < max_uses)`
+
+	result, err := r.db.Exec(query, FormatTimestamp(time.Now()), id)
+	if err != nil {
+		return fmt.Errorf("failed to increment referral code uses: %w", err)
+	}
+
+	// Check if update actually happened
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rows == 0 {
+		// Either referral code doesn't exist, or max_uses reached
+		return ErrReferralCodeMaxUsesReached
+	}
+
+	return nil
 }
 
 // DeleteReferralCode deletes a referral code

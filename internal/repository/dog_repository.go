@@ -6,10 +6,16 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/tranmh/gassigeher/internal/models"
 )
+
+// BUG #1 FIX: Application-level mutex map for per-tenant dog limit enforcement
+// This prevents race conditions where concurrent requests could exceed the dog limit
+// by ensuring only one dog creation operation per tenant can run at a time
+var dogLimitMutexes sync.Map
 
 // DogRepository handles dog database operations
 type DogRepository struct {
@@ -230,16 +236,18 @@ func (r *DogRepository) FindAll(filter *models.DogFilterRequest, tenantID int) (
 		}
 
 		// Category filter maps to color_id via color name lookup using subquery
+		// BUG #7 FIX: Validate category against whitelist to prevent invalid inputs
 		if filter.Category != nil && *filter.Category != "" {
-			// Map English category names to German color names
+			// Map English category names to German color names (whitelist)
 			categoryToColorName := map[string]string{
 				"green":  "gruen",
 				"orange": "orange",
 				"blue":   "dunkelblau",
 			}
-			colorName := *filter.Category
-			if mapped, ok := categoryToColorName[colorName]; ok {
-				colorName = mapped
+			colorName, ok := categoryToColorName[*filter.Category]
+			if !ok {
+				// Invalid category - reject (defense in depth)
+				return nil, fmt.Errorf("invalid category: %s (allowed: green, orange, blue)", *filter.Category)
 			}
 			// Use subquery to find color_id by name for the same tenant
 			query += " AND color_id IN (SELECT id FROM color_categories WHERE tenant_id = dogs.tenant_id AND LOWER(name) = LOWER(?))"
@@ -435,11 +443,26 @@ var ErrDogLimitExceeded = fmt.Errorf("dog limit exceeded")
 // CreateWithLimitCheck creates a dog atomically while checking the limit
 // This prevents race conditions where multiple requests could exceed the limit
 // SaaS: Used for enforcing dog limits in the freemium model
-// FIX: Uses SERIALIZABLE isolation to prevent concurrent transactions from
-// both reading the same count and then inserting, which would exceed the limit
+//
+// BUG #1 FIX: Uses application-level mutex per tenant to prevent race conditions.
+// SERIALIZABLE isolation alone is NOT sufficient because:
+// - In PostgreSQL/MySQL, each HTTP request gets a separate database connection
+// - Concurrent requests can each start their own SERIALIZABLE transaction
+// - Each transaction sees a snapshot at transaction start time
+// - Both can read count=9, pass the check, and insert, resulting in count=11
+//
+// The per-tenant mutex ensures only one CreateWithLimitCheck can run per tenant
+// at a time, preventing the TOCTOU (time-of-check-time-of-use) race condition.
 func (r *DogRepository) CreateWithLimitCheck(dog *models.Dog, limit int) error {
-	// Start transaction with SERIALIZABLE isolation to prevent race conditions
-	// This ensures that concurrent transactions cannot both read count=9 and then insert
+	// BUG #1 FIX: Get or create mutex for this tenant
+	mutexValue, _ := dogLimitMutexes.LoadOrStore(dog.TenantID, &sync.Mutex{})
+	mutex := mutexValue.(*sync.Mutex)
+
+	// Lock the tenant-specific mutex to serialize dog creation
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	// Now safe to check and insert without race condition
 	ctx := context.Background()
 	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
@@ -447,7 +470,7 @@ func (r *DogRepository) CreateWithLimitCheck(dog *models.Dog, limit int) error {
 	}
 	defer tx.Rollback() // Will be no-op after commit
 
-	// Count dogs within transaction (serialized by SERIALIZABLE isolation)
+	// Count dogs within transaction
 	var count int
 	err = tx.QueryRow(`SELECT COUNT(*) FROM dogs WHERE tenant_id = ?`, dog.TenantID).Scan(&count)
 	if err != nil {
