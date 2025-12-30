@@ -126,20 +126,19 @@ func (p *SMTPProvider) sendWithSSL(recipients []string, message []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to send DATA command: %v", err)
 	}
+	// BUG FIX: Use defer to ensure writer is always closed, even on errors
+	defer writer.Close()
 
 	_, err = writer.Write(message)
 	if err != nil {
-		writer.Close()
 		return fmt.Errorf("failed to write message: %v", err)
 	}
 
-	err = writer.Close()
-	if err != nil {
-		return fmt.Errorf("failed to close data writer: %v", err)
+	// BUG FIX: Log but don't fail on client.Quit() errors - email was already sent
+	if err := client.Quit(); err != nil {
+		fmt.Printf("Warning: SMTP QUIT command failed (SSL): %v\n", err)
 	}
-
-	// Send QUIT command
-	return client.Quit()
+	return nil
 }
 
 // sendWithTLS sends email using STARTTLS (port 587) or plain connection
@@ -212,20 +211,19 @@ func (p *SMTPProvider) sendWithSTARTTLS(addr string, auth smtp.Auth, recipients 
 	if err != nil {
 		return fmt.Errorf("failed to send DATA command: %v", err)
 	}
+	// BUG FIX: Use defer to ensure writer is always closed, even on errors
+	defer writer.Close()
 
 	_, err = writer.Write(message)
 	if err != nil {
-		writer.Close()
 		return fmt.Errorf("failed to write message: %v", err)
 	}
 
-	err = writer.Close()
-	if err != nil {
-		return fmt.Errorf("failed to close data writer: %v", err)
+	// BUG FIX: Log but don't fail on client.Quit() errors - email was already sent
+	if err := client.Quit(); err != nil {
+		fmt.Printf("Warning: SMTP QUIT command failed (STARTTLS): %v\n", err)
 	}
-
-	// Send QUIT command
-	return client.Quit()
+	return nil
 }
 
 // buildMIMEMessage creates a properly formatted MIME email message

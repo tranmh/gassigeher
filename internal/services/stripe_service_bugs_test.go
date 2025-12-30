@@ -79,7 +79,7 @@ func TestParseCheckoutSessionEvent_InvalidTenantID_ReturnsError(t *testing.T) {
 		{
 			name:          "Empty tenant ID",
 			tenantIDValue: "",
-			errorMessage:  "invalid tenant_id",
+			errorMessage:  "tenant_id is required", // BUG FIX: Empty tenant_id now returns "required" error
 		},
 		{
 			name:          "Negative tenant ID",
@@ -114,10 +114,11 @@ func TestParseCheckoutSessionEvent_InvalidTenantID_ReturnsError(t *testing.T) {
 	}
 }
 
-func TestParseCheckoutSessionEvent_MissingTenantID_AllowedButZero(t *testing.T) {
-	// When tenant_id is completely missing from metadata, it's allowed
-	// but TenantID will be 0 (the zero value)
-	// The caller should handle this case
+// TestParseCheckoutSessionEvent_MissingTenantID_ReturnsError tests that missing tenant_id returns error
+// BUG FIX: tenant_id is now REQUIRED in metadata, not optional
+func TestParseCheckoutSessionEvent_MissingTenantID_ReturnsError(t *testing.T) {
+	// When tenant_id is completely missing from metadata, it should now return an error
+	// This prevents TenantID=0 from being used, which could cause cross-tenant issues
 	service := NewStripeService("sk_test", "pk_test", "price_monthly", "price_yearly", "https://example.com")
 
 	// Create event without tenant_id in metadata
@@ -136,14 +137,15 @@ func TestParseCheckoutSessionEvent_MissingTenantID_AllowedButZero(t *testing.T) 
 
 	data, err := service.ParseCheckoutSessionEvent(event)
 
-	// No error expected when metadata is missing (different from invalid value)
-	if err != nil {
-		t.Errorf("Unexpected error for missing tenant_id: %v", err)
+	// BUG FIX: Error expected when tenant_id is missing from metadata
+	if err == nil {
+		t.Errorf("Expected error for missing tenant_id, got none (TenantID=%d)", data.TenantID)
 		return
 	}
 
-	if data.TenantID != 0 {
-		t.Errorf("Expected TenantID=0 when metadata is missing, got %d", data.TenantID)
+	// Verify error message indicates tenant_id is required
+	if !stripeContainsSubstring(err.Error(), "tenant_id") {
+		t.Errorf("Error message should mention tenant_id: %v", err)
 	}
 }
 

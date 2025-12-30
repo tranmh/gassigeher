@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -12,6 +13,34 @@ import (
 // validSubdomainRegex validates that subdomains only contain safe characters
 // Allowed: lowercase letters, digits, and hyphens (no starting/ending with hyphen)
 var validSubdomainRegex = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
+
+// dangerousSubdomainPatterns contains patterns that could be used for SQL injection
+// or other attacks. These are checked explicitly even though regex should catch most.
+var dangerousSubdomainPatterns = []string{
+	"--",     // SQL comment
+	"/*",     // SQL comment start
+	"*/",     // SQL comment end
+	";",      // SQL statement separator
+	"\x00",   // Null byte
+	"\r",     // Carriage return (CRLF injection)
+	"\n",     // Newline (CRLF injection)
+	"'",      // Single quote (SQL injection)
+	"\"",     // Double quote
+	"\\",     // Backslash
+}
+
+// containsDangerousPattern checks if the subdomain contains dangerous patterns
+// that could be used for SQL injection or other attacks
+func containsDangerousPattern(subdomain string) bool {
+	for _, pattern := range dangerousSubdomainPatterns {
+		if strings.Contains(subdomain, pattern) {
+			// Log security warning for dangerous pattern detection
+			log.Printf("SECURITY WARNING: Rejected subdomain with dangerous pattern: %q (pattern: %q)", subdomain, pattern)
+			return true
+		}
+	}
+	return false
+}
 
 // TenantMiddleware resolves the tenant from the subdomain and adds it to the request context.
 // Example: "tierheim-goeppingen.gassigeher.org" → tenant_id for "tierheim-goeppingen"
@@ -104,10 +133,23 @@ func extractSubdomain(host, baseDomain string) string {
 		return ""
 	}
 
+	// Security: Validate subdomain length (max 50 chars to prevent abuse)
+	if len(subdomain) > 50 {
+		// Log security warning for overlong subdomain attempts
+		// This could indicate an attack or misconfiguration
+		return ""
+	}
+
 	// Security: Validate subdomain contains only safe characters
 	// This prevents SQL injection, null bytes, and other attacks
 	// Allowed: lowercase letters, digits, and hyphens (DNS-safe characters)
 	if !validSubdomainRegex.MatchString(subdomain) {
+		return ""
+	}
+
+	// Security: Check for dangerous patterns that could be used for injection
+	// Even though regex should catch most, be explicit about dangerous patterns
+	if containsDangerousPattern(subdomain) {
 		return ""
 	}
 

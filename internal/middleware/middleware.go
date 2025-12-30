@@ -2,13 +2,16 @@ package middleware
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/tranmh/gassigeher/internal/logging"
+	"github.com/tranmh/gassigeher/internal/repository"
 	"github.com/tranmh/gassigeher/internal/services"
 )
 
@@ -239,6 +242,19 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 				w.Header().Set("Content-Type", "application/json")
 				http.Error(w, `{"error":"Tenant context missing - invalid request"}`, http.StatusUnauthorized)
 				return
+			} else {
+				// Both subdomainTenantID and jwtTenantID are 0
+				// This is valid for:
+				// 1. Simple-Mode (non-SaaS) where tenant_id is always 0
+				// 2. Central admin accessing platform-wide endpoints
+				// 3. Landing page/public endpoints in SaaS mode
+				// Log a debug message for potential misconfiguration detection in SaaS mode
+				if os.Getenv("BASE_DOMAIN") != "" {
+					// SaaS mode is enabled but both tenant IDs are 0
+					// This is expected for central admin, but could indicate misconfiguration
+					log.Printf("DEBUG: AuthMiddleware - both subdomain and JWT tenant IDs are 0 (user_id=%d, email=%s, path=%s)",
+						int(userID), email, r.URL.Path)
+				}
 			}
 
 			// Add to context
@@ -262,6 +278,7 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 }
 
 // RequireAdmin middleware checks if user is an admin
+// Note: This only checks JWT claims. For high-security scenarios, use RequireAdminWithVerification
 func RequireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		isAdmin, ok := r.Context().Value(IsAdminKey).(bool)
@@ -271,6 +288,106 @@ func RequireAdmin(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// adminVerificationCache stores cached admin verification results
+// Key: userID, Value: {isAdmin, isActive, lastChecked}
+type adminVerificationEntry struct {
+	isAdmin     bool
+	isActive    bool
+	lastChecked time.Time
+}
+
+var (
+	adminVerificationCache = make(map[int]*adminVerificationEntry)
+	adminVerificationMu    sync.RWMutex
+	adminVerificationTTL   = 1 * time.Minute // Cache for 1 minute
+)
+
+// verifyAdminStatus checks the database to verify the user is still an admin and active
+// Results are cached for 1 minute to balance security and performance
+func verifyAdminStatus(db *sql.DB, userID int) (isAdmin, isActive bool, err error) {
+	// Check cache first
+	adminVerificationMu.RLock()
+	entry, exists := adminVerificationCache[userID]
+	if exists && time.Since(entry.lastChecked) < adminVerificationTTL {
+		adminVerificationMu.RUnlock()
+		return entry.isAdmin, entry.isActive, nil
+	}
+	adminVerificationMu.RUnlock()
+
+	// Cache miss or expired - query database
+	userRepo := repository.NewUserRepository(db)
+	user, err := userRepo.FindByID(userID)
+	if err != nil {
+		return false, false, err
+	}
+	if user == nil {
+		return false, false, nil
+	}
+
+	// Update cache
+	adminVerificationMu.Lock()
+	adminVerificationCache[userID] = &adminVerificationEntry{
+		isAdmin:     user.IsAdmin,
+		isActive:    user.IsActive,
+		lastChecked: time.Now(),
+	}
+	adminVerificationMu.Unlock()
+
+	return user.IsAdmin, user.IsActive, nil
+}
+
+// RequireAdminWithVerification is a more secure version of RequireAdmin that
+// verifies the user's admin status against the database (cached for 1 minute).
+// Use this for sensitive admin operations where immediate revocation is critical.
+func RequireAdminWithVerification(db *sql.DB) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// First check JWT claims
+			isAdmin, ok := r.Context().Value(IsAdminKey).(bool)
+			if !ok || !isAdmin {
+				http.Error(w, `{"error":"Admin access required"}`, http.StatusForbidden)
+				return
+			}
+
+			// Get user ID from context
+			userID, ok := r.Context().Value(UserIDKey).(int)
+			if !ok || userID == 0 {
+				http.Error(w, `{"error":"User ID not found in context"}`, http.StatusForbidden)
+				return
+			}
+
+			// Verify against database (cached)
+			dbIsAdmin, dbIsActive, err := verifyAdminStatus(db, userID)
+			if err != nil {
+				log.Printf("ERROR: Failed to verify admin status for user %d: %v", userID, err)
+				http.Error(w, `{"error":"Failed to verify admin status"}`, http.StatusInternalServerError)
+				return
+			}
+
+			if !dbIsAdmin {
+				log.Printf("SECURITY: User %d has admin JWT claim but is not admin in database", userID)
+				http.Error(w, `{"error":"Admin access revoked"}`, http.StatusForbidden)
+				return
+			}
+
+			if !dbIsActive {
+				log.Printf("SECURITY: Admin user %d is deactivated", userID)
+				http.Error(w, `{"error":"Account deactivated"}`, http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// ClearAdminVerificationCache clears the admin verification cache (for testing)
+func ClearAdminVerificationCache() {
+	adminVerificationMu.Lock()
+	adminVerificationCache = make(map[int]*adminVerificationEntry)
+	adminVerificationMu.Unlock()
 }
 
 // RequireSuperAdmin middleware checks if user is a super admin

@@ -3,6 +3,8 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"io"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -194,10 +196,13 @@ func (h *ColorRequestHandler) ApproveRequest(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Parse optional message
+	// BUG FIX #7: Check error from json.NewDecoder().Decode() and log warning if not io.EOF
 	var req struct {
 		Message string `json:"message"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+		log.Printf("Warning: Failed to decode optional message in ApproveRequest: %v", err)
+	}
 
 	var message *string
 	if req.Message != "" {
@@ -257,10 +262,13 @@ func (h *ColorRequestHandler) DenyRequest(w http.ResponseWriter, r *http.Request
 	}
 
 	// Parse optional message
+	// BUG FIX #8: Check error from json.NewDecoder().Decode() and log warning if not io.EOF
 	var req struct {
 		Message string `json:"message"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+		log.Printf("Warning: Failed to decode optional message in DenyRequest: %v", err)
+	}
 
 	var message *string
 	if req.Message != "" {

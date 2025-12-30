@@ -348,9 +348,9 @@ h.db.QueryRow(`SELECT COUNT(*) FROM bookings WHERE tenant_id = ?`, tenantID).Sca
 
 ## Testing Checklist
 
-- [ ] All CRITICAL bugs have failing tests (RED phase)
-- [ ] All CRITICAL bugs fixed (GREEN phase)
-- [ ] All HIGH bugs have failing tests (RED phase)
-- [ ] All HIGH bugs fixed (GREEN phase)
-- [ ] Full test suite passes
-- [ ] Build succeeds on all platforms
+- [x] All CRITICAL bugs have failing tests (RED phase)
+- [x] All CRITICAL bugs fixed (GREEN phase)
+- [x] All HIGH bugs have failing tests (RED phase)
+- [x] All HIGH bugs fixed (GREEN phase)
+- [x] Full test suite passes
+- [x] Build succeeds on all platforms

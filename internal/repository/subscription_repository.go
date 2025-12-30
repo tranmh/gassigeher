@@ -52,6 +52,14 @@ func (r *SubscriptionRepository) GetAllPlans() ([]*models.PricingPlan, error) {
 		plans = append(plans, plan)
 	}
 
+	// CRITICAL BUG FIX: Check for errors that occurred during iteration
+	// rows.Err() returns any error encountered during iteration that wasn't
+	// returned by Scan(). This is important for catching connection issues
+	// or other database errors that may occur mid-iteration.
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating pricing plans: %w", err)
+	}
+
 	return plans, nil
 }
 

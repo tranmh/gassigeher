@@ -248,17 +248,21 @@ func (s *StripeService) ParseCheckoutSessionEvent(event *stripe.Event) (*Checkou
 	}
 
 	// Extract tenant_id from metadata with proper error handling
-	if tenantIDStr, ok := session.Metadata["tenant_id"]; ok {
-		var tenantID int
-		n, err := fmt.Sscanf(tenantIDStr, "%d", &tenantID)
-		if err != nil || n != 1 {
-			return nil, fmt.Errorf("invalid tenant_id in metadata: %s", tenantIDStr)
-		}
-		if tenantID <= 0 {
-			return nil, fmt.Errorf("tenant_id must be positive, got: %d", tenantID)
-		}
-		data.TenantID = tenantID
+	// BUG FIX: tenant_id is now REQUIRED - return error if missing to prevent TenantID=0
+	tenantIDStr, ok := session.Metadata["tenant_id"]
+	if !ok || tenantIDStr == "" {
+		return nil, errors.New("tenant_id is required in metadata but was missing")
 	}
+
+	var tenantID int
+	n, err := fmt.Sscanf(tenantIDStr, "%d", &tenantID)
+	if err != nil || n != 1 {
+		return nil, fmt.Errorf("invalid tenant_id in metadata: %s", tenantIDStr)
+	}
+	if tenantID <= 0 {
+		return nil, fmt.Errorf("tenant_id must be positive, got: %d", tenantID)
+	}
+	data.TenantID = tenantID
 
 	// Extract promo code from metadata
 	if promoCode, ok := session.Metadata["promo_code"]; ok {

@@ -656,12 +656,17 @@ func (h *CentralAdminHandler) ExportTenantData(w http.ResponseWriter, r *http.Re
 	export["users"] = users
 
 	// Get dogs
+	// BUG FIX #5: Use defer func() to check rows.Close() error
 	var dogs []models.Dog
 	rows, err := h.db.Query(`SELECT id, tenant_id, name, breed, size, age,
 		color_id, is_featured, is_available, external_link, photo, photo_thumbnail,
 		created_at, updated_at FROM dogs WHERE tenant_id = ?`, tenantID)
 	if err == nil {
-		defer rows.Close()
+		defer func() {
+			if closeErr := rows.Close(); closeErr != nil {
+				log.Printf("ERROR: Failed to close rows in ExportTenantData for tenant %d: %v", tenantID, closeErr)
+			}
+		}()
 		for rows.Next() {
 			var d models.Dog
 			rows.Scan(&d.ID, &d.TenantID, &d.Name, &d.Breed, &d.Size, &d.Age,
@@ -669,16 +674,22 @@ func (h *CentralAdminHandler) ExportTenantData(w http.ResponseWriter, r *http.Re
 				&d.CreatedAt, &d.UpdatedAt)
 			dogs = append(dogs, d)
 		}
+		// BUG FIX: Check rows.Err() after iteration
+		if err := rows.Err(); err != nil {
+			log.Printf("ERROR: Error during dogs iteration for tenant %d: %v", tenantID, err)
+			respondError(w, http.StatusInternalServerError, "Fehler beim Exportieren der Daten")
+			return
+		}
 	}
 	export["dogs"] = dogs
 
 	// Get bookings count (not full data for performance)
-	// HIGH-11: Handle QueryRow error properly
+	// BUG FIX #4: Fail the export on QueryRow error instead of just logging a warning
 	var bookingCount int
 	if err := h.db.QueryRow(`SELECT COUNT(*) FROM bookings WHERE tenant_id = ?`, tenantID).Scan(&bookingCount); err != nil {
-		log.Printf("Warning: Failed to get booking count for tenant %d: %v", tenantID, err)
-		// Continue with export, just set count to -1 to indicate error
-		bookingCount = -1
+		log.Printf("ERROR: Failed to get booking count for tenant %d: %v", tenantID, err)
+		respondError(w, http.StatusInternalServerError, "Fehler beim Exportieren der Buchungsdaten")
+		return
 	}
 	export["booking_count"] = bookingCount
 

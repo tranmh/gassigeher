@@ -33,6 +33,18 @@ func NewHolidayService(holidayRepo *repository.HolidayRepository, settingsRepo *
 // FetchAndCacheHolidays fetches holidays from API and stores in DB for a tenant
 // BUG FIX: Added context parameter for cancellation support
 func (s *HolidayService) FetchAndCacheHolidays(ctx context.Context, tenantID int, year int) error {
+	// BUG FIX: Add explicit timeout if context doesn't have deadline
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+	}
+
+	// BUG FIX: Check ctx.Err() before expensive operations
+	if ctx.Err() != nil {
+		return fmt.Errorf("context cancelled before start: %w", ctx.Err())
+	}
+
 	// Get state from settings
 	state := "BW" // Default
 	if setting, err := s.settingsRepo.Get(tenantID, "feiertage_state"); err == nil && setting != nil && setting.Value != "" {
@@ -44,6 +56,11 @@ func (s *HolidayService) FetchAndCacheHolidays(ctx context.Context, tenantID int
 	if err == nil && cached != "" {
 		// Cache hit - populate custom_holidays table for this tenant
 		return s.populateHolidaysFromCache(tenantID, cached, year)
+	}
+
+	// BUG FIX: Check ctx.Err() before making HTTP request
+	if ctx.Err() != nil {
+		return fmt.Errorf("context cancelled before API call: %w", ctx.Err())
 	}
 
 	// Cache miss - fetch from API (with 10s timeout)

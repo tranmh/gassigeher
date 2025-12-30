@@ -594,10 +594,13 @@ func (h *UserHandler) ActivateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse optional message
+	// BUG FIX #9: Check error from json.NewDecoder().Decode() and log warning if not io.EOF
 	var req struct {
 		Message *string `json:"message,omitempty"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+		log.Printf("Warning: Failed to decode optional message in ActivateUser: %v", err)
+	}
 
 	// Get user
 	user, err := h.userRepo.FindByID(userID)
@@ -1321,9 +1324,11 @@ func (h *UserHandler) ExportMyData(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 		}
-		// BUG FIX: Check for errors during iteration
+		// BUG FIX: Check for errors during iteration - MUST fail export for GDPR compliance
 		if err := rows.Err(); err != nil {
 			log.Printf("ERROR: Failed to iterate bookings for user %d: %v", userID, err)
+			respondError(w, http.StatusInternalServerError, "Fehler beim Laden der Buchungsdaten")
+			return
 		}
 	}
 	export["bookings"] = bookings
@@ -1368,9 +1373,11 @@ func (h *UserHandler) ExportMyData(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 		}
-		// BUG FIX: Check for errors during iteration
+		// BUG FIX: Check for errors during iteration - MUST fail export for GDPR compliance
 		if err := rows.Err(); err != nil {
 			log.Printf("ERROR: Failed to iterate walk reports for user %d: %v", userID, err)
+			respondError(w, http.StatusInternalServerError, "Fehler beim Laden der Laufberichte")
+			return
 		}
 	}
 	export["walk_reports"] = walkReports
@@ -1407,9 +1414,11 @@ func (h *UserHandler) ExportMyData(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 		}
-		// BUG FIX: Check for errors during iteration
+		// BUG FIX: Check for errors during iteration - MUST fail export for GDPR compliance
 		if err := rows.Err(); err != nil {
 			log.Printf("ERROR: Failed to iterate experience requests for user %d: %v", userID, err)
+			respondError(w, http.StatusInternalServerError, "Fehler beim Laden der Erfahrungsanfragen")
+			return
 		}
 	}
 	export["experience_requests"] = experienceRequests
@@ -1450,9 +1459,11 @@ func (h *UserHandler) ExportMyData(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 		}
-		// BUG FIX: Check for errors during iteration
+		// BUG FIX: Check for errors during iteration - MUST fail export for GDPR compliance
 		if err := rows.Err(); err != nil {
 			log.Printf("ERROR: Failed to iterate color requests for user %d: %v", userID, err)
+			respondError(w, http.StatusInternalServerError, "Fehler beim Laden der Farbanfragen")
+			return
 		}
 	}
 	export["color_requests"] = colorRequests

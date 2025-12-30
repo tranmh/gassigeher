@@ -3,9 +3,11 @@ package middleware
 import (
 	"database/sql"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
+	"golang.org/x/sync/singleflight"
 	"golang.org/x/time/rate"
 
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -65,6 +67,9 @@ type TenantRateLimiter struct {
 
 	// Cleanup control
 	stopChan chan struct{}
+
+	// Singleflight group to prevent duplicate DB queries during cache miss
+	tierGroup singleflight.Group
 }
 
 type tenantLimiterEntry struct {
@@ -101,6 +106,7 @@ func (t *TenantRateLimiter) Close() {
 
 // getTenantTier fetches the subscription tier for a tenant
 // Caches result for 5 minutes to avoid DB hits on every request
+// Uses singleflight to prevent duplicate DB queries during concurrent cache misses
 func (t *TenantRateLimiter) getTenantTier(tenantID int) string {
 	// Check cache first
 	t.tenantMu.RLock()
@@ -112,13 +118,23 @@ func (t *TenantRateLimiter) getTenantTier(tenantID int) string {
 	}
 	t.tenantMu.RUnlock()
 
-	// Fetch from database
-	subscription, err := t.subscriptionRepo.GetSubscriptionByTenant(tenantID)
-	if err != nil || subscription == nil || subscription.Plan == nil {
-		return "free" // Default to free tier on error
-	}
+	// Use singleflight to deduplicate concurrent DB queries for the same tenant
+	// This prevents the "thundering herd" problem during cache miss
+	key := "tier:" + strconv.Itoa(tenantID)
+	result, _, _ := t.tierGroup.Do(key, func() (interface{}, error) {
+		// Fetch from database
+		subscription, err := t.subscriptionRepo.GetSubscriptionByTenant(tenantID)
+		if err != nil || subscription == nil || subscription.Plan == nil {
+			return "free", nil // Default to free tier on error
+		}
+		return subscription.Plan.Slug, nil
+	})
 
-	return subscription.Plan.Slug
+	tier, ok := result.(string)
+	if !ok {
+		return "free"
+	}
+	return tier
 }
 
 // getTenantLimiter returns the tenant-wide limiter, creating if needed

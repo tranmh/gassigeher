@@ -17,6 +17,8 @@ type rateLimiter struct {
 	limit          int
 	window         time.Duration
 	trustedProxies map[string]bool // IP addresses of trusted proxies
+	stopChan       chan struct{}   // Channel to signal cleanup goroutine to stop
+	stopOnce       sync.Once       // Prevent double-close panic
 }
 
 var loginLimiter = &rateLimiter{
@@ -24,6 +26,12 @@ var loginLimiter = &rateLimiter{
 	limit:          5,               // 5 attempts
 	window:         1 * time.Minute, // per minute
 	trustedProxies: make(map[string]bool),
+	stopChan:       make(chan struct{}),
+}
+
+func init() {
+	// Start cleanup goroutine for login rate limiter
+	go loginLimiter.cleanupStaleEntries()
 }
 
 // SetTrustedProxies configures which proxy IPs are trusted for X-Forwarded-For
@@ -43,6 +51,46 @@ func ResetRateLimiter() {
 	loginLimiter.mu.Lock()
 	defer loginLimiter.mu.Unlock()
 	loginLimiter.requests = make(map[string][]time.Time)
+}
+
+// CloseLoginRateLimiter stops the cleanup goroutine (call on server shutdown)
+func CloseLoginRateLimiter() {
+	loginLimiter.stopOnce.Do(func() {
+		close(loginLimiter.stopChan)
+	})
+}
+
+// cleanupStaleEntries removes rate limiter entries not seen in the last 2x window
+// This prevents memory leaks from accumulating IP entries
+func (r *rateLimiter) cleanupStaleEntries() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-r.stopChan:
+			return
+		case <-ticker.C:
+			r.mu.Lock()
+			now := time.Now()
+			// Remove entries where all requests are older than 2x window
+			cutoff := now.Add(-2 * r.window)
+			for ip, requests := range r.requests {
+				// Check if all requests are old
+				allOld := true
+				for _, reqTime := range requests {
+					if reqTime.After(cutoff) {
+						allOld = false
+						break
+					}
+				}
+				if allOld {
+					delete(r.requests, ip)
+				}
+			}
+			r.mu.Unlock()
+		}
+	}
 }
 
 // getClientIP extracts the client IP address safely

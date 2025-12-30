@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -320,8 +321,9 @@ func (h *TenantHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 5. Process referral code if provided (non-blocking, registration succeeds regardless)
+	// BUG FIX #6: Add context timeout to prevent goroutine leaks
 	if req.ReferralCode != "" {
-		go h.processReferralCode(req.ReferralCode, tenantID)
+		go h.processReferralCodeWithTimeout(req.ReferralCode, tenantID)
 	}
 
 	// 6. Check and claim FOMO early-adopter benefit (non-blocking)
@@ -779,6 +781,30 @@ func (h *TenantHandler) sendTenantWelcomeEmail(contactEmail, orgName, slug, admi
 	h.emailService.SendEmail(contactEmail, subject, body)
 }
 
+// processReferralCodeWithTimeout wraps processReferralCode with a context timeout
+// BUG FIX #6: Prevents goroutine leaks by ensuring the goroutine completes within a reasonable time
+func (h *TenantHandler) processReferralCodeWithTimeout(code string, refereeTenantID int) {
+	// Create a context with 30 second timeout to prevent indefinite hangs
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Channel to signal completion
+	done := make(chan struct{})
+
+	go func() {
+		h.processReferralCode(code, refereeTenantID)
+		close(done)
+	}()
+
+	// Wait for completion or timeout
+	select {
+	case <-done:
+		// Completed successfully
+	case <-ctx.Done():
+		log.Printf("WARNING: processReferralCode timed out for code '%s', tenant %d", code, refereeTenantID)
+	}
+}
+
 // processReferralCode validates and applies a referral code during tenant registration
 // This is called in a goroutine and should not block registration
 func (h *TenantHandler) processReferralCode(code string, refereeTenantID int) {
@@ -984,8 +1010,11 @@ func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request)
 				})
 			}
 		}
+		// BUG FIX: Check for errors during iteration - MUST fail export for GDPR compliance
 		if err := rows.Err(); err != nil {
-			log.Printf("Warning: Error during dogs iteration for tenant %d: %v", tenantID, err)
+			log.Printf("ERROR: Error during dogs iteration for tenant %d: %v", tenantID, err)
+			respondError(w, http.StatusInternalServerError, "Fehler beim Laden der Hundedaten")
+			return
 		}
 	}
 	export["dogs"] = dogs
@@ -1038,8 +1067,11 @@ func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request)
 				})
 			}
 		}
+		// BUG FIX: Check for errors during iteration - MUST fail export for GDPR compliance
 		if err := rows.Err(); err != nil {
-			log.Printf("Warning: Error during bookings iteration for tenant %d: %v", tenantID, err)
+			log.Printf("ERROR: Error during bookings iteration for tenant %d: %v", tenantID, err)
+			respondError(w, http.StatusInternalServerError, "Fehler beim Laden der Buchungsdaten")
+			return
 		}
 	}
 	export["bookings"] = bookings

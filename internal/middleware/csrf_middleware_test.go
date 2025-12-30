@@ -73,7 +73,8 @@ func TestCSRFMiddleware_AcceptsValidToken(t *testing.T) {
 		w.Write([]byte("success"))
 	}))
 
-	validToken := "valid-csrf-token-12345"
+	// Generate a valid token with proper timestamp format
+	validToken := csrf.GenerateToken()
 
 	req := httptest.NewRequest("POST", "/api/bookings", strings.NewReader("{}"))
 	req.AddCookie(&http.Cookie{
@@ -279,19 +280,22 @@ func TestCSRFMiddleware_ConstantTimeComparison(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	// Test with tokens of equal length but different content
-	// Timing attacks would show different response times for tokens
-	// that match more characters at the beginning
+	// Generate a valid base token for testing
+	validToken := csrf.GenerateToken()
+	// Create variations of the token for mismatch testing
+	invalidToken := "X" + validToken[1:]
+
+	// Test with proper timestamp format tokens
 	testCases := []struct {
 		name        string
 		cookieToken string
 		headerToken string
 		shouldPass  bool
 	}{
-		{"exact match", "abcdefghij1234567890abcdefghij12", "abcdefghij1234567890abcdefghij12", true},
-		{"first char differs", "Xbcdefghij1234567890abcdefghij12", "abcdefghij1234567890abcdefghij12", false},
-		{"last char differs", "abcdefghij1234567890abcdefghij1X", "abcdefghij1234567890abcdefghij12", false},
-		{"middle char differs", "abcdefghij12345X7890abcdefghij12", "abcdefghij1234567890abcdefghij12", false},
+		{"exact match", validToken, validToken, true},
+		{"first char differs", invalidToken, validToken, false},
+		{"header differs", validToken, invalidToken, false},
+		{"both differ", invalidToken, invalidToken, false}, // Still fails because token is invalid format
 	}
 
 	for _, tc := range testCases {

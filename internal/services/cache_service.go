@@ -20,8 +20,9 @@ type CacheService struct {
 	defaultTTL time.Duration
 	maxEntries int
 	stats      CacheStats
-	stopCh     chan struct{} // Channel to stop cleanup goroutine
-	stopped    bool          // Flag to track if Close() was called
+	stopCh     chan struct{}   // Channel to stop cleanup goroutine
+	stopped    bool            // Flag to track if Close() was called
+	wg         sync.WaitGroup  // WaitGroup to track cleanup goroutine (BUG FIX: prevents goroutine leak)
 }
 
 // CacheStats tracks cache performance metrics
@@ -60,7 +61,9 @@ func NewCacheService(cfg CacheConfig) *CacheService {
 	}
 
 	// Start background cleanup if configured
+	// BUG FIX: Add to WaitGroup before starting goroutine to prevent leak
 	if cfg.CleanupInterval > 0 {
+		c.wg.Add(1)
 		go c.runCleanup(cfg.CleanupInterval)
 	}
 
@@ -79,6 +82,9 @@ func (c *CacheService) Close() {
 
 	// Signal cleanup goroutine to stop
 	close(c.stopCh)
+
+	// BUG FIX: Wait for cleanup goroutine to finish to prevent leak
+	c.wg.Wait()
 }
 
 // NewDefaultCacheService creates a cache with default settings
@@ -270,6 +276,9 @@ func (c *CacheService) evictOldest() bool {
 
 // runCleanup periodically removes expired entries
 func (c *CacheService) runCleanup(interval time.Duration) {
+	// BUG FIX: Signal WaitGroup when goroutine exits to prevent leak
+	defer c.wg.Done()
+
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 

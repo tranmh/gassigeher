@@ -136,8 +136,11 @@ func (s *ImageService) ProcessDogPhoto(file multipart.File, dogID int) (fullPath
 		thumbURL, err := s.s3Service.Upload(ctx, s.tenantSlug,
 			fmt.Sprintf("dogs/%s", thumbFilename), thumbBuf.Bytes(), "image/jpeg")
 		if err != nil {
-			// Try to clean up the full-size image
-			s.s3Service.DeleteByPath(ctx, s.tenantSlug, fmt.Sprintf("dogs/%s", fullFilename))
+			// BUG FIX: Log cleanup error instead of ignoring it
+			cleanupPath := fmt.Sprintf("dogs/%s", fullFilename)
+			if cleanupErr := s.s3Service.DeleteByPath(ctx, s.tenantSlug, cleanupPath); cleanupErr != nil {
+				fmt.Printf("Warning: Failed to cleanup S3 object %s after thumbnail failure: %v\n", cleanupPath, cleanupErr)
+			}
 			return "", "", fmt.Errorf("failed to upload thumbnail to S3: %w", err)
 		}
 
@@ -303,9 +306,15 @@ func (s *ImageService) DeleteDogPhotos(dogID int) error {
 	// Use S3 if configured
 	if s.useS3 && s.s3Service != nil {
 		ctx := context.Background()
-		// Delete from S3 (errors are ignored for idempotency)
-		s.s3Service.DeleteByPath(ctx, s.tenantSlug, fmt.Sprintf("dogs/%s", fullFilename))
-		s.s3Service.DeleteByPath(ctx, s.tenantSlug, fmt.Sprintf("dogs/%s", thumbFilename))
+		// BUG FIX: Log S3 deletion errors instead of ignoring them (still idempotent)
+		fullPath := fmt.Sprintf("dogs/%s", fullFilename)
+		if err := s.s3Service.DeleteByPath(ctx, s.tenantSlug, fullPath); err != nil {
+			fmt.Printf("Warning: Failed to delete S3 object %s for tenant %s: %v\n", fullPath, s.tenantSlug, err)
+		}
+		thumbPath := fmt.Sprintf("dogs/%s", thumbFilename)
+		if err := s.s3Service.DeleteByPath(ctx, s.tenantSlug, thumbPath); err != nil {
+			fmt.Printf("Warning: Failed to delete S3 thumbnail %s for tenant %s: %v\n", thumbPath, s.tenantSlug, err)
+		}
 		return nil
 	}
 

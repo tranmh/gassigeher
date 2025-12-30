@@ -430,8 +430,11 @@ func (h *BillingHandler) CancelSubscription(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Parse request (optional reason)
+	// BUG FIX #10: Check error from json.NewDecoder().Decode() and log warning if not io.EOF
 	var req CancelSubscriptionRequest
-	json.NewDecoder(r.Body).Decode(&req) // Ignore error - reason is optional
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+		log.Printf("Warning: Failed to decode optional reason in CancelSubscription: %v", err)
+	}
 
 	// Get subscription
 	subscription, err := h.subscriptionRepo.GetSubscriptionByTenant(tenantID)

@@ -451,6 +451,65 @@ func TestCacheService_Close(t *testing.T) {
 	cache.Close()
 }
 
+// TestCacheService_Close_WaitsForGoroutine tests that Close() waits for cleanup goroutine to finish
+// BUG FIX: Without sync.WaitGroup, Close() returns immediately while goroutine may still be running
+func TestCacheService_Close_WaitsForGoroutine(t *testing.T) {
+	cache := NewCacheService(CacheConfig{
+		DefaultTTL:      1 * time.Minute,
+		CleanupInterval: 50 * time.Millisecond, // Short interval to ensure goroutine is running
+	})
+
+	// Let the cleanup goroutine run at least once
+	time.Sleep(100 * time.Millisecond)
+
+	// Close should wait for goroutine to finish
+	startTime := time.Now()
+	cache.Close()
+	elapsed := time.Since(startTime)
+
+	// If Close() waits properly, it should return quickly but not before signaling the goroutine
+	// The key is that after Close() returns, the goroutine should be completely stopped
+	if elapsed > 1*time.Second {
+		t.Errorf("Close() took too long: %v (possible deadlock)", elapsed)
+	}
+
+	// Test that cache is still usable after goroutine stops (data structures intact)
+	// This ensures the goroutine didn't corrupt state during shutdown
+	cache.Set("test-after-close", "value")
+	if cache.Get("test-after-close") != "value" {
+		t.Error("Cache should still be functional after Close() for data operations")
+	}
+}
+
+// TestCacheService_GoroutineCleanupOnClose verifies the goroutine properly exits
+// BUG FIX: Without WaitGroup, we can't guarantee goroutine has exited
+func TestCacheService_GoroutineCleanupOnClose(t *testing.T) {
+	// Create many cache instances with cleanup goroutines
+	caches := make([]*CacheService, 10)
+	for i := 0; i < 10; i++ {
+		caches[i] = NewCacheService(CacheConfig{
+			DefaultTTL:      1 * time.Minute,
+			CleanupInterval: 10 * time.Millisecond,
+		})
+	}
+
+	// Let goroutines run
+	time.Sleep(50 * time.Millisecond)
+
+	// Close all caches - with proper WaitGroup, this should complete quickly
+	// Without WaitGroup, goroutines may leak
+	startTime := time.Now()
+	for _, cache := range caches {
+		cache.Close()
+	}
+	elapsed := time.Since(startTime)
+
+	// All closes should complete quickly if goroutines are properly tracked
+	if elapsed > 2*time.Second {
+		t.Errorf("Closing multiple caches took too long: %v (goroutine leak suspected)", elapsed)
+	}
+}
+
 // ============================================================================
 // Cache Key Generator Tests
 // ============================================================================
