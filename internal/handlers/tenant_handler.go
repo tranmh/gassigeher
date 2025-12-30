@@ -330,7 +330,8 @@ func (h *TenantHandler) Register(w http.ResponseWriter, r *http.Request) {
 	// Build login URL
 	loginURL := fmt.Sprintf("https://%s.%s/login.html", req.Slug, h.cfg.BaseDomain)
 	if h.cfg.BaseDomain == "" {
-		loginURL = fmt.Sprintf("http://localhost:%s/login.html", h.cfg.Port)
+		// Simple-Mode: use configured BASE_URL
+		loginURL = fmt.Sprintf("%s/login.html", h.cfg.BaseURL)
 	}
 
 	respondJSON(w, http.StatusCreated, map[string]interface{}{
@@ -714,7 +715,8 @@ func (h *TenantHandler) sendTenantWelcomeEmail(contactEmail, orgName, slug, admi
 
 	loginURL := fmt.Sprintf("https://%s.%s/login.html", slug, h.cfg.BaseDomain)
 	if h.cfg.BaseDomain == "" {
-		loginURL = fmt.Sprintf("http://localhost:%s/login.html", h.cfg.Port)
+		// Simple-Mode: use configured BASE_URL
+		loginURL = fmt.Sprintf("%s/login.html", h.cfg.BaseURL)
 	}
 
 	body := fmt.Sprintf(`

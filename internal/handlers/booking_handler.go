@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -423,8 +424,6 @@ func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) {
 		// Parse booking date and time
 		// booking.Date comes from DB as ISO 8601 format (e.g., "2025-11-27T00:00:00Z")
 		// We need to extract just the date part (YYYY-MM-DD) and combine with scheduled time
-		fmt.Printf("[CANCEL DEBUG] Raw booking.Date from DB: '%s'\n", booking.Date)
-		fmt.Printf("[CANCEL DEBUG] Raw booking.ScheduledTime from DB: '%s'\n", booking.ScheduledTime)
 
 		// Parse the ISO date first to get a time.Time object
 		dateOnly, err := time.Parse(time.RFC3339, booking.Date)
@@ -432,7 +431,7 @@ func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) {
 			// Try simple date format as fallback
 			dateOnly, err = time.Parse("2006-01-02", booking.Date)
 			if err != nil {
-				fmt.Printf("[CANCEL ERROR] Failed to parse booking date: %v\n", err)
+				log.Printf("ERROR: Failed to parse booking date: %v", err)
 				respondError(w, http.StatusInternalServerError, "Failed to parse booking date: "+err.Error())
 				return
 			}
@@ -441,19 +440,16 @@ func (h *BookingHandler) CancelBooking(w http.ResponseWriter, r *http.Request) {
 		// Format date as YYYY-MM-DD and combine with time
 		dateStr := dateOnly.Format("2006-01-02")
 		bookingDateTime := dateStr + " " + booking.ScheduledTime
-		fmt.Printf("[CANCEL DEBUG] Combined datetime string: '%s'\n", bookingDateTime)
 
 		bookingTime, err := time.Parse("2006-01-02 15:04", bookingDateTime)
 		if err != nil {
-			fmt.Printf("[CANCEL ERROR] Failed to parse booking datetime: %v\n", err)
+			log.Printf("ERROR: Failed to parse booking datetime: %v", err)
 			respondError(w, http.StatusInternalServerError, "Failed to parse booking date/time: "+err.Error())
 			return
 		}
 
 		now := time.Now()
 		hoursUntilBooking := bookingTime.Sub(now).Hours()
-		fmt.Printf("[CANCEL DEBUG] Booking time: %v, Now: %v, Hours until: %.2f, Required: %d\n",
-			bookingTime, now, hoursUntilBooking, noticeHours)
 
 		if hoursUntilBooking < float64(noticeHours) {
 			respondError(w, http.StatusBadRequest, fmt.Sprintf("Buchungen müssen mindestens %d Stunden im Voraus storniert werden. Verbleibende Zeit: %.1f Stunden", noticeHours, hoursUntilBooking))

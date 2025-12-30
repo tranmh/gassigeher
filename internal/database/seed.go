@@ -152,7 +152,9 @@ func generateSecurePassword(length int) string {
 	secureRandomIndex := func(max int) int {
 		n, err := rand.Int(rand.Reader, big.NewInt(int64(max)))
 		if err != nil {
-			// Fallback should never happen with crypto/rand
+			// This should never happen - if crypto/rand fails, the system is compromised
+			// Log the error for operators before terminating
+			log.Printf("CRITICAL: crypto/rand failed during password generation: %v", err)
 			panic("crypto/rand failed: " + err.Error())
 		}
 		return int(n.Int64())
