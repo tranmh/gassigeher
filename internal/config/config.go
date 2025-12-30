@@ -109,6 +109,8 @@ type Config struct {
 	// Monitoring - Prometheus
 	PrometheusEnabled bool   // Enable Prometheus metrics endpoint
 	PrometheusPath    string // Path for metrics endpoint (default: /metrics)
+	MetricsUsername   string // Basic auth username for /metrics endpoint
+	MetricsPassword   string // Basic auth password for /metrics endpoint
 }
 
 // Load loads configuration from environment variables
@@ -210,6 +212,8 @@ func Load() *Config {
 		// Monitoring - Prometheus
 		PrometheusEnabled: getEnvAsBool("PROMETHEUS_ENABLED", false),
 		PrometheusPath:    getEnv("PROMETHEUS_PATH", "/metrics"),
+		MetricsUsername:   getEnv("METRICS_USERNAME", "prometheus"),
+		MetricsPassword:   getEnv("METRICS_PASSWORD", ""),
 	}
 }
 

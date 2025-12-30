@@ -107,6 +107,18 @@ func main() {
 		log.Println("JWT secret has been updated for this session")
 	}
 
+	// Enforce strong metrics password on fresh installations
+	// This auto-generates a secure password for Prometheus /metrics Basic Auth
+	newMetricsPassword, metricsChanged, err := database.EnforceStrongMetricsPassword(isFreshInstall, cfg.MetricsPassword, *envPath)
+	if err != nil {
+		log.Fatalf("Failed to enforce strong metrics password: %v", err)
+	}
+	if metricsChanged {
+		// Update the config with the new password for this session
+		cfg.MetricsPassword = newMetricsPassword
+		log.Println("Metrics password has been updated for this session")
+	}
+
 	// DONE: Phase 2 - Run seed data (first-time installations)
 	if err := database.SeedDatabase(db, cfg.SuperAdminEmail); err != nil {
 		log.Fatalf("Failed to seed database: %v", err)
@@ -271,8 +283,14 @@ func main() {
 	router.HandleFunc("/api/health", healthHandler.Health).Methods("GET")
 	router.HandleFunc("/api/ready", healthHandler.Ready).Methods("GET")
 	router.HandleFunc("/api/health/detailed", healthHandler.DetailedHealth).Methods("GET")
-	router.HandleFunc("/metrics", metricsHandler.GetPrometheusMetrics).Methods("GET")
-	router.HandleFunc("/api/metrics", metricsHandler.GetMetrics).Methods("GET")
+
+	// Metrics endpoints protected with Basic Auth (standard Prometheus pattern)
+	router.HandleFunc("/metrics", middleware.WrapWithMetricsAuth(
+		metricsHandler.GetPrometheusMetrics, cfg.MetricsUsername, cfg.MetricsPassword,
+	)).Methods("GET")
+	router.HandleFunc("/api/metrics", middleware.WrapWithMetricsAuth(
+		metricsHandler.GetMetrics, cfg.MetricsUsername, cfg.MetricsPassword,
+	)).Methods("GET")
 
 	// NOTE: API Version redirect is applied via WrapWithVersionRedirect at server startup
 	// (router.Use() doesn't work because gorilla/mux runs middleware AFTER route matching)
