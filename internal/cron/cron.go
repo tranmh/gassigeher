@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/tranmh/gassigeher/internal/config"
@@ -35,6 +36,7 @@ type CronService struct {
 	demoSeedService        *services.DemoSeedService
 	tenantActivityChecker  *TenantActivityChecker
 	stopChan               chan bool
+	stopOnce               sync.Once
 }
 
 // NewCronService creates a new cron service
@@ -96,10 +98,12 @@ func (s *CronService) checkTenantActivity() {
 	}
 }
 
-// Stop stops all cron jobs
+// Stop stops all cron jobs (safe to call multiple times)
 func (s *CronService) Stop() {
-	log.Println("Stopping cron service...")
-	close(s.stopChan)
+	s.stopOnce.Do(func() {
+		log.Println("Stopping cron service...")
+		close(s.stopChan)
+	})
 }
 
 // runPeriodically runs a function periodically with panic recovery

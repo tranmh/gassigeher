@@ -4,9 +4,14 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"regexp"
 	"sort"
 	"time"
 )
+
+// validIdentifier checks if a SQL identifier is safe (alphanumeric, underscore only)
+// BUG FIX: Prevent SQL injection in dynamic index/table/column names
+var validIdentifier = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
 // Migration represents a database schema migration
 // Each migration has SQL statements for each supported database type
@@ -254,7 +259,21 @@ func GetMigrationStatus(db *sql.DB, dialect Dialect) (applied int, pending int, 
 
 // createIndexIfNotExists creates an index if it doesn't already exist
 // Uses dialect-specific approach since MySQL doesn't support IF NOT EXISTS for indexes
+// BUG FIX: Validates identifiers to prevent SQL injection attacks
 func createIndexIfNotExists(db *sql.DB, dialect Dialect, indexName, tableName, columnName string) error {
+	// Validate identifiers to prevent SQL injection
+	// These values are interpolated into SQL strings because MySQL doesn't support
+	// parameterized identifiers (table names, column names, index names)
+	if !validIdentifier.MatchString(indexName) {
+		return fmt.Errorf("invalid index name: %q", indexName)
+	}
+	if !validIdentifier.MatchString(tableName) {
+		return fmt.Errorf("invalid table name: %q", tableName)
+	}
+	if !validIdentifier.MatchString(columnName) {
+		return fmt.Errorf("invalid column name: %q", columnName)
+	}
+
 	switch dialect.Name() {
 	case "mysql":
 		// MySQL: Check if index exists first using information_schema

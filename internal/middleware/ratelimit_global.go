@@ -10,11 +10,12 @@ import (
 
 // GlobalRateLimiter implements per-IP rate limiting for all endpoints
 type GlobalRateLimiter struct {
-	limiters map[string]*rateLimiterEntry
-	mu       sync.RWMutex
-	rps      rate.Limit // requests per second
-	burst    int
-	stopChan chan struct{} // Channel to signal cleanup goroutine to stop
+	limiters  map[string]*rateLimiterEntry
+	mu        sync.RWMutex
+	rps       rate.Limit    // requests per second
+	burst     int
+	stopChan  chan struct{} // Channel to signal cleanup goroutine to stop
+	closeOnce sync.Once     // BUG FIX: Prevent double-close panic
 }
 
 type rateLimiterEntry struct {
@@ -37,9 +38,11 @@ func NewGlobalRateLimiter(rps float64, burst int) *GlobalRateLimiter {
 	return grl
 }
 
-// Close stops the cleanup goroutine and releases resources
+// Close stops the cleanup goroutine and releases resources (safe to call multiple times)
 func (g *GlobalRateLimiter) Close() {
-	close(g.stopChan)
+	g.closeOnce.Do(func() {
+		close(g.stopChan)
+	})
 }
 
 // GetLimiter returns the rate limiter for a given IP
@@ -62,6 +65,7 @@ func (g *GlobalRateLimiter) GetLimiter(ip string) *rate.Limiter {
 }
 
 // cleanupStaleEntries removes rate limiter entries not seen in the last hour
+// BUG FIX: Uses shorter lock durations to avoid blocking requests during cleanup
 func (g *GlobalRateLimiter) cleanupStaleEntries() {
 	ticker := time.NewTicker(10 * time.Minute)
 	defer ticker.Stop()
@@ -71,14 +75,33 @@ func (g *GlobalRateLimiter) cleanupStaleEntries() {
 		case <-g.stopChan:
 			return
 		case <-ticker.C:
-			g.mu.Lock()
 			cutoff := time.Now().Add(-1 * time.Hour)
+
+			// Phase 1: Identify stale entries (read lock)
+			g.mu.RLock()
+			staleIPs := make([]string, 0)
 			for ip, entry := range g.limiters {
 				if entry.lastSeen.Before(cutoff) {
-					delete(g.limiters, ip)
+					staleIPs = append(staleIPs, ip)
 				}
 			}
-			g.mu.Unlock()
+			g.mu.RUnlock()
+
+			// Phase 2: Delete stale entries in batches (short write locks)
+			if len(staleIPs) > 0 {
+				const batchSize = 100
+				for i := 0; i < len(staleIPs); i += batchSize {
+					end := i + batchSize
+					if end > len(staleIPs) {
+						end = len(staleIPs)
+					}
+					g.mu.Lock()
+					for _, ip := range staleIPs[i:end] {
+						delete(g.limiters, ip)
+					}
+					g.mu.Unlock()
+				}
+			}
 		}
 	}
 }

@@ -214,7 +214,9 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 				jwtTenantID = int(tid)
 			}
 
-			// SaaS: Validate JWT tenant_id matches subdomain tenant (if subdomain tenant is set)
+			// SaaS: Validate JWT tenant_id matches subdomain tenant
+			// BUG FIX: Also reject when JWT has tenant_id but subdomain context is missing
+			// This prevents cross-tenant access via misconfigured routes
 			subdomainTenantID, _ := r.Context().Value(TenantIDKey).(int)
 			if subdomainTenantID != 0 {
 				// Subdomain tenant is set - JWT must have matching tenant_id
@@ -228,6 +230,15 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 					http.Error(w, `{"error":"Token für anderes Tierheim ungültig"}`, http.StatusUnauthorized)
 					return
 				}
+			} else if jwtTenantID != 0 {
+				// JWT has tenant_id but subdomain context is missing
+				// This indicates either:
+				// 1. TenantMiddleware wasn't applied to this route (misconfiguration)
+				// 2. Attempt to use tenant-specific token on wrong endpoint
+				// Reject to prevent cross-tenant access vulnerability
+				w.Header().Set("Content-Type", "application/json")
+				http.Error(w, `{"error":"Tenant context missing - invalid request"}`, http.StatusUnauthorized)
+				return
 			}
 
 			// Add to context

@@ -7,17 +7,15 @@ func init() {
 		Up: map[string]string{
 			"sqlite": `
 -- Add missing columns to tenant_settings (tagline and description)
--- SQLite doesn't support IF NOT EXISTS for columns, so we use a trick
--- by creating a new table if the column doesn't exist
+-- SQLite doesn't support IF NOT EXISTS for ALTER TABLE ADD COLUMN
+-- The migration runner handles "duplicate column name" errors gracefully
+-- by marking the migration as applied and continuing.
+-- All CREATE TABLE statements use IF NOT EXISTS for idempotency.
 
--- First check if tagline exists by trying to select it
--- If this migration runs on a fresh DB, these tables already exist from 001
--- If it runs on an existing DB, we need to add them
-
--- Add tagline column if not exists
+-- Add tagline column (will fail gracefully if exists)
 ALTER TABLE tenant_settings ADD COLUMN tagline TEXT;
 
--- Add description column if not exists
+-- Add description column (will fail gracefully if exists)
 ALTER TABLE tenant_settings ADD COLUMN description TEXT;
 
 -- Marketing campaigns table (if not exists from 001)

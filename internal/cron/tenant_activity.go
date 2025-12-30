@@ -134,22 +134,30 @@ func (c *TenantActivityChecker) CheckAndFlagInactiveTenants() error {
 		}
 
 		// Check last booking date for this tenant
+		// BUG FIX: Check and log database errors instead of ignoring them
 		var lastBooking *time.Time
 		bookingQuery := `
 			SELECT MAX(created_at)
 			FROM bookings
 			WHERE tenant_id = ?
 		`
-		c.db.QueryRow(bookingQuery, tenantID).Scan(&lastBooking)
+		if err := c.db.QueryRow(bookingQuery, tenantID).Scan(&lastBooking); err != nil && err != sql.ErrNoRows {
+			log.Printf("Error querying bookings for tenant %d: %v", tenantID, err)
+			continue // Skip this tenant due to database error
+		}
 
 		// Check last user activity for this tenant
+		// BUG FIX: Check and log database errors instead of ignoring them
 		var lastActivity *time.Time
 		activityQuery := `
 			SELECT MAX(last_activity_at)
 			FROM users
 			WHERE tenant_id = ? AND is_active = 1
 		`
-		c.db.QueryRow(activityQuery, tenantID).Scan(&lastActivity)
+		if err := c.db.QueryRow(activityQuery, tenantID).Scan(&lastActivity); err != nil && err != sql.ErrNoRows {
+			log.Printf("Error querying user activity for tenant %d: %v", tenantID, err)
+			continue // Skip this tenant due to database error
+		}
 
 		// Determine the most recent activity
 		var mostRecentActivity *time.Time

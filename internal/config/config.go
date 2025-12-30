@@ -353,8 +353,9 @@ func (c *Config) Validate() error {
 
 	// HIGH: Validate SMTP configuration
 	if c.EmailProvider == "smtp" && c.SMTPHost != "" {
-		if c.SMTPPort <= 0 || c.SMTPPort > 65535 {
-			errors = append(errors, "SMTP_PORT must be a valid port number (1-65535)")
+		// BUG FIX: Allow port 0 as valid default (means "use standard port")
+		if c.SMTPPort < 0 || c.SMTPPort > 65535 {
+			errors = append(errors, "SMTP_PORT must be between 0-65535 (0 means use default)")
 		}
 		// Warn if neither TLS nor SSL is enabled (insecure)
 		if !c.SMTPUseTLS && !c.SMTPUseSSL {

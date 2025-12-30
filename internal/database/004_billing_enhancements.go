@@ -126,11 +126,16 @@ CREATE TABLE IF NOT EXISTS tenant_invoices (
 ALTER TABLE tenant_subscriptions ADD COLUMN free_months_remaining INT DEFAULT 0;
 ALTER TABLE tenant_subscriptions ADD COLUMN free_months_granted INT DEFAULT 0;
 ALTER TABLE tenant_subscriptions ADD COLUMN free_months_source VARCHAR(50);
-ALTER TABLE tenant_subscriptions ADD COLUMN applied_promo_code_id INT,
-  ADD FOREIGN KEY (applied_promo_code_id) REFERENCES promo_codes(id) ON DELETE SET NULL;
-ALTER TABLE tenant_subscriptions ADD COLUMN applied_referral_code_id INT,
-  ADD FOREIGN KEY (applied_referral_code_id) REFERENCES referral_codes(id) ON DELETE SET NULL;
+-- BUG FIX: Split ADD COLUMN and ADD FOREIGN KEY into separate statements
+-- MySQL doesn't support combining them in one ALTER TABLE
+ALTER TABLE tenant_subscriptions ADD COLUMN applied_promo_code_id INT;
+ALTER TABLE tenant_subscriptions ADD COLUMN applied_referral_code_id INT;
 ALTER TABLE tenant_subscriptions ADD COLUMN trial_ends_at DATETIME;
+-- Add foreign key constraints separately
+ALTER TABLE tenant_subscriptions ADD CONSTRAINT fk_subscriptions_promo_code
+  FOREIGN KEY (applied_promo_code_id) REFERENCES promo_codes(id) ON DELETE SET NULL;
+ALTER TABLE tenant_subscriptions ADD CONSTRAINT fk_subscriptions_referral_code
+  FOREIGN KEY (applied_referral_code_id) REFERENCES referral_codes(id) ON DELETE SET NULL;
 `,
 			"postgres": `
 -- Promotional codes (separate from referral codes)
