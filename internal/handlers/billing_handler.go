@@ -597,20 +597,31 @@ func (h *BillingHandler) handleCheckoutCompleted(event *stripe.Event) {
 				if err := h.promoCodeRepo.RecordUse(promoCode.ID, data.TenantID); err != nil {
 					log.Printf("ERROR: Failed to record promo code use: %v", err)
 				}
-				if err := h.promoCodeRepo.IncrementUsesCount(promoCode.ID); err != nil {
-					log.Printf("ERROR: Failed to increment promo code uses: %v", err)
-				}
 
-				// Apply free months to subscription
-				if promoCode.DiscountType == models.DiscountTypeFreeMonths {
-					subscription.FreeMonthsRemaining += promoCode.DiscountValue
-					subscription.FreeMonthsGranted += promoCode.DiscountValue
-					subscription.AppliedPromoCodeID = &promoCode.ID
-					hasPromo = true
-					totalFreeMonths += promoCode.DiscountValue
-				}
+				// BUG FIX: Atomically increment uses count and CHECK the error
+				// If max uses is reached (race condition), do NOT apply benefits
+				incrementErr := h.promoCodeRepo.IncrementUsesCount(promoCode.ID)
+				if incrementErr != nil {
+					if incrementErr == repository.ErrPromoCodeMaxUsesReached {
+						log.Printf("WARNING: Promo code %s max uses reached (race condition prevented) for tenant %d",
+							promoCode.Code, data.TenantID)
+						// Skip applying benefits - another request got there first
+					} else {
+						log.Printf("ERROR: Failed to increment promo code uses: %v", incrementErr)
+						// For other errors, also skip benefits to be safe
+					}
+				} else {
+					// Only apply benefits if increment succeeded
+					if promoCode.DiscountType == models.DiscountTypeFreeMonths {
+						subscription.FreeMonthsRemaining += promoCode.DiscountValue
+						subscription.FreeMonthsGranted += promoCode.DiscountValue
+						subscription.AppliedPromoCodeID = &promoCode.ID
+						hasPromo = true
+						totalFreeMonths += promoCode.DiscountValue
+					}
 
-				log.Printf("Applied promo code %s for tenant %d", promoCode.Code, data.TenantID)
+					log.Printf("Applied promo code %s for tenant %d", promoCode.Code, data.TenantID)
+				}
 			}
 		}
 
