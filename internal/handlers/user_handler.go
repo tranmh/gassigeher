@@ -773,6 +773,7 @@ func (h *UserHandler) DemoteAdmin(w http.ResponseWriter, r *http.Request) {
 }
 
 // ImpersonateUser allows super-admin to act as another user (not super-admin)
+// SaaS SECURITY: Super Admin can ONLY impersonate users within their own tenant
 func (h *UserHandler) ImpersonateUser(w http.ResponseWriter, r *http.Request) {
 	// Extract super admin from context (middleware already verified)
 	isSuperAdmin, _ := r.Context().Value(middleware.IsSuperAdminKey).(bool)
@@ -780,6 +781,9 @@ func (h *UserHandler) ImpersonateUser(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusForbidden, "Only Super Admin can impersonate users")
 		return
 	}
+
+	// SaaS SECURITY: Get tenant_id from context - Super Admin is tenant-scoped
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Get current super-admin user ID
 	currentUserID, _ := r.Context().Value(middleware.UserIDKey).(int)
@@ -806,6 +810,15 @@ func (h *UserHandler) ImpersonateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if targetUser == nil {
+		respondError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	// SaaS SECURITY: Verify target user belongs to the Super Admin's tenant
+	// Super Admin can only impersonate users within their own tenant
+	// (Central Admin uses a different endpoint for cross-tenant impersonation)
+	if targetUser.TenantID != tenantID {
+		// Return 404 to prevent tenant enumeration
 		respondError(w, http.StatusNotFound, "User not found")
 		return
 	}

@@ -1344,3 +1344,173 @@ func TestMultiTenant_DemoteAdmin_CrossTenantBlocked(t *testing.T) {
 		t.Error("BUG: Cross-tenant demotion actually demoted the admin!")
 	}
 }
+
+// TestMultiTenant_ImpersonateUser_CrossTenantBlocked tests that Super Admin cannot impersonate users from other tenants
+// TDD RED PHASE: This test should FAIL until we add tenant validation to ImpersonateUser
+func TestMultiTenant_ImpersonateUser_CrossTenantBlocked(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret-key-for-jwt-generation",
+		JWTExpirationHours: 24,
+	}
+	handler := NewUserHandler(db, cfg)
+
+	now := time.Now()
+	userRepo := repository.NewUserRepository(db)
+
+	// First, create the Super Admin in tenant 0 (gets ID 1)
+	superAdminEmail := "superadmin@tenant0.com"
+	superAdminHash := "hashedpassword"
+	superAdmin := &models.User{
+		TenantID:        0,
+		FirstName:       "Super",
+		LastName:        "Admin",
+		Email:           &superAdminEmail,
+		PasswordHash:    &superAdminHash,
+		IsVerified:      true,
+		IsActive:        true,
+		IsAdmin:         true,
+		IsSuperAdmin:    true,
+		TermsAcceptedAt: now,
+		LastActivityAt:  now,
+	}
+	if err := userRepo.Create(superAdmin); err != nil {
+		t.Fatalf("Failed to create super admin: %v", err)
+	}
+
+	// Create tenant 2
+	_, err := db.Exec(`INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
+		VALUES (2, 'tenant2', 'Tenant 2', 'active', 'tenant2@example.com', ?, ?)`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create tenant 2: %v", err)
+	}
+
+	// Create a regular user in tenant 2 (target for impersonation - gets ID 2)
+	victimEmail := "victim@tenant2.com"
+	victimHash := "hashedpassword"
+	tenant2User := &models.User{
+		TenantID:        2,
+		FirstName:       "Victim",
+		LastName:        "User",
+		Email:           &victimEmail,
+		PasswordHash:    &victimHash,
+		IsVerified:      true,
+		IsActive:        true,
+		IsAdmin:         false,
+		IsSuperAdmin:    false,
+		TermsAcceptedAt: now,
+		LastActivityAt:  now,
+	}
+	if err := userRepo.Create(tenant2User); err != nil {
+		t.Fatalf("Failed to create tenant 2 user: %v", err)
+	}
+
+	// Verify IDs are different
+	if superAdmin.ID == tenant2User.ID {
+		t.Fatalf("Test setup error: Super Admin ID (%d) == Target User ID (%d)", superAdmin.ID, tenant2User.ID)
+	}
+
+	// Super Admin from tenant 0 tries to impersonate user from tenant 2
+	// This should be BLOCKED - Super Admin can only impersonate within their tenant
+	req := httptest.NewRequest("POST", fmt.Sprintf("/api/users/%d/impersonate", tenant2User.ID), nil)
+	req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", tenant2User.ID)})
+
+	// Context: Super Admin from tenant 0
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 0)            // Super Admin's tenant
+	ctx = context.WithValue(ctx, middleware.UserIDKey, superAdmin.ID)             // Super Admin user ID
+	ctx = context.WithValue(ctx, middleware.EmailKey, "superadmin@tenant0.com")
+	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.IsSuperAdminKey, true)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.ImpersonateUser(rec, req)
+
+	// SECURITY: Cross-tenant impersonation MUST be blocked
+	// Expected: 404 Not Found (user not in Super Admin's tenant)
+	// Bug behavior: 200 OK with impersonation token
+	if rec.Code == http.StatusOK {
+		t.Errorf("SECURITY BUG: ImpersonateUser allowed cross-tenant impersonation! "+
+			"Super Admin (ID=%d, tenant=0) got token for user (ID=%d, tenant=2). Response: %s",
+			superAdmin.ID, tenant2User.ID, rec.Body.String())
+	}
+
+	// The correct behavior is 404 (user not found in requesting tenant)
+	if rec.Code != http.StatusNotFound {
+		t.Logf("Expected 404 Not Found, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestMultiTenant_ImpersonateUser_SameTenantAllowed tests that Super Admin CAN impersonate users within their own tenant
+func TestMultiTenant_ImpersonateUser_SameTenantAllowed(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret-key-for-jwt-generation",
+		JWTExpirationHours: 24,
+	}
+	handler := NewUserHandler(db, cfg)
+
+	now := time.Now()
+	userRepo := repository.NewUserRepository(db)
+
+	// Create Super Admin in tenant 0
+	superAdminEmail := "superadmin@tenant0.com"
+	superAdminHash := "hashedpassword"
+	superAdmin := &models.User{
+		TenantID:        0,
+		FirstName:       "Super",
+		LastName:        "Admin",
+		Email:           &superAdminEmail,
+		PasswordHash:    &superAdminHash,
+		IsVerified:      true,
+		IsActive:        true,
+		IsAdmin:         true,
+		IsSuperAdmin:    true,
+		TermsAcceptedAt: now,
+		LastActivityAt:  now,
+	}
+	if err := userRepo.Create(superAdmin); err != nil {
+		t.Fatalf("Failed to create super admin: %v", err)
+	}
+
+	// Create regular user in SAME tenant (tenant 0)
+	regularUserEmail := "regularuser@tenant0.com"
+	regularUserHash := "hashedpassword"
+	regularUser := &models.User{
+		TenantID:        0, // Same tenant as Super Admin
+		FirstName:       "Regular",
+		LastName:        "User",
+		Email:           &regularUserEmail,
+		PasswordHash:    &regularUserHash,
+		IsVerified:      true,
+		IsActive:        true,
+		IsAdmin:         false,
+		IsSuperAdmin:    false,
+		TermsAcceptedAt: now,
+		LastActivityAt:  now,
+	}
+	if err := userRepo.Create(regularUser); err != nil {
+		t.Fatalf("Failed to create regular user: %v", err)
+	}
+
+	// Super Admin from tenant 0 impersonates user from tenant 0 - should SUCCEED
+	req := httptest.NewRequest("POST", fmt.Sprintf("/api/users/%d/impersonate", regularUser.ID), nil)
+	req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", regularUser.ID)})
+
+	// Context: Super Admin from tenant 0
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 0)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, superAdmin.ID)
+	ctx = context.WithValue(ctx, middleware.EmailKey, "superadmin@tenant0.com")
+	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.IsSuperAdminKey, true)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.ImpersonateUser(rec, req)
+
+	// Super Admin should be able to impersonate within same tenant
+	if rec.Code != http.StatusOK {
+		t.Errorf("Super Admin should be able to impersonate within same tenant. Got %d: %s",
+			rec.Code, rec.Body.String())
+	}
+}
