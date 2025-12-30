@@ -1220,3 +1220,78 @@ func TestTenantHandler_CheckSlug_RateLimiting(t *testing.T) {
 		}
 	})
 }
+
+// HIGH-10: Test ExportTenantData authorization
+func TestTenantHandler_ExportTenantData_Authorization(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+		BaseDomain:         "gassigeher.org",
+	}
+	handler := NewTenantHandler(db, cfg)
+
+	// Create a tenant first
+	db.Exec(`INSERT INTO tenants (slug, name, contact_email, status, created_at, updated_at)
+		VALUES ('test-tenant', 'Test Tenant', 'test@example.com', 'active', datetime('now'), datetime('now'))`)
+	var tenantID int
+	db.QueryRow("SELECT id FROM tenants WHERE slug = 'test-tenant'").Scan(&tenantID)
+
+	t.Run("HIGH-10: rejects request without tenant context", func(t *testing.T) {
+		// Request without tenantID in context should fail
+		req := httptest.NewRequest("GET", "/api/admin/tenant/export", nil)
+		// Only set admin but no tenant context
+		ctx := context.WithValue(req.Context(), middleware.UserIDKey, 1)
+		ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ExportTenantData(rec, req)
+
+		if rec.Code != http.StatusInternalServerError {
+			t.Errorf("HIGH-10: Request without tenant context should fail, got status %d", rec.Code)
+		}
+	})
+
+	t.Run("HIGH-10: rejects request from non-admin", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/admin/tenant/export", nil)
+		// Set tenant context but not admin
+		ctx := contextWithTenant(req.Context(), tenantID, 1, false)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ExportTenantData(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("HIGH-10: Non-admin should be forbidden, got status %d", rec.Code)
+		}
+	})
+
+	t.Run("HIGH-10: allows admin of same tenant to export", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/admin/tenant/export", nil)
+		// Set tenant context with admin
+		ctx := contextWithTenant(req.Context(), tenantID, 1, true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ExportTenantData(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("HIGH-10: Admin of same tenant should be allowed, got status %d: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("HIGH-10: rejects export for non-existent tenant", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/admin/tenant/export", nil)
+		// Set context with non-existent tenant ID
+		ctx := contextWithTenant(req.Context(), 99999, 1, true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ExportTenantData(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("HIGH-10: Non-existent tenant should return 404, got status %d", rec.Code)
+		}
+	})
+}

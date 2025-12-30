@@ -338,11 +338,11 @@ h.db.QueryRow(`SELECT COUNT(*) FROM bookings WHERE tenant_id = ?`, tenantID).Sca
 | HIGH-4 | **DONE** | Added name length validation (max 255 chars) |
 | HIGH-5 | **DONE** | Added description length validation (max 10000 chars) |
 | HIGH-6 | **DONE** | Added Validate() methods and validation calls in handler |
-| HIGH-7 | Pending | - |
-| HIGH-8 | Pending | - |
-| HIGH-9 | Pending | - |
-| HIGH-10 | Pending | - |
-| HIGH-11 | Pending | - |
+| HIGH-7 | **DONE** | Added ValidateSetting() with range validation in models/settings.go |
+| HIGH-8 | **DONE** | Added SafeInt64ToInt() with bounds checking for int64→int conversion |
+| HIGH-9 | **DONE** | Added MaxUses, ExpiresAt, ValidForPlans validation in PromoCode.Validate() |
+| HIGH-10 | **DONE** | Verified existing protection + added security documentation + tests |
+| HIGH-11 | **DONE** | Added QueryRow error handling in ExportTenantData |
 
 ---
 

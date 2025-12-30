@@ -1,12 +1,94 @@
 package repository
 
 import (
+	"math"
 	"testing"
 	"time"
 
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/testutil"
 )
+
+// HIGH-8: Test SafeInt64ToInt for bounds checking
+func TestSafeInt64ToInt(t *testing.T) {
+	t.Run("converts valid positive value", func(t *testing.T) {
+		val, err := SafeInt64ToInt(100)
+		if err != nil {
+			t.Fatalf("SafeInt64ToInt(100) error: %v", err)
+		}
+		if val != 100 {
+			t.Errorf("Expected 100, got %d", val)
+		}
+	})
+
+	t.Run("converts zero", func(t *testing.T) {
+		val, err := SafeInt64ToInt(0)
+		if err != nil {
+			t.Fatalf("SafeInt64ToInt(0) error: %v", err)
+		}
+		if val != 0 {
+			t.Errorf("Expected 0, got %d", val)
+		}
+	})
+
+	t.Run("converts valid negative value", func(t *testing.T) {
+		val, err := SafeInt64ToInt(-100)
+		if err != nil {
+			t.Fatalf("SafeInt64ToInt(-100) error: %v", err)
+		}
+		if val != -100 {
+			t.Errorf("Expected -100, got %d", val)
+		}
+	})
+
+	t.Run("converts MaxInt32 successfully", func(t *testing.T) {
+		val, err := SafeInt64ToInt(math.MaxInt32)
+		if err != nil {
+			t.Fatalf("SafeInt64ToInt(MaxInt32) error: %v", err)
+		}
+		if val != math.MaxInt32 {
+			t.Errorf("Expected MaxInt32, got %d", val)
+		}
+	})
+
+	t.Run("converts MinInt32 successfully", func(t *testing.T) {
+		val, err := SafeInt64ToInt(math.MinInt32)
+		if err != nil {
+			t.Fatalf("SafeInt64ToInt(MinInt32) error: %v", err)
+		}
+		if val != math.MinInt32 {
+			t.Errorf("Expected MinInt32, got %d", val)
+		}
+	})
+
+	t.Run("rejects value exceeding MaxInt32", func(t *testing.T) {
+		_, err := SafeInt64ToInt(math.MaxInt32 + 1)
+		if err == nil {
+			t.Error("SafeInt64ToInt should reject value > MaxInt32")
+		}
+	})
+
+	t.Run("rejects value below MinInt32", func(t *testing.T) {
+		_, err := SafeInt64ToInt(math.MinInt32 - 1)
+		if err == nil {
+			t.Error("SafeInt64ToInt should reject value < MinInt32")
+		}
+	})
+
+	t.Run("rejects very large int64", func(t *testing.T) {
+		_, err := SafeInt64ToInt(math.MaxInt64)
+		if err == nil {
+			t.Error("SafeInt64ToInt should reject MaxInt64")
+		}
+	})
+
+	t.Run("rejects very negative int64", func(t *testing.T) {
+		_, err := SafeInt64ToInt(math.MinInt64)
+		if err == nil {
+			t.Error("SafeInt64ToInt should reject MinInt64")
+		}
+	})
+}
 
 func TestPromoCodeRepository_Create(t *testing.T) {
 	db := testutil.SetupTestDB(t)

@@ -176,6 +176,7 @@ func TestSettingsHandler_UpdateSetting(t *testing.T) {
 	})
 
 	// DONE: BUG #3 - Prevent invalid numeric setting values
+	// HIGH-7: Now uses centralized ValidateSetting with more informative error messages
 	t.Run("BUGFIX: reject non-numeric value for booking_advance_days", func(t *testing.T) {
 		reqBody := map[string]interface{}{
 			"value": "abc123", // Invalid - should be number
@@ -199,8 +200,9 @@ func TestSettingsHandler_UpdateSetting(t *testing.T) {
 		json.Unmarshal(rec.Body.Bytes(), &response)
 		errorMsg := response["error"].(string)
 
-		if errorMsg != "Value must be a positive integer" {
-			t.Errorf("Expected clear validation error, got %q", errorMsg)
+		// HIGH-7: Centralized validation provides more informative error message
+		if !strings.Contains(errorMsg, "integer") {
+			t.Errorf("Expected validation error mentioning integer, got %q", errorMsg)
 		}
 	})
 
@@ -241,6 +243,135 @@ func TestSettingsHandler_UpdateSetting(t *testing.T) {
 
 		if rec.Code != http.StatusBadRequest {
 			t.Errorf("BUGFIX: Expected status 400 for zero value, got %d", rec.Code)
+		}
+	})
+
+	// HIGH-7: Range validation tests for settings
+	t.Run("HIGH-7: reject booking_advance_days exceeding 365", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"value": "366", // Invalid - max is 365
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/settings/booking_advance_days", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"key": "booking_advance_days"})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UpdateSetting(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("HIGH-7: Expected status 400 for value > 365, got %d", rec.Code)
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+		errorMsg := response["error"].(string)
+		if !strings.Contains(errorMsg, "365") {
+			t.Errorf("HIGH-7: Expected error mentioning max 365, got %q", errorMsg)
+		}
+	})
+
+	t.Run("HIGH-7: reject cancellation_notice_hours exceeding 168", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"value": "169", // Invalid - max is 168 (1 week)
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/settings/cancellation_notice_hours", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"key": "cancellation_notice_hours"})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UpdateSetting(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("HIGH-7: Expected status 400 for value > 168, got %d", rec.Code)
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+		errorMsg := response["error"].(string)
+		if !strings.Contains(errorMsg, "168") {
+			t.Errorf("HIGH-7: Expected error mentioning max 168, got %q", errorMsg)
+		}
+	})
+
+	t.Run("HIGH-7: reject auto_deactivation_days below 30", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"value": "29", // Invalid - min is 30
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/settings/auto_deactivation_days", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"key": "auto_deactivation_days"})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UpdateSetting(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("HIGH-7: Expected status 400 for value < 30, got %d", rec.Code)
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+		errorMsg := response["error"].(string)
+		if !strings.Contains(errorMsg, "30") {
+			t.Errorf("HIGH-7: Expected error mentioning min 30, got %q", errorMsg)
+		}
+	})
+
+	t.Run("HIGH-7: reject auto_deactivation_days exceeding 730", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"value": "731", // Invalid - max is 730 (2 years)
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/settings/auto_deactivation_days", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"key": "auto_deactivation_days"})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UpdateSetting(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("HIGH-7: Expected status 400 for value > 730, got %d", rec.Code)
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+		errorMsg := response["error"].(string)
+		if !strings.Contains(errorMsg, "730") {
+			t.Errorf("HIGH-7: Expected error mentioning max 730, got %q", errorMsg)
+		}
+	})
+
+	t.Run("HIGH-7: accept valid booking_advance_days within range", func(t *testing.T) {
+		reqBody := map[string]interface{}{
+			"value": "30", // Valid - within 1-365
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", "/api/settings/booking_advance_days", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = mux.SetURLVars(req, map[string]string{"key": "booking_advance_days"})
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UpdateSetting(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("HIGH-7: Expected status 200 for valid value, got %d", rec.Code)
 		}
 	})
 }

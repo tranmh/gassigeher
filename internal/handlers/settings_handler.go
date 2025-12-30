@@ -6,8 +6,6 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -66,56 +64,15 @@ func (h *SettingsHandler) UpdateSetting(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Settings that allow empty values
-	allowEmptySettings := map[string]bool{
-		"whatsapp_group_link": true,
-	}
-
-	// Validate request (skip for settings that allow empty values)
-	if !allowEmptySettings[key] {
-		if err := req.Validate(); err != nil {
-			respondError(w, http.StatusBadRequest, err.Error())
-			return
-		}
-	}
-
-	// BUGFIX #3: Validate numeric settings to prevent silent failures
-	// These settings must be valid positive integers
-	numericSettings := map[string]bool{
-		"booking_advance_days":      true,
-		"cancellation_notice_hours": true,
-		"auto_deactivation_days":    true,
-	}
-
-	if numericSettings[key] {
-		if val, err := strconv.Atoi(req.Value); err != nil || val <= 0 {
-			respondError(w, http.StatusBadRequest, "Value must be a positive integer")
-			return
-		}
-	}
-
-	// Validate registration password format (8 alphanumeric characters)
-	if key == "registration_password" {
-		if !regexp.MustCompile(`^[a-zA-Z0-9]{8}$`).MatchString(req.Value) {
-			respondError(w, http.StatusBadRequest, "Registration password must be exactly 8 alphanumeric characters")
-			return
-		}
-	}
-
-	// Validate WhatsApp group enabled (boolean as string)
-	if key == "whatsapp_group_enabled" {
-		if req.Value != "true" && req.Value != "false" {
-			respondError(w, http.StatusBadRequest, "WhatsApp group enabled must be 'true' or 'false'")
-			return
-		}
-	}
-
-	// Validate WhatsApp group link (must be valid WhatsApp URL or empty)
-	if key == "whatsapp_group_link" {
-		if req.Value != "" && !strings.HasPrefix(req.Value, "https://chat.whatsapp.com/") {
-			respondError(w, http.StatusBadRequest, "WhatsApp group link must start with https://chat.whatsapp.com/")
-			return
-		}
+	// HIGH-7: Use centralized validation with type-specific and range validation
+	// This replaces the previous scattered validation logic with a single call
+	// to models.ValidateSetting which validates:
+	// - Integer settings with min/max ranges (booking_advance_days: 1-365, etc.)
+	// - Boolean settings (whatsapp_group_enabled)
+	// - Special formats (registration_password, whatsapp_group_link)
+	if err := models.ValidateSetting(key, req.Value); err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
 	// Update setting

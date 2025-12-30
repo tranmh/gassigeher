@@ -865,15 +865,24 @@ func (h *TenantHandler) claimFOMOBenefit(tenantID int) {
 // ExportTenantData exports all tenant data for GDPR compliance
 // GET /api/admin/tenant/export
 // Allows tenant admin to download all data for their tenant
+//
+// HIGH-10: SECURITY MODEL - Cross-tenant protection is enforced through:
+// 1. TenantMiddleware sets tenantID in context based on subdomain
+// 2. AuthMiddleware validates JWT tenant_id matches subdomain tenant_id
+// 3. This handler requires both tenant context AND admin status
+// An admin from Tenant A cannot export Tenant B's data because:
+// - If they visit Tenant B's subdomain, AuthMiddleware rejects their JWT
+// - The tenantID in context always matches the authenticated user's tenant
 func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request) {
-	// Get tenant ID from context
+	// Get tenant ID from context (set by TenantMiddleware from subdomain)
+	// HIGH-10: This is always the subdomain's tenant, validated against JWT by AuthMiddleware
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 	if !ok {
 		respondError(w, http.StatusInternalServerError, "Request validation failed")
 		return
 	}
 
-	// Verify admin access
+	// Verify admin access (from JWT, validated by AuthMiddleware to belong to this tenant)
 	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
 	if !isAdmin {
 		respondError(w, http.StatusForbidden, "Nur Administratoren können Daten exportieren")

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -120,6 +121,24 @@ func (p *PromoCode) Validate() error {
 		}
 	default:
 		return &ValidationError{Field: "discount_type", Message: "Ungültiger Rabatttyp"}
+	}
+
+	// HIGH-9: Validate MaxUses (must be positive if set)
+	if p.MaxUses != nil && *p.MaxUses <= 0 {
+		return &ValidationError{Field: "max_uses", Message: "Maximale Nutzungen muss positiv sein"}
+	}
+
+	// HIGH-9: Validate ExpiresAt (must not be in the past if set)
+	if p.ExpiresAt != nil && time.Now().After(*p.ExpiresAt) {
+		return &ValidationError{Field: "expires_at", Message: "Ablaufdatum darf nicht in der Vergangenheit liegen"}
+	}
+
+	// HIGH-9: Validate ValidForPlans (must be valid JSON array if set)
+	if p.ValidForPlans != "" {
+		var plans []interface{}
+		if err := json.Unmarshal([]byte(p.ValidForPlans), &plans); err != nil {
+			return &ValidationError{Field: "valid_for_plans", Message: "Ungültiges JSON-Format für Pläne"}
+		}
 	}
 
 	return nil

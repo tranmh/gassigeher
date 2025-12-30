@@ -4,11 +4,24 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"math"
 	"strings"
 	"time"
 
 	"github.com/tranmh/gassigeher/internal/models"
 )
+
+// SafeInt64ToInt safely converts int64 to int with bounds checking
+// HIGH-8: Prevents integer overflow on 32-bit systems
+func SafeInt64ToInt(val int64) (int, error) {
+	if val > math.MaxInt32 {
+		return 0, fmt.Errorf("value %d exceeds maximum int32 (%d)", val, math.MaxInt32)
+	}
+	if val < math.MinInt32 {
+		return 0, fmt.Errorf("value %d is below minimum int32 (%d)", val, math.MinInt32)
+	}
+	return int(val), nil
+}
 
 // PromoCodeRepository handles promo code database operations
 type PromoCodeRepository struct {
@@ -113,8 +126,13 @@ func (r *PromoCodeRepository) GetByID(id int) (*models.PromoCode, error) {
 		code.StripeCouponID = &stripeCouponID.String
 	}
 	if maxUses.Valid {
-		maxUsesInt := int(maxUses.Int64)
-		code.MaxUses = &maxUsesInt
+		// HIGH-8: Safe conversion with bounds checking
+		maxUsesInt, err := SafeInt64ToInt(maxUses.Int64)
+		if err != nil {
+			log.Printf("Warning: MaxUses value overflow for promo code %d: %v", code.ID, err)
+		} else {
+			code.MaxUses = &maxUsesInt
+		}
 	}
 	if expiresAt.Valid {
 		t, err := time.Parse(time.RFC3339, expiresAt.String)
@@ -176,8 +194,13 @@ func (r *PromoCodeRepository) GetByCode(codeStr string) (*models.PromoCode, erro
 		code.StripeCouponID = &stripeCouponID.String
 	}
 	if maxUses.Valid {
-		maxUsesInt := int(maxUses.Int64)
-		code.MaxUses = &maxUsesInt
+		// HIGH-8: Safe conversion with bounds checking
+		maxUsesInt, err := SafeInt64ToInt(maxUses.Int64)
+		if err != nil {
+			log.Printf("Warning: MaxUses value overflow for promo code %s: %v", codeStr, err)
+		} else {
+			code.MaxUses = &maxUsesInt
+		}
 	}
 	if expiresAt.Valid {
 		t, err := time.Parse(time.RFC3339, expiresAt.String)
@@ -246,8 +269,13 @@ func (r *PromoCodeRepository) GetAll(activeOnly bool) ([]*models.PromoCode, erro
 			code.StripeCouponID = &stripeCouponID.String
 		}
 		if maxUses.Valid {
-			maxUsesInt := int(maxUses.Int64)
-			code.MaxUses = &maxUsesInt
+			// HIGH-8: Safe conversion with bounds checking
+			maxUsesInt, err := SafeInt64ToInt(maxUses.Int64)
+			if err != nil {
+				log.Printf("Warning: MaxUses value overflow for promo code %d: %v", code.ID, err)
+			} else {
+				code.MaxUses = &maxUsesInt
+			}
 		}
 		if expiresAt.Valid {
 			t, err := time.Parse(time.RFC3339, expiresAt.String)

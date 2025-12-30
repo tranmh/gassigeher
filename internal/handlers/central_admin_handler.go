@@ -673,8 +673,13 @@ func (h *CentralAdminHandler) ExportTenantData(w http.ResponseWriter, r *http.Re
 	export["dogs"] = dogs
 
 	// Get bookings count (not full data for performance)
+	// HIGH-11: Handle QueryRow error properly
 	var bookingCount int
-	h.db.QueryRow(`SELECT COUNT(*) FROM bookings WHERE tenant_id = ?`, tenantID).Scan(&bookingCount)
+	if err := h.db.QueryRow(`SELECT COUNT(*) FROM bookings WHERE tenant_id = ?`, tenantID).Scan(&bookingCount); err != nil {
+		log.Printf("Warning: Failed to get booking count for tenant %d: %v", tenantID, err)
+		// Continue with export, just set count to -1 to indicate error
+		bookingCount = -1
+	}
 	export["booking_count"] = bookingCount
 
 	// Audit log
