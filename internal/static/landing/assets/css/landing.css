@@ -231,6 +231,115 @@ a:hover {
     margin-bottom: 0;
 }
 
+.stats-subtext {
+    text-align: center;
+    margin-top: 2rem;
+    font-size: 1.25rem;
+    font-style: italic;
+    opacity: 0.9;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Trust Badges Section */
+.trust-badges {
+    padding: 3rem 0;
+    background-color: var(--color-accent);
+}
+
+.trust-badges-grid {
+    display: flex;
+    justify-content: center;
+    gap: 3rem;
+    flex-wrap: wrap;
+}
+
+.trust-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--color-white);
+    padding: 1rem 1.5rem;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+}
+
+.trust-badge-icon {
+    font-size: 1.75rem;
+}
+
+.trust-badge-text {
+    font-weight: 600;
+    color: var(--color-secondary);
+    font-size: 0.95rem;
+}
+
+.trust-badge-text small {
+    display: block;
+    font-weight: 400;
+    color: var(--color-text-light);
+    font-size: 0.8rem;
+}
+
+/* Testimonial Section */
+.testimonial {
+    padding: 4rem 0;
+    background-color: var(--color-white);
+}
+
+.testimonial h2 {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.testimonial-card {
+    max-width: 700px;
+    margin: 0 auto;
+    background: var(--color-accent);
+    padding: 2.5rem;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.testimonial-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--color-primary);
+    color: var(--color-white);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+}
+
+.testimonial-text {
+    font-size: 1.25rem;
+    color: var(--color-secondary);
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+}
+
+.testimonial-source {
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: 1rem;
+}
+
+.testimonial-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
+.testimonial-link:hover {
+    text-decoration: underline;
+}
+
 /* How It Works */
 .how-it-works {
     padding: 5rem 0;

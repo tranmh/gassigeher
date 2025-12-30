@@ -113,6 +113,61 @@
             text-align: center;
             color: var(--color-text-light);
         }
+        .developer-section {
+            background: white;
+            padding: 4rem 0;
+        }
+        .developer-card {
+            background: var(--color-accent);
+            border-radius: 12px;
+            padding: 2.5rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .developer-header {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .developer-avatar {
+            width: 80px;
+            height: 80px;
+            background: var(--color-primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+            flex-shrink: 0;
+        }
+        .developer-info h3 {
+            margin: 0 0 0.25rem 0;
+            color: var(--color-secondary);
+        }
+        .developer-info p {
+            margin: 0;
+            color: var(--color-text-light);
+            font-size: 0.95rem;
+        }
+        .developer-story {
+            color: var(--color-text);
+            line-height: 1.8;
+            font-style: italic;
+            border-left: 3px solid var(--color-primary);
+            padding-left: 1.5rem;
+            margin: 1.5rem 0;
+        }
+        .developer-contact {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--color-border);
+        }
+        .developer-contact a {
+            color: var(--color-primary);
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -206,11 +261,42 @@
             </div>
         </section>
 
+        <section class="developer-section">
+            <div class="container">
+                <div class="about-content">
+                    <h2>Der Entwickler</h2>
+                    <div class="developer-card">
+                        <div class="developer-header">
+                            <div class="developer-avatar">MCT</div>
+                            <div class="developer-info">
+                                <h3>Dipl.-Inf. Minh Cuong Tran</h3>
+                                <p>Softwareentwickler aus Göppingen</p>
+                            </div>
+                        </div>
+                        <div class="developer-story">
+                            <p>
+                                "Nach unserem Umzug wollten meine Frau und ich etwas Gutes tun und gleichzeitig an die frische Luft kommen. Das Tierheim Göppingen liegt direkt bei uns um die Ecke - perfekt, um Hunden zu helfen. Wir wurden beide Gassigeher.
+                            </p>
+                            <p>
+                                Eines Tages kam meine Frau frustriert nach Hause: Ihr Spaziergang wurde kurzfristig abgesagt, ohne dass sie informiert wurde. Die Koordination lief über Papier und Telefon. Mit meiner Erfahrung als Softwareentwickler war klar: Das muss besser gehen.
+                            </p>
+                            <p>
+                                In drei Monaten Arbeit neben meinem Vollzeitjob entstand Gassigeher - nicht nur für uns, sondern für alle Tierheime in Deutschland, die moderne Werkzeuge verdienen, unabhängig von ihrem Budget."
+                            </p>
+                        </div>
+                        <div class="developer-contact">
+                            <strong>Kontakt:</strong> <a href="mailto:info@gassigeher.org">info@gassigeher.org</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <section class="open-source-section">
             <div class="container">
                 <h2>Open Source</h2>
                 <p>
-                    Gassigeher ist vollständig Open Source. Tierheime, die ihre eigene Infrastruktur betreiben möchten, können den kompletten Quellcode kostenlos nutzen und selbst hosten - ohne Einschränkungen und ohne Lizenzgebühren.
+                    Gassigeher ist vollständig Open Source unter der <strong>GPL-3.0 Lizenz</strong>. Tierheime, die ihre eigene Infrastruktur betreiben möchten, können den kompletten Quellcode kostenlos nutzen und selbst hosten - ohne Einschränkungen und ohne Lizenzgebühren.
                 </p>
                 <a href="https://github.com/tranmh/gassigeher" target="_blank" rel="noopener" class="github-link">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
