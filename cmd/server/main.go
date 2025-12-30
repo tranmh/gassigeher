@@ -83,9 +83,28 @@ func main() {
 	// Log database type for transparency
 	log.Printf("Using database: %s", dialect.Name())
 
+	// Check if this is a fresh install BEFORE running migrations
+	// (After migrations, schema_migrations table will have entries)
+	isFreshInstall := database.IsFreshInstall(db)
+	if isFreshInstall {
+		log.Println("Detected fresh installation (no existing schema)")
+	}
+
 	// Run migrations with dialect support
 	if err := database.RunMigrationsWithDialect(db, dialect); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
+	}
+
+	// Enforce strong JWT secret on fresh installations
+	// This auto-generates a secure secret if the current one is weak/default
+	newSecret, changed, err := database.EnforceStrongJWTSecret(isFreshInstall, cfg.JWTSecret, *envPath)
+	if err != nil {
+		log.Fatalf("Failed to enforce strong JWT secret: %v", err)
+	}
+	if changed {
+		// Update the config with the new secret for this session
+		cfg.JWTSecret = newSecret
+		log.Println("JWT secret has been updated for this session")
 	}
 
 	// DONE: Phase 2 - Run seed data (first-time installations)
