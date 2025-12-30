@@ -204,6 +204,7 @@ func (s *DemoSeedService) seedDemoColors(tenantID int) error {
 
 // seedDemoUsers creates demo users and returns their IDs
 // Returns map: "admin" -> ID, "green" -> ID, "orange" -> ID, "blue" -> ID
+// All users have profile photos using UI Avatars service
 func (s *DemoSeedService) seedDemoUsers(tenantID int, adminPassword string) (map[string]int, error) {
 	userIDs := make(map[string]int)
 	now := time.Now()
@@ -228,6 +229,7 @@ func (s *DemoSeedService) seedDemoUsers(tenantID int, adminPassword string) (map
 		IsSuperAdmin bool
 		IsAdmin      bool
 		ColorLevel   string // green, orange, blue
+		ProfilePhoto string // URL to avatar image
 	}{
 		{
 			Key:          "admin",
@@ -238,41 +240,46 @@ func (s *DemoSeedService) seedDemoUsers(tenantID int, adminPassword string) (map
 			IsSuperAdmin: true,
 			IsAdmin:      true,
 			ColorLevel:   "blue", // Admin gets all colors
+			ProfilePhoto: "/assets/images/demo/users/admin.svg",
 		},
 		{
 			Key:          "green",
 			FirstName:    "Anna",
-			LastName:     "Gruen",
+			LastName:     "Mueller",
 			Email:        "anna@demo.gassigeher.org",
 			PasswordHash: string(demoHash),
 			IsSuperAdmin: false,
 			IsAdmin:      false,
 			ColorLevel:   "green",
+			ProfilePhoto: "/assets/images/demo/users/anna.svg",
 		},
 		{
 			Key:          "orange",
 			FirstName:    "Bernd",
-			LastName:     "Orange",
+			LastName:     "Schmidt",
 			Email:        "bernd@demo.gassigeher.org",
 			PasswordHash: string(demoHash),
 			IsSuperAdmin: false,
 			IsAdmin:      false,
 			ColorLevel:   "orange",
+			ProfilePhoto: "/assets/images/demo/users/bernd.svg",
 		},
 		{
 			Key:          "blue",
 			FirstName:    "Clara",
-			LastName:     "Blau",
+			LastName:     "Weber",
 			Email:        "clara@demo.gassigeher.org",
 			PasswordHash: string(demoHash),
 			IsSuperAdmin: false,
 			IsAdmin:      false,
 			ColorLevel:   "blue",
+			ProfilePhoto: "/assets/images/demo/users/clara.svg",
 		},
 	}
 
 	for _, u := range users {
 		email := u.Email
+		profilePhoto := u.ProfilePhoto
 		user := &models.User{
 			TenantID:        tenantID,
 			FirstName:       u.FirstName,
@@ -283,6 +290,7 @@ func (s *DemoSeedService) seedDemoUsers(tenantID int, adminPassword string) (map
 			IsSuperAdmin:    u.IsSuperAdmin,
 			IsVerified:      true,
 			IsActive:        true,
+			ProfilePhoto:    &profilePhoto,
 			TermsAcceptedAt: now,
 			LastActivityAt:  now,
 		}
@@ -299,7 +307,7 @@ func (s *DemoSeedService) seedDemoUsers(tenantID int, adminPassword string) (map
 		}
 	}
 
-	log.Printf("Created %d demo users", len(users))
+	log.Printf("Created %d demo users (all with profile photos)", len(users))
 	return userIDs, nil
 }
 
@@ -344,6 +352,7 @@ func (s *DemoSeedService) assignUserColors(tenantID, userID int, level string) e
 }
 
 // seedDemoDogs creates demo dogs and returns their IDs
+// All dogs are featured with photos and external links for a visually appealing demo
 func (s *DemoSeedService) seedDemoDogs(tenantID int) ([]int, error) {
 	// Get color IDs
 	colors, err := s.colorRepo.FindAll(tenantID)
@@ -356,13 +365,16 @@ func (s *DemoSeedService) seedDemoDogs(tenantID int) ([]int, error) {
 		colorMap[c.Name] = c.ID
 	}
 
+	// External link for all demo dogs - points to main Gassigeher site
+	externalLink := "https://gassigeher.org"
+
 	dogs := []struct {
 		Name                string
 		Breed               string
 		Size                string
 		Age                 int
 		ColorName           string
-		IsFeatured          bool
+		Photo               string // Direct URL to Unsplash image
 		SpecialNeeds        string
 		PickupLocation      string
 		WalkRoute           string
@@ -370,69 +382,108 @@ func (s *DemoSeedService) seedDemoDogs(tenantID int) ([]int, error) {
 		SpecialInstructions string
 	}{
 		{
-			Name:                "Bella",
-			Breed:               "Labrador Retriever",
+			Name:                "Max",
+			Breed:               "Deutscher Schaeferhund",
 			Size:                "large",
-			Age:                 3,
+			Age:                 4,
 			ColorName:           "Gruen",
-			IsFeatured:          true,
+			Photo:               "/assets/images/demo/dogs/max.jpg",
 			SpecialNeeds:        "Keine besonderen Beduerfnisse",
 			PickupLocation:      "Zwinger 1, Gebaeude A",
 			WalkRoute:           "Waldweg hinter dem Tierheim",
 			WalkDuration:        45,
-			SpecialInstructions: "Bella ist sehr freundlich und vertraegt sich gut mit anderen Hunden.",
-		},
-		{
-			Name:                "Max",
-			Breed:               "Golden Retriever",
-			Size:                "large",
-			Age:                 5,
-			ColorName:           "Gruen",
-			IsFeatured:          true,
-			SpecialNeeds:        "Leichte Arthrose - keine langen Spaziergaenge",
-			PickupLocation:      "Zwinger 3, Gebaeude A",
-			WalkRoute:           "Kurze Runde um den Teich",
-			WalkDuration:        30,
-			SpecialInstructions: "Max braucht haeufige Pausen. Bei Anzeichen von Muedigkeit bitte umkehren.",
+			SpecialInstructions: "Max ist sehr freundlich und gut erzogen. Perfekt fuer Anfaenger.",
 		},
 		{
 			Name:                "Luna",
-			Breed:               "Border Collie",
+			Breed:               "Labrador Retriever",
+			Size:                "large",
+			Age:                 3,
+			ColorName:           "Gruen",
+			Photo:               "/assets/images/demo/dogs/luna.jpg",
+			SpecialNeeds:        "Liebt Wasser - nicht am Teich vorbeigehen!",
+			PickupLocation:      "Zwinger 2, Gebaeude A",
+			WalkRoute:           "Kurze Runde durch den Park",
+			WalkDuration:        40,
+			SpecialInstructions: "Luna ist verspielt und freundlich. Mag andere Hunde.",
+		},
+		{
+			Name:                "Bello",
+			Breed:               "Mischling",
 			Size:                "medium",
-			Age:                 4,
-			ColorName:           "Orange",
-			IsFeatured:          false,
-			SpecialNeeds:        "Reaktiv gegenueber anderen Hunden - Abstand halten!",
-			PickupLocation:      "Zwinger 7, Gebaeude B",
-			WalkRoute:           "Feldweg Richtung Sueden, weg von den Hauptwegen",
-			WalkDuration:        60,
-			SpecialInstructions: "WICHTIG: Mindestens 10m Abstand zu anderen Hunden.",
+			Age:                 5,
+			ColorName:           "Gelb",
+			Photo:               "/assets/images/demo/dogs/bello.jpg",
+			SpecialNeeds:        "Leichte Arthrose - kuerzere Spaziergaenge bevorzugt",
+			PickupLocation:      "Zwinger 4, Gebaeude A",
+			WalkRoute:           "Flache Strecke ohne Treppen",
+			WalkDuration:        30,
+			SpecialInstructions: "Bello braucht Pausen. Bei Muedigkeit bitte umkehren.",
 		},
 		{
 			Name:                "Rocky",
-			Breed:               "Deutscher Schaeferhund",
+			Breed:               "Rottweiler",
 			Size:                "large",
 			Age:                 6,
 			ColorName:           "Orange",
-			IsFeatured:          false,
-			SpecialNeeds:        "Braucht erfahrene Fuehrung",
-			PickupLocation:      "Zwinger 5, Gebaeude B",
+			Photo:               "/assets/images/demo/dogs/rocky.jpg",
+			SpecialNeeds:        "Braucht erfahrene Fuehrung - stark an der Leine",
+			PickupLocation:      "Zwinger 7, Gebaeude B",
 			WalkRoute:           "Trainingsgelaende, dann Waldweg Nord",
 			WalkDuration:        45,
 			SpecialInstructions: "Rocky braucht klare Fuehrung. Immer Leckerlis dabei haben.",
 		},
 		{
-			Name:                "Duke",
-			Breed:               "Rottweiler",
+			Name:                "Mia",
+			Breed:               "Beagle",
+			Size:                "small",
+			Age:                 2,
+			ColorName:           "Gruen",
+			Photo:               "/assets/images/demo/dogs/mia.jpg",
+			SpecialNeeds:        "Folgt ihrer Nase - immer an der Leine halten!",
+			PickupLocation:      "Zwinger 3, Gebaeude A",
+			WalkRoute:           "Eingezaeunter Bereich oder Leine",
+			WalkDuration:        35,
+			SpecialInstructions: "Mia ist neugierig. Nicht ableinen, sie laeuft weg!",
+		},
+		{
+			Name:                "Bruno",
+			Breed:               "Boxer",
 			Size:                "large",
 			Age:                 4,
+			ColorName:           "Gelb",
+			Photo:               "/assets/images/demo/dogs/bruno.jpg",
+			SpecialNeeds:        "Viel Energie - braucht aktiven Spaziergang",
+			PickupLocation:      "Zwinger 5, Gebaeude B",
+			WalkRoute:           "Lange Runde durch den Wald",
+			WalkDuration:        60,
+			SpecialInstructions: "Bruno liebt es zu rennen. Ideal fuer sportliche Gassigeher.",
+		},
+		{
+			Name:                "Lotte",
+			Breed:               "Dackel",
+			Size:                "small",
+			Age:                 7,
+			ColorName:           "Gruen",
+			Photo:               "/assets/images/demo/dogs/lotte.jpg",
+			SpecialNeeds:        "Rueckenschonend - keine Treppen!",
+			PickupLocation:      "Zwinger 6, Gebaeude A",
+			WalkRoute:           "Ebene Strecke, keine Steigungen",
+			WalkDuration:        25,
+			SpecialInstructions: "Lotte darf nicht springen. Bitte hochheben bei Hindernissen.",
+		},
+		{
+			Name:                "Thor",
+			Breed:               "Husky",
+			Size:                "large",
+			Age:                 3,
 			ColorName:           "Dunkelblau",
-			IsFeatured:          false,
-			SpecialNeeds:        "Nur fuer sehr erfahrene Hundefuehrer",
+			Photo:               "/assets/images/demo/dogs/thor.jpg",
+			SpecialNeeds:        "Sehr stark - nur fuer erfahrene Hundefuehrer",
 			PickupLocation:      "Zwinger 10, Gebaeude C (Schluessel beim Pfleger)",
-			WalkRoute:           "Abgelegener Waldweg, keine Begegnungen",
-			WalkDuration:        45,
-			SpecialInstructions: "Duke ist stark und kann ziehen. Nur mit Erfahrung!",
+			WalkRoute:           "Abgelegener Waldweg, wenig Begegnungen",
+			WalkDuration:        60,
+			SpecialInstructions: "Thor zieht stark und braucht konsequente Fuehrung. Nur mit Erfahrung!",
 		},
 	}
 
@@ -444,6 +495,8 @@ func (s *DemoSeedService) seedDemoDogs(tenantID int) ([]int, error) {
 		walkRoute := d.WalkRoute
 		walkDuration := d.WalkDuration
 		specialInstructions := d.SpecialInstructions
+		photo := d.Photo
+		extLink := externalLink
 		morningTime := "09:00"
 		eveningTime := "17:00"
 
@@ -454,8 +507,10 @@ func (s *DemoSeedService) seedDemoDogs(tenantID int) ([]int, error) {
 			Size:                d.Size,
 			Age:                 d.Age,
 			ColorID:             &colorID,
-			IsFeatured:          d.IsFeatured,
+			IsFeatured:          true, // All demo dogs are featured
 			IsAvailable:         true,
+			Photo:               &photo,
+			ExternalLink:        &extLink,
 			SpecialNeeds:        &specialNeeds,
 			PickupLocation:      &pickupLocation,
 			WalkRoute:           &walkRoute,
@@ -472,20 +527,31 @@ func (s *DemoSeedService) seedDemoDogs(tenantID int) ([]int, error) {
 		dogIDs = append(dogIDs, dog.ID)
 	}
 
-	log.Printf("Created %d demo dogs", len(dogs))
+	log.Printf("Created %d demo dogs (all featured with photos)", len(dogs))
 	return dogIDs, nil
 }
 
-// seedDemoBookings creates sample bookings
+// seedDemoBookings creates sample bookings with realistic past and future data
 func (s *DemoSeedService) seedDemoBookings(tenantID int, userIDs map[string]int, dogIDs []int) error {
-	if len(dogIDs) < 3 || len(userIDs) < 3 {
+	if len(dogIDs) < 5 || len(userIDs) < 3 {
 		log.Println("Not enough users or dogs for demo bookings")
 		return nil
 	}
 
 	today := time.Now()
+
+	// Past dates (completed walks)
+	yesterday := today.AddDate(0, 0, -1)
+	twoDaysAgo := today.AddDate(0, 0, -2)
+	threeDaysAgo := today.AddDate(0, 0, -3)
+	fourDaysAgo := today.AddDate(0, 0, -4)
+	fiveDaysAgo := today.AddDate(0, 0, -5)
+
+	// Future dates (scheduled walks)
 	tomorrow := today.AddDate(0, 0, 1)
 	dayAfter := today.AddDate(0, 0, 2)
+	threeDaysFromNow := today.AddDate(0, 0, 3)
+	fourDaysFromNow := today.AddDate(0, 0, 4)
 
 	bookings := []struct {
 		UserKey string
@@ -493,14 +559,41 @@ func (s *DemoSeedService) seedDemoBookings(tenantID int, userIDs map[string]int,
 		Date    time.Time
 		Time    string
 		Status  string
+		Notes   string // Notes for completed walks
 	}{
-		{"green", 0, tomorrow, "09:00", "scheduled"},  // Anna + Bella
-		{"orange", 1, tomorrow, "14:00", "scheduled"}, // Bernd + Max
-		{"blue", 2, dayAfter, "10:00", "scheduled"},   // Clara + Luna
+		// Past completed walks with notes
+		{"green", 0, fiveDaysAgo, "09:00", "completed", "Max war heute sehr gut gelaunt! Wir sind die lange Runde gelaufen. Er hat brav auf andere Hunde reagiert."},
+		{"orange", 3, fiveDaysAgo, "14:00", "completed", "Rocky war anfangs etwas aufgeregt, hat sich aber schnell beruhigt. Leckerlis haben gut geholfen."},
+		{"blue", 7, fourDaysAgo, "10:00", "completed", "Thor hat heute viel Energie gehabt. Wir mussten mehrere Pausen machen, damit ich mithalten konnte!"},
+		{"green", 1, fourDaysAgo, "15:00", "completed", "Luna ist so ein Schatz! Sie wollte unbedingt zum Teich, aber ich habe sie erfolgreich abgelenkt."},
+		{"orange", 2, threeDaysAgo, "09:30", "completed", "Bello hat heute seinen guten Tag. Er hat sogar ein bisschen gerannt, obwohl er sonst lieber gemütlich geht."},
+		{"blue", 4, threeDaysAgo, "11:00", "completed", "Mia hat wie immer versucht, jeder Spur zu folgen. Zum Glück war sie an der Leine!"},
+		{"green", 5, twoDaysAgo, "14:00", "completed", "Bruno hatte richtig Spass heute. Wir haben Ball gespielt im eingezäunten Bereich."},
+		{"orange", 6, twoDaysAgo, "16:00", "completed", "Lotte ist so süss! Musste sie zweimal über den Baumstamm heben. Sie hat sich gefreut."},
+		{"blue", 0, yesterday, "09:00", "completed", "Max ist wirklich ein Traumhund. Perfektes Verhalten, hat sogar ein Kind begrüsst ohne zu springen."},
+		{"green", 3, yesterday, "15:00", "completed", "Rocky macht Fortschritte! Er hat heute einen anderen Hund gesehen und ist ruhig geblieben."},
+
+		// Future scheduled walks
+		{"green", 0, tomorrow, "09:00", "scheduled", ""},       // Anna + Max
+		{"orange", 1, tomorrow, "14:00", "scheduled", ""},      // Bernd + Luna
+		{"blue", 2, tomorrow, "11:00", "scheduled", ""},        // Clara + Bello
+		{"green", 4, dayAfter, "10:00", "scheduled", ""},       // Anna + Mia
+		{"orange", 5, dayAfter, "15:00", "scheduled", ""},      // Bernd + Bruno
+		{"blue", 7, threeDaysFromNow, "09:30", "scheduled", ""}, // Clara + Thor
+		{"green", 6, threeDaysFromNow, "14:00", "scheduled", ""}, // Anna + Lotte
+		{"orange", 0, fourDaysFromNow, "10:00", "scheduled", ""}, // Bernd + Max
 	}
+
+	completedCount := 0
+	scheduledCount := 0
 
 	for _, b := range bookings {
 		userID := userIDs[b.UserKey]
+		var notes *string
+		if b.Notes != "" {
+			notes = &b.Notes
+		}
+
 		booking := &models.Booking{
 			TenantID:      tenantID,
 			UserID:        userID,
@@ -508,15 +601,22 @@ func (s *DemoSeedService) seedDemoBookings(tenantID int, userIDs map[string]int,
 			Date:          b.Date.Format("2006-01-02"),
 			ScheduledTime: b.Time,
 			Status:        b.Status,
+			UserNotes:     notes,
 		}
 
 		if err := s.bookingRepo.Create(booking); err != nil {
 			log.Printf("Warning: failed to create demo booking: %v", err)
 			continue
 		}
+
+		if b.Status == "completed" {
+			completedCount++
+		} else {
+			scheduledCount++
+		}
 	}
 
-	log.Printf("Created %d demo bookings", len(bookings))
+	log.Printf("Created %d demo bookings (%d completed, %d scheduled)", len(bookings), completedCount, scheduledCount)
 	return nil
 }
 

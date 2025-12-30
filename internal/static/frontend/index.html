@@ -106,6 +106,7 @@
     <script src="/js/i18n.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/sanitize.js"></script>
+    <script src="/js/dog-photo-helpers.js"></script>
     <script src="/js/event-handlers.js"></script>
     <script>
         // Custom toggle menu for index.html (handles both public and authenticated nav)
@@ -267,7 +268,7 @@
                     const dogColor = dog.color || allColors.find(c => c.id === dog.color_id);
                     const borderColor = dogColor ? dogColor.hex_code : '#82b965';
 
-                    const photoUrl = dog.photo ? `/uploads/${dog.photo}` : '/assets/images/placeholders/dog-placeholder.svg';
+                    const photoUrl = getPhotoUrl(dog.photo, '/assets/images/placeholders/dog-placeholder.svg');
 
                     // Validate external link URL to prevent javascript: protocol injection
                     let safeExternalLink = '';

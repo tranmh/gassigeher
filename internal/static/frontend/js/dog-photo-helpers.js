@@ -48,8 +48,8 @@ function getDogPhotoUrl(dog, useThumbnail = false) {
             ? dog.photo_thumbnail
             : dog.photo;
 
-        // Check if it's already a full URL (S3 storage) - use directly without prepending /uploads/
-        if (photoField.startsWith('http://') || photoField.startsWith('https://')) {
+        // Check if it's already a full URL (S3 storage) or absolute path - use directly
+        if (photoField.startsWith('http://') || photoField.startsWith('https://') || photoField.startsWith('/')) {
             return photoField;
         }
 
@@ -71,8 +71,8 @@ function getPhotoUrl(photoPath, fallback = '') {
         return fallback;
     }
 
-    // Check if it's already a full URL (S3 storage) - use directly
-    if (photoPath.startsWith('http://') || photoPath.startsWith('https://')) {
+    // Check if it's already a full URL (S3 storage) or absolute path - use directly
+    if (photoPath.startsWith('http://') || photoPath.startsWith('https://') || photoPath.startsWith('/')) {
         return photoPath;
     }
 

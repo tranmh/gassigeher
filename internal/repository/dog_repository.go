@@ -40,8 +40,8 @@ func (r *DogRepository) CreateTx(tx *sql.Tx, dog *models.Dog) error {
 		INSERT INTO dogs (
 			tenant_id, name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
 			pickup_location, walk_route, walk_duration, special_instructions,
-			default_morning_time, default_evening_time, is_available, external_link
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			default_morning_time, default_evening_time, is_available, is_featured, external_link
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	// tenant_id=0 is valid for Simple-Mode (non-SaaS)
@@ -63,6 +63,7 @@ func (r *DogRepository) CreateTx(tx *sql.Tx, dog *models.Dog) error {
 		dog.DefaultMorningTime,
 		dog.DefaultEveningTime,
 		dog.IsAvailable,
+		dog.IsFeatured,
 		dog.ExternalLink,
 	)
 	if err != nil {
@@ -87,8 +88,8 @@ func (r *DogRepository) Create(dog *models.Dog) error {
 		INSERT INTO dogs (
 			tenant_id, name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
 			pickup_location, walk_route, walk_duration, special_instructions,
-			default_morning_time, default_evening_time, is_available, external_link
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			default_morning_time, default_evening_time, is_available, is_featured, external_link
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	// tenant_id=0 is valid for Simple-Mode (non-SaaS)
@@ -110,6 +111,7 @@ func (r *DogRepository) Create(dog *models.Dog) error {
 		dog.DefaultMorningTime,
 		dog.DefaultEveningTime,
 		dog.IsAvailable,
+		dog.IsFeatured,
 		dog.ExternalLink,
 	)
 	if err != nil {
@@ -487,8 +489,8 @@ func (r *DogRepository) CreateWithLimitCheck(dog *models.Dog, limit int) error {
 		INSERT INTO dogs (
 			tenant_id, name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
 			pickup_location, walk_route, walk_duration, special_instructions,
-			default_morning_time, default_evening_time, is_available, external_link
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			default_morning_time, default_evening_time, is_available, is_featured, external_link
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	// tenant_id=0 is valid for Simple-Mode (non-SaaS)
@@ -510,6 +512,7 @@ func (r *DogRepository) CreateWithLimitCheck(dog *models.Dog, limit int) error {
 		dog.DefaultMorningTime,
 		dog.DefaultEveningTime,
 		dog.IsAvailable,
+		dog.IsFeatured,
 		dog.ExternalLink,
 	)
 	if err != nil {

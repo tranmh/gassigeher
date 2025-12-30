@@ -238,13 +238,13 @@ func TestDemoSeedService_ResetDemoTenant(t *testing.T) {
 	})
 
 	t.Run("reset recreates data", func(t *testing.T) {
-		// Delete some data first
-		db.Exec("DELETE FROM dogs WHERE tenant_id = ? AND name = 'Bella'", tenantID)
+		// Delete some data first (Max is a demo dog name)
+		db.Exec("DELETE FROM dogs WHERE tenant_id = ? AND name = 'Max'", tenantID)
 
 		var countBefore int
-		db.QueryRow("SELECT COUNT(*) FROM dogs WHERE tenant_id = ? AND name = 'Bella'", tenantID).Scan(&countBefore)
+		db.QueryRow("SELECT COUNT(*) FROM dogs WHERE tenant_id = ? AND name = 'Max'", tenantID).Scan(&countBefore)
 		if countBefore != 0 {
-			t.Errorf("Expected 0 Bella dogs before reset, got %d", countBefore)
+			t.Errorf("Expected 0 Max dogs before reset, got %d", countBefore)
 		}
 
 		// Reset
@@ -255,9 +255,9 @@ func TestDemoSeedService_ResetDemoTenant(t *testing.T) {
 
 		// Check data is recreated
 		var countAfter int
-		db.QueryRow("SELECT COUNT(*) FROM dogs WHERE tenant_id = ? AND name = 'Bella'", tenantID).Scan(&countAfter)
+		db.QueryRow("SELECT COUNT(*) FROM dogs WHERE tenant_id = ? AND name = 'Max'", tenantID).Scan(&countAfter)
 		if countAfter != 1 {
-			t.Errorf("Expected 1 Bella dog after reset, got %d", countAfter)
+			t.Errorf("Expected 1 Max dog after reset, got %d", countAfter)
 		}
 	})
 }
