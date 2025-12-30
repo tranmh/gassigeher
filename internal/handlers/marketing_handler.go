@@ -147,10 +147,20 @@ func (h *MarketingHandler) UpdateCampaign(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// HIGH-4 fix: Validate name length to prevent memory exhaustion
 	if req.Name != nil {
+		if len(*req.Name) > 255 {
+			respondError(w, http.StatusBadRequest, "Kampagnenname darf maximal 255 Zeichen lang sein")
+			return
+		}
 		campaign.Name = *req.Name
 	}
+	// HIGH-5 fix: Validate description length to prevent database bloat
 	if req.Description != nil {
+		if len(*req.Description) > 10000 {
+			respondError(w, http.StatusBadRequest, "Beschreibung darf maximal 10000 Zeichen lang sein")
+			return
+		}
 		campaign.Description = req.Description
 	}
 	if req.Config != nil {
@@ -160,11 +170,19 @@ func (h *MarketingHandler) UpdateCampaign(w http.ResponseWriter, r *http.Request
 		campaign.IsActive = *req.IsActive
 	}
 	if req.StartDate != nil {
-		t, _ := time.Parse("2006-01-02", *req.StartDate)
+		t, err := time.Parse("2006-01-02", *req.StartDate)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "Ungültiges Startdatum (Format: YYYY-MM-DD)")
+			return
+		}
 		campaign.StartDate = &t
 	}
 	if req.EndDate != nil {
-		t, _ := time.Parse("2006-01-02", *req.EndDate)
+		t, err := time.Parse("2006-01-02", *req.EndDate)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "Ungültiges Enddatum (Format: YYYY-MM-DD)")
+			return
+		}
 		campaign.EndDate = &t
 	}
 
@@ -300,6 +318,14 @@ func (h *MarketingHandler) CreateReferralCode(w http.ResponseWriter, r *http.Req
 		}
 	}
 
+	// Validate referrer email (HIGH-3 fix: prevent email header injection)
+	if req.ReferrerEmail != nil && *req.ReferrerEmail != "" {
+		if err := models.ValidateEmail(*req.ReferrerEmail); err != nil {
+			respondError(w, http.StatusBadRequest, "Ungültige E-Mail-Adresse des Empfehlers")
+			return
+		}
+	}
+
 	code := &models.ReferralCode{
 		Code:                   sanitizedCode,
 		ReferrerEmail:          req.ReferrerEmail,
@@ -393,6 +419,15 @@ func (h *MarketingHandler) UpdateReferralCode(w http.ResponseWriter, r *http.Req
 	if req.Code != "" {
 		code.Code = strings.ToUpper(strings.TrimSpace(req.Code))
 	}
+
+	// Validate referrer email (HIGH-3 fix: prevent email header injection)
+	if req.ReferrerEmail != nil && *req.ReferrerEmail != "" {
+		if err := models.ValidateEmail(*req.ReferrerEmail); err != nil {
+			respondError(w, http.StatusBadRequest, "Ungültige E-Mail-Adresse des Empfehlers")
+			return
+		}
+	}
+
 	code.ReferrerEmail = req.ReferrerEmail
 	code.DiscountMonthsReferrer = req.DiscountMonthsReferrer
 	code.DiscountMonthsReferee = req.DiscountMonthsReferee

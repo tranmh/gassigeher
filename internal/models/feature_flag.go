@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"regexp"
+	"time"
+)
 
 // FeatureFlag represents a feature toggle for gradual rollout
 type FeatureFlag struct {
@@ -64,4 +67,45 @@ type UpdateFeatureFlagRequest struct {
 // SetTenantFeatureFlagRequest represents the request to set a tenant's feature flag
 type SetTenantFeatureFlagRequest struct {
 	IsEnabled bool `json:"is_enabled"`
+}
+
+// featureFlagKeyPattern validates feature flag keys (alphanumeric + underscores)
+var featureFlagKeyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
+
+// Validate validates CreateFeatureFlagRequest (HIGH-6 fix)
+func (r *CreateFeatureFlagRequest) Validate() error {
+	// Key is required
+	if r.Key == "" {
+		return &ValidationError{Field: "key", Message: "Key ist erforderlich"}
+	}
+	// Key format: lowercase alphanumeric + underscores, 1-64 chars
+	if !featureFlagKeyPattern.MatchString(r.Key) {
+		return &ValidationError{Field: "key", Message: "Key muss mit Kleinbuchstaben beginnen und darf nur Kleinbuchstaben, Zahlen und Unterstriche enthalten (max 64 Zeichen)"}
+	}
+	// Name is required
+	if r.Name == "" {
+		return &ValidationError{Field: "name", Message: "Name ist erforderlich"}
+	}
+	// Name length limit
+	if len(r.Name) > 255 {
+		return &ValidationError{Field: "name", Message: "Name darf maximal 255 Zeichen lang sein"}
+	}
+	// Description length limit (optional but bounded)
+	if len(r.Description) > 1000 {
+		return &ValidationError{Field: "description", Message: "Beschreibung darf maximal 1000 Zeichen lang sein"}
+	}
+	return nil
+}
+
+// Validate validates UpdateFeatureFlagRequest (HIGH-6 fix)
+func (r *UpdateFeatureFlagRequest) Validate() error {
+	// Name length limit if provided
+	if r.Name != nil && len(*r.Name) > 255 {
+		return &ValidationError{Field: "name", Message: "Name darf maximal 255 Zeichen lang sein"}
+	}
+	// Description length limit if provided
+	if r.Description != nil && len(*r.Description) > 1000 {
+		return &ValidationError{Field: "description", Message: "Beschreibung darf maximal 1000 Zeichen lang sein"}
+	}
+	return nil
 }

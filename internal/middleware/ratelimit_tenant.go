@@ -218,6 +218,14 @@ func (t *TenantRateLimiter) cleanupStaleEntries() {
 var tenantRateLimiterInstance *TenantRateLimiter
 var tenantRateLimiterOnce sync.Once
 
+// CloseTenantRateLimiter stops the cleanup goroutine and releases resources
+// Should be called on server shutdown to prevent goroutine leaks
+func CloseTenantRateLimiter() {
+	if tenantRateLimiterInstance != nil {
+		tenantRateLimiterInstance.Close()
+	}
+}
+
 // TenantRateLimit creates middleware that enforces both tenant-wide and per-IP limits
 // Must be applied after TenantMiddleware (requires tenant ID in context)
 func TenantRateLimit(db *sql.DB) func(http.Handler) http.Handler {

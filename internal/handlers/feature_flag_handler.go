@@ -88,6 +88,12 @@ func (h *FeatureFlagHandler) CreateFlag(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// HIGH-6 fix: Validate request
+	if err := req.Validate(); err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	flag, err := h.service.CreateFlag(&req)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
@@ -110,6 +116,12 @@ func (h *FeatureFlagHandler) UpdateFlag(w http.ResponseWriter, r *http.Request) 
 	var req models.UpdateFeatureFlagRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondError(w, http.StatusBadRequest, "Ungültige Anfrage")
+		return
+	}
+
+	// HIGH-6 fix: Validate request
+	if err := req.Validate(); err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 

@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"path/filepath"
 	"regexp"
@@ -197,7 +198,11 @@ func (h *SettingsHandler) UploadLogo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Reset file reader position after MIME check
-	file.Seek(0, 0)
+	if _, err := file.Seek(0, 0); err != nil {
+		log.Printf("Error seeking file: %v", err)
+		respondError(w, http.StatusInternalServerError, "Fehler beim Verarbeiten der Datei")
+		return
+	}
 
 	// Process and save logo
 	logoPath, err := h.imageService.ProcessLogo(file)

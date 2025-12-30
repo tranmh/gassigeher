@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -478,7 +479,11 @@ func (h *WalkReportHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	// Reset file reader position after MIME check
-	file.Seek(0, 0)
+	if _, err := file.Seek(0, 0); err != nil {
+		log.Printf("Error seeking file: %v", err)
+		respondError(w, http.StatusInternalServerError, "Fehler beim Verarbeiten der Datei")
+		return
+	}
 
 	var fullPath, thumbPath string
 

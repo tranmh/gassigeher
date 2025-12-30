@@ -624,7 +624,11 @@ func (h *DogHandler) UploadDogPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Reset file reader position after MIME check
-	file.Seek(0, 0)
+	if _, err := file.Seek(0, 0); err != nil {
+		log.Printf("Error seeking file: %v", err)
+		respondError(w, http.StatusInternalServerError, "Fehler beim Verarbeiten der Datei")
+		return
+	}
 
 	// BUG FIX: Capture old photo path BEFORE processing new photo
 	// We'll delete old photos AFTER successfully processing the new one

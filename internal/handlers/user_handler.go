@@ -284,7 +284,11 @@ func (h *UserHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Reset file reader position after MIME check
-	file.Seek(0, 0)
+	if _, err := file.Seek(0, 0); err != nil {
+		log.Printf("Error seeking file: %v", err)
+		respondError(w, http.StatusInternalServerError, "Fehler beim Verarbeiten der Datei")
+		return
+	}
 
 	// Get user first (needed for cleanup)
 	user, err := h.userRepo.FindByID(userID)

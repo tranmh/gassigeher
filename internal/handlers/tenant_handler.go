@@ -975,6 +975,9 @@ func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request)
 				})
 			}
 		}
+		if err := rows.Err(); err != nil {
+			log.Printf("Warning: Error during dogs iteration for tenant %d: %v", tenantID, err)
+		}
 	}
 	export["dogs"] = dogs
 	export["dog_count"] = len(dogs)
@@ -1026,6 +1029,9 @@ func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request)
 				})
 			}
 		}
+		if err := rows.Err(); err != nil {
+			log.Printf("Warning: Error during bookings iteration for tenant %d: %v", tenantID, err)
+		}
 	}
 	export["bookings"] = bookings
 	export["booking_count"] = len(bookings)
@@ -1073,6 +1079,9 @@ func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request)
 					"created_at": bd.CreatedAt,
 				})
 			}
+		}
+		if err := rows.Err(); err != nil {
+			log.Printf("Warning: Error during blocked_dates iteration for tenant %d: %v", tenantID, err)
 		}
 	}
 	export["blocked_dates"] = blockedDates

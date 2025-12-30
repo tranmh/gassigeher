@@ -209,11 +209,17 @@ func (h *CentralAdminHandler) GetTenant(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Get additional stats
+	// Get additional stats (log errors but don't fail the request - stats are supplementary)
 	var userCount, dogCount, bookingCount int
-	h.db.QueryRow(`SELECT COUNT(*) FROM users WHERE tenant_id = ? AND is_deleted = 0`, tenantID).Scan(&userCount)
-	h.db.QueryRow(`SELECT COUNT(*) FROM dogs WHERE tenant_id = ?`, tenantID).Scan(&dogCount)
-	h.db.QueryRow(`SELECT COUNT(*) FROM bookings WHERE tenant_id = ?`, tenantID).Scan(&bookingCount)
+	if err := h.db.QueryRow(`SELECT COUNT(*) FROM users WHERE tenant_id = ? AND is_deleted = 0`, tenantID).Scan(&userCount); err != nil {
+		log.Printf("Warning: Failed to get user count for tenant %d: %v", tenantID, err)
+	}
+	if err := h.db.QueryRow(`SELECT COUNT(*) FROM dogs WHERE tenant_id = ?`, tenantID).Scan(&dogCount); err != nil {
+		log.Printf("Warning: Failed to get dog count for tenant %d: %v", tenantID, err)
+	}
+	if err := h.db.QueryRow(`SELECT COUNT(*) FROM bookings WHERE tenant_id = ?`, tenantID).Scan(&bookingCount); err != nil {
+		log.Printf("Warning: Failed to get booking count for tenant %d: %v", tenantID, err)
+	}
 
 	response := map[string]interface{}{
 		"tenant":        tenant,
@@ -374,6 +380,13 @@ func (h *CentralAdminHandler) ListCentralAdmins(w http.ResponseWriter, r *http.R
 			continue
 		}
 		admins = append(admins, a)
+	}
+
+	// Check for errors during iteration
+	if err := rows.Err(); err != nil {
+		log.Printf("Error iterating central admins: %v", err)
+		respondError(w, http.StatusInternalServerError, "Fehler beim Laden der Administratoren")
+		return
 	}
 
 	respondJSON(w, http.StatusOK, admins)
@@ -590,6 +603,13 @@ func (h *CentralAdminHandler) SearchUsers(w http.ResponseWriter, r *http.Request
 			continue
 		}
 		results = append(results, u)
+	}
+
+	// Check for errors during iteration
+	if err := rows.Err(); err != nil {
+		log.Printf("Error iterating user search results: %v", err)
+		respondError(w, http.StatusInternalServerError, "Fehler bei der Suche")
+		return
 	}
 
 	// Return paginated response

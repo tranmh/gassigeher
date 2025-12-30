@@ -221,6 +221,7 @@ func main() {
 		// Free tier: 30 req/s tenant-wide, 20 req/s per-IP
 		// Pro tier: 100 req/s tenant-wide, 50 req/s per-IP
 		router.Use(middleware.TenantRateLimit(db))
+		defer middleware.CloseTenantRateLimiter() // Cleanup goroutine on shutdown
 		log.Println("SaaS mode: Per-tenant rate limiting enabled")
 	} else {
 		// Simple-Mode: Inject default tenant (id=0) for all requests

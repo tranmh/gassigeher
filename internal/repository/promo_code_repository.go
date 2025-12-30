@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -116,8 +117,12 @@ func (r *PromoCodeRepository) GetByID(id int) (*models.PromoCode, error) {
 		code.MaxUses = &maxUsesInt
 	}
 	if expiresAt.Valid {
-		t, _ := time.Parse(time.RFC3339, expiresAt.String)
-		code.ExpiresAt = &t
+		t, err := time.Parse(time.RFC3339, expiresAt.String)
+		if err != nil {
+			log.Printf("Warning: Failed to parse expires_at for promo code %d: %v", code.ID, err)
+		} else {
+			code.ExpiresAt = &t
+		}
 	}
 
 	return code, nil
@@ -175,8 +180,12 @@ func (r *PromoCodeRepository) GetByCode(codeStr string) (*models.PromoCode, erro
 		code.MaxUses = &maxUsesInt
 	}
 	if expiresAt.Valid {
-		t, _ := time.Parse(time.RFC3339, expiresAt.String)
-		code.ExpiresAt = &t
+		t, err := time.Parse(time.RFC3339, expiresAt.String)
+		if err != nil {
+			log.Printf("Warning: Failed to parse expires_at for promo code %s: %v", codeStr, err)
+		} else {
+			code.ExpiresAt = &t
+		}
 	}
 
 	return code, nil
@@ -241,8 +250,12 @@ func (r *PromoCodeRepository) GetAll(activeOnly bool) ([]*models.PromoCode, erro
 			code.MaxUses = &maxUsesInt
 		}
 		if expiresAt.Valid {
-			t, _ := time.Parse(time.RFC3339, expiresAt.String)
-			code.ExpiresAt = &t
+			t, err := time.Parse(time.RFC3339, expiresAt.String)
+			if err != nil {
+				log.Printf("Warning: Failed to parse expires_at for promo code %d: %v", code.ID, err)
+			} else {
+				code.ExpiresAt = &t
+			}
 		}
 
 		codes = append(codes, code)

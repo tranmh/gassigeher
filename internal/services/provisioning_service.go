@@ -128,16 +128,25 @@ func (s *ProvisioningService) CreateDefaultSettings(tx *sql.Tx, tenantID int, fe
 	}
 
 	for key, value := range settings {
-		// Use INSERT OR REPLACE to handle schema where key alone is unique
-		// This handles cases where the original schema hasn't been fully migrated
-		// to the (tenant_id, key) composite key.
-		// Note: 'key' is a reserved word in SQL, so we use backticks/quotes.
-		_, err := tx.Exec(
-			"INSERT OR REPLACE INTO system_settings (tenant_id, `key`, value) VALUES (?, ?, ?)",
-			tenantID, key, value,
+		// Use UPDATE-then-INSERT pattern for cross-database compatibility
+		// (INSERT OR REPLACE is SQLite-specific, ON CONFLICT is PostgreSQL-specific)
+		result, err := tx.Exec(
+			"UPDATE system_settings SET value = ? WHERE tenant_id = ? AND `key` = ?",
+			value, tenantID, key,
 		)
 		if err != nil {
 			return err
+		}
+		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected == 0 {
+			// Row doesn't exist, insert it
+			_, err = tx.Exec(
+				"INSERT INTO system_settings (tenant_id, `key`, value) VALUES (?, ?, ?)",
+				tenantID, key, value,
+			)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
