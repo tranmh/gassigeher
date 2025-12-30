@@ -184,7 +184,7 @@ func (r *DogRepository) FindByID(id int) (*models.Dog, error) {
 }
 
 // FindByIDAndTenant finds a dog by ID with tenant isolation
-// SaaS: Returns nil if dog doesn't belong to the specified tenant
+// SaaS: Returns ErrNotFound if dog doesn't exist, ErrTenantMismatch if it belongs to a different tenant
 // Use tenantID=0 for Simple-Mode (no tenant filtering)
 func (r *DogRepository) FindByIDAndTenant(id int, tenantID int) (*models.Dog, error) {
 	dog, err := r.FindByID(id)
@@ -192,11 +192,11 @@ func (r *DogRepository) FindByIDAndTenant(id int, tenantID int) (*models.Dog, er
 		return nil, err
 	}
 	if dog == nil {
-		return nil, nil
+		return nil, ErrNotFound
 	}
 	// Verify tenant membership (works for both Simple-Mode tenant_id=0 and SaaS-Mode)
 	if dog.TenantID != tenantID {
-		return nil, nil // Dog doesn't belong to this tenant
+		return nil, ErrTenantMismatch // Dog doesn't belong to this tenant
 	}
 	return dog, nil
 }
@@ -321,10 +321,22 @@ func (r *DogRepository) FindAll(filter *models.DogFilterRequest, tenantID int) (
 	return dogs, nil
 }
 
+// maxFeaturedDogs is the maximum number of featured dogs to return
+const maxFeaturedDogs = 3
+
+// featuredQueryLimit bounds the initial query to prevent unbounded memory usage
+// We fetch a small pool (3x the result size) for random selection variety
+// while still limiting memory usage to a reasonable amount
+const featuredQueryLimit = 12
+
 // GetFeatured returns up to 3 randomly selected featured dogs that are available
 // If more than 3 dogs are featured, a random selection of 3 is returned
 // Always filters by tenant_id (tenant_id=0 for Simple-Mode, >0 for SaaS-Mode)
+// FIX: Now uses LIMIT to bound the initial query and prevent unbounded memory usage
 func (r *DogRepository) GetFeatured(tenantID int) ([]*models.Dog, error) {
+	// Use LIMIT to bound memory usage - fetch a pool of candidates for random selection
+	// Using a larger pool (featuredQueryLimit) gives good randomization variety
+	// while still preventing unbounded memory usage
 	query := `
 		SELECT id, tenant_id, name, breed, size, age, color_id, photo, photo_thumbnail, special_needs,
 		       pickup_location, walk_route, walk_duration, special_instructions,
@@ -332,10 +344,11 @@ func (r *DogRepository) GetFeatured(tenantID int) ([]*models.Dog, error) {
 		       external_link, unavailable_reason, unavailable_since, created_at, updated_at
 		FROM dogs
 		WHERE is_featured = 1 AND is_available = 1 AND tenant_id = ?
-		ORDER BY name ASC
+		ORDER BY id DESC
+		LIMIT ?
 	`
 
-	args := []interface{}{tenantID}
+	args := []interface{}{tenantID, featuredQueryLimit}
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -343,7 +356,7 @@ func (r *DogRepository) GetFeatured(tenantID int) ([]*models.Dog, error) {
 	}
 	defer rows.Close()
 
-	allFeatured := []*models.Dog{}
+	candidates := make([]*models.Dog, 0, featuredQueryLimit)
 	for rows.Next() {
 		dog := &models.Dog{}
 		var tenantIDVal sql.NullInt64
@@ -378,24 +391,24 @@ func (r *DogRepository) GetFeatured(tenantID int) ([]*models.Dog, error) {
 		if tenantIDVal.Valid {
 			dog.TenantID = int(tenantIDVal.Int64)
 		}
-		allFeatured = append(allFeatured, dog)
+		candidates = append(candidates, dog)
 	}
 
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating featured dogs: %w", err)
 	}
 
-	// If 3 or fewer, return all
-	if len(allFeatured) <= 3 {
-		return allFeatured, nil
+	// If maxFeaturedDogs or fewer, return all
+	if len(candidates) <= maxFeaturedDogs {
+		return candidates, nil
 	}
 
-	// Randomly select 3 from all featured dogs
-	rand.Shuffle(len(allFeatured), func(i, j int) {
-		allFeatured[i], allFeatured[j] = allFeatured[j], allFeatured[i]
+	// Randomly select maxFeaturedDogs from the bounded candidate pool
+	rand.Shuffle(len(candidates), func(i, j int) {
+		candidates[i], candidates[j] = candidates[j], candidates[i]
 	})
 
-	return allFeatured[:3], nil
+	return candidates[:maxFeaturedDogs], nil
 }
 
 // SetFeatured sets the featured status for a dog
@@ -648,7 +661,8 @@ func (r *DogRepository) ForceDelete(id int, tenantID int) error {
 }
 
 // GetFutureBookings returns all future bookings for a dog with user details
-func (r *DogRepository) GetFutureBookings(dogID int) ([]*models.Booking, error) {
+// SaaS: Now includes tenant_id filter for multi-tenant isolation
+func (r *DogRepository) GetFutureBookings(dogID int, tenantID int) ([]*models.Booking, error) {
 	currentDate := time.Now().Format("2006-01-02")
 	query := `
 		SELECT
@@ -657,11 +671,11 @@ func (r *DogRepository) GetFutureBookings(dogID int) ([]*models.Booking, error) 
 			u.first_name as user_first_name, u.last_name as user_last_name, u.email as user_email
 		FROM bookings b
 		LEFT JOIN users u ON b.user_id = u.id
-		WHERE b.dog_id = ? AND b.date >= ? AND b.status = 'scheduled'
+		WHERE b.dog_id = ? AND b.tenant_id = ? AND b.date >= ? AND b.status = 'scheduled'
 		ORDER BY b.date ASC, b.scheduled_time ASC
 	`
 
-	rows, err := r.db.Query(query, dogID, currentDate)
+	rows, err := r.db.Query(query, dogID, tenantID, currentDate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query future bookings: %w", err)
 	}

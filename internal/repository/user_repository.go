@@ -258,7 +258,7 @@ func (r *UserRepository) FindByID(id int) (*models.User, error) {
 }
 
 // FindByIDAndTenant finds a user by ID with tenant isolation
-// SaaS: Returns nil if user doesn't belong to the specified tenant
+// SaaS: Returns ErrNotFound if user doesn't exist, ErrTenantMismatch if they belong to a different tenant
 // Use tenantID=0 for Simple-Mode (no tenant filtering)
 func (r *UserRepository) FindByIDAndTenant(id int, tenantID int) (*models.User, error) {
 	user, err := r.FindByID(id)
@@ -266,11 +266,11 @@ func (r *UserRepository) FindByIDAndTenant(id int, tenantID int) (*models.User, 
 		return nil, err
 	}
 	if user == nil {
-		return nil, nil
+		return nil, ErrNotFound
 	}
 	// Verify tenant membership (works for both Simple-Mode tenant_id=0 and SaaS-Mode)
 	if user.TenantID != tenantID {
-		return nil, nil // User doesn't belong to this tenant
+		return nil, ErrTenantMismatch // User doesn't belong to this tenant
 	}
 	return user, nil
 }

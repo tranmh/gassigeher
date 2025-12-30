@@ -82,6 +82,69 @@ func isDemoEmail(email string) bool {
 	return strings.HasSuffix(email, "@demo.gassigeher.org")
 }
 
+// =============================================================================
+// EMAIL SERVICE HEALTH CHECK METHODS
+// =============================================================================
+// These methods allow handlers and health endpoints to verify email functionality
+// is properly configured and available, addressing the silent failure issue.
+
+// EmailServiceHealthStatus contains comprehensive health check results
+type EmailServiceHealthStatus struct {
+	Healthy   bool   `json:"healthy"`
+	Provider  string `json:"provider"`
+	FromEmail string `json:"from_email,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
+// IsHealthy returns true if the email service is properly initialized and ready
+// This method is safe to call on a nil receiver
+func (s *EmailService) IsHealthy() bool {
+	if s == nil {
+		return false
+	}
+	if s.provider == nil {
+		return false
+	}
+	return true
+}
+
+// GetHealthStatus returns detailed health status for the email service
+// This method is safe to call on a nil receiver
+func (s *EmailService) GetHealthStatus() EmailServiceHealthStatus {
+	if s == nil {
+		return EmailServiceHealthStatus{
+			Healthy:  false,
+			Provider: "none",
+			Error:    "email service not initialized",
+		}
+	}
+	if s.provider == nil {
+		return EmailServiceHealthStatus{
+			Healthy:  false,
+			Provider: "none",
+			Error:    "email provider not configured",
+		}
+	}
+
+	return EmailServiceHealthStatus{
+		Healthy:   true,
+		Provider:  "configured",
+		FromEmail: s.provider.GetFromEmail(),
+		Error:     "",
+	}
+}
+
+// LogHealthStatus logs the current health status of the email service
+// Use this at startup or when debugging email issues
+func (s *EmailService) LogHealthStatus() {
+	status := s.GetHealthStatus()
+	if status.Healthy {
+		log.Printf("[EMAIL HEALTH] OK: Provider configured, from email: %s", status.FromEmail)
+	} else {
+		log.Printf("[EMAIL HEALTH] UNHEALTHY: %s", status.Error)
+	}
+}
+
 // SendVerificationEmail sends an email verification link
 func (s *EmailService) SendVerificationEmail(to, name, token string) error {
 	subject := "Willkommen bei Gassigeher - E-Mail-Adresse bestätigen"

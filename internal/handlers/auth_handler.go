@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -87,15 +88,17 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if user already exists (within tenant)
-	existing, err := h.userRepo.FindByEmail(req.Email, tenantID)
+	// BUG FIX: Check if email already exists GLOBALLY (across all tenants)
+	// This prevents the same email from being registered in multiple tenants,
+	// which would cause login ambiguity (which tenant should the user log into?)
+	emailExistsGlobally, err := h.userRepo.EmailExistsGlobally(req.Email)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Database error")
 		return
 	}
 	// SECURITY: GASSI-2025-006 - Don't reveal if email exists
 	// Return same response for existing and new emails to prevent user enumeration
-	if existing != nil {
+	if emailExistsGlobally {
 		// Return same response as successful registration to prevent enumeration
 		// Don't send verification email since user already exists
 		respondJSON(w, http.StatusCreated, map[string]interface{}{
@@ -559,6 +562,12 @@ func respondJSON(w http.ResponseWriter, status int, data interface{}) {
 
 func respondError(w http.ResponseWriter, status int, message string) {
 	respondJSON(w, status, map[string]string{"error": message})
+}
+
+// isNotFoundOrTenantError checks if the error is ErrNotFound or ErrTenantMismatch
+// This helper is used to convert repository-level errors to appropriate HTTP responses
+func isNotFoundOrTenantError(err error) bool {
+	return errors.Is(err, repository.ErrNotFound) || errors.Is(err, repository.ErrTenantMismatch)
 }
 
 // getClientIPForAuth extracts the real client IP address for brute force tracking

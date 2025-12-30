@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -17,6 +18,18 @@ import (
 	"github.com/tranmh/gassigeher/internal/repository"
 	"github.com/tranmh/gassigeher/internal/services"
 )
+
+// escapeSQLLikeWildcards escapes SQL LIKE wildcard characters (% and _) in a search term
+// This prevents SQL LIKE injection attacks where user input containing % or _ could
+// match unintended patterns. Uses '!' as the escape character for cross-database compatibility.
+// Example: "100%" becomes "100!%", "under_score" becomes "under!_"
+func escapeSQLLikeWildcards(s string) string {
+	// Escape the escape character first (so we don't double-escape), then % and _
+	s = strings.ReplaceAll(s, "!", "!!")
+	s = strings.ReplaceAll(s, "%", "!%")
+	s = strings.ReplaceAll(s, "_", "!_")
+	return s
+}
 
 // CentralAdminHandler handles platform-wide administration
 type CentralAdminHandler struct {
@@ -140,8 +153,9 @@ func (h *CentralAdminHandler) ListTenants(w http.ResponseWriter, r *http.Request
 	}
 
 	if searchTerm != "" {
-		query += ` AND (t.name LIKE ? OR t.slug LIKE ? OR t.contact_email LIKE ?)`
-		searchPattern := "%" + searchTerm + "%"
+		query += " AND (t.name LIKE ? ESCAPE '!' OR t.slug LIKE ? ESCAPE '!' OR t.contact_email LIKE ? ESCAPE '!')"
+		escapedTerm := escapeSQLLikeWildcards(searchTerm)
+		searchPattern := "%" + escapedTerm + "%"
 		args = append(args, searchPattern, searchPattern, searchPattern)
 	}
 
@@ -534,12 +548,13 @@ func (h *CentralAdminHandler) SearchUsers(w http.ResponseWriter, r *http.Request
 			LIMIT ? OFFSET ?
 		`, limit, offset)
 	} else {
-		// Search with term
-		searchPattern := "%" + searchTerm + "%"
+		// Search with term - escape LIKE wildcards to prevent injection
+		escapedTerm := escapeSQLLikeWildcards(searchTerm)
+		searchPattern := "%" + escapedTerm + "%"
 		err = h.db.QueryRow(`
 			SELECT COUNT(*) FROM users u
 			WHERE u.is_deleted = 0
-			  AND (u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ?)
+			  AND (u.first_name LIKE ? ESCAPE '!' OR u.last_name LIKE ? ESCAPE '!' OR u.email LIKE ? ESCAPE '!')
 		`, searchPattern, searchPattern, searchPattern).Scan(&totalCount)
 		if err != nil {
 			log.Printf("Error counting users: %v", err)
@@ -553,7 +568,7 @@ func (h *CentralAdminHandler) SearchUsers(w http.ResponseWriter, r *http.Request
 			FROM users u
 			LEFT JOIN tenants t ON u.tenant_id = t.id
 			WHERE u.is_deleted = 0
-			  AND (u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ?)
+			  AND (u.first_name LIKE ? ESCAPE '!' OR u.last_name LIKE ? ESCAPE '!' OR u.email LIKE ? ESCAPE '!')
 			ORDER BY u.last_name, u.first_name
 			LIMIT ? OFFSET ?
 		`, searchPattern, searchPattern, searchPattern, limit, offset)

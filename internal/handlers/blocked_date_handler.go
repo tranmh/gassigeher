@@ -85,11 +85,11 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
 	if req.DogID != nil {
 		dog, err := h.dogRepo.FindByIDAndTenant(*req.DogID, tenantID)
 		if err != nil {
+			if isNotFoundOrTenantError(err) {
+				respondError(w, http.StatusNotFound, "Dog not found")
+				return
+			}
 			respondError(w, http.StatusInternalServerError, "Failed to verify dog")
-			return
-		}
-		if dog == nil {
-			respondError(w, http.StatusNotFound, "Dog not found")
 			return
 		}
 		dogName = dog.Name

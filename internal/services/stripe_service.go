@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/stripe/stripe-go/v76"
 	portalsession "github.com/stripe/stripe-go/v76/billingportal/session"
@@ -272,15 +273,21 @@ func (s *StripeService) ParseCheckoutSessionEvent(event *stripe.Event) (*Checkou
 	// Extract promo code ID from metadata
 	if promoCodeIDStr, ok := session.Metadata["promo_code_id"]; ok {
 		var promoCodeID int
-		fmt.Sscanf(promoCodeIDStr, "%d", &promoCodeID)
-		data.PromoCodeID = promoCodeID
+		if n, err := fmt.Sscanf(promoCodeIDStr, "%d", &promoCodeID); err != nil || n != 1 {
+			log.Printf("WARNING: Failed to parse promo_code_id '%s': %v", promoCodeIDStr, err)
+		} else {
+			data.PromoCodeID = promoCodeID
+		}
 	}
 
 	// Extract referral code ID from metadata
 	if referralCodeIDStr, ok := session.Metadata["referral_code_id"]; ok {
 		var referralCodeID int
-		fmt.Sscanf(referralCodeIDStr, "%d", &referralCodeID)
-		data.ReferralCodeID = referralCodeID
+		if n, err := fmt.Sscanf(referralCodeIDStr, "%d", &referralCodeID); err != nil || n != 1 {
+			log.Printf("WARNING: Failed to parse referral_code_id '%s': %v", referralCodeIDStr, err)
+		} else {
+			data.ReferralCodeID = referralCodeID
+		}
 	}
 
 	return data, nil

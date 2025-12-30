@@ -578,7 +578,7 @@ func (h *BillingHandler) handleCheckoutCompleted(event *stripe.Event) {
 	}
 
 	if subscription != nil {
-		subscription.PlanID = 2 // Pro plan
+		subscription.PlanID = models.ProPlanID
 		subscription.Status = models.SubscriptionStatusActive
 
 		// Track which codes were applied for combined source
@@ -840,7 +840,7 @@ func (h *BillingHandler) handleSubscriptionDeleted(event *stripe.Event) {
 
 	// Mark as cancelled and downgrade to free
 	subscription.Status = models.SubscriptionStatusCancelled
-	subscription.PlanID = 1 // Free plan
+	subscription.PlanID = models.FreePlanID
 	if err := h.subscriptionRepo.UpdateSubscription(subscription); err != nil {
 		log.Printf("ERROR: Failed to downgrade subscription %s to free: %v", data.SubscriptionID, err)
 	}

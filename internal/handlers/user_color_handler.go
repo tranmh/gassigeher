@@ -53,13 +53,12 @@ func (h *UserColorHandler) GetUserColors(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Check if user exists and belongs to this tenant
-	user, err := h.userRepo.FindByIDAndTenant(userID, tenantID)
-	if err != nil {
+	if _, err := h.userRepo.FindByIDAndTenant(userID, tenantID); err != nil {
+		if isNotFoundOrTenantError(err) {
+			respondError(w, http.StatusNotFound, "User not found")
+			return
+		}
 		respondError(w, http.StatusInternalServerError, "Failed to get user")
-		return
-	}
-	if user == nil {
-		respondError(w, http.StatusNotFound, "User not found")
 		return
 	}
 
@@ -94,13 +93,13 @@ func (h *UserColorHandler) AddColorToUser(w http.ResponseWriter, r *http.Request
 	}
 
 	// Check if user exists and belongs to this tenant
-	user, err := h.userRepo.FindByIDAndTenant(userID, tenantID)
+	_, err = h.userRepo.FindByIDAndTenant(userID, tenantID)
 	if err != nil {
+		if isNotFoundOrTenantError(err) {
+			respondError(w, http.StatusNotFound, "User not found")
+			return
+		}
 		respondError(w, http.StatusInternalServerError, "Failed to get user")
-		return
-	}
-	if user == nil {
-		respondError(w, http.StatusNotFound, "User not found")
 		return
 	}
 
@@ -177,13 +176,13 @@ func (h *UserColorHandler) RemoveColorFromUser(w http.ResponseWriter, r *http.Re
 	}
 
 	// Check if user exists and belongs to this tenant
-	user, err := h.userRepo.FindByIDAndTenant(userID, tenantID)
+	_, err = h.userRepo.FindByIDAndTenant(userID, tenantID)
 	if err != nil {
+		if isNotFoundOrTenantError(err) {
+			respondError(w, http.StatusNotFound, "User not found")
+			return
+		}
 		respondError(w, http.StatusInternalServerError, "Failed to get user")
-		return
-	}
-	if user == nil {
-		respondError(w, http.StatusNotFound, "User not found")
 		return
 	}
 
@@ -229,13 +228,13 @@ func (h *UserColorHandler) SetUserColors(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Check if user exists and belongs to this tenant
-	user, err := h.userRepo.FindByIDAndTenant(userID, tenantID)
+	_, err = h.userRepo.FindByIDAndTenant(userID, tenantID)
 	if err != nil {
+		if isNotFoundOrTenantError(err) {
+			respondError(w, http.StatusNotFound, "User not found")
+			return
+		}
 		respondError(w, http.StatusInternalServerError, "Failed to get user")
-		return
-	}
-	if user == nil {
-		respondError(w, http.StatusNotFound, "User not found")
 		return
 	}
 

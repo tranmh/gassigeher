@@ -1232,7 +1232,10 @@ func (h *UserHandler) AdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	// Delete account (GDPR anonymization)
 	if err := h.userRepo.DeleteAccount(targetUserID); err != nil {
-		respondError(w, http.StatusInternalServerError, "Fehler beim Löschen des Benutzers: "+err.Error())
+		// BUG FIX: Log detailed error internally, return generic message to user
+		// This prevents leaking database/system error details to potential attackers
+		log.Printf("ERROR: Failed to delete user %d: %v", targetUserID, err)
+		respondError(w, http.StatusInternalServerError, "Fehler beim Löschen des Benutzers")
 		return
 	}
 

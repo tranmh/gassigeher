@@ -187,14 +187,27 @@ func (r *WalkReportRepository) FindByDogID(tenantID int, dogID int, limit int) (
 		reports = append(reports, report)
 	}
 
-	// Load photos for each report AFTER closing the rows cursor
-	// (avoids deadlock with SQLite's single connection)
-	for _, report := range reports {
-		photos, err := r.GetPhotos(tenantID, report.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load photos: %w", err)
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating walk reports: %w", err)
+	}
+
+	// Batch load photos for all reports in a single query (fixes N+1 query bug)
+	if len(reports) > 0 {
+		reportIDs := make([]int, len(reports))
+		for i, report := range reports {
+			reportIDs[i] = report.ID
 		}
-		report.Photos = photos
+
+		photosMap, err := r.GetPhotosByReportIDs(tenantID, reportIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to batch load photos: %w", err)
+		}
+
+		for _, report := range reports {
+			if photos, ok := photosMap[report.ID]; ok {
+				report.Photos = photos
+			}
+		}
 	}
 
 	return reports, nil
@@ -250,14 +263,27 @@ func (r *WalkReportRepository) FindByUserID(tenantID int, userID int, limit int)
 		reports = append(reports, report)
 	}
 
-	// Load photos for each report AFTER closing the rows cursor
-	// (avoids deadlock with SQLite's single connection)
-	for _, report := range reports {
-		photos, err := r.GetPhotos(tenantID, report.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load photos: %w", err)
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating walk reports: %w", err)
+	}
+
+	// Batch load photos for all reports in a single query (fixes N+1 query bug)
+	if len(reports) > 0 {
+		reportIDs := make([]int, len(reports))
+		for i, report := range reports {
+			reportIDs[i] = report.ID
 		}
-		report.Photos = photos
+
+		photosMap, err := r.GetPhotosByReportIDs(tenantID, reportIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to batch load photos: %w", err)
+		}
+
+		for _, report := range reports {
+			if photos, ok := photosMap[report.ID]; ok {
+				report.Photos = photos
+			}
+		}
 	}
 
 	return reports, nil
@@ -381,6 +407,10 @@ func (r *WalkReportRepository) GetPhotos(tenantID int, reportID int) ([]models.W
 			return nil, fmt.Errorf("failed to scan photo: %w", err)
 		}
 		photos = append(photos, photo)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating photos: %w", err)
 	}
 
 	return photos, nil
@@ -507,4 +537,71 @@ func (r *WalkReportRepository) IsBookingCompleted(tenantID int, bookingID int) (
 	}
 
 	return status == "completed", nil
+}
+
+// GetPhotosByReportIDs batch loads photos for multiple walk reports in a single query
+// This fixes the N+1 query problem where GetPhotos was called individually for each report
+// Returns a map of reportID -> photos
+func (r *WalkReportRepository) GetPhotosByReportIDs(tenantID int, reportIDs []int) (map[int][]models.WalkReportPhoto, error) {
+	if len(reportIDs) == 0 {
+		return make(map[int][]models.WalkReportPhoto), nil
+	}
+
+	// Build placeholder string for IN clause
+	placeholders := make([]string, len(reportIDs))
+	args := make([]interface{}, len(reportIDs)+1)
+	args[0] = tenantID
+	for i, id := range reportIDs {
+		placeholders[i] = "?"
+		args[i+1] = id
+	}
+
+	query := `
+		SELECT id, tenant_id, walk_report_id, photo_path, photo_thumbnail, display_order, created_at
+		FROM walk_report_photos
+		WHERE tenant_id = ? AND walk_report_id IN (` + joinStrings(placeholders, ",") + `)
+		ORDER BY walk_report_id, display_order ASC
+	`
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query photos: %w", err)
+	}
+	defer rows.Close()
+
+	photosMap := make(map[int][]models.WalkReportPhoto)
+	for rows.Next() {
+		photo := models.WalkReportPhoto{}
+		err := rows.Scan(
+			&photo.ID,
+			&photo.TenantID,
+			&photo.WalkReportID,
+			&photo.PhotoPath,
+			&photo.PhotoThumbnail,
+			&photo.DisplayOrder,
+			&photo.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan photo: %w", err)
+		}
+		photosMap[photo.WalkReportID] = append(photosMap[photo.WalkReportID], photo)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating photos: %w", err)
+	}
+
+	return photosMap, nil
+}
+
+// joinStrings joins strings with a separator (avoiding import of strings package)
+func joinStrings(strs []string, sep string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+	result := strs[0]
+	for i := 1; i < len(strs); i++ {
+		result += sep + strs[i]
+	}
+	return result
 }

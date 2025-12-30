@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
 	"github.com/tranmh/gassigeher/internal/services"
@@ -171,6 +173,10 @@ func TestDogHandler_UploadDogPhoto_Integration(t *testing.T) {
 		// Add route vars
 		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dog.ID)})
 
+		// Add tenant context (required after TenantID=0 bypass fix)
+		ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 0)
+		req = req.WithContext(ctx)
+
 		// Record response
 		rr := httptest.NewRecorder()
 
@@ -268,6 +274,10 @@ func TestDogHandler_UploadDogPhoto_Integration(t *testing.T) {
 		req.Header.Set("Content-Type", contentType)
 		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dog.ID)})
 
+		// Add tenant context (required after TenantID=0 bypass fix)
+		ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 0)
+		req = req.WithContext(ctx)
+
 		// Record response
 		rr := httptest.NewRecorder()
 
@@ -298,6 +308,8 @@ func TestDogHandler_UploadDogPhoto_Integration(t *testing.T) {
 		req1 := httptest.NewRequest("POST", fmt.Sprintf("/api/dogs/%d/photo", dog.ID), body1)
 		req1.Header.Set("Content-Type", contentType1)
 		req1 = mux.SetURLVars(req1, map[string]string{"id": fmt.Sprintf("%d", dog.ID)})
+		ctx1 := context.WithValue(req1.Context(), middleware.TenantIDKey, 0)
+		req1 = req1.WithContext(ctx1)
 
 		rr1 := httptest.NewRecorder()
 		handler.UploadDogPhoto(rr1, req1)
@@ -313,6 +325,8 @@ func TestDogHandler_UploadDogPhoto_Integration(t *testing.T) {
 		req2 := httptest.NewRequest("POST", fmt.Sprintf("/api/dogs/%d/photo", dog.ID), body2)
 		req2.Header.Set("Content-Type", contentType2)
 		req2 = mux.SetURLVars(req2, map[string]string{"id": fmt.Sprintf("%d", dog.ID)})
+		ctx2 := context.WithValue(req2.Context(), middleware.TenantIDKey, 0)
+		req2 = req2.WithContext(ctx2)
 
 		rr2 := httptest.NewRecorder()
 		handler.UploadDogPhoto(rr2, req2)
@@ -334,6 +348,8 @@ func TestDogHandler_UploadDogPhoto_Integration(t *testing.T) {
 		req := httptest.NewRequest("POST", fmt.Sprintf("/api/dogs/%d/photo", dog.ID), body)
 		req.Header.Set("Content-Type", contentType)
 		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dog.ID)})
+		ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 0)
+		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
 		handler.UploadDogPhoto(rr, req)
@@ -351,6 +367,8 @@ func TestDogHandler_UploadDogPhoto_Integration(t *testing.T) {
 		req := httptest.NewRequest("POST", fmt.Sprintf("/api/dogs/%d/photo", dog.ID), body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dog.ID)})
+		ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 0)
+		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
 		handler.UploadDogPhoto(rr, req)
@@ -367,6 +385,8 @@ func TestDogHandler_UploadDogPhoto_Integration(t *testing.T) {
 		req := httptest.NewRequest("POST", "/api/dogs/99999/photo", body)
 		req.Header.Set("Content-Type", contentType)
 		req = mux.SetURLVars(req, map[string]string{"id": "99999"})
+		ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 0)
+		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
 		handler.UploadDogPhoto(rr, req)
@@ -384,6 +404,8 @@ func TestDogHandler_UploadDogPhoto_Integration(t *testing.T) {
 		req := httptest.NewRequest("POST", fmt.Sprintf("/api/dogs/%d/photo", dog.ID), body)
 		req.Header.Set("Content-Type", contentType)
 		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dog.ID)})
+		ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 0)
+		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
 		handler.UploadDogPhoto(rr, req)
@@ -401,6 +423,8 @@ func TestDogHandler_UploadDogPhoto_Integration(t *testing.T) {
 		req := httptest.NewRequest("POST", fmt.Sprintf("/api/dogs/%d/photo", dog.ID), body)
 		req.Header.Set("Content-Type", contentType)
 		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", dog.ID)})
+		ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 0)
+		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
 		handler.UploadDogPhoto(rr, req)

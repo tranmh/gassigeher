@@ -174,5 +174,9 @@ func (r *HolidayRepository) scanHolidays(rows *sql.Rows) ([]models.CustomHoliday
 		holidays = append(holidays, h)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating holidays: %w", err)
+	}
+
 	return holidays, nil
 }

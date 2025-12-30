@@ -160,12 +160,11 @@ func (h *DogHandler) GetDog(w http.ResponseWriter, r *http.Request) {
 
 	dog, err := h.dogRepo.FindByIDAndTenant(id, tenantID)
 	if err != nil {
+		if isNotFoundOrTenantError(err) {
+			respondError(w, http.StatusNotFound, "Dog not found")
+			return
+		}
 		respondError(w, http.StatusInternalServerError, "Database error")
-		return
-	}
-
-	if dog == nil {
-		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
 
@@ -346,12 +345,11 @@ func (h *DogHandler) UpdateDog(w http.ResponseWriter, r *http.Request) {
 	// Get existing dog with tenant verification
 	dog, err := h.dogRepo.FindByIDAndTenant(id, tenantID)
 	if err != nil {
+		if isNotFoundOrTenantError(err) {
+			respondError(w, http.StatusNotFound, "Dog not found")
+			return
+		}
 		respondError(w, http.StatusInternalServerError, "Database error")
-		return
-	}
-
-	if dog == nil {
-		respondError(w, http.StatusNotFound, "Dog not found")
 		return
 	}
 
@@ -487,8 +485,8 @@ func (h *DogHandler) DeleteDog(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Get all future bookings
-		bookings, err := h.dogRepo.GetFutureBookings(id)
+		// Get all future bookings (filtered by tenantID for SaaS isolation)
+		bookings, err := h.dogRepo.GetFutureBookings(id, tenantID)
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "Failed to fetch bookings")
 			return
@@ -543,8 +541,8 @@ func (h *DogHandler) DeleteDog(w http.ResponseWriter, r *http.Request) {
 	err = h.dogRepo.Delete(id, tenantID)
 	if err != nil {
 		if strings.Contains(err.Error(), "future bookings") {
-			// Get the future bookings to return to frontend
-			bookings, fetchErr := h.dogRepo.GetFutureBookings(id)
+			// Get the future bookings to return to frontend (filtered by tenantID for SaaS isolation)
+			bookings, fetchErr := h.dogRepo.GetFutureBookings(id, tenantID)
 			if fetchErr != nil {
 				respondError(w, http.StatusInternalServerError, "Failed to fetch bookings")
 				return
@@ -575,12 +573,22 @@ func (h *DogHandler) UploadDogPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// SaaS: Get tenant_id from context for isolation
-	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+	// SaaS SECURITY: Get tenant_id from context and validate presence
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+	if !ok {
+		// BUG FIX: Tenant context is missing (middleware bypass or misconfiguration)
+		respondError(w, http.StatusInternalServerError, "Request validation failed")
+		return
+	}
 
 	// Get existing dog with tenant verification
 	dog, err := h.dogRepo.FindByIDAndTenant(id, tenantID)
 	if err != nil {
+		// BUG FIX: Handle ErrNotFound and ErrTenantMismatch properly
+		if isNotFoundOrTenantError(err) {
+			respondError(w, http.StatusNotFound, "Dog not found")
+			return
+		}
 		respondError(w, http.StatusInternalServerError, "Database error")
 		return
 	}
@@ -723,6 +731,11 @@ func (h *DogHandler) DeleteDogPhoto(w http.ResponseWriter, r *http.Request) {
 	// Get existing dog with tenant verification
 	dog, err := h.dogRepo.FindByIDAndTenant(id, tenantID)
 	if err != nil {
+		// BUG FIX: Handle ErrNotFound and ErrTenantMismatch properly
+		if isNotFoundOrTenantError(err) {
+			respondError(w, http.StatusNotFound, "Dog not found")
+			return
+		}
 		respondError(w, http.StatusInternalServerError, "Database error")
 		return
 	}
