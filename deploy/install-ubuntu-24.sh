@@ -315,7 +315,6 @@ RUN apk add --no-cache ca-certificates tzdata wget
 WORKDIR /app
 
 COPY --from=builder /app/gassigeher .
-COPY --from=builder /app/frontend ./frontend
 
 RUN mkdir -p /app/uploads /app/logs
 
@@ -647,11 +646,11 @@ copy_source_code() {
     SOURCE_DIR="$(dirname "$SCRIPT_DIR")"
 
     if [[ -f "$SOURCE_DIR/go.mod" ]]; then
-        cp -r "$SOURCE_DIR"/{cmd,internal,frontend,go.mod,go.sum} "$INSTALL_DIR/"
+        cp -r "$SOURCE_DIR"/{cmd,internal,go.mod,go.sum} "$INSTALL_DIR/"
         log_success "Source code copied from $SOURCE_DIR"
     else
         log_warn "Source code not found. You'll need to copy it manually."
-        echo "  cp -r /path/to/gassigeher/{cmd,internal,frontend,go.mod,go.sum} $INSTALL_DIR/"
+        echo "  cp -r /path/to/gassigeher/{cmd,internal,go.mod,go.sum} $INSTALL_DIR/"
     fi
 }
 
@@ -725,7 +724,34 @@ print_summary() {
 # MAIN INSTALLATION
 # ============================================
 
+show_help() {
+    echo "Gassigeher SaaS Installer"
+    echo ""
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --force       Force reconfiguration (regenerate .env with new passwords)"
+    echo "  --help        Show this help message"
+    echo ""
+    echo "The script is idempotent - safe to run multiple times."
+    echo "Existing .env configuration is preserved unless --force is used."
+}
+
 main() {
+    # Parse arguments
+    FORCE_RECONFIGURE=false
+    for arg in "$@"; do
+        case $arg in
+            --force)
+                FORCE_RECONFIGURE=true
+                ;;
+            --help|-h)
+                show_help
+                exit 0
+                ;;
+        esac
+    done
+
     echo ""
     echo "============================================"
     echo "  GASSIGEHER SAAS INSTALLER"
@@ -746,11 +772,26 @@ main() {
     # Create directories
     create_directories
 
-    # Collect configuration
-    collect_configuration
+    # Configuration handling (idempotent)
+    if [[ -f "$INSTALL_DIR/.env" ]] && [[ "$FORCE_RECONFIGURE" == "false" ]]; then
+        log_success "Existing .env found - preserving configuration"
+        log_info "Use --force to reconfigure with new credentials"
+        # Source existing env to get variables for summary
+        source "$INSTALL_DIR/.env"
+    else
+        if [[ -f "$INSTALL_DIR/.env" ]]; then
+            log_warn "Existing .env will be overwritten (--force specified)"
+            # Backup existing .env
+            cp "$INSTALL_DIR/.env" "$INSTALL_DIR/.env.backup.$(date +%Y%m%d_%H%M%S)"
+            log_info "Backup created: .env.backup.$(date +%Y%m%d_%H%M%S)"
+        fi
+        # Collect configuration
+        collect_configuration
+        # Create .env file
+        create_env_file
+    fi
 
-    # Create configuration files
-    create_env_file
+    # Create/update configuration files (always safe to overwrite)
     create_dockerfile
     create_caddy_dockerfile
     create_caddyfile
@@ -758,10 +799,10 @@ main() {
     create_backup_script
     create_management_script
 
-    # Copy source code
+    # Copy source code (overwrites are safe)
     copy_source_code
 
-    # Setup cron and firewall
+    # Setup cron and firewall (idempotent)
     setup_cron_backup
     setup_firewall
 
