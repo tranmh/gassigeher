@@ -1,10 +1,8 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -639,49 +637,28 @@ func (h *DogHandler) UploadDogPhoto(w http.ResponseWriter, r *http.Request) {
 
 	var fullPath, thumbPath string
 
-	// SaaS: Use S3 storage if enabled
+	// Use ImageService for BOTH local and S3 storage
+	// ImageService handles resizing, compression, and thumbnail generation correctly
+	var imageService *services.ImageService
 	if h.s3Service != nil && h.config.UseS3 {
-		// Get tenant slug from context
+		// S3 mode: Create tenant-aware ImageService with S3 support
 		tenantSlug, _ := r.Context().Value(middleware.TenantSlugKey).(string)
 		if tenantSlug == "" {
 			tenantSlug = "default"
 		}
-
-		// Read file data
-		fileData, err := io.ReadAll(file)
-		if err != nil {
-			respondError(w, http.StatusInternalServerError, "Failed to read file")
-			return
-		}
-
-		// Determine content type
-		contentType := "image/jpeg"
-		if ext == ".png" {
-			contentType = "image/png"
-		}
-
-		// Upload full-size photo to S3
-		fullObjectPath := fmt.Sprintf("dogs/dog_%d_full%s", id, ext)
-		fullURL, err := h.s3Service.Upload(context.Background(), tenantSlug, fullObjectPath, fileData, contentType)
-		if err != nil {
-			log.Printf("Failed to upload dog photo to S3: %v", err)
-			respondError(w, http.StatusInternalServerError, "Failed to upload photo")
-			return
-		}
-
-		// For S3, we store the full URL in the database
-		fullPath = fullURL
-		thumbPath = fullURL // For now, use same URL for thumbnail (S3 doesn't auto-resize)
-
-		log.Printf("Uploaded dog %d photo to S3: %s", id, fullURL)
+		imageService = services.NewImageServiceWithS3(h.config.UploadDir, h.s3Service, tenantSlug)
+		log.Printf("Using S3 storage for dog %d photo upload (tenant: %s)", id, tenantSlug)
 	} else {
-		// Local filesystem storage
-		// Process the uploaded photo (resize, compress, create thumbnail)
-		fullPath, thumbPath, err = h.imageService.ProcessDogPhoto(file, id)
-		if err != nil {
-			respondError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to process image: %v", err))
-			return
-		}
+		// Local storage: Use existing imageService
+		imageService = h.imageService
+	}
+
+	// Process the uploaded photo (resize, compress, create thumbnail)
+	// This works for BOTH local filesystem and S3 storage
+	fullPath, thumbPath, err = imageService.ProcessDogPhoto(file, id)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to process image: %v", err))
+		return
 	}
 
 	// Update dog with new photo paths

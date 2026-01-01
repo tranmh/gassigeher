@@ -50,6 +50,47 @@ services:
     networks:
       - internal
 
+  # MinIO S3-compatible object storage (for local S3 testing)
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin123}
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web Console
+    volumes:
+      - ./data/minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  # MinIO bucket initialization (runs once to create bucket)
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $${MINIO_ROOT_USER:-minioadmin} $${MINIO_ROOT_PASSWORD:-minioadmin123};
+      mc mb local/$${S3_BUCKET_NAME:-gassigeher-uploads} --ignore-existing;
+      mc anonymous set download local/$${S3_BUCKET_NAME:-gassigeher-uploads};
+      echo 'Bucket ready';
+      "
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin123}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-gassigeher-uploads}
+    networks:
+      - internal
+
   # Production only: Caddy for wildcard SSL
   caddy:
     profiles: ["production"]

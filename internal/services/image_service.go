@@ -254,6 +254,32 @@ func (s *ImageService) ProcessUserPhoto(file multipart.File, userID int, ext str
 		return "", fmt.Errorf("failed to decode image: %w", err)
 	}
 
+	// Resize to fit profile dimensions
+	resized := s.resizeImage(img, MaxImageWidth, MaxImageHeight)
+
+	// Generate unique filename based on user ID (always JPEG for consistency)
+	filename := fmt.Sprintf("user_%d_profile.jpg", userID)
+
+	// Use S3 if configured
+	if s.useS3 && s.s3Service != nil {
+		// Encode image to JPEG in memory
+		buf, err := s.encodeJPEGToBuffer(resized, JPEGQuality)
+		if err != nil {
+			return "", fmt.Errorf("failed to encode user photo: %w", err)
+		}
+
+		// Upload to S3
+		ctx := context.Background()
+		photoURL, err := s.s3Service.Upload(ctx, s.tenantSlug,
+			fmt.Sprintf("users/%s", filename), buf.Bytes(), "image/jpeg")
+		if err != nil {
+			return "", fmt.Errorf("failed to upload user photo to S3: %w", err)
+		}
+
+		return photoURL, nil
+	}
+
+	// Local filesystem storage (default)
 	// Create users directory if it doesn't exist
 	// Use tenant-aware base path for SaaS-Mode isolation
 	usersDir := filepath.Join(s.getTenantBasePath(), "users")
@@ -261,11 +287,6 @@ func (s *ImageService) ProcessUserPhoto(file multipart.File, userID int, ext str
 		return "", fmt.Errorf("failed to create users directory: %w", err)
 	}
 
-	// Resize to fit profile dimensions
-	resized := s.resizeImage(img, MaxImageWidth, MaxImageHeight)
-
-	// Generate unique filename based on user ID
-	filename := fmt.Sprintf("user_%d_profile%s", userID, ext)
 	filePath := filepath.Join(usersDir, filename)
 
 	// Save as JPEG (convert all formats to JPEG for consistency and smaller size)

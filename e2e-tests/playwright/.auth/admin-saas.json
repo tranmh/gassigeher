@@ -1,23 +1,16 @@
 {
-  "cookies": [
-    {
-      "name": "csrf_token",
-      "value": "AAAAAGlWYgl4fsAAaaTLKFXr2KJEX1TWYl9pjXPHay7q9t4b2jMccg==",
-      "domain": "demo.gassigeher.local",
-      "path": "/",
-      "expires": 1767355273.432008,
-      "httpOnly": false,
-      "secure": false,
-      "sameSite": "Lax"
-    }
-  ],
+  "cookies": [],
   "origins": [
     {
       "origin": "http://demo.gassigeher.local:8080",
       "localStorage": [
         {
+          "name": "gassigeher_skip_tour",
+          "value": "true"
+        },
+        {
           "name": "gassigeher_token",
-          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImFkbWluQGRlbW8uZ2Fzc2lnZWhlci5vcmciLCJleHAiOjE3NjczNTUyNzIsImlzX2FkbWluIjp0cnVlLCJpc19jZW50cmFsX2FkbWluIjpmYWxzZSwiaXNfc3VwZXJfYWRtaW4iOnRydWUsInRlbmFudF9pZCI6MiwidXNlcl9pZCI6MTI5fQ.u23I36Ov1-EcWcEcZ9s_ZRDhZ7_2J-cosBTSzGUGiEA"
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImFkbWluQGRlbW8uZ2Fzc2lnZWhlci5sb2NhbCIsImV4cCI6MTc2NzM4MjU1OCwiaXNfYWRtaW4iOnRydWUsImlzX2NlbnRyYWxfYWRtaW4iOmZhbHNlLCJpc19zdXBlcl9hZG1pbiI6dHJ1ZSwidGVuYW50X2lkIjoyLCJ1c2VyX2lkIjoyfQ.1kaQhTAdj3I1mDSmfztKJM5zC_1dCwJSZCP6MCC4eKA"
         }
       ]
     }

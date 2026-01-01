@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -79,6 +78,11 @@ func (h *UserHandler) getImageServiceForRequest(r *http.Request) *services.Image
 	tenantSlug, _ := r.Context().Value(middleware.TenantSlugKey).(string)
 	if tenantSlug != "" {
 		// SaaS-Mode: Create tenant-aware service
+		if h.s3Service != nil && h.config.UseS3 {
+			// S3 storage: Include S3 service for proper upload handling with resizing
+			return services.NewImageServiceWithS3(h.config.UploadDir, h.s3Service, tenantSlug)
+		}
+		// Local storage with tenant isolation
 		return services.NewImageServiceWithTenant(h.config.UploadDir, tenantSlug)
 	}
 	// Simple-Mode: Use default service (no tenant isolation)
@@ -301,59 +305,22 @@ func (h *UserHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var photoPath string
+	// Use ImageService for BOTH local and S3 storage
+	// ImageService handles resizing, compression, and proper storage
+	imageService := h.getImageServiceForRequest(r)
 
-	// SaaS: Use S3 storage if enabled
-	if h.s3Service != nil && h.config.UseS3 {
-		// Get tenant slug from context
-		tenantSlug, _ := r.Context().Value(middleware.TenantSlugKey).(string)
-		if tenantSlug == "" {
-			tenantSlug = "default"
-		}
+	// Delete old photo if exists (before uploading new one)
+	if user.ProfilePhoto != nil && *user.ProfilePhoto != "" {
+		imageService.DeleteUserPhoto(userID)
+	}
 
-		// Read file data
-		fileData, err := io.ReadAll(file)
-		if err != nil {
-			respondError(w, http.StatusInternalServerError, "Failed to read file")
-			return
-		}
-
-		// Determine content type
-		contentType := "image/jpeg"
-		if ext == ".png" {
-			contentType = "image/png"
-		}
-
-		// Upload to S3
-		objectPath := fmt.Sprintf("users/user_%d_profile%s", userID, ext)
-		photoURL, err := h.s3Service.Upload(context.Background(), tenantSlug, objectPath, fileData, contentType)
-		if err != nil {
-			log.Printf("Failed to upload user photo to S3: %v", err)
-			respondError(w, http.StatusInternalServerError, "Failed to upload photo")
-			return
-		}
-
-		photoPath = photoURL
-		log.Printf("Uploaded user %d photo to S3: %s", userID, photoURL)
-	} else {
-		// Local filesystem storage with tenant isolation
-		// Get tenant-aware ImageService for this request
-		imageService := h.getImageServiceForRequest(r)
-
-		// Delete old photo if exists (before uploading new one)
-		if user.ProfilePhoto != nil && *user.ProfilePhoto != "" {
-			imageService.DeleteUserPhoto(userID)
-		}
-
-		// Process and save the photo using ImageService
-		// This handles tenant isolation, unique filenames, and resizing
-		var err error
-		photoPath, err = imageService.ProcessUserPhoto(file, userID, ext)
-		if err != nil {
-			log.Printf("Failed to process user photo: %v", err)
-			respondError(w, http.StatusInternalServerError, "Failed to save file")
-			return
-		}
+	// Process and save the photo using ImageService
+	// This handles tenant isolation, unique filenames, resizing, and S3 upload
+	photoPath, err := imageService.ProcessUserPhoto(file, userID, ext)
+	if err != nil {
+		log.Printf("Failed to process user photo: %v", err)
+		respondError(w, http.StatusInternalServerError, "Failed to save file")
+		return
 	}
 
 	user.ProfilePhoto = &photoPath
