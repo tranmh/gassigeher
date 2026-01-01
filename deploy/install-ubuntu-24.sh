@@ -176,26 +176,32 @@ collect_configuration() {
     read -p "Stripe Price ID - Yearly (price_...): " STRIPE_PRICE_YEARLY
     echo ""
 
-    # S3 Configuration (Hetzner Object Storage)
-    echo -e "${YELLOW}Hetzner S3 Object Storage (optional - press Enter to skip)${NC}"
-    echo "Create bucket at: https://console.hetzner.cloud/"
-    read -p "Use S3 storage? (y/N): " USE_S3_INPUT
-    if [[ "$USE_S3_INPUT" =~ ^[Yy]$ ]]; then
+    # S3 Configuration (MinIO default, or external Hetzner)
+    echo -e "${YELLOW}S3 Object Storage Configuration${NC}"
+    echo "MinIO is included in Docker Compose (default). For production, you can use Hetzner Object Storage."
+    read -p "Use external S3 instead of MinIO? (y/N): " USE_EXTERNAL_S3
+    if [[ "$USE_EXTERNAL_S3" =~ ^[Yy]$ ]]; then
         USE_S3="true"
+        echo "Create bucket at: https://console.hetzner.cloud/"
         read -p "S3 Endpoint (e.g., fsn1.your-objectstorage.com): " S3_ENDPOINT
         read -p "S3 Access Key: " S3_ACCESS_KEY
         read -p "S3 Secret Key: " S3_SECRET_KEY
-        read -p "S3 Bucket Name: " S3_BUCKET_NAME
+        read -p "S3 Bucket Name [gassigeher-uploads]: " S3_BUCKET_NAME
+        S3_BUCKET_NAME=${S3_BUCKET_NAME:-gassigeher-uploads}
         read -p "S3 Region (e.g., fsn1): " S3_REGION
         read -p "S3 Public URL (e.g., https://bucket.fsn1.your-objectstorage.com): " S3_PUBLIC_URL
+        S3_USE_SSL="true"
     else
-        USE_S3="false"
-        S3_ENDPOINT=""
-        S3_ACCESS_KEY=""
-        S3_SECRET_KEY=""
-        S3_BUCKET_NAME=""
-        S3_REGION=""
-        S3_PUBLIC_URL=""
+        # Default: Use MinIO from Docker Compose
+        USE_S3="true"
+        S3_ENDPOINT="minio:9000"
+        S3_ACCESS_KEY="minioadmin"
+        S3_SECRET_KEY="minioadmin123"
+        S3_BUCKET_NAME="gassigeher-uploads"
+        S3_REGION="us-east-1"
+        S3_PUBLIC_URL="http://localhost:9000/gassigeher-uploads"
+        S3_USE_SSL="false"
+        echo -e "${GREEN}Using MinIO (included in Docker Compose)${NC}"
     fi
     echo ""
 
@@ -289,7 +295,7 @@ STRIPE_PRICE_MONTHLY=${STRIPE_PRICE_MONTHLY}
 STRIPE_PRICE_YEARLY=${STRIPE_PRICE_YEARLY}
 
 # ============================================
-# S3 STORAGE (Hetzner Object Storage)
+# S3 STORAGE (MinIO default / Hetzner for production)
 # ============================================
 USE_S3=${USE_S3}
 S3_ENDPOINT=${S3_ENDPOINT}
@@ -298,6 +304,7 @@ S3_SECRET_KEY=${S3_SECRET_KEY}
 S3_BUCKET_NAME=${S3_BUCKET_NAME}
 S3_REGION=${S3_REGION}
 S3_PUBLIC_URL=${S3_PUBLIC_URL}
+S3_USE_SSL=${S3_USE_SSL}
 
 # ============================================
 # EMAIL (SMTP)
