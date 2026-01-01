@@ -516,7 +516,8 @@ func initializeSystemSettings(db *sql.DB) error {
 }
 
 // writeCredentialsFile writes Central Admin credentials to a file
-// DONE
+// In Docker, writes to logs/ directory (mounted volume) for persistence
+// In non-Docker, writes to current directory
 func writeCredentialsFile(email, password string) error {
 	now := time.Now().Format("2006-01-02 15:04:05")
 	content := fmt.Sprintf(`=============================================================
@@ -560,12 +561,18 @@ IMPORTANT:
 =============================================================
 `, email, password, now, now)
 
-	err := os.WriteFile("SUPER_ADMIN_CREDENTIALS.txt", []byte(content), 0600)
+	// Determine file path - use data/ if it exists (Docker volume mount)
+	filePath := "SUPER_ADMIN_CREDENTIALS.txt"
+	if info, err := os.Stat("data"); err == nil && info.IsDir() {
+		filePath = "data/SUPER_ADMIN_CREDENTIALS.txt"
+	}
+
+	err := os.WriteFile(filePath, []byte(content), 0600)
 	if err != nil {
 		return fmt.Errorf("failed to write credentials file: %w", err)
 	}
 
-	log.Println("✓ Credentials file written: SUPER_ADMIN_CREDENTIALS.txt")
+	log.Printf("✓ Credentials file written: %s", filePath)
 	return nil
 }
 

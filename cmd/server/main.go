@@ -202,7 +202,13 @@ func main() {
 	}
 
 	// SaaS Phase 5: Global rate limiter (100 requests/second burst 200 per IP)
-	router.Use(middleware.GlobalRateLimit(100, 200))
+	// Disabled by default for development/testing - enable with RATE_LIMIT_ENABLED=true
+	if cfg.RateLimitEnabled {
+		router.Use(middleware.GlobalRateLimit(100, 200))
+		log.Println("Global rate limiting enabled (100 rps, burst 200)")
+	} else {
+		log.Println("Global rate limiting DISABLED (set RATE_LIMIT_ENABLED=true to enable)")
+	}
 	router.Use(middleware.MetricsMiddleware) // Collect request metrics
 	router.Use(middleware.LoggingMiddleware)
 	router.Use(middleware.BlockDangerousMethods) // SECURITY: GASSI-2025-004 - Block TRACE/TRACK
@@ -220,9 +226,11 @@ func main() {
 		// SaaS Phase: Per-tenant rate limiting (after tenant is resolved)
 		// Free tier: 30 req/s tenant-wide, 20 req/s per-IP
 		// Pro tier: 100 req/s tenant-wide, 50 req/s per-IP
-		router.Use(middleware.TenantRateLimit(db))
-		defer middleware.CloseTenantRateLimiter() // Cleanup goroutine on shutdown
-		log.Println("SaaS mode: Per-tenant rate limiting enabled")
+		if cfg.RateLimitEnabled {
+			router.Use(middleware.TenantRateLimit(db))
+			defer middleware.CloseTenantRateLimiter() // Cleanup goroutine on shutdown
+			log.Println("SaaS mode: Per-tenant rate limiting enabled")
+		}
 	} else {
 		// Simple-Mode: Inject default tenant (id=0) for all requests
 		// This ensures all repository queries always filter by tenant_id
@@ -326,26 +334,39 @@ func main() {
 	// Public routes
 	// Auth endpoint rate limiting: 3 requests per minute per IP (conservative)
 	// Shared bucket across register, forgot-password, reset-password
-	registerRoute := router.PathPrefix("/api/v1/auth/register").Subrouter()
-	registerRoute.Use(middleware.RateLimitAuthEndpoint)
-	registerRoute.HandleFunc("", authHandler.Register).Methods("POST")
+	if cfg.RateLimitEnabled {
+		registerRoute := router.PathPrefix("/api/v1/auth/register").Subrouter()
+		registerRoute.Use(middleware.RateLimitAuthEndpoint)
+		registerRoute.HandleFunc("", authHandler.Register).Methods("POST")
+	} else {
+		router.HandleFunc("/api/v1/auth/register", authHandler.Register).Methods("POST")
+	}
 
 	router.HandleFunc("/api/v1/auth/verify-email", authHandler.VerifyEmail).Methods("POST")
 
 	// BUG FIX #6: Add rate limiting to login endpoint (5/min - separate from auth endpoints)
-	loginRoute := router.PathPrefix("/api/v1/auth/login").Subrouter()
-	loginRoute.Use(middleware.RateLimitLogin)
-	loginRoute.HandleFunc("", authHandler.Login).Methods("POST")
+	if cfg.RateLimitEnabled {
+		loginRoute := router.PathPrefix("/api/v1/auth/login").Subrouter()
+		loginRoute.Use(middleware.RateLimitLogin)
+		loginRoute.HandleFunc("", authHandler.Login).Methods("POST")
+	} else {
+		router.HandleFunc("/api/v1/auth/login", authHandler.Login).Methods("POST")
+	}
 	// DONE: BUG #6 - Rate limiting applied to login
 
 	// Password reset endpoints with auth rate limiting (3/min shared bucket)
-	forgotPasswordRoute := router.PathPrefix("/api/v1/auth/forgot-password").Subrouter()
-	forgotPasswordRoute.Use(middleware.RateLimitAuthEndpoint)
-	forgotPasswordRoute.HandleFunc("", authHandler.ForgotPassword).Methods("POST")
+	if cfg.RateLimitEnabled {
+		forgotPasswordRoute := router.PathPrefix("/api/v1/auth/forgot-password").Subrouter()
+		forgotPasswordRoute.Use(middleware.RateLimitAuthEndpoint)
+		forgotPasswordRoute.HandleFunc("", authHandler.ForgotPassword).Methods("POST")
 
-	resetPasswordRoute := router.PathPrefix("/api/v1/auth/reset-password").Subrouter()
-	resetPasswordRoute.Use(middleware.RateLimitAuthEndpoint)
-	resetPasswordRoute.HandleFunc("", authHandler.ResetPassword).Methods("POST")
+		resetPasswordRoute := router.PathPrefix("/api/v1/auth/reset-password").Subrouter()
+		resetPasswordRoute.Use(middleware.RateLimitAuthEndpoint)
+		resetPasswordRoute.HandleFunc("", authHandler.ResetPassword).Methods("POST")
+	} else {
+		router.HandleFunc("/api/v1/auth/forgot-password", authHandler.ForgotPassword).Methods("POST")
+		router.HandleFunc("/api/v1/auth/reset-password", authHandler.ResetPassword).Methods("POST")
+	}
 
 	// Reactivation request (public - for deactivated users)
 	router.HandleFunc("/api/v1/reactivation-requests", reactivationHandler.CreateRequest).Methods("POST")

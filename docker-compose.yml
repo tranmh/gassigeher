@@ -23,6 +23,7 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
+      - ./data/app:/app/data
     networks:
       - internal
     healthcheck:

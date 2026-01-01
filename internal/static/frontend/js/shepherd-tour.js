@@ -35,8 +35,26 @@
         return localStorage.getItem(STORAGE_KEYS.isDemo) === 'true';
     }
 
+    // Check if tour should be skipped (for e2e tests)
+    function shouldSkipTour() {
+        // URL param: ?skipTour=true
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('skipTour') === 'true') {
+            return true;
+        }
+        // localStorage flag (for e2e test setup)
+        if (localStorage.getItem('gassigeher_skip_tour') === 'true') {
+            return true;
+        }
+        return false;
+    }
+
     // Check if tour has been completed
     function isTourComplete(tourType) {
+        // Allow skipping for e2e tests
+        if (shouldSkipTour()) {
+            return true;
+        }
         if (isDemoTenant()) {
             return false; // Always show on demo
         }

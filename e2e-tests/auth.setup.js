@@ -19,6 +19,11 @@ async function loginWithRateLimitHandling(page, email, password, maxRetries = 3)
     await page.goto('/login.html');
     await page.waitForLoadState('networkidle');
 
+    // Skip Shepherd tour for e2e tests (prevents modal overlay blocking clicks)
+    await page.evaluate(() => {
+      localStorage.setItem('gassigeher_skip_tour', 'true');
+    });
+
     // Check for existing rate limit message
     const rateLimitMsg = page.locator('text=Zu viele Anmeldeversuche');
     if (await rateLimitMsg.isVisible().catch(() => false)) {

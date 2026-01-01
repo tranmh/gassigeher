@@ -130,14 +130,14 @@ create_directories() {
     log_info "Creating directories..."
 
     if [[ "$CAN_SUDO" == "true" ]]; then
-        $SUDO mkdir -p "$INSTALL_DIR"/{data,logs,backups,uploads}
+        $SUDO mkdir -p "$INSTALL_DIR"/{data/app,logs,backups,uploads}
         $SUDO chmod 750 "$INSTALL_DIR"
         # Make current user the owner if using sudo
         if [[ -n "$SUDO" ]]; then
             $SUDO chown -R "$(id -u):$(id -g)" "$INSTALL_DIR"
         fi
     else
-        mkdir -p "$INSTALL_DIR"/{data,logs,backups,uploads}
+        mkdir -p "$INSTALL_DIR"/{data/app,logs,backups,uploads}
         chmod 750 "$INSTALL_DIR"
     fi
 
@@ -221,8 +221,15 @@ collect_configuration() {
     read -p "Contact form email [kontakt@$DOMAIN]: " CONTACT_EMAIL
     CONTACT_EMAIL=${CONTACT_EMAIL:-kontakt@$DOMAIN}
 
-    # Super Admin Email
-    read -p "Super Admin email: " SUPER_ADMIN_EMAIL
+    # Super Admin Email (with validation)
+    while true; do
+        read -p "Super Admin email: " SUPER_ADMIN_EMAIL
+        if [[ "$SUPER_ADMIN_EMAIL" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+            break
+        else
+            log_error "Invalid email format. Please enter a valid email address."
+        fi
+    done
     echo ""
 
     log_success "Configuration collected"

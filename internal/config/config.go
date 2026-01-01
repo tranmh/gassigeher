@@ -98,6 +98,9 @@ type Config struct {
 	// Billing Test Mode (for development without Stripe)
 	BillingTestMode bool // Enable test upgrade/downgrade without Stripe
 
+	// Rate Limiting (disabled by default for development/testing)
+	RateLimitEnabled bool // Enable rate limiting (default: false)
+
 	// Contact Form
 	ContactEmail string // Email address for contact form submissions
 
@@ -200,6 +203,9 @@ func Load() *Config {
 
 		// Billing Test Mode (auto-enabled for .local domains, or set BILLING_TEST_MODE=true)
 		BillingTestMode: getEnvAsBool("BILLING_TEST_MODE", false),
+
+		// Rate Limiting (disabled by default - enable in production with RATE_LIMIT_ENABLED=true)
+		RateLimitEnabled: getEnvAsBool("RATE_LIMIT_ENABLED", false),
 
 		// Contact Form
 		ContactEmail: getEnv("CONTACT_EMAIL", "kontakt@gassigeher.org"),

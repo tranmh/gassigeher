@@ -24,20 +24,20 @@ function getTestConfig(mode = process.env.PLAYWRIGHT_TEST_MODE || TEST_MODES.SAA
       // Demo tenant credentials (same as SaaS mode)
       credentials: {
         admin: {
-          email: 'admin@demo.gassigeher.org',
+          email: 'admin@demo.gassigeher.local',
           password: process.env.DEMO_ADMIN_PASSWORD || 'demo1234'
         },
         // Demo users have fixed password
         greenUser: {
-          email: 'anna@demo.gassigeher.org',
+          email: 'anna@demo.gassigeher.local',
           password: 'demo1234'
         },
         orangeUser: {
-          email: 'bernd@demo.gassigeher.org',
+          email: 'bernd@demo.gassigeher.local',
           password: 'demo1234'
         },
         blueUser: {
-          email: 'clara@demo.gassigeher.org',
+          email: 'clara@demo.gassigeher.local',
           password: 'demo1234'
         }
       },
@@ -67,26 +67,26 @@ function getTestConfig(mode = process.env.PLAYWRIGHT_TEST_MODE || TEST_MODES.SAA
       // Demo tenant credentials (all demo users use same password)
       credentials: {
         admin: {
-          email: 'admin@demo.gassigeher.org',
+          email: 'admin@demo.gassigeher.local',
           password: process.env.DEMO_ADMIN_PASSWORD || 'demo1234'
         },
         // Demo users have fixed password
         greenUser: {
-          email: 'anna@demo.gassigeher.org',
+          email: 'anna@demo.gassigeher.local',
           password: 'demo1234'
         },
         orangeUser: {
-          email: 'bernd@demo.gassigeher.org',
+          email: 'bernd@demo.gassigeher.local',
           password: 'demo1234'
         },
         blueUser: {
-          email: 'clara@demo.gassigeher.org',
+          email: 'clara@demo.gassigeher.local',
           password: 'demo1234'
         },
         // Central admin (platform-level)
         centralAdmin: {
-          email: 'admin@localhost',
-          password: process.env.CENTRAL_ADMIN_PASSWORD || 'E404q%C#QnSNIMbaq!JY'
+          email: process.env.CENTRAL_ADMIN_EMAIL || 'admin@gassigeher.local',
+          password: process.env.CENTRAL_ADMIN_PASSWORD || 'changeme'
         }
       },
 
