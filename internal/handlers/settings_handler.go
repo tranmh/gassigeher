@@ -127,8 +127,15 @@ func (h *SettingsHandler) UploadLogo(w http.ResponseWriter, r *http.Request) {
 	// SaaS: Extract tenant ID from context
 	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
+	// SECURITY: Limit request body size to prevent DoS attacks
+	maxSizeMB := h.cfg.MaxUploadSizeMB
+	if maxSizeMB <= 0 {
+		maxSizeMB = 10 // Default 10MB if not configured
+	}
+	maxSize := int64(maxSizeMB) << 20
+	r.Body = http.MaxBytesReader(w, r.Body, maxSize)
+
 	// Parse multipart form with max size limit
-	maxSize := int64(h.cfg.MaxUploadSizeMB) << 20
 	if err := r.ParseMultipartForm(maxSize); err != nil {
 		respondError(w, http.StatusBadRequest, "File too large or invalid form data")
 		return

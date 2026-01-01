@@ -1,5 +1,3 @@
-//go:build integration
-
 package cron
 
 import (
@@ -665,5 +663,239 @@ func TestCronService_RunPeriodically_StopsOnSignal(t *testing.T) {
 		// Goroutine stopped as expected
 	case <-time.After(1 * time.Second):
 		t.Error("runPeriodically should stop when stopChan is closed")
+	}
+}
+
+// =============================================================================
+// BUG-FINDING EDGE CASE TESTS
+// =============================================================================
+
+// TestCronService_AutoCompleteBookings_EdgeCases tests boundary conditions
+func TestCronService_AutoCompleteBookings_EdgeCases(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cronService := NewCronService(db, nil)
+
+	userID := testutil.SeedTestUser(t, db, "edge@example.com", "Edge User", "green")
+	dogID := testutil.SeedTestDog(t, db, "EdgeDog", "Labrador", "green")
+
+	t.Run("handles booking with empty scheduled_time", func(t *testing.T) {
+		// Create booking with empty scheduled_time (edge case - schema requires NOT NULL but let's test with empty string)
+		yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+		_, err := db.Exec(`
+			INSERT INTO bookings (user_id, dog_id, date, scheduled_time, status, tenant_id)
+			VALUES (?, ?, ?, '', 'scheduled', 1)
+		`, userID, dogID, yesterday)
+		if err != nil {
+			t.Fatalf("Failed to create booking with empty time: %v", err)
+		}
+
+		// Should not panic
+		cronService.autoCompleteBookings()
+
+		// Verify booking is completed (past date with empty time should still complete)
+		var status string
+		db.QueryRow("SELECT status FROM bookings WHERE scheduled_time = ''").Scan(&status)
+		if status != "completed" {
+			t.Errorf("Booking with empty scheduled_time should be completed, got: %s", status)
+		}
+	})
+
+	t.Run("handles multiple bookings same dog same day", func(t *testing.T) {
+		testutil.ClearTable(t, db, "bookings")
+
+		yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+
+		// Create multiple bookings for same dog on same day (morning, afternoon, evening)
+		testutil.SeedTestBooking(t, db, userID, dogID, yesterday, "09:00", "scheduled")
+		testutil.SeedTestBooking(t, db, userID, dogID, yesterday, "14:00", "scheduled")
+		testutil.SeedTestBooking(t, db, userID, dogID, yesterday, "18:00", "scheduled")
+
+		cronService.autoCompleteBookings()
+
+		// All three should be completed
+		var count int
+		db.QueryRow("SELECT COUNT(*) FROM bookings WHERE date = ? AND status = 'completed'", yesterday).Scan(&count)
+		if count != 3 {
+			t.Errorf("Expected 3 completed bookings, got %d", count)
+		}
+	})
+
+	t.Run("boundary: booking at current time today", func(t *testing.T) {
+		testutil.ClearTable(t, db, "bookings")
+
+		now := time.Now()
+		// Skip this test if it's too early in the morning (before 02:00)
+		// because -1 hour would cross to previous day
+		if now.Hour() < 2 {
+			t.Skip("Skipping boundary test: too close to midnight")
+		}
+
+		today := now.Format("2006-01-02")
+		// Create booking at an hour ago (should complete)
+		pastTime := now.Add(-1 * time.Hour).Format("15:04")
+
+		testutil.SeedTestBooking(t, db, userID, dogID, today, pastTime, "scheduled")
+
+		cronService.autoCompleteBookings()
+
+		var status string
+		db.QueryRow("SELECT status FROM bookings WHERE date = ? AND scheduled_time = ?", today, pastTime).Scan(&status)
+		if status != "completed" {
+			t.Errorf("Today's booking with past time should be completed, got: %s", status)
+		}
+	})
+}
+
+// TestCronService_AutoDeactivateUsers_EdgeCases tests admin/superadmin skipping
+func TestCronService_AutoDeactivateUsers_EdgeCases(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cronService := NewCronService(db, nil)
+
+	// Ensure tenant exists (use INSERT OR IGNORE to handle existing tenant from seed)
+	_, err := db.Exec(`
+		INSERT OR IGNORE INTO tenants (id, slug, name, contact_email, status, created_at)
+		VALUES (1, 'test-tenant', 'Test Tenant', 'test@example.com', 'active', ?)
+	`, time.Now())
+	if err != nil {
+		t.Fatalf("Failed to create tenant: %v", err)
+	}
+
+	t.Run("skips super admin users", func(t *testing.T) {
+		// Create super admin with old activity
+		oldActivity := time.Now().AddDate(-2, 0, 0) // 2 years ago
+		_, err := db.Exec(`
+			INSERT INTO users (email, first_name, last_name, password_hash, is_verified, is_active,
+			                   is_admin, is_super_admin, tenant_id, last_activity_at, created_at, terms_accepted_at)
+			VALUES ('superadmin@test.com', 'Super', 'Admin', 'hash', 1, 1, 1, 1, 1, ?, ?, ?)
+		`, oldActivity, oldActivity, oldActivity)
+		if err != nil {
+			t.Fatalf("Failed to create super admin: %v", err)
+		}
+
+		cronService.autoDeactivateInactiveUsers()
+
+		// Super admin should NOT be deactivated
+		var isActive int
+		db.QueryRow("SELECT is_active FROM users WHERE email = 'superadmin@test.com'").Scan(&isActive)
+		if isActive != 1 {
+			t.Error("Super admin should NOT be deactivated regardless of inactivity")
+		}
+	})
+
+	t.Run("skips regular admin users", func(t *testing.T) {
+		// Create regular admin with old activity
+		oldActivity := time.Now().AddDate(-2, 0, 0)
+		_, err := db.Exec(`
+			INSERT INTO users (email, first_name, last_name, password_hash, is_verified, is_active,
+			                   is_admin, is_super_admin, tenant_id, last_activity_at, created_at, terms_accepted_at)
+			VALUES ('admin@test.com', 'Regular', 'Admin', 'hash', 1, 1, 1, 0, 1, ?, ?, ?)
+		`, oldActivity, oldActivity, oldActivity)
+		if err != nil {
+			t.Fatalf("Failed to create admin: %v", err)
+		}
+
+		cronService.autoDeactivateInactiveUsers()
+
+		// Admin should NOT be deactivated
+		var isActive int
+		db.QueryRow("SELECT is_active FROM users WHERE email = 'admin@test.com'").Scan(&isActive)
+		if isActive != 1 {
+			t.Error("Admin should NOT be deactivated regardless of inactivity")
+		}
+	})
+
+	t.Run("boundary: exactly 365 days inactive", func(t *testing.T) {
+		testutil.ClearTable(t, db, "users")
+
+		// Create user with exactly 365 days of inactivity (boundary)
+		exactly365DaysAgo := time.Now().AddDate(0, 0, -365)
+		_, err := db.Exec(`
+			INSERT INTO users (email, first_name, last_name, password_hash, is_verified, is_active,
+			                   is_admin, is_super_admin, tenant_id, last_activity_at, created_at, terms_accepted_at)
+			VALUES ('boundary@test.com', 'Boundary', 'User', 'hash', 1, 1, 0, 0, 1, ?, ?, ?)
+		`, exactly365DaysAgo, exactly365DaysAgo, exactly365DaysAgo)
+		if err != nil {
+			t.Fatalf("Failed to create user: %v", err)
+		}
+
+		cronService.autoDeactivateInactiveUsers()
+
+		// User at exactly 365 days should be deactivated (>= 365)
+		var isActive int
+		db.QueryRow("SELECT is_active FROM users WHERE email = 'boundary@test.com'").Scan(&isActive)
+		if isActive != 0 {
+			t.Error("User with exactly 365 days inactivity should be deactivated")
+		}
+	})
+
+	t.Run("boundary: 364 days inactive - should NOT deactivate", func(t *testing.T) {
+		testutil.ClearTable(t, db, "users")
+
+		// Create user with 364 days of inactivity (just under threshold)
+		days364Ago := time.Now().AddDate(0, 0, -364)
+		_, err := db.Exec(`
+			INSERT INTO users (email, first_name, last_name, password_hash, is_verified, is_active,
+			                   is_admin, is_super_admin, tenant_id, last_activity_at, created_at, terms_accepted_at)
+			VALUES ('under@test.com', 'Under', 'Threshold', 'hash', 1, 1, 0, 0, 1, ?, ?, ?)
+		`, days364Ago, days364Ago, days364Ago)
+		if err != nil {
+			t.Fatalf("Failed to create user: %v", err)
+		}
+
+		cronService.autoDeactivateInactiveUsers()
+
+		// User at 364 days should NOT be deactivated
+		var isActive int
+		db.QueryRow("SELECT is_active FROM users WHERE email = 'under@test.com'").Scan(&isActive)
+		if isActive != 1 {
+			t.Error("User with 364 days inactivity should NOT be deactivated")
+		}
+	})
+}
+
+// TestCronService_NilDemoSeedService tests handling when demo seed service is nil
+func TestCronService_NilDemoSeedService(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	// Create cron service with nil config (which means nil demoSeedService)
+	cronService := NewCronService(db, nil)
+
+	// Create a demo tenant to trigger the reset logic
+	_, err := db.Exec(`
+		INSERT INTO tenants (slug, name, contact_email, status, is_demo, created_at)
+		VALUES ('demo', 'Demo', 'demo@test.com', 'active', 1, ?)
+	`, time.Now())
+	if err != nil {
+		t.Fatalf("Failed to create demo tenant: %v", err)
+	}
+
+	// Should not panic - gracefully skip when demoSeedService is nil
+	cronService.resetDemoTenant()
+	// Test passes if no panic occurs
+}
+
+// TestCronService_ConcurrentStopCalls tests thread safety of Stop()
+func TestCronService_ConcurrentStopCalls(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cronService := NewCronService(db, nil)
+
+	// Call Stop() concurrently from multiple goroutines
+	// This tests the sync.Once protection
+	done := make(chan bool, 10)
+
+	for i := 0; i < 10; i++ {
+		go func() {
+			cronService.Stop() // Should not panic even when called multiple times
+			done <- true
+		}()
+	}
+
+	// Wait for all goroutines
+	for i := 0; i < 10; i++ {
+		select {
+		case <-done:
+			// OK
+		case <-time.After(1 * time.Second):
+			t.Fatal("Concurrent Stop() calls timed out")
+		}
 	}
 }

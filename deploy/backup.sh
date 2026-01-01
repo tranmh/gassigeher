@@ -140,6 +140,78 @@ backup_postgres() {
     log "PostgreSQL backup completed: ${backup_file}.gz ($(du -h "${backup_file}.gz" | cut -f1))"
 }
 
+# Backup .env configuration file
+backup_env_config() {
+    log "Starting .env configuration backup..."
+
+    local env_file="${ENV_FILE:-$INSTALL_DIR/.env}"
+    local backup_file="${BACKUP_DIR}/gassigeher_env_${DATE}.env"
+
+    if [ ! -f "$env_file" ]; then
+        log "Warning: .env file not found at $env_file, skipping"
+        return 0
+    fi
+
+    # Copy .env file (contains secrets - handle carefully!)
+    cp "$env_file" "$backup_file" || error_exit ".env backup failed"
+
+    # Set restrictive permissions on backup
+    chmod 600 "$backup_file"
+
+    # Compress
+    gzip "$backup_file" || error_exit ".env compression failed"
+
+    # Set restrictive permissions on compressed file
+    chmod 600 "${backup_file}.gz"
+
+    log ".env backup completed: ${backup_file}.gz (contains secrets - store securely!)"
+}
+
+# Backup file storage (uploads, MinIO data)
+backup_file_storage() {
+    log "Starting file storage backup..."
+
+    local backup_file="${BACKUP_DIR}/gassigeher_files_${DATE}.tar"
+    local dirs_to_backup=""
+
+    # Check for uploads directory (Simple-Mode filesystem storage)
+    local uploads_dir="${UPLOADS_DIR:-$INSTALL_DIR/uploads}"
+    if [ -d "$uploads_dir" ] && [ "$(ls -A "$uploads_dir" 2>/dev/null)" ]; then
+        dirs_to_backup="$uploads_dir"
+        log "Found uploads directory: $uploads_dir"
+    fi
+
+    # Check for MinIO data directory (Docker mode S3 storage)
+    local minio_dir="${MINIO_DATA_DIR:-$INSTALL_DIR/data/minio}"
+    if [ -d "$minio_dir" ] && [ "$(ls -A "$minio_dir" 2>/dev/null)" ]; then
+        dirs_to_backup="$dirs_to_backup $minio_dir"
+        log "Found MinIO data directory: $minio_dir"
+    fi
+
+    # Skip if no directories to backup
+    if [ -z "$dirs_to_backup" ]; then
+        log "No file storage directories found to backup (uploads or MinIO data)"
+        return 0
+    fi
+
+    # Create tar archive
+    tar -cf "$backup_file" $dirs_to_backup 2>/dev/null || {
+        log "Warning: Some files could not be archived (may be in use)"
+    }
+
+    # Check if archive was created
+    if [ ! -f "$backup_file" ] || [ ! -s "$backup_file" ]; then
+        log "Warning: File storage backup appears empty or failed"
+        rm -f "$backup_file" 2>/dev/null
+        return 0
+    fi
+
+    # Compress
+    gzip "$backup_file" || error_exit "File storage compression failed"
+
+    log "File storage backup completed: ${backup_file}.gz ($(du -h "${backup_file}.gz" | cut -f1))"
+}
+
 # Cleanup old backups
 cleanup_old_backups() {
     log "Cleaning up backups older than $RETENTION_DAYS days..."
@@ -161,6 +233,7 @@ main() {
     log "=========================================="
     log "Starting backup for DB_TYPE=$DB_TYPE"
 
+    # Step 1: Database backup
     case "$DB_TYPE" in
         sqlite)
             backup_sqlite
@@ -176,6 +249,13 @@ main() {
             ;;
     esac
 
+    # Step 2: Configuration backup (.env with secrets)
+    backup_env_config
+
+    # Step 3: File storage backup (uploads, MinIO data)
+    backup_file_storage
+
+    # Step 4: Cleanup old backups
     cleanup_old_backups
 
     log "Backup completed successfully"

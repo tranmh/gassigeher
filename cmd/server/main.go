@@ -146,6 +146,12 @@ func main() {
 		} else {
 			defer sentryService.Flush(2 * time.Second)
 		}
+	} else {
+		// Warn in production if Sentry is not configured
+		if cfg.SentryEnvironment == "production" || os.Getenv("GO_ENV") == "production" {
+			log.Printf("WARNING: SENTRY_DSN not configured - production errors will NOT be tracked!")
+			log.Printf("         Set SENTRY_DSN in .env to enable error tracking")
+		}
 	}
 
 	// Initialize business metrics collection
@@ -203,8 +209,11 @@ func main() {
 
 	// SaaS Phase 5: Global rate limiter (100 requests/second burst 200 per IP)
 	// Disabled by default for development/testing - enable with RATE_LIMIT_ENABLED=true
+	var globalRateLimiter *middleware.GlobalRateLimiter
 	if cfg.RateLimitEnabled {
-		router.Use(middleware.GlobalRateLimit(100, 200))
+		rateLimitMiddleware, limiter := middleware.GlobalRateLimitWithCleanup(100, 200)
+		globalRateLimiter = limiter
+		router.Use(rateLimitMiddleware)
 		log.Println("Global rate limiting enabled (100 rps, burst 200)")
 	} else {
 		log.Println("Global rate limiting DISABLED (set RATE_LIMIT_ENABLED=true to enable)")
@@ -753,9 +762,10 @@ func main() {
 	srv := &http.Server{
 		Addr:         ":" + port,
 		Handler:      wrappedRouter,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  60 * time.Second,  // Increased from 15s for file uploads
+		WriteTimeout: 60 * time.Second,  // Increased from 15s for file uploads
+		IdleTimeout:  120 * time.Second, // Increased from 60s for keep-alive connections
+		MaxHeaderBytes: 1 << 20,         // 1MB max header size (DoS protection)
 	}
 
 	// Channel to listen for shutdown signals
@@ -789,6 +799,12 @@ func main() {
 	// BUG FIX: Stop AuthHandler's BruteForceService goroutine to prevent leak
 	authHandler.Close()
 	log.Println("Auth handler cleanup completed")
+
+	// BUG FIX: Stop GlobalRateLimiter's cleanup goroutine to prevent leak
+	if globalRateLimiter != nil {
+		globalRateLimiter.Close()
+		log.Println("Global rate limiter cleanup completed")
+	}
 
 	// Create context with timeout for shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

@@ -229,7 +229,8 @@ func InitializeWithConfig(config *DBConfig) (*DB, Dialect, error) {
 	}
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open database: %w", err)
+		// Redact password from error message to prevent credential leakage in logs
+		return nil, nil, fmt.Errorf("failed to open database: %s", redactPassword(err.Error()))
 	}
 
 	// Configure connection pool (MySQL and PostgreSQL only)
@@ -239,7 +240,8 @@ func InitializeWithConfig(config *DBConfig) (*DB, Dialect, error) {
 
 	// Test connection
 	if err := db.Ping(); err != nil {
-		return nil, nil, fmt.Errorf("failed to ping database: %w", err)
+		// Redact password from error message to prevent credential leakage in logs
+		return nil, nil, fmt.Errorf("failed to ping database: %s", redactPassword(err.Error()))
 	}
 
 	// Apply database-specific settings (needs underlying sql.DB)
@@ -263,6 +265,46 @@ func WrapSqlxDB(db *sqlx.DB, dialect Dialect) *DB {
 		DB:      db,
 		dialect: dialect,
 	}
+}
+
+// redactPassword removes passwords from connection strings/error messages
+// Handles postgres://user:pass@host and key=value formats
+func redactPassword(s string) string {
+	// Redact postgres://user:password@host format
+	if idx := strings.Index(s, "://"); idx != -1 {
+		// Find the @ symbol after ://
+		afterProtocol := s[idx+3:]
+		if atIdx := strings.Index(afterProtocol, "@"); atIdx != -1 {
+			// Find the : between user and password
+			userPart := afterProtocol[:atIdx]
+			if colonIdx := strings.Index(userPart, ":"); colonIdx != -1 {
+				// Redact the password
+				return s[:idx+3+colonIdx+1] + "***REDACTED***" + s[idx+3+atIdx:]
+			}
+		}
+	}
+	// Also redact password= in key-value format
+	if strings.Contains(strings.ToLower(s), "password=") {
+		// Simple approach: replace password=anything until next space or end
+		result := s
+		lower := strings.ToLower(result)
+		for {
+			idx := strings.Index(lower, "password=")
+			if idx == -1 {
+				break
+			}
+			// Find end of password value (space or end of string)
+			endIdx := strings.IndexAny(result[idx+9:], " \t\n&")
+			if endIdx == -1 {
+				result = result[:idx] + "password=***REDACTED***"
+			} else {
+				result = result[:idx] + "password=***REDACTED***" + result[idx+9+endIdx:]
+			}
+			lower = strings.ToLower(result)
+		}
+		return result
+	}
+	return s
 }
 
 // buildPostgreSQLDSN builds a PostgreSQL connection string

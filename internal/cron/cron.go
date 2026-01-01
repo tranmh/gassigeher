@@ -51,6 +51,12 @@ func NewCronService(db *database.DB, cfg *config.Config) *CronService {
 		}
 	}
 
+	// Only create demo seed service if config is provided (requires valid config for domain info)
+	var demoSeedService *services.DemoSeedService
+	if cfg != nil {
+		demoSeedService = services.NewDemoSeedService(db, cfg)
+	}
+
 	return &CronService{
 		db:                    db,
 		bookingRepo:           repository.NewBookingRepository(db),
@@ -59,7 +65,7 @@ func NewCronService(db *database.DB, cfg *config.Config) *CronService {
 		tenantRepo:            repository.NewTenantRepository(db),
 		demoStateRepo:         repository.NewDemoTenantRepository(db),
 		emailService:          emailService,
-		demoSeedService:       services.NewDemoSeedService(db, cfg),
+		demoSeedService:       demoSeedService,
 		tenantActivityChecker: NewTenantActivityChecker(db, 30), // Default 30 days inactivity
 		stopChan:              make(chan bool),
 	}
@@ -337,6 +343,12 @@ func (s *CronService) autoDeactivateUsersForTenant(tenantID int) {
 // resetDemoTenant resets the demo tenant to its initial state
 // Called daily at midnight (Europe/Berlin time)
 func (s *CronService) resetDemoTenant() {
+	// Check if demo seed service is configured (requires valid config)
+	if s.demoSeedService == nil {
+		log.Println("Demo reset: Demo seed service not configured, skipping")
+		return
+	}
+
 	// Check if demo tenant exists
 	demoTenant, err := s.tenantRepo.GetDemoTenant()
 	if err != nil {

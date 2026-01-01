@@ -1,0 +1,49 @@
+# Prometheus configuration for Gassigeher SaaS
+# This file is mounted into the Prometheus container
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'gassigeher'
+
+# Alertmanager configuration (optional - add later for alerting)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Gassigeher application metrics
+  - job_name: 'gassigeher'
+    metrics_path: '/metrics'
+    # Use file-based service discovery or static config
+    # For basic auth, use the environment variables
+    static_configs:
+      - targets: ['app:8080']
+        labels:
+          app: 'gassigeher'
+          env: 'production'
+    # Basic auth for metrics endpoint (configured via .env)
+    # Note: Prometheus doesn't support env vars in config directly
+    # For production, use file_sd_configs or hardcode the credentials
+    # basic_auth:
+    #   username: 'prometheus'
+    #   password: 'your-metrics-password'
+
+  # PostgreSQL metrics (if using postgres_exporter)
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+
+  # MinIO metrics
+  # - job_name: 'minio'
+  #   metrics_path: '/minio/v2/metrics/cluster'
+  #   static_configs:
+  #     - targets: ['minio:9000']

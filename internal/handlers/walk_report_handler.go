@@ -451,8 +451,15 @@ func (h *WalkReportHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// SECURITY: Limit request body size to prevent DoS attacks
+	maxSizeMB := h.cfg.MaxUploadSizeMB
+	if maxSizeMB <= 0 {
+		maxSizeMB = 10 // Default 10MB if not configured
+	}
+	maxSize := int64(maxSizeMB) * 1024 * 1024
+	r.Body = http.MaxBytesReader(w, r.Body, maxSize)
+
 	// Parse multipart form
-	maxSize := int64(h.cfg.MaxUploadSizeMB) * 1024 * 1024
 	if err := r.ParseMultipartForm(maxSize); err != nil {
 		respondError(w, http.StatusBadRequest, "Datei zu groß")
 		return

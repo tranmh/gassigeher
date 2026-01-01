@@ -262,8 +262,16 @@ func (h *UserHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SECURITY: Limit request body size to prevent DoS attacks
+	maxSizeMB := h.config.MaxUploadSizeMB
+	if maxSizeMB <= 0 {
+		maxSizeMB = 10 // Default 10MB if not configured
+	}
+	maxSize := int64(maxSizeMB) << 20 // Convert MB to bytes
+	r.Body = http.MaxBytesReader(w, r.Body, maxSize)
+
 	// Parse multipart form
-	if err := r.ParseMultipartForm(int64(h.config.MaxUploadSizeMB) << 20); err != nil {
+	if err := r.ParseMultipartForm(maxSize); err != nil {
 		respondError(w, http.StatusBadRequest, "File too large or invalid form")
 		return
 	}

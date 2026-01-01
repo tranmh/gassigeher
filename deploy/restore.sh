@@ -36,10 +36,12 @@ error_exit() {
 usage() {
     echo "Usage: $0 <backup_file>"
     echo ""
-    echo "Restore a Gassigeher database backup."
+    echo "Restore a Gassigeher database or file storage backup."
     echo ""
     echo "Arguments:"
-    echo "  backup_file    Path to the backup file (.gz, .sql.gz, or .dump.gz)"
+    echo "  backup_file    Path to the backup file"
+    echo "                 Database: .db.gz, .sql.gz, or .dump.gz"
+    echo "                 File storage: _files_*.tar.gz"
     echo ""
     echo "Environment variables (or from .env):"
     echo "  DB_TYPE        Database type: sqlite, mysql, postgres (default: sqlite)"
@@ -49,11 +51,20 @@ usage() {
     echo "  DB_USER        Database username"
     echo "  DB_PASSWORD    Database password"
     echo "  DB_NAME        Database name"
+    echo "  UPLOADS_DIR    Uploads directory (default: INSTALL_DIR/uploads)"
+    echo "  MINIO_DATA_DIR MinIO data directory (default: INSTALL_DIR/data/minio)"
     echo ""
     echo "Examples:"
+    echo "  # Database restore"
     echo "  DB_TYPE=sqlite ./restore.sh backups/gassigeher_sqlite_20250101.db.gz"
     echo "  DB_TYPE=mysql ./restore.sh backups/gassigeher_mysql_20250101.sql.gz"
     echo "  DB_TYPE=postgres ./restore.sh backups/gassigeher_postgres_20250101.dump.gz"
+    echo ""
+    echo "  # Configuration restore (.env with secrets)"
+    echo "  ./restore.sh backups/gassigeher_env_20250101.env.gz"
+    echo ""
+    echo "  # File storage restore (uploads, MinIO data)"
+    echo "  ./restore.sh backups/gassigeher_files_20250101.tar.gz"
     exit 1
 }
 
@@ -230,6 +241,124 @@ restore_postgres() {
     log "PostgreSQL restore completed successfully"
 }
 
+# File storage restore
+restore_file_storage() {
+    local backup_file="$1"
+    local temp_dir="/tmp/gassigeher_restore_files_$$"
+
+    log "Starting file storage restore from $backup_file..."
+
+    # Create temp directory
+    mkdir -p "$temp_dir"
+
+    # Decompress if needed and extract
+    if [[ "$backup_file" == *.tar.gz ]]; then
+        log "Extracting backup archive..."
+        tar -xzf "$backup_file" -C "$temp_dir" || error_exit "Extraction failed"
+    elif [[ "$backup_file" == *.tar ]]; then
+        tar -xf "$backup_file" -C "$temp_dir" || error_exit "Extraction failed"
+    else
+        error_exit "Unknown file format. Expected .tar or .tar.gz"
+    fi
+
+    # Find and restore uploads directory
+    local uploads_src=$(find "$temp_dir" -type d -name "uploads" -print -quit)
+    if [ -n "$uploads_src" ] && [ -d "$uploads_src" ]; then
+        local uploads_dest="${UPLOADS_DIR:-$INSTALL_DIR/uploads}"
+        log "Restoring uploads to $uploads_dest..."
+
+        # Backup current uploads if exists
+        if [ -d "$uploads_dest" ] && [ "$(ls -A "$uploads_dest" 2>/dev/null)" ]; then
+            local uploads_backup="${uploads_dest}.pre_restore_$(date +%Y%m%d_%H%M%S)"
+            log "Backing up current uploads to $uploads_backup"
+            mv "$uploads_dest" "$uploads_backup"
+        fi
+
+        mkdir -p "$(dirname "$uploads_dest")"
+        cp -r "$uploads_src" "$uploads_dest"
+        log "Uploads restored successfully"
+    else
+        log "No uploads directory found in backup"
+    fi
+
+    # Find and restore MinIO data directory
+    local minio_src=$(find "$temp_dir" -type d -name "minio" -print -quit)
+    if [ -n "$minio_src" ] && [ -d "$minio_src" ]; then
+        local minio_dest="${MINIO_DATA_DIR:-$INSTALL_DIR/data/minio}"
+        log "Restoring MinIO data to $minio_dest..."
+
+        # Backup current MinIO data if exists
+        if [ -d "$minio_dest" ] && [ "$(ls -A "$minio_dest" 2>/dev/null)" ]; then
+            local minio_backup="${minio_dest}.pre_restore_$(date +%Y%m%d_%H%M%S)"
+            log "Backing up current MinIO data to $minio_backup"
+            mv "$minio_dest" "$minio_backup"
+        fi
+
+        mkdir -p "$(dirname "$minio_dest")"
+        cp -r "$minio_src" "$minio_dest"
+        log "MinIO data restored successfully"
+    else
+        log "No MinIO data directory found in backup"
+    fi
+
+    # Cleanup temp directory
+    rm -rf "$temp_dir"
+
+    log "File storage restore completed successfully"
+}
+
+# .env configuration restore
+restore_env_config() {
+    local backup_file="$1"
+    local env_dest="${ENV_FILE:-$INSTALL_DIR/.env}"
+
+    log "Starting .env configuration restore from $backup_file..."
+
+    # Decompress if needed
+    local temp_file="/tmp/gassigeher_restore_env_$$.env"
+    if [[ "$backup_file" == *.gz ]]; then
+        log "Decompressing .env backup..."
+        gunzip -c "$backup_file" > "$temp_file" || error_exit "Decompression failed"
+    else
+        cp "$backup_file" "$temp_file" || error_exit "Copy failed"
+    fi
+
+    # Backup current .env if exists
+    if [ -f "$env_dest" ]; then
+        local env_backup="${env_dest}.pre_restore_$(date +%Y%m%d_%H%M%S)"
+        log "Backing up current .env to $env_backup"
+        cp "$env_dest" "$env_backup"
+        chmod 600 "$env_backup"
+    fi
+
+    # Restore .env
+    mkdir -p "$(dirname "$env_dest")"
+    mv "$temp_file" "$env_dest" || error_exit "Failed to restore .env"
+    chmod 600 "$env_dest"
+
+    log ".env configuration restore completed successfully"
+    log "IMPORTANT: Review restored .env and update any environment-specific values!"
+}
+
+# Detect backup type from filename
+detect_backup_type() {
+    local filename="$1"
+
+    if [[ "$filename" == *"_env_"*.env* ]]; then
+        echo "env"
+    elif [[ "$filename" == *"_files_"*.tar* ]]; then
+        echo "files"
+    elif [[ "$filename" == *"_sqlite_"* ]]; then
+        echo "sqlite"
+    elif [[ "$filename" == *"_mysql_"* ]]; then
+        echo "mysql"
+    elif [[ "$filename" == *"_postgres_"* ]]; then
+        echo "postgres"
+    else
+        echo "unknown"
+    fi
+}
+
 # Confirm restore
 confirm_restore() {
     echo ""
@@ -253,8 +382,53 @@ confirm_restore() {
 # Main execution
 main() {
     log "=========================================="
-    log "Starting restore for DB_TYPE=$DB_TYPE"
     log "Backup file: $BACKUP_FILE"
+
+    # Auto-detect backup type from filename
+    local detected_type=$(detect_backup_type "$BACKUP_FILE")
+    log "Detected backup type: $detected_type"
+
+    # Handle .env configuration backups
+    if [ "$detected_type" = "env" ]; then
+        log "Starting .env configuration restore..."
+
+        # Ask for confirmation
+        confirm_restore
+
+        restore_env_config "$BACKUP_FILE"
+
+        log "Restore completed successfully"
+        log "=========================================="
+        echo ""
+        echo ".env configuration restore complete!"
+        echo "IMPORTANT: Review the restored .env file and restart the application."
+        return
+    fi
+
+    # Handle file storage backups
+    if [ "$detected_type" = "files" ]; then
+        log "Starting file storage restore..."
+
+        # Ask for confirmation
+        confirm_restore
+
+        restore_file_storage "$BACKUP_FILE"
+
+        log "Restore completed successfully"
+        log "=========================================="
+        echo ""
+        echo "File storage restore complete!"
+        echo "If using Docker, you may need to restart MinIO: docker compose restart minio"
+        return
+    fi
+
+    # Handle database backups
+    # Use detected type if available, otherwise fall back to DB_TYPE env var
+    if [ "$detected_type" != "unknown" ]; then
+        DB_TYPE="$detected_type"
+    fi
+
+    log "Starting database restore for DB_TYPE=$DB_TYPE"
 
     # Ask for confirmation
     confirm_restore
@@ -277,7 +451,7 @@ main() {
     log "Restore completed successfully"
     log "=========================================="
     echo ""
-    echo "Restore complete! You may need to restart the application."
+    echo "Database restore complete! You may need to restart the application."
 }
 
 # Run main

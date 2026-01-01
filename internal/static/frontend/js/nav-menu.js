@@ -3,15 +3,11 @@
 
 // Mobile menu toggle function
 function toggleMenu() {
-    console.log('toggleMenu called');
     const nav = document.getElementById('main-nav');
     const overlay = document.getElementById('nav-overlay');
-    console.log('nav element:', nav);
-    console.log('overlay element:', overlay);
     if (nav && overlay) {
         nav.classList.toggle('active');
         overlay.classList.toggle('active');
-        console.log('Toggled active class - nav now:', nav.classList.contains('active') ? 'OPEN' : 'CLOSED');
     } else {
         console.error('Could not find nav or overlay elements!');
     }
@@ -44,8 +40,3 @@ function showAdminLinkIfAdmin(user) {
 }
 
 // User area link is always visible on admin pages (no special logic needed)
-
-// Debug logging
-console.log('nav-menu.js loaded successfully');
-console.log('toggleMenu function:', typeof toggleMenu);
-console.log('showAdminLinkIfAdmin function:', typeof showAdminLinkIfAdmin);

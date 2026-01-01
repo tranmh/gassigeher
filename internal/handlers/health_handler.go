@@ -57,7 +57,7 @@ func (h *HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 			response.Status = "degraded"
 			response.Checks["database"] = HealthCheck{
 				Status:  "fail",
-				Message: "Database connection failed: " + err.Error(),
+				Message: "Database connection failed", // Sanitized - don't leak internal error details
 			}
 		} else {
 			response.Checks["database"] = HealthCheck{
@@ -76,7 +76,7 @@ func (h *HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 			response.Status = "degraded"
 			response.Checks["database_query"] = HealthCheck{
 				Status:  "fail",
-				Message: "Database query failed: " + err.Error(),
+				Message: "Database query failed", // Sanitized - don't leak internal error details
 			}
 		} else {
 			response.Checks["database_query"] = HealthCheck{
@@ -121,7 +121,7 @@ func (h *HealthHandler) DetailedHealth(w http.ResponseWriter, r *http.Request) {
 			response.Status = "degraded"
 			response.Checks["database_ping"] = HealthCheck{
 				Status:  "fail",
-				Message: err.Error(),
+				Message: "Database ping failed", // Sanitized - don't leak internal error details
 			}
 		} else {
 			response.Checks["database_ping"] = HealthCheck{

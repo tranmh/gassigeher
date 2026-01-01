@@ -90,7 +90,8 @@ func TestBookingHandler_CreateBooking(t *testing.T) {
 	})
 
 	t.Run("past date booking", func(t *testing.T) {
-		yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+		// Use UTC for consistency with handler (which uses UTC for date comparison)
+		yesterday := time.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02")
 
 		reqBody := map[string]interface{}{
 			"dog_id":         dogID,

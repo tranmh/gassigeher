@@ -106,11 +106,12 @@ func (g *GlobalRateLimiter) cleanupStaleEntries() {
 	}
 }
 
-// GlobalRateLimit creates a middleware that limits requests per IP
-func GlobalRateLimit(rps float64, burst int) func(http.Handler) http.Handler {
+// GlobalRateLimitWithCleanup creates a middleware that limits requests per IP
+// Returns the middleware function AND the limiter (for cleanup on shutdown)
+func GlobalRateLimitWithCleanup(rps float64, burst int) (func(http.Handler) http.Handler, *GlobalRateLimiter) {
 	limiter := NewGlobalRateLimiter(rps, burst)
 
-	return func(next http.Handler) http.Handler {
+	middleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Use existing getClientIP function with empty trusted proxies map
 			ip := getClientIP(r, nil)
@@ -126,4 +127,13 @@ func GlobalRateLimit(rps float64, burst int) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+
+	return middleware, limiter
+}
+
+// GlobalRateLimit creates a middleware that limits requests per IP
+// DEPRECATED: Use GlobalRateLimitWithCleanup for proper resource cleanup
+func GlobalRateLimit(rps float64, burst int) func(http.Handler) http.Handler {
+	middleware, _ := GlobalRateLimitWithCleanup(rps, burst)
+	return middleware
 }

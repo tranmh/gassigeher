@@ -69,6 +69,4 @@
             window.location.href = '/login.html';
         });
     }
-
-    console.log('AuthGuard: User authenticated');
 })();

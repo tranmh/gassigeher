@@ -333,7 +333,6 @@
         if (typeof Shepherd === 'undefined') {
             shepherdRetryCount++;
             if (shepherdRetryCount <= MAX_SHEPHERD_RETRIES) {
-                console.log(`[GassigeherTour] Shepherd.js not yet loaded, retry ${shepherdRetryCount}/${MAX_SHEPHERD_RETRIES}...`);
                 setTimeout(initTour, 200);
                 return null;
             } else {
@@ -342,15 +341,9 @@
             }
         }
 
-        console.log('[GassigeherTour] Initializing tour for path:', path);
-        console.log('[GassigeherTour] Demo tenant:', isDemoTenant());
-        console.log('[GassigeherTour] User tour complete:', isTourComplete('user'));
-        console.log('[GassigeherTour] Admin tour complete:', isTourComplete('admin'));
-
         // Determine which tour to show based on page
         if (path.includes('admin-dashboard')) {
             if (!isTourComplete('admin')) {
-                console.log('[GassigeherTour] Starting admin tour...');
                 tour = createTour('admin');
                 if (tour) {
                     adminDashboardSteps.forEach(step => tour.addStep(step));
@@ -359,7 +352,6 @@
             }
         } else if (path.includes('dashboard') && !path.includes('admin')) {
             if (!isTourComplete('user')) {
-                console.log('[GassigeherTour] Starting user dashboard tour...');
                 tour = createTour('user');
                 if (tour) {
                     userDashboardSteps.forEach(step => tour.addStep(step));
@@ -367,7 +359,6 @@
             }
         } else if (path.includes('dogs.html') && !path.includes('admin')) {
             if (!isTourComplete('user')) {
-                console.log('[GassigeherTour] Starting dogs page tour...');
                 tour = createTour('user');
                 if (tour) {
                     dogsPageSteps.forEach(step => tour.addStep(step));
@@ -382,15 +373,12 @@
                     // The first step (welcome) has no attachTo, so just start
                     const firstStep = tour.steps[0];
                     if (firstStep) {
-                        console.log('[GassigeherTour] Starting tour with first step:', firstStep.id);
                         tour.start();
                     }
                 } catch (e) {
                     console.error('[GassigeherTour] Error starting tour:', e);
                 }
             }, 800);
-        } else {
-            console.log('[GassigeherTour] No tour to start (already complete or wrong page)');
         }
 
         return tour;

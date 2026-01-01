@@ -66,8 +66,12 @@ type FieldMapping struct {
 func (h *ImportHandler) PreviewImport(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
+	// SECURITY: Limit request body size to prevent DoS attacks
+	const maxSize = 10 << 20 // 10MB
+	r.Body = http.MaxBytesReader(w, r.Body, maxSize)
+
 	// Parse multipart form (max 10MB)
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
+	if err := r.ParseMultipartForm(maxSize); err != nil {
 		respondError(w, http.StatusBadRequest, "Datei zu gross (max 10MB)")
 		return
 	}
@@ -254,8 +258,12 @@ func (h *ImportHandler) suggestMappings(headers []string, tenantID int) map[stri
 func (h *ImportHandler) ExecuteImport(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
+	// SECURITY: Limit request body size to prevent DoS attacks
+	const maxSize = 10 << 20 // 10MB
+	r.Body = http.MaxBytesReader(w, r.Body, maxSize)
+
 	// Parse multipart form
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
+	if err := r.ParseMultipartForm(maxSize); err != nil {
 		respondError(w, http.StatusBadRequest, "Datei zu gross (max 10MB)")
 		return
 	}

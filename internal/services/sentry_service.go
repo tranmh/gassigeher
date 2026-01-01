@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"runtime"
 	"time"
+
+	"github.com/getsentry/sentry-go"
 )
 
 // SentryConfig holds Sentry configuration
@@ -17,13 +19,6 @@ type SentryConfig struct {
 }
 
 // SentryService handles error tracking via Sentry
-// Note: This is a stub implementation. When you install the Sentry SDK,
-// replace the stub methods with actual Sentry calls.
-//
-// To enable Sentry:
-// 1. Run: go get github.com/getsentry/sentry-go
-// 2. Set SENTRY_DSN in your .env file
-// 3. Uncomment the sentry imports and actual implementation
 type SentryService struct {
 	config  *SentryConfig
 	enabled bool
@@ -42,23 +37,20 @@ func NewSentryService(config *SentryConfig) (*SentryService, error) {
 		return s, nil
 	}
 
-	// When you have the Sentry SDK installed, uncomment this:
-	/*
-		err := sentry.Init(sentry.ClientOptions{
-			Dsn:              config.DSN,
-			Environment:      config.Environment,
-			Release:          config.Release,
-			ServerName:       config.ServerName,
-			AttachStacktrace: true,
-			BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
-				// You can modify or filter events here
-				return event
-			},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("sentry init failed: %w", err)
-		}
-	*/
+	err := sentry.Init(sentry.ClientOptions{
+		Dsn:              config.DSN,
+		Environment:      config.Environment,
+		Release:          config.Release,
+		ServerName:       config.ServerName,
+		AttachStacktrace: true,
+		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+			// You can modify or filter events here
+			return event
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("sentry init failed: %w", err)
+	}
 
 	log.Printf("Sentry: Initialized (env=%s, release=%s)", config.Environment, config.Release)
 	return s, nil
@@ -70,11 +62,7 @@ func (s *SentryService) CaptureException(err error) {
 		return
 	}
 
-	// Log locally as fallback
-	log.Printf("SENTRY ERROR: %v", err)
-
-	// When you have the Sentry SDK installed, uncomment this:
-	// sentry.CaptureException(err)
+	sentry.CaptureException(err)
 }
 
 // CaptureMessage captures a message and sends it to Sentry
@@ -83,10 +71,7 @@ func (s *SentryService) CaptureMessage(message string) {
 		return
 	}
 
-	log.Printf("SENTRY MESSAGE: %s", message)
-
-	// When you have the Sentry SDK installed, uncomment this:
-	// sentry.CaptureMessage(message)
+	sentry.CaptureMessage(message)
 }
 
 // CaptureExceptionWithContext captures an error with additional context
@@ -95,20 +80,15 @@ func (s *SentryService) CaptureExceptionWithContext(err error, tags map[string]s
 		return
 	}
 
-	log.Printf("SENTRY ERROR: %v (tags=%v, extra=%v)", err, tags, extra)
-
-	// When you have the Sentry SDK installed, uncomment this:
-	/*
-		sentry.WithScope(func(scope *sentry.Scope) {
-			for k, v := range tags {
-				scope.SetTag(k, v)
-			}
-			for k, v := range extra {
-				scope.SetExtra(k, v)
-			}
-			sentry.CaptureException(err)
-		})
-	*/
+	sentry.WithScope(func(scope *sentry.Scope) {
+		for k, v := range tags {
+			scope.SetTag(k, v)
+		}
+		for k, v := range extra {
+			scope.SetExtra(k, v)
+		}
+		sentry.CaptureException(err)
+	})
 }
 
 // SetUser sets user context for subsequent events
@@ -117,17 +97,14 @@ func (s *SentryService) SetUser(userID int, email string, tenantID int, tenantSl
 		return
 	}
 
-	// When you have the Sentry SDK installed, uncomment this:
-	/*
-		sentry.ConfigureScope(func(scope *sentry.Scope) {
-			scope.SetUser(sentry.User{
-				ID:    fmt.Sprintf("%d", userID),
-				Email: email,
-			})
-			scope.SetTag("tenant_id", fmt.Sprintf("%d", tenantID))
-			scope.SetTag("tenant_slug", tenantSlug)
+	sentry.ConfigureScope(func(scope *sentry.Scope) {
+		scope.SetUser(sentry.User{
+			ID:    fmt.Sprintf("%d", userID),
+			Email: email,
 		})
-	*/
+		scope.SetTag("tenant_id", fmt.Sprintf("%d", tenantID))
+		scope.SetTag("tenant_slug", tenantSlug)
+	})
 }
 
 // Flush waits for all events to be sent (call before shutdown)
@@ -136,8 +113,7 @@ func (s *SentryService) Flush(timeout time.Duration) {
 		return
 	}
 
-	// When you have the Sentry SDK installed, uncomment this:
-	// sentry.Flush(timeout)
+	sentry.Flush(timeout)
 }
 
 // RecoveryMiddleware returns HTTP middleware that captures panics
