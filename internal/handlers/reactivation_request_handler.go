@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -27,7 +28,7 @@ type ReactivationRequestHandler struct {
 func NewReactivationRequestHandler(db *database.DB, cfg *config.Config) *ReactivationRequestHandler {
 	emailService, err := services.NewEmailService(services.ConfigToEmailConfig(cfg))
 	if err != nil {
-		println("Warning: Failed to initialize email service:", err.Error())
+		log.Printf("Warning: Failed to initialize email service: %v", err)
 	}
 
 	return &ReactivationRequestHandler{

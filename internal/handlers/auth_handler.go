@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -32,7 +33,7 @@ func NewAuthHandler(db *database.DB, cfg *config.Config) *AuthHandler {
 	emailService, err := services.NewEmailService(services.ConfigToEmailConfig(cfg))
 	if err != nil {
 		// Log error but don't fail - emails will fail gracefully
-		fmt.Printf("Warning: Failed to initialize email service: %v\n", err)
+		log.Printf("Warning: Failed to initialize email service: %v", err)
 	}
 
 	return &AuthHandler{
@@ -151,14 +152,14 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	if h.userColorRepo != nil {
 		if err := h.userColorRepo.SetUserColors(tenantID, user.ID, []int{1}, user.ID); err != nil {
 			// Log but don't fail registration
-			fmt.Printf("Warning: Failed to assign default color to user %d: %v\n", user.ID, err)
+			log.Printf("Warning: Failed to assign default color to user %d: %v", user.ID, err)
 		}
 	}
 
 	// Send verification email
 	if h.emailService != nil {
 		if err := h.emailService.SendVerificationEmail(req.Email, req.FirstName, verificationToken); err != nil {
-			fmt.Printf("Failed to send verification email: %v\n", err)
+			log.Printf("Failed to send verification email: %v", err)
 			// Don't fail the registration if email fails
 		}
 
@@ -172,7 +173,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 					req.Email,
 					req.Phone,
 				); err != nil {
-					fmt.Printf("Failed to send admin notification email: %v\n", err)
+					log.Printf("Failed to send admin notification email: %v", err)
 				}
 			}()
 		}
@@ -233,7 +234,7 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 	// Send welcome email
 	if h.emailService != nil && user.Email != nil {
 		if err := h.emailService.SendWelcomeEmail(*user.Email, user.FirstName); err != nil {
-			fmt.Printf("Failed to send welcome email: %v\n", err)
+			log.Printf("Failed to send welcome email: %v", err)
 		}
 	}
 
@@ -327,7 +328,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Update last activity
 	if err := h.userRepo.UpdateLastActivity(user.ID); err != nil {
-		fmt.Printf("Failed to update last activity: %v\n", err)
+		log.Printf("Failed to update last activity: %v", err)
 	}
 
 	// DONE: Get admin status from database (not config)
@@ -413,7 +414,7 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	// Send reset email
 	if h.emailService != nil && user.Email != nil {
 		if err := h.emailService.SendPasswordResetEmail(*user.Email, user.FirstName, resetToken); err != nil {
-			fmt.Printf("Failed to send password reset email: %v\n", err)
+			log.Printf("Failed to send password reset email: %v", err)
 		}
 	}
 
@@ -543,7 +544,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	// Clear must_change_password flag if set
 	if user.MustChangePassword {
 		if err := h.userRepo.ClearMustChangePassword(user.ID); err != nil {
-			fmt.Printf("Warning: Failed to clear must_change_password flag: %v\n", err)
+			log.Printf("Warning: Failed to clear must_change_password flag: %v", err)
 		}
 	}
 

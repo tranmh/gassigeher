@@ -258,6 +258,36 @@ func main() {
 	reactivationHandler := handlers.NewReactivationRequestHandler(db, cfg)
 	dashboardHandler := handlers.NewDashboardHandler(db, cfg)
 	healthHandler := handlers.NewHealthHandler(db)
+
+	// Initialize shared services for health checks
+	// Email service (used by health check to verify configuration)
+	emailService, err := services.NewEmailService(services.ConfigToEmailConfig(cfg))
+	if err != nil {
+		log.Printf("Warning: Email service not available for health checks: %v", err)
+	} else {
+		healthHandler.SetEmailService(emailService)
+	}
+
+	// S3 service (if enabled, used by health check to verify connectivity)
+	if cfg.UseS3 {
+		s3Config := &services.S3Config{
+			Endpoint:   cfg.S3Endpoint,
+			AccessKey:  cfg.S3AccessKey,
+			SecretKey:  cfg.S3SecretKey,
+			BucketName: cfg.S3BucketName,
+			Region:     cfg.S3Region,
+			PublicURL:  cfg.S3PublicURL,
+			UseSSL:     cfg.S3UseSSL,
+		}
+		s3Service, err := services.NewS3Service(s3Config)
+		if err != nil {
+			log.Printf("Warning: S3 service not available for health checks: %v", err)
+		} else {
+			healthHandler.SetS3Service(s3Service)
+			log.Println("S3 service configured for health checks")
+		}
+	}
+
 	walkReportHandler := handlers.NewWalkReportHandler(db, cfg)
 	colorCategoryHandler := handlers.NewColorCategoryHandler(db, cfg)
 	colorRequestHandler := handlers.NewColorRequestHandler(db, cfg)

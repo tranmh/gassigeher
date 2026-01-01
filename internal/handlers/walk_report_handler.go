@@ -47,7 +47,7 @@ func NewWalkReportHandler(db *database.DB, cfg *config.Config) *WalkReportHandle
 		var err error
 		s3Service, err = services.NewS3Service(s3Config)
 		if err != nil {
-			println("Warning: Failed to initialize S3 service for walk reports:", err.Error())
+			log.Printf("Warning: Failed to initialize S3 service for walk reports: %v", err)
 		}
 	}
 

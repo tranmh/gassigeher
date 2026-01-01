@@ -37,7 +37,7 @@ func NewBookingHandler(db *database.DB, cfg *config.Config) *BookingHandler {
 	emailService, err := services.NewEmailService(services.ConfigToEmailConfig(cfg))
 	if err != nil {
 		// Log error but don't fail - emails will fail gracefully
-		fmt.Printf("Warning: Failed to initialize email service: %v\n", err)
+		log.Printf("Warning: Failed to initialize email service: %v", err)
 	}
 
 	// Initialize booking time service

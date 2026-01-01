@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -37,7 +36,7 @@ type UserHandler struct {
 func NewUserHandler(db *database.DB, cfg *config.Config) *UserHandler {
 	emailService, err := services.NewEmailService(services.ConfigToEmailConfig(cfg))
 	if err != nil {
-		println("Warning: Failed to initialize email service:", err.Error())
+		log.Printf("Warning: Failed to initialize email service: %v", err)
 	}
 
 	// Initialize S3 service if enabled
@@ -54,9 +53,9 @@ func NewUserHandler(db *database.DB, cfg *config.Config) *UserHandler {
 		}
 		s3Service, err = services.NewS3Service(s3Config)
 		if err != nil {
-			fmt.Printf("Warning: Failed to initialize S3 service in UserHandler: %v\n", err)
+			log.Printf("Warning: Failed to initialize S3 service in UserHandler: %v", err)
 		} else {
-			fmt.Printf("S3 storage enabled for UserHandler\n")
+			log.Printf("S3 storage enabled for UserHandler")
 		}
 	}
 

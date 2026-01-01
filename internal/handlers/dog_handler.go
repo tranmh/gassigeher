@@ -43,7 +43,7 @@ func NewDogHandler(db *database.DB, cfg *config.Config) *DogHandler {
 	// Initialize email service (may fail gracefully)
 	emailService, err := services.NewEmailService(services.ConfigToEmailConfig(cfg))
 	if err != nil {
-		fmt.Printf("Warning: Failed to initialize email service in DogHandler: %v\n", err)
+		log.Printf("Warning: Failed to initialize email service in DogHandler: %v", err)
 	}
 
 	// Initialize S3 service if enabled
@@ -60,9 +60,9 @@ func NewDogHandler(db *database.DB, cfg *config.Config) *DogHandler {
 		}
 		s3Service, err = services.NewS3Service(s3Config)
 		if err != nil {
-			fmt.Printf("Warning: Failed to initialize S3 service in DogHandler: %v\n", err)
+			log.Printf("Warning: Failed to initialize S3 service in DogHandler: %v", err)
 		} else {
-			fmt.Printf("S3 storage enabled for DogHandler\n")
+			log.Printf("S3 storage enabled for DogHandler")
 		}
 	}
 

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -31,7 +32,7 @@ func NewExperienceRequestHandler(db *database.DB, cfg *config.Config) *Experienc
 	emailService, err := services.NewEmailService(services.ConfigToEmailConfig(cfg))
 	if err != nil {
 		// Log error but don't fail
-		println("Warning: Failed to initialize email service:", err.Error())
+		log.Printf("Warning: Failed to initialize email service: %v", err)
 	}
 
 	return &ExperienceRequestHandler{
@@ -254,7 +255,7 @@ func (h *ExperienceRequestHandler) ApproveRequest(w http.ResponseWriter, r *http
 		if len(colorIDs) > 0 {
 			if err := h.userColorRepo.SetUserColors(tenantID, user.ID, colorIDs, reviewerID); err != nil {
 				// Log but don't fail the approval
-				println("Warning: Failed to assign colors to user:", err.Error())
+				log.Printf("Warning: Failed to assign colors to user: %v", err)
 			}
 		}
 	}

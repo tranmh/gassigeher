@@ -3,6 +3,7 @@ package services
 import (
 	"crypto/tls"
 	"fmt"
+	"log"
 	"net"
 	"net/mail"
 	"net/smtp"
@@ -136,7 +137,7 @@ func (p *SMTPProvider) sendWithSSL(recipients []string, message []byte) error {
 
 	// BUG FIX: Log but don't fail on client.Quit() errors - email was already sent
 	if err := client.Quit(); err != nil {
-		fmt.Printf("Warning: SMTP QUIT command failed (SSL): %v\n", err)
+		log.Printf("Warning: SMTP QUIT command failed (SSL): %v", err)
 	}
 	return nil
 }
@@ -221,7 +222,7 @@ func (p *SMTPProvider) sendWithSTARTTLS(addr string, auth smtp.Auth, recipients 
 
 	// BUG FIX: Log but don't fail on client.Quit() errors - email was already sent
 	if err := client.Quit(); err != nil {
-		fmt.Printf("Warning: SMTP QUIT command failed (STARTTLS): %v\n", err)
+		log.Printf("Warning: SMTP QUIT command failed (STARTTLS): %v", err)
 	}
 	return nil
 }
@@ -422,10 +423,10 @@ func (p *SMTPProvider) ValidateConfig() error {
 
 	// Port validation for common configurations
 	if p.useSSL && p.port != 465 {
-		fmt.Printf("Warning: SMTP_USE_SSL is true but port is %d (expected 465)\n", p.port)
+		log.Printf("Warning: SMTP_USE_SSL is true but port is %d (expected 465)", p.port)
 	}
 	if p.useTLS && p.port != 587 {
-		fmt.Printf("Warning: SMTP_USE_TLS is true but port is %d (expected 587)\n", p.port)
+		log.Printf("Warning: SMTP_USE_TLS is true but port is %d (expected 587)", p.port)
 	}
 
 	return nil

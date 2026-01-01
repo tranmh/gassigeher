@@ -6,16 +6,29 @@ import (
 	"time"
 
 	"github.com/tranmh/gassigeher/internal/database"
+	"github.com/tranmh/gassigeher/internal/services"
 )
 
 // HealthHandler handles health check endpoints
 type HealthHandler struct {
-	db *database.DB
+	db           *database.DB
+	s3Service    *services.S3Service
+	emailService *services.EmailService
 }
 
 // NewHealthHandler creates a new health handler
 func NewHealthHandler(db *database.DB) *HealthHandler {
 	return &HealthHandler{db: db}
+}
+
+// SetS3Service sets the S3 service for health checks
+func (h *HealthHandler) SetS3Service(s3 *services.S3Service) {
+	h.s3Service = s3
+}
+
+// SetEmailService sets the email service for health checks
+func (h *HealthHandler) SetEmailService(email *services.EmailService) {
+	h.emailService = email
 }
 
 // HealthCheck represents a single health check result
@@ -89,6 +102,58 @@ func (h *HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 		response.Checks["database"] = HealthCheck{
 			Status:  "fail",
 			Message: "Database not configured",
+		}
+	}
+
+	// Check S3 service (if configured)
+	if h.s3Service != nil {
+		start := time.Now()
+		exists, err := h.s3Service.BucketExists(r.Context())
+		latency := time.Since(start)
+
+		if err != nil {
+			response.Checks["s3_storage"] = HealthCheck{
+				Status:  "warn",
+				Message: "S3 connection check failed",
+				Latency: latency.String(),
+			}
+		} else if !exists {
+			response.Checks["s3_storage"] = HealthCheck{
+				Status:  "warn",
+				Message: "S3 bucket not found",
+				Latency: latency.String(),
+			}
+		} else {
+			response.Checks["s3_storage"] = HealthCheck{
+				Status:  "ok",
+				Latency: latency.String(),
+			}
+		}
+	} else {
+		response.Checks["s3_storage"] = HealthCheck{
+			Status:  "ok",
+			Message: "Not configured (using local storage)",
+		}
+	}
+
+	// Check email service (if configured)
+	if h.emailService != nil {
+		status := h.emailService.GetHealthStatus()
+		if status.Healthy {
+			response.Checks["email"] = HealthCheck{
+				Status:  "ok",
+				Message: "Provider configured",
+			}
+		} else {
+			response.Checks["email"] = HealthCheck{
+				Status:  "warn",
+				Message: "Email service unavailable",
+			}
+		}
+	} else {
+		response.Checks["email"] = HealthCheck{
+			Status:  "warn",
+			Message: "Not configured",
 		}
 	}
 

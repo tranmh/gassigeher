@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 )
 
@@ -123,7 +124,7 @@ func (d *PostgreSQLDialect) ApplySettings(db *sql.DB) error {
 	// Set datestyle for consistent date handling
 	if _, err := db.Exec("SET datestyle = 'ISO, YMD'"); err != nil {
 		// Non-fatal
-		fmt.Printf("Warning: Failed to set datestyle: %v\n", err)
+		log.Printf("Warning: Failed to set datestyle: %v", err)
 	}
 
 	return nil

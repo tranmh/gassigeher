@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -31,7 +32,7 @@ func NewBlockedDateHandler(db *database.DB, cfg *config.Config) *BlockedDateHand
 	// Initialize email service (fail gracefully if email not configured)
 	emailService, err := services.NewEmailService(services.ConfigToEmailConfig(cfg))
 	if err != nil {
-		fmt.Printf("Warning: Failed to initialize email service in BlockedDateHandler: %v\n", err)
+		log.Printf("Warning: Failed to initialize email service in BlockedDateHandler: %v", err)
 	}
 
 	return &BlockedDateHandler{
@@ -131,7 +132,7 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
 
 	bookings, err := h.bookingRepo.FindAll(filter)
 	if err != nil {
-		fmt.Printf("Warning: Failed to find bookings for date %s: %v\n", req.Date, err)
+		log.Printf("Warning: Failed to find bookings for date %s: %v", req.Date, err)
 		// Continue even if we can't find bookings - at least the date is blocked
 	}
 
@@ -147,7 +148,7 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
 	for _, booking := range bookings {
 		// Cancel the booking
 		if err := h.bookingRepo.Cancel(booking.ID, tenantID, &cancellationReason); err != nil {
-			fmt.Printf("Warning: Failed to cancel booking %d: %v\n", booking.ID, err)
+			log.Printf("Warning: Failed to cancel booking %d: %v", booking.ID, err)
 			continue
 		}
 		cancelledCount++
@@ -155,14 +156,14 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
 		// Get user details for email (with tenant verification for defense in depth)
 		user, err := h.userRepo.FindByIDAndTenant(booking.UserID, tenantID)
 		if err != nil || user == nil {
-			fmt.Printf("Warning: Failed to get user %d for cancellation email: %v\n", booking.UserID, err)
+			log.Printf("Warning: Failed to get user %d for cancellation email: %v", booking.UserID, err)
 			continue
 		}
 
 		// Get dog details for email (with tenant verification for defense in depth)
 		dog, err := h.dogRepo.FindByIDAndTenant(booking.DogID, tenantID)
 		if err != nil || dog == nil {
-			fmt.Printf("Warning: Failed to get dog %d for cancellation email: %v\n", booking.DogID, err)
+			log.Printf("Warning: Failed to get dog %d for cancellation email: %v", booking.DogID, err)
 			continue
 		}
 
@@ -170,7 +171,7 @@ func (h *BlockedDateHandler) CreateBlockedDate(w http.ResponseWriter, r *http.Re
 		if h.emailService != nil && user.Email != nil {
 			go func(userEmail, userName, dogName, date, scheduledTime, reason string) {
 				if err := h.emailService.SendAdminCancellation(userEmail, userName, dogName, date, scheduledTime, reason); err != nil {
-					fmt.Printf("Warning: Failed to send cancellation email to %s: %v\n", userEmail, err)
+					log.Printf("Warning: Failed to send cancellation email to %s: %v", userEmail, err)
 				}
 			}(*user.Email, user.FirstName, dog.Name, booking.Date, booking.ScheduledTime, cancellationReason)
 		}

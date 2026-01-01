@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -113,7 +114,7 @@ func (s *HolidayService) FetchAndCacheHolidays(ctx context.Context, tenantID int
 
 	if err := s.holidayRepo.SetCachedHolidays(year, state, string(body), cacheDays); err != nil {
 		// Log error but continue
-		fmt.Printf("Warning: Failed to cache holidays: %v\n", err)
+		log.Printf("Warning: Failed to cache holidays: %v", err)
 	}
 
 	// Insert holidays into custom_holidays table for this tenant
@@ -134,7 +135,7 @@ func (s *HolidayService) FetchAndCacheHolidays(ctx context.Context, tenantID int
 
 	// Log errors but don't fail the operation (some holidays may already exist)
 	if len(createErrors) > 0 {
-		fmt.Printf("Warning: %d holiday creation errors for tenant %d\n", len(createErrors), tenantID)
+		log.Printf("Warning: %d holiday creation errors for tenant %d", len(createErrors), tenantID)
 	}
 
 	return nil
@@ -154,7 +155,7 @@ func (s *HolidayService) IsHoliday(ctx context.Context, tenantID int, date strin
 		// Ensure holidays are cached for this year (log but don't fail on error)
 		year := dateObj.Year()
 		if err := s.FetchAndCacheHolidays(ctx, tenantID, year); err != nil {
-			fmt.Printf("Warning: Failed to fetch holidays for tenant %d, year %d: %v\n", tenantID, year, err)
+			log.Printf("Warning: Failed to fetch holidays for tenant %d, year %d: %v", tenantID, year, err)
 		}
 	}
 
@@ -168,7 +169,7 @@ func (s *HolidayService) GetHolidaysForYear(ctx context.Context, tenantID int, y
 	// Fetch and cache if API enabled (log but don't fail on error)
 	if setting, err := s.settingsRepo.Get(tenantID, "use_feiertage_api"); err == nil && setting != nil && setting.Value == "true" {
 		if err := s.FetchAndCacheHolidays(ctx, tenantID, year); err != nil {
-			fmt.Printf("Warning: Failed to fetch holidays for tenant %d, year %d: %v\n", tenantID, year, err)
+			log.Printf("Warning: Failed to fetch holidays for tenant %d, year %d: %v", tenantID, year, err)
 		}
 	}
 
@@ -200,7 +201,7 @@ func (s *HolidayService) populateHolidaysFromCache(tenantID int, cached string, 
 
 	// Log errors but don't fail (some holidays may already exist)
 	if createErrors > 0 {
-		fmt.Printf("Warning: %d holiday creation errors for tenant %d from cache\n", createErrors, tenantID)
+		log.Printf("Warning: %d holiday creation errors for tenant %d from cache", createErrors, tenantID)
 	}
 
 	return nil
