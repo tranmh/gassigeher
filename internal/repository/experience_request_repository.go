@@ -10,11 +10,11 @@ import (
 
 // ExperienceRequestRepository handles experience request database operations
 type ExperienceRequestRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
 // NewExperienceRequestRepository creates a new experience request repository
-func NewExperienceRequestRepository(db *sql.DB) *ExperienceRequestRepository {
+func NewExperienceRequestRepository(db DBExecutor) *ExperienceRequestRepository {
 	return &ExperienceRequestRepository{db: db}
 }
 
@@ -26,14 +26,9 @@ func (r *ExperienceRequestRepository) Create(tenantID int, request *models.Exper
 	`
 
 	now := time.Now()
-	result, err := r.db.Exec(query, tenantID, request.UserID, request.RequestedLevel, now)
+	id, err := r.db.InsertReturningID(query, tenantID, request.UserID, request.RequestedLevel, now)
 	if err != nil {
 		return fmt.Errorf("failed to create experience request: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
 	request.ID = int(id)

@@ -14,7 +14,7 @@ Gassigeher supports two deployment modes:
 
 | Mode | Infrastructure | Database | Best For |
 |------|---------------|----------|----------|
-| **Simple-Mode** | nginx + systemd | SQLite/MySQL/PostgreSQL | Individual shelters |
+| **Simple-Mode** | nginx + systemd | SQLite or PostgreSQL | Individual shelters |
 | **SaaS-Mode** | Docker + Caddy | PostgreSQL with RLS | Platform for 500+ shelters |
 
 ### Simple-Mode Deployment
@@ -46,7 +46,7 @@ Gassigeher supports two deployment modes:
 ### Base Requirements (All Deployments)
 
 - **CPU**: 1 core minimum, 2+ cores recommended
-- **RAM**: 512MB minimum, 1GB+ recommended (2GB+ for MySQL/PostgreSQL)
+- **RAM**: 512MB minimum, 1GB+ recommended (2GB+ for PostgreSQL)
 - **Disk**: 10GB minimum, 20GB+ recommended
 - **Go**: 1.24 or higher
 - **nginx**: Latest stable version
@@ -58,12 +58,7 @@ Gassigeher supports two deployment modes:
 - No additional server needed
 - Zero configuration
 
-**MySQL** (Best for 1,000-50,000 users):
-- **MySQL**: 8.0 or higher
-- Additional 512MB RAM recommended
-- Separate database server optional
-
-**PostgreSQL** (Best for 10,000+ users):
+**PostgreSQL** (Best for 10,000+ users or SaaS-Mode):
 - **PostgreSQL**: 12 or higher
 - Additional 1GB RAM recommended
 - Separate database server recommended
@@ -100,22 +95,7 @@ sudo apt install -y sqlite3
 sqlite3 --version
 ```
 
-**Option B: MySQL**
-
-```bash
-# Install MySQL Server
-sudo apt install -y mysql-server
-
-# Secure MySQL installation
-sudo mysql_secure_installation
-
-# Verify installation
-mysql --version
-```
-
-See **[MySQL_Setup_Guide.md](MySQL_Setup_Guide.md)** for complete MySQL configuration.
-
-**Option C: PostgreSQL**
+**Option B: PostgreSQL**
 
 ```bash
 # Install PostgreSQL
@@ -172,7 +152,7 @@ sudo nano /var/gassigeher/config/.env
 
 Choose configuration based on your database:
 
-#### Option A: SQLite Configuration (Default)
+#### SQLite Configuration (Default)
 
 ```bash
 # Application
@@ -218,62 +198,7 @@ CANCELLATION_NOTICE_HOURS=12
 AUTO_DEACTIVATION_DAYS=365
 ```
 
-#### Option B: MySQL Configuration
-
-```bash
-# Application
-PORT=8080
-
-# Database - MySQL
-DB_TYPE=mysql
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=gassigeher
-DB_USER=gassigeher_user
-DB_PASSWORD=your_secure_mysql_password
-DB_MAX_OPEN_CONNS=25
-DB_MAX_IDLE_CONNS=5
-DB_CONN_MAX_LIFETIME=5
-
-# JWT (Generate secure random string: openssl rand -base64 32)
-JWT_SECRET=your-super-secret-256-bit-random-string-here
-JWT_EXPIRATION_HOURS=24
-
-# Super Admin (created automatically on first run)
-SUPER_ADMIN_EMAIL=admin@yourdomain.com
-
-# Email Provider (gmail or smtp)
-EMAIL_PROVIDER=gmail
-EMAIL_BCC_ADMIN=
-
-# Gmail API (from Google Cloud Console)
-GMAIL_CLIENT_ID=your-client-id.apps.googleusercontent.com
-GMAIL_CLIENT_SECRET=your-client-secret
-GMAIL_REFRESH_TOKEN=your-refresh-token
-GMAIL_FROM_EMAIL=noreply@yourdomain.com
-
-# SMTP Configuration (alternative to Gmail API, when EMAIL_PROVIDER=smtp)
-# SMTP_HOST=smtp.yourdomain.com
-# SMTP_PORT=587
-# SMTP_USERNAME=noreply@yourdomain.com
-# SMTP_PASSWORD=your-password
-# SMTP_FROM_EMAIL=noreply@yourdomain.com
-# SMTP_USE_TLS=true
-# SMTP_USE_SSL=false
-
-# Uploads
-UPLOAD_DIR=/var/gassigeher/uploads
-MAX_UPLOAD_SIZE_MB=5
-
-# System Settings (defaults)
-BOOKING_ADVANCE_DAYS=14
-CANCELLATION_NOTICE_HOURS=12
-AUTO_DEACTIVATION_DAYS=365
-```
-
-**Note**: Create MySQL database and user first (see [MySQL_Setup_Guide.md](MySQL_Setup_Guide.md)).
-
-#### Option C: PostgreSQL Configuration
+#### PostgreSQL Configuration
 
 ```bash
 # Application
@@ -577,19 +502,6 @@ sqlite3 /var/gassigeher/data/gassigeher.db "PRAGMA integrity_check;"
 du -h /var/gassigeher/data/gassigeher.db
 ```
 
-#### MySQL Maintenance
-
-```bash
-# Optimize tables
-mysql -u gassigeher_user -p gassigeher -e "OPTIMIZE TABLE users, dogs, bookings, blocked_dates, experience_requests, reactivation_requests, system_settings;"
-
-# Check tables
-mysql -u gassigeher_user -p gassigeher -e "CHECK TABLE users, dogs, bookings;"
-
-# View database size
-mysql -u gassigeher_user -p gassigeher -e "SELECT table_schema AS 'Database', ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS 'Size (MB)' FROM information_schema.tables WHERE table_schema='gassigeher';"
-```
-
 #### PostgreSQL Maintenance
 
 ```bash
@@ -732,16 +644,15 @@ For issues or questions:
 - Multiple application servers
 
 **Migration Path:**
-1. **SQLite → MySQL**: Good for web-scale (1,000-50,000 users)
-2. **SQLite → PostgreSQL**: Best for enterprise (10,000+ users)
+- **SQLite -> PostgreSQL**: Best for enterprise (10,000+ users) and required for SaaS-Mode
 
 See **[Database_Selection_Guide.md](Database_Selection_Guide.md)** for migration procedures.
 
 ### Application Scaling
 
 For high traffic (beyond single server):
-- **Connection Pooling**: Already configured for MySQL/PostgreSQL
-- **Database Replication**: Master-slave setup for read scaling
+- **Connection Pooling**: Already configured for PostgreSQL
+- **Database Replication**: Primary-replica setup for read scaling
 - **Caching Layer**: Add Redis for sessions and frequently accessed data
 - **CDN**: CloudFlare or AWS CloudFront for static assets
 - **Load Balancer**: nginx or HAProxy for multiple app instances
@@ -958,7 +869,6 @@ curl https://gassigeher.org/api/v1/central-admin/stats -H "Authorization: Bearer
 
 **Simple-Mode Setup:**
 - [Database_Selection_Guide.md](Database_Selection_Guide.md) - Choosing the right database
-- [MySQL_Setup_Guide.md](MySQL_Setup_Guide.md) - Complete MySQL configuration
 - [PostgreSQL_Setup_Guide.md](PostgreSQL_Setup_Guide.md) - Complete PostgreSQL configuration
 - [MultiDatabase_Testing_Guide.md](MultiDatabase_Testing_Guide.md) - Testing across databases
 

@@ -202,11 +202,11 @@ func (s *StripeService) VerifyWebhookSignature(payload []byte, signature string)
 
 // WebhookEvent types
 const (
-	WebhookEventCheckoutCompleted      = "checkout.session.completed"
-	WebhookEventInvoicePaid            = "invoice.paid"
-	WebhookEventInvoicePaymentFailed   = "invoice.payment_failed"
-	WebhookEventSubscriptionUpdated    = "customer.subscription.updated"
-	WebhookEventSubscriptionDeleted    = "customer.subscription.deleted"
+	WebhookEventCheckoutCompleted    = "checkout.session.completed"
+	WebhookEventInvoicePaid          = "invoice.paid"
+	WebhookEventInvoicePaymentFailed = "invoice.payment_failed"
+	WebhookEventSubscriptionUpdated  = "customer.subscription.updated"
+	WebhookEventSubscriptionDeleted  = "customer.subscription.deleted"
 )
 
 // CheckoutSessionData represents data from a checkout.session.completed event
@@ -309,16 +309,16 @@ type SubscriptionEventData struct {
 
 // InvoiceEventData represents data from invoice events
 type InvoiceEventData struct {
-	InvoiceID          string
-	SubscriptionID     string
-	CustomerID         string
-	AmountPaid         int64  // in cents
-	Currency           string
-	Status             string
-	InvoicePDF         string // URL to invoice PDF
-	PeriodStart        int64
-	PeriodEnd          int64
-	InvoiceNumber      string
+	InvoiceID      string
+	SubscriptionID string
+	CustomerID     string
+	AmountPaid     int64 // in cents
+	Currency       string
+	Status         string
+	InvoicePDF     string // URL to invoice PDF
+	PeriodStart    int64
+	PeriodEnd      int64
+	InvoiceNumber  string
 }
 
 // ParseSubscriptionEvent extracts data from a subscription event

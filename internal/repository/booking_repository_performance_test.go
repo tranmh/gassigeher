@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"database/sql"
 	"fmt"
 	"sync"
 	"testing"
@@ -9,7 +8,6 @@ import (
 
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/testutil"
-	_ "modernc.org/sqlite"
 )
 
 // ========================================
@@ -98,7 +96,7 @@ func TestConcurrentBookingCreation(t *testing.T) {
 	constraintErrors := 0
 	for _, err := range errors {
 		if err != nil && (err.Error() == "UNIQUE constraint failed: bookings.dog_id, bookings.date, bookings.walk_type" ||
-		   err.Error() == "booking already exists for this time slot") {
+			err.Error() == "booking already exists for this time slot") {
 			constraintErrors++
 		}
 	}
@@ -301,11 +299,9 @@ func TestConcurrentApprovalUpdates(t *testing.T) {
 
 // Benchmark: Concurrent Booking Creation Performance
 func BenchmarkConcurrentBookingCreation(b *testing.B) {
-	db, _ := sql.Open("sqlite", ":memory:")
+	// Use testutil.SetupBenchmarkDB which sets up schema and returns proper *database.DB
+	db := testutil.SetupBenchmarkDB(b)
 	defer db.Close()
-
-	// Setup schema
-	testutil.SetupTestDB(nil)
 
 	// Create test data
 	for i := 1; i <= 100; i++ {

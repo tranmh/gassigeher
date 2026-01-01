@@ -6,18 +6,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/models"
 )
 
-func setupMarketingTestDB(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite3", ":memory:")
+func setupMarketingTestDB(t *testing.T) *database.DB {
+	rawDB, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
 
 	// Create marketing tables
-	_, err = db.Exec(`
+	_, err = rawDB.Exec(`
 		CREATE TABLE marketing_campaigns (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			type TEXT NOT NULL,
@@ -82,7 +84,9 @@ func setupMarketingTestDB(t *testing.T) *sql.DB {
 		t.Fatalf("Failed to create tables: %v", err)
 	}
 
-	return db
+	// Wrap in database.DB
+	sqlxDB := sqlx.NewDb(rawDB, "sqlite3")
+	return database.WrapSqlxDB(sqlxDB, database.NewSQLiteDialect())
 }
 
 // ========== BUG #1 & #3: Test that CreateCampaign populates timestamps correctly ==========

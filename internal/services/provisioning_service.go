@@ -4,15 +4,17 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"fmt"
+
+	"github.com/tranmh/gassigeher/internal/database"
 )
 
 // ProvisioningService handles default data setup for new tenants
 type ProvisioningService struct {
-	db *sql.DB
+	db *database.DB
 }
 
 // NewProvisioningService creates a new provisioning service
-func NewProvisioningService(db *sql.DB) *ProvisioningService {
+func NewProvisioningService(db *database.DB) *ProvisioningService {
 	return &ProvisioningService{db: db}
 }
 

@@ -1,13 +1,13 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -16,15 +16,15 @@ import (
 
 // ReactivationRequestHandler handles reactivation request-related HTTP requests
 type ReactivationRequestHandler struct {
-	db          *sql.DB
-	cfg         *config.Config
-	requestRepo *repository.ReactivationRequestRepository
-	userRepo    *repository.UserRepository
+	db           *database.DB
+	cfg          *config.Config
+	requestRepo  *repository.ReactivationRequestRepository
+	userRepo     *repository.UserRepository
 	emailService *services.EmailService
 }
 
 // NewReactivationRequestHandler creates a new reactivation request handler
-func NewReactivationRequestHandler(db *sql.DB, cfg *config.Config) *ReactivationRequestHandler {
+func NewReactivationRequestHandler(db *database.DB, cfg *config.Config) *ReactivationRequestHandler {
 	emailService, err := services.NewEmailService(services.ConfigToEmailConfig(cfg))
 	if err != nil {
 		println("Warning: Failed to initialize email service:", err.Error())

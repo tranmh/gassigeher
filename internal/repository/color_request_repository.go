@@ -10,11 +10,11 @@ import (
 
 // ColorRequestRepository handles color request database operations
 type ColorRequestRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
 // NewColorRequestRepository creates a new color request repository
-func NewColorRequestRepository(db *sql.DB) *ColorRequestRepository {
+func NewColorRequestRepository(db DBExecutor) *ColorRequestRepository {
 	return &ColorRequestRepository{db: db}
 }
 
@@ -26,14 +26,9 @@ func (r *ColorRequestRepository) Create(tenantID int, request *models.ColorReque
 	`
 
 	now := time.Now()
-	result, err := r.db.Exec(query, tenantID, request.UserID, request.ColorID, now)
+	id, err := r.db.InsertReturningID(query, tenantID, request.UserID, request.ColorID, now)
 	if err != nil {
 		return fmt.Errorf("failed to create color request: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
 	request.ID = int(id)

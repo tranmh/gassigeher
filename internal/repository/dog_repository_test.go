@@ -691,114 +691,114 @@ func TestDogRepository_GetBreeds(t *testing.T) {
 // DONE: TestCanUserAccessDog tests experience level access control
 func TestCanUserAccessDog(t *testing.T) {
 	tests := []struct {
-		name         string
-		userLevel    string
-		dogCategory  string
+		name           string
+		userLevel      string
+		dogCategory    string
 		expectedAccess bool
 	}{
 		// Green user tests
 		{
-			name:         "green user can access green dog",
-			userLevel:    "green",
-			dogCategory:  "green",
+			name:           "green user can access green dog",
+			userLevel:      "green",
+			dogCategory:    "green",
 			expectedAccess: true,
 		},
 		{
-			name:         "green user cannot access blue dog",
-			userLevel:    "green",
-			dogCategory:  "blue",
+			name:           "green user cannot access blue dog",
+			userLevel:      "green",
+			dogCategory:    "blue",
 			expectedAccess: false,
 		},
 		{
-			name:         "green user cannot access orange dog",
-			userLevel:    "green",
-			dogCategory:  "orange",
+			name:           "green user cannot access orange dog",
+			userLevel:      "green",
+			dogCategory:    "orange",
 			expectedAccess: false,
 		},
 
 		// Blue user tests (new order: green < orange < blue, so blue is highest)
 		{
-			name:         "blue user can access green dog",
-			userLevel:    "blue",
-			dogCategory:  "green",
+			name:           "blue user can access green dog",
+			userLevel:      "blue",
+			dogCategory:    "green",
 			expectedAccess: true,
 		},
 		{
-			name:         "blue user can access blue dog",
-			userLevel:    "blue",
-			dogCategory:  "blue",
+			name:           "blue user can access blue dog",
+			userLevel:      "blue",
+			dogCategory:    "blue",
 			expectedAccess: true,
 		},
 		{
-			name:         "blue user can access orange dog",
-			userLevel:    "blue",
-			dogCategory:  "orange",
+			name:           "blue user can access orange dog",
+			userLevel:      "blue",
+			dogCategory:    "orange",
 			expectedAccess: true,
 		},
 
 		// Orange user tests (new order: green < orange < blue)
 		{
-			name:         "orange user can access green dog",
-			userLevel:    "orange",
-			dogCategory:  "green",
+			name:           "orange user can access green dog",
+			userLevel:      "orange",
+			dogCategory:    "green",
 			expectedAccess: true,
 		},
 		{
-			name:         "orange user cannot access blue dog",
-			userLevel:    "orange",
-			dogCategory:  "blue",
+			name:           "orange user cannot access blue dog",
+			userLevel:      "orange",
+			dogCategory:    "blue",
 			expectedAccess: false,
 		},
 		{
-			name:         "orange user can access orange dog",
-			userLevel:    "orange",
-			dogCategory:  "orange",
+			name:           "orange user can access orange dog",
+			userLevel:      "orange",
+			dogCategory:    "orange",
 			expectedAccess: true,
 		},
 
 		// Case insensitivity tests
 		{
-			name:         "case insensitive - GREEN user, green dog",
-			userLevel:    "GREEN",
-			dogCategory:  "green",
+			name:           "case insensitive - GREEN user, green dog",
+			userLevel:      "GREEN",
+			dogCategory:    "green",
 			expectedAccess: true,
 		},
 		{
-			name:         "case insensitive - Blue user, BLUE dog",
-			userLevel:    "Blue",
-			dogCategory:  "BLUE",
+			name:           "case insensitive - Blue user, BLUE dog",
+			userLevel:      "Blue",
+			dogCategory:    "BLUE",
 			expectedAccess: true,
 		},
 
 		// Invalid level tests
 		{
-			name:         "invalid user level",
-			userLevel:    "red",
-			dogCategory:  "green",
+			name:           "invalid user level",
+			userLevel:      "red",
+			dogCategory:    "green",
 			expectedAccess: false,
 		},
 		{
-			name:         "invalid dog category",
-			userLevel:    "green",
-			dogCategory:  "purple",
+			name:           "invalid dog category",
+			userLevel:      "green",
+			dogCategory:    "purple",
 			expectedAccess: false,
 		},
 		{
-			name:         "empty user level",
-			userLevel:    "",
-			dogCategory:  "green",
+			name:           "empty user level",
+			userLevel:      "",
+			dogCategory:    "green",
 			expectedAccess: false,
 		},
 		{
-			name:         "empty dog category",
-			userLevel:    "green",
-			dogCategory:  "",
+			name:           "empty dog category",
+			userLevel:      "green",
+			dogCategory:    "",
 			expectedAccess: false,
 		},
 		{
-			name:         "both invalid",
-			userLevel:    "invalid",
-			dogCategory:  "invalid",
+			name:           "both invalid",
+			userLevel:      "invalid",
+			dogCategory:    "invalid",
 			expectedAccess: false,
 		},
 	}
@@ -1140,7 +1140,7 @@ func TestDogRepository_Update_TenantIsolation(t *testing.T) {
 	// but tries to update it from a different tenant context
 	attackerTenantID := 999
 	maliciousDog := &models.Dog{
-		ID:          originalDogID, // Same dog ID
+		ID:          originalDogID,    // Same dog ID
 		TenantID:    attackerTenantID, // Different tenant!
 		Name:        "HACKED",
 		Breed:       "HACKED",

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -11,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -18,13 +18,13 @@ import (
 
 // ImportHandler handles data import requests
 type ImportHandler struct {
-	db              *sql.DB
-	dogRepo         *repository.DogRepository
-	colorRepo       *repository.ColorCategoryRepository
+	db        *database.DB
+	dogRepo   *repository.DogRepository
+	colorRepo *repository.ColorCategoryRepository
 }
 
 // NewImportHandler creates a new import handler
-func NewImportHandler(db *sql.DB) *ImportHandler {
+func NewImportHandler(db *database.DB) *ImportHandler {
 	return &ImportHandler{
 		db:        db,
 		dogRepo:   repository.NewDogRepository(db),
@@ -34,19 +34,19 @@ func NewImportHandler(db *sql.DB) *ImportHandler {
 
 // ImportPreview represents a preview of data to import
 type ImportPreview struct {
-	Headers     []string         `json:"headers"`
-	SampleRows  [][]string       `json:"sample_rows"` // First 5 rows
-	TotalRows   int              `json:"total_rows"`
+	Headers     []string          `json:"headers"`
+	SampleRows  [][]string        `json:"sample_rows"` // First 5 rows
+	TotalRows   int               `json:"total_rows"`
 	Mapping     map[string]string `json:"mapping,omitempty"` // column index -> field name
 	Suggestions map[string]string `json:"suggestions"`       // auto-detected mappings
 }
 
 // ImportResult represents the result of an import
 type ImportResult struct {
-	TotalRows    int      `json:"total_rows"`
-	Imported     int      `json:"imported"`
-	Skipped      int      `json:"skipped"`
-	Errors       []string `json:"errors"`
+	TotalRows int      `json:"total_rows"`
+	Imported  int      `json:"imported"`
+	Skipped   int      `json:"skipped"`
+	Errors    []string `json:"errors"`
 }
 
 // FieldMapping maps CSV columns to dog fields

@@ -7,13 +7,13 @@ import (
 
 // Input length limits for dog fields
 const (
-	MaxDogNameLength               = 100
-	MaxDogBreedLength              = 100
-	MaxDogSpecialNeedsLength       = 1000
-	MaxDogPickupLocationLength     = 500
-	MaxDogWalkRouteLength          = 1000
+	MaxDogNameLength                = 100
+	MaxDogBreedLength               = 100
+	MaxDogSpecialNeedsLength        = 1000
+	MaxDogPickupLocationLength      = 500
+	MaxDogWalkRouteLength           = 1000
 	MaxDogSpecialInstructionsLength = 1000
-	MaxDogExternalLinkLength       = 500
+	MaxDogExternalLinkLength        = 500
 )
 
 // ValidationError represents a field validation error

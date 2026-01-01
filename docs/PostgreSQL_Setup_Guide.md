@@ -906,23 +906,22 @@ docker volume rm gassigeher_postgres_data  # Removes data permanently!
 
 ## Performance Comparison
 
-### PostgreSQL vs MySQL for Gassigeher
+### PostgreSQL vs SQLite for Gassigeher
 
-| Operation | MySQL | PostgreSQL |
-|-----------|-------|------------|
-| **Simple SELECT** | 0.5-2ms | 0.5-2ms |
-| **Complex JOIN** | 2-10ms | 2-8ms (better) |
-| **INSERT** | 1-3ms | 1-3ms |
-| **Concurrent Writes** | Good | Excellent |
+| Operation | SQLite | PostgreSQL |
+|-----------|--------|------------|
+| **Simple SELECT** | 0.1-0.5ms | 0.5-2ms |
+| **Complex JOIN** | 1-5ms | 2-8ms |
+| **INSERT** | 0.5-1ms | 1-3ms |
+| **Concurrent Writes** | Limited | Excellent |
 
-**For Gassigeher workload:** PostgreSQL typically 10-20% faster for complex queries
+**For Gassigeher workload:** PostgreSQL is better for concurrent access and larger deployments.
 
 ---
 
 ## Next Steps
 
 - **Completed PostgreSQL Setup?** See [Database_Migration_Guide.md](Database_Migration_Guide.md) to migrate data from SQLite
-- **Need MySQL instead?** See [MySQL_Setup_Guide.md](MySQL_Setup_Guide.md)
 - **Performance optimization?** See DEPLOYMENT.md
 - **Questions?** See [Database_Selection_Guide.md](Database_Selection_Guide.md)
 

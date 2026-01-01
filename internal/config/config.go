@@ -11,13 +11,13 @@ import (
 
 // Config holds the application configuration
 type Config struct {
-	// Database Type (sqlite, mysql, postgres)
+	// Database Type (sqlite, postgres)
 	DBType string
 
 	// SQLite Configuration
 	DatabasePath string
 
-	// MySQL/PostgreSQL Configuration
+	// PostgreSQL Configuration
 	DBHost     string
 	DBPort     int
 	DBName     string
@@ -28,7 +28,7 @@ type Config struct {
 	// Alternative: Full connection string (overrides individual params if set)
 	DBConnectionString string
 
-	// Connection Pool (MySQL/PostgreSQL only)
+	// Connection Pool (PostgreSQL only)
 	DBMaxOpenConns    int // Maximum open connections
 	DBMaxIdleConns    int // Maximum idle connections
 	DBConnMaxLifetime int // Connection max lifetime in minutes
@@ -122,16 +122,16 @@ func Load() *Config {
 		// SQLite Configuration
 		DatabasePath: getEnv("DATABASE_PATH", "./gassigeher.db"),
 
-		// MySQL/PostgreSQL Configuration
+		// PostgreSQL Configuration
 		DBHost:             getEnv("DB_HOST", "localhost"),
-		DBPort:             getEnvAsInt("DB_PORT", 0), // 0 means use default (3306 for MySQL, 5432 for PostgreSQL)
+		DBPort:             getEnvAsInt("DB_PORT", 0), // 0 means use default (5432 for PostgreSQL)
 		DBName:             getEnv("DB_NAME", "gassigeher"),
 		DBUser:             getEnv("DB_USER", ""),
 		DBPassword:         getEnv("DB_PASSWORD", ""),
 		DBSSLMode:          getEnv("DB_SSLMODE", "disable"), // PostgreSQL SSL mode
 		DBConnectionString: getEnv("DB_CONNECTION_STRING", ""),
 
-		// Connection Pool Configuration (MySQL/PostgreSQL)
+		// Connection Pool Configuration (PostgreSQL)
 		DBMaxOpenConns:    getEnvAsInt("DB_MAX_OPEN_CONNS", 25),  // Default: 25 connections
 		DBMaxIdleConns:    getEnvAsInt("DB_MAX_IDLE_CONNS", 5),   // Default: 5 idle connections
 		DBConnMaxLifetime: getEnvAsInt("DB_CONN_MAX_LIFETIME", 5), // Default: 5 minutes
@@ -343,8 +343,8 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// HIGH: Validate DB port when using MySQL/PostgreSQL
-	if c.DBType == "mysql" || c.DBType == "postgres" {
+	// HIGH: Validate DB port when using PostgreSQL
+	if c.DBType == "postgres" {
 		if c.DBPort < 0 {
 			errors = append(errors, "DB_PORT cannot be negative")
 		}
@@ -380,9 +380,9 @@ func (c *Config) Validate() error {
 	}
 
 	// Validate DBType
-	validDBTypes := map[string]bool{"sqlite": true, "mysql": true, "postgres": true}
+	validDBTypes := map[string]bool{"sqlite": true, "postgres": true}
 	if !validDBTypes[c.DBType] {
-		errors = append(errors, fmt.Sprintf("DB_TYPE must be 'sqlite', 'mysql', or 'postgres', got: %s", c.DBType))
+		errors = append(errors, fmt.Sprintf("DB_TYPE must be 'sqlite' or 'postgres', got: %s", c.DBType))
 	}
 
 	// Validate EmailProvider
@@ -401,8 +401,6 @@ func (c *Config) Validate() error {
 // GetDefaultDBPort returns the default port for the configured database type
 func (c *Config) GetDefaultDBPort() int {
 	switch c.DBType {
-	case "mysql":
-		return 3306
 	case "postgres":
 		return 5432
 	default:

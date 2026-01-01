@@ -10,23 +10,29 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
 	"github.com/tranmh/gassigeher/internal/services"
+	_ "modernc.org/sqlite"
 )
 
 // setupSecurityTest creates a test database and handler
-func setupSecurityTest(t *testing.T) (*sql.DB, *BookingTimeHandler, *HolidayHandler, func()) {
-	db, err := sql.Open("sqlite", ":memory:")
+func setupSecurityTest(t *testing.T) (*database.DB, *BookingTimeHandler, *HolidayHandler, func()) {
+	rawDB, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
 
-	if err := database.RunMigrations(db); err != nil {
+	if err := database.RunMigrations(rawDB); err != nil {
 		t.Fatalf("Failed to run migrations: %v", err)
 	}
+
+	// Wrap in database.DB for auto-rebinding
+	sqlxDB := sqlx.NewDb(rawDB, "sqlite")
+	db := database.WrapSqlxDB(sqlxDB, database.NewSQLiteDialect())
 
 	// Create test tenant
 	now := time.Now().Format("2006-01-02 15:04:05")
@@ -321,7 +327,7 @@ func TestSecuritySQLInjection(t *testing.T) {
 		path          string
 		handler       http.HandlerFunc
 		body          string
-		checkDatabase func(*testing.T, *sql.DB)
+		checkDatabase func(*testing.T, *database.DB)
 		description   string
 	}{
 		{
@@ -330,7 +336,7 @@ func TestSecuritySQLInjection(t *testing.T) {
 			path:    "/api/booking-times/rules",
 			handler: bookingTimeHandler.CreateRule,
 			body:    `{"day_type":"weekday","rule_name":"Test'; DROP TABLE bookings; --","start_time":"09:00","end_time":"12:00","is_blocked":false}`,
-			checkDatabase: func(t *testing.T, db *sql.DB) {
+			checkDatabase: func(t *testing.T, db *database.DB) {
 				// Verify bookings table still exists
 				var count int
 				err := db.QueryRow("SELECT COUNT(*) FROM bookings").Scan(&count)
@@ -353,7 +359,7 @@ func TestSecuritySQLInjection(t *testing.T) {
 			path:    "/api/holidays",
 			handler: holidayHandler.CreateHoliday,
 			body:    `{"date":"2025-07-01","name":"Holiday'; DELETE FROM custom_holidays; --","is_active":true,"source":"admin"}`,
-			checkDatabase: func(t *testing.T, db *sql.DB) {
+			checkDatabase: func(t *testing.T, db *database.DB) {
 				// Verify custom_holidays table still exists (not dropped)
 				var tableName string
 				err := db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='custom_holidays'").Scan(&tableName)
@@ -373,7 +379,7 @@ func TestSecuritySQLInjection(t *testing.T) {
 			path:    "/api/booking-times/available?date=2025-01-01%27%3B%20DROP%20TABLE%20bookings%3B%20--",
 			handler: bookingTimeHandler.GetAvailableSlots,
 			body:    "",
-			checkDatabase: func(t *testing.T, db *sql.DB) {
+			checkDatabase: func(t *testing.T, db *database.DB) {
 				// Verify bookings table still exists
 				var count int
 				err := db.QueryRow("SELECT COUNT(*) FROM bookings").Scan(&count)
@@ -420,13 +426,13 @@ func TestSecurityXSSPrevention(t *testing.T) {
 	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
 
 	testCases := []struct {
-		name             string
-		method           string
-		path             string
-		handler          http.HandlerFunc
-		body             string
-		checkResponse    func(*testing.T, []byte)
-		description      string
+		name          string
+		method        string
+		path          string
+		handler       http.HandlerFunc
+		body          string
+		checkResponse func(*testing.T, []byte)
+		description   string
 	}{
 		{
 			name:    "TC-6.2.2-A: XSS in rule_name",

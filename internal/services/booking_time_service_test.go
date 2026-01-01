@@ -2,17 +2,14 @@ package services
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
 	"github.com/tranmh/gassigeher/internal/testutil"
-	_ "modernc.org/sqlite"
 )
 
 // Test 1.1.1: ValidateBookingTime - Weekday Allowed Times
@@ -321,14 +318,8 @@ func containsTimeSlot(slice []string, item string) bool {
 // Test 7.1.2: Available Slots Generation Performance
 // Purpose: Verify time slot generation is fast
 func BenchmarkGetAvailableTimeSlots(b *testing.B) {
-	// Use the benchmark itself as a testing.T-compatible interface
-	db, _ := sql.Open("sqlite", ":memory:")
+	db := testutil.SetupBenchmarkDB(b)
 	defer db.Close()
-
-	// Setup database (manual migration to avoid T dependency)
-	dialect := database.NewSQLiteDialect()
-	_ = dialect.ApplySettings(db)
-	_ = database.RunMigrationsWithDialect(db, dialect)
 
 	bookingTimeRepo := repository.NewBookingTimeRepository(db)
 	holidayRepo := repository.NewHolidayRepository(db)
@@ -344,12 +335,8 @@ func BenchmarkGetAvailableTimeSlots(b *testing.B) {
 
 // Test 7.1.2: Available Slots Generation for Weekend
 func BenchmarkGetAvailableTimeSlots_Weekend(b *testing.B) {
-	db, _ := sql.Open("sqlite", ":memory:")
+	db := testutil.SetupBenchmarkDB(b)
 	defer db.Close()
-
-	dialect := database.NewSQLiteDialect()
-	_ = dialect.ApplySettings(db)
-	_ = database.RunMigrationsWithDialect(db, dialect)
 
 	bookingTimeRepo := repository.NewBookingTimeRepository(db)
 	holidayRepo := repository.NewHolidayRepository(db)
@@ -366,12 +353,8 @@ func BenchmarkGetAvailableTimeSlots_Weekend(b *testing.B) {
 // Test 7.1.3: Booking Validation Performance
 // Purpose: Verify booking validation completes quickly
 func BenchmarkValidateBookingTime(b *testing.B) {
-	db, _ := sql.Open("sqlite", ":memory:")
+	db := testutil.SetupBenchmarkDB(b)
 	defer db.Close()
-
-	dialect := database.NewSQLiteDialect()
-	_ = dialect.ApplySettings(db)
-	_ = database.RunMigrationsWithDialect(db, dialect)
 
 	bookingTimeRepo := repository.NewBookingTimeRepository(db)
 	holidayRepo := repository.NewHolidayRepository(db)
@@ -387,12 +370,8 @@ func BenchmarkValidateBookingTime(b *testing.B) {
 
 // Test 7.1.3: Booking Validation with Holiday Check
 func BenchmarkValidateBookingTime_WithHolidayCheck(b *testing.B) {
-	db, _ := sql.Open("sqlite", ":memory:")
+	db := testutil.SetupBenchmarkDB(b)
 	defer db.Close()
-
-	dialect := database.NewSQLiteDialect()
-	_ = dialect.ApplySettings(db)
-	_ = database.RunMigrationsWithDialect(db, dialect)
 
 	bookingTimeRepo := repository.NewBookingTimeRepository(db)
 	holidayRepo := repository.NewHolidayRepository(db)

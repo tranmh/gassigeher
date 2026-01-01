@@ -20,9 +20,9 @@ type CacheService struct {
 	defaultTTL time.Duration
 	maxEntries int
 	stats      CacheStats
-	stopCh     chan struct{}   // Channel to stop cleanup goroutine
-	stopped    bool            // Flag to track if Close() was called
-	wg         sync.WaitGroup  // WaitGroup to track cleanup goroutine (BUG FIX: prevents goroutine leak)
+	stopCh     chan struct{}  // Channel to stop cleanup goroutine
+	stopped    bool           // Flag to track if Close() was called
+	wg         sync.WaitGroup // WaitGroup to track cleanup goroutine (BUG FIX: prevents goroutine leak)
 }
 
 // CacheStats tracks cache performance metrics
@@ -37,8 +37,8 @@ type CacheStats struct {
 
 // CacheConfig allows customization of cache behavior
 type CacheConfig struct {
-	DefaultTTL time.Duration // Default time-to-live for entries
-	MaxEntries int           // Maximum number of entries (0 = unlimited)
+	DefaultTTL      time.Duration // Default time-to-live for entries
+	MaxEntries      int           // Maximum number of entries (0 = unlimited)
 	CleanupInterval time.Duration // How often to run cleanup (0 = no background cleanup)
 }
 

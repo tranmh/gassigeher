@@ -25,7 +25,7 @@ Gassigeher is a **complete, production-ready** web application for managing dog 
 
 | Mode | Best For | Tenants | Database | Storage |
 |------|----------|---------|----------|---------|
-| **Simple-Mode** | Individual shelters | 1 | SQLite/MySQL/PostgreSQL | Local filesystem |
+| **Simple-Mode** | Individual shelters | 1 | SQLite or PostgreSQL | Local filesystem |
 | **SaaS-Mode** | Platform operators | Unlimited | PostgreSQL with RLS | S3 object storage |
 
 ---
@@ -74,7 +74,7 @@ Gassigeher is a **complete, production-ready** web application for managing dog 
 
 **Backend:**
 - Go 1.24+
-- Multi-database support (SQLite, MySQL, PostgreSQL)
+- Multi-database support (SQLite and PostgreSQL)
 - PostgreSQL Row-Level Security (SaaS-Mode)
 - gorilla/mux router
 - JWT authentication (with tenant_id claim in SaaS)
@@ -167,9 +167,8 @@ docs/
 ├── PROJECT_SUMMARY.md         This file
 ├── DOCUMENTATION_INDEX.md     Navigation guide
 ├── Database_Selection_Guide.md Choosing the right database
-├── MySQL_Setup_Guide.md       MySQL installation
 ├── PostgreSQL_Setup_Guide.md  PostgreSQL installation
-└── [6+ more guides]           Additional documentation
+└── [5+ more guides]           Additional documentation
 ```
 
 ### Deployment Files
@@ -585,8 +584,7 @@ Upon launch, monitor:
 
 ### Why Multi-Database Support?
 - **SQLite**: Zero config, perfect for development and small deployments
-- **MySQL**: Proven web-scale, familiar to most developers
-- **PostgreSQL**: Row-Level Security for SaaS multi-tenancy
+- **PostgreSQL**: Row-Level Security for SaaS multi-tenancy, enterprise-grade
 
 ### Why Vanilla JavaScript?
 - No build step required

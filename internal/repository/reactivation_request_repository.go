@@ -10,11 +10,11 @@ import (
 
 // ReactivationRequestRepository handles reactivation request database operations
 type ReactivationRequestRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
 // NewReactivationRequestRepository creates a new reactivation request repository
-func NewReactivationRequestRepository(db *sql.DB) *ReactivationRequestRepository {
+func NewReactivationRequestRepository(db DBExecutor) *ReactivationRequestRepository {
 	return &ReactivationRequestRepository{db: db}
 }
 
@@ -26,14 +26,9 @@ func (r *ReactivationRequestRepository) Create(tenantID int, request *models.Rea
 	`
 
 	now := time.Now()
-	result, err := r.db.Exec(query, tenantID, request.UserID, now)
+	id, err := r.db.InsertReturningID(query, tenantID, request.UserID, now)
 	if err != nil {
 		return fmt.Errorf("failed to create reactivation request: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
 	request.ID = int(id)

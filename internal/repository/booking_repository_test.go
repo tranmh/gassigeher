@@ -1,20 +1,20 @@
 package repository
 
 import (
-	"database/sql"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
-	_ "modernc.org/sqlite"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/testutil"
+	_ "modernc.org/sqlite"
 )
 
 // setupTestDB creates a test database using the standard migration system
 // and seeds with default test data
-func setupTestDB(t *testing.T) *sql.DB {
+func setupTestDB(t *testing.T) *database.DB {
 	db := testutil.SetupTestDB(t)
 
 	// Insert test users with explicit IDs (tenant_id = 0 for Simple-Mode)
@@ -400,7 +400,6 @@ func TestBookingRepository_FindAll(t *testing.T) {
 			t.Errorf("Expected DogID=2, got %d", bookings[0].DogID)
 		}
 	})
-
 
 	t.Run("filter by date_from", func(t *testing.T) {
 		dateFrom := "2025-12-01"
@@ -789,7 +788,6 @@ func TestBookingRepository_Update(t *testing.T) {
 			t.Errorf("Expected date '2025-12-15', got %s", updated.Date)
 		}
 	})
-
 
 	t.Run("update non-existent booking", func(t *testing.T) {
 		nonExistent := &models.Booking{

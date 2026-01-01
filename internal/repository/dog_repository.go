@@ -19,17 +19,17 @@ var dogLimitMutexes sync.Map
 
 // DogRepository handles dog database operations
 type DogRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
 // NewDogRepository creates a new dog repository
-func NewDogRepository(db *sql.DB) *DogRepository {
+func NewDogRepository(db DBExecutor) *DogRepository {
 	return &DogRepository{db: db}
 }
 
 // NewDogRepositoryWithTx creates a dog repository that can work with transactions
 // The tx parameter is stored for use with CreateTx method
-func NewDogRepositoryWithTx(db *sql.DB, tx *sql.Tx) *DogRepository {
+func NewDogRepositoryWithTx(db DBExecutor, tx *sql.Tx) *DogRepository {
 	return &DogRepository{db: db}
 }
 
@@ -44,7 +44,41 @@ func (r *DogRepository) CreateTx(tx *sql.Tx, dog *models.Dog) error {
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	// tenant_id=0 is valid for Simple-Mode (non-SaaS)
+	// PostgreSQL requires RETURNING clause instead of LastInsertId
+	if r.db.GetDialectName() == "postgres" {
+		query = query + " RETURNING id"
+		var id int64
+		err := tx.QueryRow(
+			query,
+			dog.TenantID,
+			dog.Name,
+			dog.Breed,
+			dog.Size,
+			dog.Age,
+			dog.ColorID,
+			dog.Photo,
+			dog.PhotoThumbnail,
+			dog.SpecialNeeds,
+			dog.PickupLocation,
+			dog.WalkRoute,
+			dog.WalkDuration,
+			dog.SpecialInstructions,
+			dog.DefaultMorningTime,
+			dog.DefaultEveningTime,
+			r.db.BoolValue(dog.IsAvailable),
+			r.db.BoolValue(dog.IsFeatured),
+			dog.ExternalLink,
+		).Scan(&id)
+		if err != nil {
+			return fmt.Errorf("failed to create dog: %w", err)
+		}
+		dog.ID = int(id)
+		dog.CreatedAt = time.Now()
+		dog.UpdatedAt = time.Now()
+		return nil
+	}
+
+	// SQLite/MySQL use LastInsertId
 	result, err := tx.Exec(
 		query,
 		dog.TenantID,
@@ -62,8 +96,8 @@ func (r *DogRepository) CreateTx(tx *sql.Tx, dog *models.Dog) error {
 		dog.SpecialInstructions,
 		dog.DefaultMorningTime,
 		dog.DefaultEveningTime,
-		dog.IsAvailable,
-		dog.IsFeatured,
+		r.db.BoolValue(dog.IsAvailable),
+		r.db.BoolValue(dog.IsFeatured),
 		dog.ExternalLink,
 	)
 	if err != nil {
@@ -93,7 +127,7 @@ func (r *DogRepository) Create(dog *models.Dog) error {
 	`
 
 	// tenant_id=0 is valid for Simple-Mode (non-SaaS)
-	result, err := r.db.Exec(
+	id, err := r.db.InsertReturningID(
 		query,
 		dog.TenantID,
 		dog.Name,
@@ -110,17 +144,12 @@ func (r *DogRepository) Create(dog *models.Dog) error {
 		dog.SpecialInstructions,
 		dog.DefaultMorningTime,
 		dog.DefaultEveningTime,
-		dog.IsAvailable,
-		dog.IsFeatured,
+		r.db.BoolValue(dog.IsAvailable),
+		r.db.BoolValue(dog.IsFeatured),
 		dog.ExternalLink,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create dog: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get dog ID: %w", err)
 	}
 
 	dog.ID = int(id)
@@ -343,12 +372,12 @@ func (r *DogRepository) GetFeatured(tenantID int) ([]*models.Dog, error) {
 		       default_morning_time, default_evening_time, is_available, is_featured,
 		       external_link, unavailable_reason, unavailable_since, created_at, updated_at
 		FROM dogs
-		WHERE is_featured = 1 AND is_available = 1 AND tenant_id = ?
+		WHERE is_featured = ? AND is_available = ? AND tenant_id = ?
 		ORDER BY id DESC
 		LIMIT ?
 	`
 
-	args := []interface{}{tenantID, featuredQueryLimit}
+	args := []interface{}{r.db.BoolValue(true), r.db.BoolValue(true), tenantID, featuredQueryLimit}
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -416,7 +445,7 @@ func (r *DogRepository) GetFeatured(tenantID int) ([]*models.Dog, error) {
 func (r *DogRepository) SetFeatured(id int, tenantID int, isFeatured bool) error {
 	query := `UPDATE dogs SET is_featured = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`
 
-	_, err := r.db.Exec(query, isFeatured, time.Now(), id, tenantID)
+	_, err := r.db.Exec(query, r.db.BoolValue(isFeatured), time.Now(), id, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to set featured status: %w", err)
 	}
@@ -427,10 +456,10 @@ func (r *DogRepository) SetFeatured(id int, tenantID int, isFeatured bool) error
 // CountFeatured returns the number of featured dogs for a tenant
 // SaaS: Filters by tenant_id for tenant isolation
 func (r *DogRepository) CountFeatured(tenantID int) (int, error) {
-	query := `SELECT COUNT(*) FROM dogs WHERE is_featured = 1 AND tenant_id = ?`
+	query := `SELECT COUNT(*) FROM dogs WHERE is_featured = ? AND tenant_id = ?`
 
 	var count int
-	err := r.db.QueryRow(query, tenantID).Scan(&count)
+	err := r.db.QueryRow(query, r.db.BoolValue(true), tenantID).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count featured dogs: %w", err)
 	}
@@ -506,35 +535,66 @@ func (r *DogRepository) CreateWithLimitCheck(dog *models.Dog, limit int) error {
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	// tenant_id=0 is valid for Simple-Mode (non-SaaS)
-	result, err := tx.Exec(
-		query,
-		dog.TenantID,
-		dog.Name,
-		dog.Breed,
-		dog.Size,
-		dog.Age,
-		dog.ColorID,
-		dog.Photo,
-		dog.PhotoThumbnail,
-		dog.SpecialNeeds,
-		dog.PickupLocation,
-		dog.WalkRoute,
-		dog.WalkDuration,
-		dog.SpecialInstructions,
-		dog.DefaultMorningTime,
-		dog.DefaultEveningTime,
-		dog.IsAvailable,
-		dog.IsFeatured,
-		dog.ExternalLink,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create dog: %w", err)
-	}
+	var id int64
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get dog ID: %w", err)
+	// PostgreSQL requires RETURNING clause instead of LastInsertId
+	if r.db.GetDialectName() == "postgres" {
+		query = query + " RETURNING id"
+		err = tx.QueryRow(
+			query,
+			dog.TenantID,
+			dog.Name,
+			dog.Breed,
+			dog.Size,
+			dog.Age,
+			dog.ColorID,
+			dog.Photo,
+			dog.PhotoThumbnail,
+			dog.SpecialNeeds,
+			dog.PickupLocation,
+			dog.WalkRoute,
+			dog.WalkDuration,
+			dog.SpecialInstructions,
+			dog.DefaultMorningTime,
+			dog.DefaultEveningTime,
+			r.db.BoolValue(dog.IsAvailable),
+			r.db.BoolValue(dog.IsFeatured),
+			dog.ExternalLink,
+		).Scan(&id)
+		if err != nil {
+			return fmt.Errorf("failed to create dog: %w", err)
+		}
+	} else {
+		// SQLite/MySQL use LastInsertId
+		result, err := tx.Exec(
+			query,
+			dog.TenantID,
+			dog.Name,
+			dog.Breed,
+			dog.Size,
+			dog.Age,
+			dog.ColorID,
+			dog.Photo,
+			dog.PhotoThumbnail,
+			dog.SpecialNeeds,
+			dog.PickupLocation,
+			dog.WalkRoute,
+			dog.WalkDuration,
+			dog.SpecialInstructions,
+			dog.DefaultMorningTime,
+			dog.DefaultEveningTime,
+			r.db.BoolValue(dog.IsAvailable),
+			r.db.BoolValue(dog.IsFeatured),
+			dog.ExternalLink,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create dog: %w", err)
+		}
+
+		id, err = result.LastInsertId()
+		if err != nil {
+			return fmt.Errorf("failed to get dog ID: %w", err)
+		}
 	}
 
 	// Commit transaction
@@ -744,25 +804,25 @@ func (r *DogRepository) ToggleAvailability(id int, tenantID int, isAvailable boo
 		// Mark as available (clear reason and timestamp)
 		query = `
 			UPDATE dogs SET
-				is_available = 1,
+				is_available = ?,
 				unavailable_reason = NULL,
 				unavailable_since = NULL,
 				updated_at = ?
 			WHERE id = ? AND tenant_id = ?
 		`
-		args = []interface{}{time.Now(), id, tenantID}
+		args = []interface{}{r.db.BoolValue(true), time.Now(), id, tenantID}
 	} else {
 		// Mark as unavailable
 		query = `
 			UPDATE dogs SET
-				is_available = 0,
+				is_available = ?,
 				unavailable_reason = ?,
 				unavailable_since = ?,
 				updated_at = ?
 			WHERE id = ? AND tenant_id = ?
 		`
 		now := time.Now()
-		args = []interface{}{reason, now, now, id, tenantID}
+		args = []interface{}{r.db.BoolValue(false), reason, now, now, id, tenantID}
 	}
 
 	_, err := r.db.Exec(query, args...)

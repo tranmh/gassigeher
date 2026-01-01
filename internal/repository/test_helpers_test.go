@@ -1,10 +1,11 @@
 package repository
 
 import (
-	"database/sql"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/tranmh/gassigeher/internal/database"
 )
 
 var (
@@ -13,7 +14,7 @@ var (
 )
 
 // createTestTenant creates a tenant for testing and returns its ID
-func createTestTenant(t *testing.T, db *sql.DB) int {
+func createTestTenant(t *testing.T, db *database.DB) int {
 	t.Helper()
 	testCounterMu.Lock()
 	testCounter++
@@ -32,7 +33,7 @@ func createTestTenant(t *testing.T, db *sql.DB) int {
 }
 
 // createTestUser creates a user for testing and returns its ID
-func createTestUser(t *testing.T, db *sql.DB, tenantID int) int {
+func createTestUser(t *testing.T, db *database.DB, tenantID int) int {
 	t.Helper()
 	testCounterMu.Lock()
 	testCounter++

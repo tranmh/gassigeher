@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"database/sql"
 	"html"
 	"net/http"
 	"time"
 
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -14,17 +14,17 @@ import (
 
 // DashboardHandler handles admin dashboard endpoints
 type DashboardHandler struct {
-	db                   *sql.DB
-	cfg                  *config.Config
-	bookingRepo          *repository.BookingRepository
-	userRepo             *repository.UserRepository
-	dogRepo              *repository.DogRepository
-	colorRequestRepo     *repository.ColorRequestRepository
-	reactivationRepo     *repository.ReactivationRequestRepository
+	db               *database.DB
+	cfg              *config.Config
+	bookingRepo      *repository.BookingRepository
+	userRepo         *repository.UserRepository
+	dogRepo          *repository.DogRepository
+	colorRequestRepo *repository.ColorRequestRepository
+	reactivationRepo *repository.ReactivationRequestRepository
 }
 
 // NewDashboardHandler creates a new dashboard handler
-func NewDashboardHandler(db *sql.DB, cfg *config.Config) *DashboardHandler {
+func NewDashboardHandler(db *database.DB, cfg *config.Config) *DashboardHandler {
 	return &DashboardHandler{
 		db:               db,
 		cfg:              cfg,

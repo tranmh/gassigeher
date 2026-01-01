@@ -4,20 +4,22 @@ import (
 	"database/sql"
 	"testing"
 
+	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/models"
 )
 
 // setupFeatureFlagTestDB creates a test database with the feature_flags schema
 // BUG: This test will fail if the feature_flags migration is missing
-func setupFeatureFlagTestDB(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite3", ":memory:")
+func setupFeatureFlagTestDB(t *testing.T) *database.DB {
+	rawDB, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
 
 	// Create required tables - this is what the migration should create
-	_, err = db.Exec(`
+	_, err = rawDB.Exec(`
 		CREATE TABLE IF NOT EXISTS feature_flags (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			key TEXT NOT NULL UNIQUE,
@@ -43,7 +45,9 @@ func setupFeatureFlagTestDB(t *testing.T) *sql.DB {
 		t.Fatalf("Failed to create tables: %v", err)
 	}
 
-	return db
+	// Wrap in database.DB
+	sqlxDB := sqlx.NewDb(rawDB, "sqlite3")
+	return database.WrapSqlxDB(sqlxDB, database.NewSQLiteDialect())
 }
 
 // TestFeatureFlagRepository_Create tests creating a feature flag

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -17,7 +17,7 @@ import (
 
 // ExperienceRequestHandler handles experience request-related HTTP requests
 type ExperienceRequestHandler struct {
-	db            *sql.DB
+	db            *database.DB
 	cfg           *config.Config
 	requestRepo   *repository.ExperienceRequestRepository
 	userRepo      *repository.UserRepository
@@ -27,7 +27,7 @@ type ExperienceRequestHandler struct {
 }
 
 // NewExperienceRequestHandler creates a new experience request handler
-func NewExperienceRequestHandler(db *sql.DB, cfg *config.Config) *ExperienceRequestHandler {
+func NewExperienceRequestHandler(db *database.DB, cfg *config.Config) *ExperienceRequestHandler {
 	emailService, err := services.NewEmailService(services.ConfigToEmailConfig(cfg))
 	if err != nil {
 		// Log error but don't fail

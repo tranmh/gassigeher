@@ -340,7 +340,7 @@ SQLite limitation with concurrent writes. Solutions:
 
 ### Large Shelter (>1000 users)
 
-**Use:** PostgreSQL or MySQL
+**Use:** PostgreSQL
 
 **Why:**
 - Better concurrent write handling

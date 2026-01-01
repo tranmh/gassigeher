@@ -16,11 +16,11 @@ func TestImpersonationTokenCanEndImpersonation(t *testing.T) {
 
 	// Set up context as if it came from an impersonation token
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, UserIDKey, 3)                   // Impersonated user ID
-	ctx = context.WithValue(ctx, IsAdminKey, false)              // Impersonated user is not admin
-	ctx = context.WithValue(ctx, IsCentralAdminKey, false)       // Impersonated user is not central admin
-	ctx = context.WithValue(ctx, IsImpersonatingKey, true)       // This IS an impersonation session
-	ctx = context.WithValue(ctx, OriginalUserIDKey, 1)           // Original central admin user ID
+	ctx = context.WithValue(ctx, UserIDKey, 3)             // Impersonated user ID
+	ctx = context.WithValue(ctx, IsAdminKey, false)        // Impersonated user is not admin
+	ctx = context.WithValue(ctx, IsCentralAdminKey, false) // Impersonated user is not central admin
+	ctx = context.WithValue(ctx, IsImpersonatingKey, true) // This IS an impersonation session
+	ctx = context.WithValue(ctx, OriginalUserIDKey, 1)     // Original central admin user ID
 	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()

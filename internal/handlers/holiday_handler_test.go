@@ -3,13 +3,13 @@ package handlers
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"testing"
 
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -17,7 +17,7 @@ import (
 	"github.com/tranmh/gassigeher/internal/testutil"
 )
 
-func setupHolidayHandlerTest(t *testing.T) (*sql.DB, *HolidayHandler, func()) {
+func setupHolidayHandlerTest(t *testing.T) (*database.DB, *HolidayHandler, func()) {
 	// Use testutil to create test database with test tenant
 	db := testutil.SetupTestDB(t)
 

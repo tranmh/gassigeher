@@ -4,15 +4,17 @@ import (
 	"database/sql"
 	"net/http"
 	"time"
+
+	"github.com/tranmh/gassigeher/internal/database"
 )
 
 // HealthHandler handles health check endpoints
 type HealthHandler struct {
-	db *sql.DB
+	db *database.DB
 }
 
 // NewHealthHandler creates a new health handler
-func NewHealthHandler(db *sql.DB) *HealthHandler {
+func NewHealthHandler(db *database.DB) *HealthHandler {
 	return &HealthHandler{db: db}
 }
 

@@ -1,13 +1,13 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -15,13 +15,13 @@ import (
 
 // ColorCategoryHandler handles color category-related HTTP requests
 type ColorCategoryHandler struct {
-	db        *sql.DB
+	db        *database.DB
 	cfg       *config.Config
 	colorRepo *repository.ColorCategoryRepository
 }
 
 // NewColorCategoryHandler creates a new color category handler
-func NewColorCategoryHandler(db *sql.DB, cfg *config.Config) *ColorCategoryHandler {
+func NewColorCategoryHandler(db *database.DB, cfg *config.Config) *ColorCategoryHandler {
 	return &ColorCategoryHandler{
 		db:        db,
 		cfg:       cfg,

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/logging"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
@@ -24,7 +24,7 @@ import (
 
 // UserHandler handles user-related endpoints
 type UserHandler struct {
-	db            *sql.DB
+	db            *database.DB
 	userRepo      *repository.UserRepository
 	userColorRepo *repository.UserColorRepository
 	authService   *services.AuthService
@@ -35,7 +35,7 @@ type UserHandler struct {
 }
 
 // NewUserHandler creates a new user handler
-func NewUserHandler(db *sql.DB, cfg *config.Config) *UserHandler {
+func NewUserHandler(db *database.DB, cfg *config.Config) *UserHandler {
 	emailService, err := services.NewEmailService(services.ConfigToEmailConfig(cfg))
 	if err != nil {
 		println("Warning: Failed to initialize email service:", err.Error())

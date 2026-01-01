@@ -211,7 +211,7 @@ func TestCORSMiddleware(t *testing.T) {
 
 	t.Run("handles OPTIONS preflight request", func(t *testing.T) {
 		req := httptest.NewRequest("OPTIONS", "/api/test", nil)
-	req.Header.Set("Origin", "http://localhost:8080") // BUG FIX #1
+		req.Header.Set("Origin", "http://localhost:8080") // BUG FIX #1
 		rec := httptest.NewRecorder()
 
 		handler.ServeHTTP(rec, req)
@@ -467,7 +467,7 @@ func TestRateLimitLogin_TrustedProxy(t *testing.T) {
 		// Make 5 requests from trusted proxy with same client IP
 		for i := 0; i < 5; i++ {
 			req := httptest.NewRequest("POST", "/api/auth/login", nil)
-			req.RemoteAddr = "127.0.0.1:12345" // Trusted proxy
+			req.RemoteAddr = "127.0.0.1:12345"                // Trusted proxy
 			req.Header.Set("X-Forwarded-For", "203.0.113.50") // Real client IP
 
 			rec := httptest.NewRecorder()
@@ -1200,7 +1200,7 @@ func TestRateLimitAuthEndpoint_TrustedProxy(t *testing.T) {
 	// Make 3 requests from trusted proxy with same client IP
 	for i := 0; i < 3; i++ {
 		req := httptest.NewRequest("POST", "/api/auth/register", nil)
-		req.RemoteAddr = "127.0.0.1:12345" // Trusted proxy
+		req.RemoteAddr = "127.0.0.1:12345"                // Trusted proxy
 		req.Header.Set("X-Forwarded-For", "203.0.113.99") // Real client IP
 
 		rec := httptest.NewRecorder()
@@ -1273,8 +1273,9 @@ func TestBlockTraceMethod(t *testing.T) {
 // TestSecurityHeadersMiddleware_Security_StrictCSP tests CSP configuration
 // SECURITY: GASSI-2025-003 - CSP configuration for XSS protection
 // NOTE: unsafe-inline is currently required because the application uses inline scripts
-//       for authentication checks and page-specific logic. A future migration to external
-//       scripts will allow removing unsafe-inline.
+//
+//	for authentication checks and page-specific logic. A future migration to external
+//	scripts will allow removing unsafe-inline.
 func TestSecurityHeadersMiddleware_Security_StrictCSP(t *testing.T) {
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

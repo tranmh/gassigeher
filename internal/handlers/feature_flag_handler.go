@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -19,7 +19,7 @@ type FeatureFlagHandler struct {
 }
 
 // NewFeatureFlagHandler creates a new feature flag handler
-func NewFeatureFlagHandler(db *sql.DB) *FeatureFlagHandler {
+func NewFeatureFlagHandler(db *database.DB) *FeatureFlagHandler {
 	repo := repository.NewFeatureFlagRepository(db)
 	service := services.NewFeatureFlagService(repo)
 	return &FeatureFlagHandler{

@@ -17,16 +17,16 @@ var validSubdomainRegex = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
 // dangerousSubdomainPatterns contains patterns that could be used for SQL injection
 // or other attacks. These are checked explicitly even though regex should catch most.
 var dangerousSubdomainPatterns = []string{
-	"--",     // SQL comment
-	"/*",     // SQL comment start
-	"*/",     // SQL comment end
-	";",      // SQL statement separator
-	"\x00",   // Null byte
-	"\r",     // Carriage return (CRLF injection)
-	"\n",     // Newline (CRLF injection)
-	"'",      // Single quote (SQL injection)
-	"\"",     // Double quote
-	"\\",     // Backslash
+	"--",   // SQL comment
+	"/*",   // SQL comment start
+	"*/",   // SQL comment end
+	";",    // SQL statement separator
+	"\x00", // Null byte
+	"\r",   // Carriage return (CRLF injection)
+	"\n",   // Newline (CRLF injection)
+	"'",    // Single quote (SQL injection)
+	"\"",   // Double quote
+	"\\",   // Backslash
 }
 
 // containsDangerousPattern checks if the subdomain contains dangerous patterns

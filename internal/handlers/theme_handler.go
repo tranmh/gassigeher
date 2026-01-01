@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -25,7 +25,7 @@ func safeDeref(s *string) string {
 }
 
 // NewThemeHandler creates a new theme handler
-func NewThemeHandler(db *sql.DB) *ThemeHandler {
+func NewThemeHandler(db *database.DB) *ThemeHandler {
 	return &ThemeHandler{
 		tenantRepo: repository.NewTenantRepository(db),
 	}

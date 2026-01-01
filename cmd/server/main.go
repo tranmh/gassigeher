@@ -85,13 +85,13 @@ func main() {
 
 	// Check if this is a fresh install BEFORE running migrations
 	// (After migrations, schema_migrations table will have entries)
-	isFreshInstall := database.IsFreshInstall(db)
+	isFreshInstall := database.IsFreshInstall(db.SqlDB())
 	if isFreshInstall {
 		log.Println("Detected fresh installation (no existing schema)")
 	}
 
 	// Run migrations with dialect support
-	if err := database.RunMigrationsWithDialect(db, dialect); err != nil {
+	if err := database.RunMigrationsWithDialect(db.SqlDB(), dialect); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
@@ -120,7 +120,7 @@ func main() {
 	}
 
 	// DONE: Phase 2 - Run seed data (first-time installations)
-	if err := database.SeedDatabase(db, cfg.SuperAdminEmail); err != nil {
+	if err := database.SeedDatabase(db.SqlDB(), cfg.SuperAdminEmail, dialect.Name()); err != nil {
 		log.Fatalf("Failed to seed database: %v", err)
 	}
 
@@ -281,8 +281,9 @@ func main() {
 	billingHandler := handlers.NewBillingHandler(db, cfg, stripeService)
 
 	// Infrastructure endpoints (unversioned - for monitoring tools)
-	router.HandleFunc("/api/health", healthHandler.Health).Methods("GET")
-	router.HandleFunc("/api/ready", healthHandler.Ready).Methods("GET")
+	// HEAD is required for Docker health checks (wget --spider uses HEAD)
+	router.HandleFunc("/api/health", healthHandler.Health).Methods("GET", "HEAD")
+	router.HandleFunc("/api/ready", healthHandler.Ready).Methods("GET", "HEAD")
 	router.HandleFunc("/api/health/detailed", healthHandler.DetailedHealth).Methods("GET")
 
 	// Metrics endpoints protected with Basic Auth (standard Prometheus pattern)

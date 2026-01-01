@@ -9,10 +9,10 @@ import (
 )
 
 type HolidayRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
-func NewHolidayRepository(db *sql.DB) *HolidayRepository {
+func NewHolidayRepository(db DBExecutor) *HolidayRepository {
 	return &HolidayRepository{db: db}
 }
 
@@ -21,14 +21,14 @@ func (r *HolidayRepository) GetHolidaysByYear(tenantID int, year int) ([]models.
 	query := `
 		SELECT id, tenant_id, date, name, is_active, source, created_at, created_by
 		FROM custom_holidays
-		WHERE is_active = 1
+		WHERE is_active = ?
 		  AND date LIKE ?
 		  AND tenant_id = ?
 		ORDER BY date ASC
 	`
 
 	yearPrefix := fmt.Sprintf("%d-%%", year)
-	rows, err := r.db.Query(query, yearPrefix, tenantID)
+	rows, err := r.db.Query(query, r.db.BoolValue(true), yearPrefix, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -41,11 +41,11 @@ func (r *HolidayRepository) GetHolidaysByYear(tenantID int, year int) ([]models.
 func (r *HolidayRepository) IsHoliday(tenantID int, date string) (bool, error) {
 	query := `
 		SELECT COUNT(*) FROM custom_holidays
-		WHERE date = ? AND is_active = 1 AND tenant_id = ?
+		WHERE date = ? AND is_active = ? AND tenant_id = ?
 	`
 
 	var count int
-	err := r.db.QueryRow(query, date, tenantID).Scan(&count)
+	err := r.db.QueryRow(query, date, r.db.BoolValue(true), tenantID).Scan(&count)
 	if err != nil {
 		return false, err
 	}
@@ -60,20 +60,11 @@ func (r *HolidayRepository) CreateHoliday(tenantID int, holiday *models.CustomHo
 		VALUES (?, ?, ?, ?, ?, ?)
 	`
 
-	isActive := 1
-	if !holiday.IsActive {
-		isActive = 0
-	}
-
-	result, err := r.db.Exec(query, tenantID, holiday.Date, holiday.Name, isActive, holiday.Source, holiday.CreatedBy)
+	id, err := r.db.InsertReturningID(query, tenantID, holiday.Date, holiday.Name, r.db.BoolValue(holiday.IsActive), holiday.Source, holiday.CreatedBy)
 	if err != nil {
 		return err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get inserted holiday ID: %w", err)
-	}
 	holiday.ID = int(id)
 	holiday.TenantID = tenantID
 	return nil
@@ -87,12 +78,7 @@ func (r *HolidayRepository) UpdateHoliday(tenantID int, id int, holiday *models.
 		WHERE id = ? AND tenant_id = ?
 	`
 
-	isActive := 1
-	if !holiday.IsActive {
-		isActive = 0
-	}
-
-	_, err := r.db.Exec(query, holiday.Name, isActive, id, tenantID)
+	_, err := r.db.Exec(query, holiday.Name, r.db.BoolValue(holiday.IsActive), id, tenantID)
 	return err
 }
 

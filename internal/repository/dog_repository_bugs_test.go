@@ -273,8 +273,9 @@ func TestDogRepository_GetFeatured_Bounded(t *testing.T) {
 // This is a GREEN test confirming the fix is in place.
 //
 // The correct pattern is:
-//   for rows.Next() { /* scan */ }
-//   if err := rows.Err(); err != nil { return nil, err }
+//
+//	for rows.Next() { /* scan */ }
+//	if err := rows.Err(); err != nil { return nil, err }
 //
 // Verified at these locations in dog_repository.go:
 //   - FindAll: line 309

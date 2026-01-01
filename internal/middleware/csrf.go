@@ -16,9 +16,9 @@ import (
 const (
 	CSRFCookieName     = "csrf_token"
 	CSRFHeaderName     = "X-CSRF-Token"
-	CSRFTokenLength    = 32                     // 32 bytes = 256 bits of entropy
-	CSRFTokenMaxAge    = 24 * time.Hour         // Token validity period
-	CSRFTimestampBytes = 8                      // 8 bytes for Unix timestamp
+	CSRFTokenLength    = 32             // 32 bytes = 256 bits of entropy
+	CSRFTokenMaxAge    = 24 * time.Hour // Token validity period
+	CSRFTimestampBytes = 8              // 8 bytes for Unix timestamp
 )
 
 // CSRFMiddleware implements Double-Submit Cookie pattern for CSRF protection
@@ -45,7 +45,7 @@ func NewCSRFMiddleware() *CSRFMiddleware {
 		},
 		skipPaths: []string{
 			"/api/v1/billing/webhook", // Stripe webhook endpoint
-			"/api/health",              // Health check endpoints
+			"/api/health",             // Health check endpoints
 		},
 		secure: false, // Set via SetSecure() for production
 	}
@@ -135,7 +135,7 @@ func (m *CSRFMiddleware) ensureToken(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: false, // Frontend needs to read this
 		Secure:   m.secure,
 		SameSite: http.SameSiteLaxMode, // Lax allows cookies on top-level navigation (email links)
-		MaxAge:   86400, // 24 hours
+		MaxAge:   86400,                // 24 hours
 	})
 }
 

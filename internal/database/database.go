@@ -1,15 +1,17 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/jmoiron/sqlx"
+
 	_ "github.com/lib/pq"
 	// _ "modernc.org/sqlite"      // CGO-based SQLite (faster, but requires CGO) - DISABLED for Windows
-	_ "modernc.org/sqlite"               // Pure Go SQLite (slower, but cross-compiles easily)
+	_ "modernc.org/sqlite" // Pure Go SQLite (slower, but cross-compiles easily)
 )
 
 // Note: Migration files (001_*.go, 002_*.go, etc.) are in this package
@@ -17,13 +19,13 @@ import (
 
 // DBConfig holds database configuration
 type DBConfig struct {
-	Type             string // sqlite, mysql, postgres
+	Type             string // sqlite, postgres
 	ConnectionString string // Full connection string (optional, overrides other fields)
 
 	// SQLite-specific
 	Path string
 
-	// MySQL/PostgreSQL-specific
+	// PostgreSQL-specific
 	Host     string
 	Port     int
 	Database string
@@ -31,16 +33,149 @@ type DBConfig struct {
 	Password string
 	SSLMode  string // PostgreSQL: disable, require, verify-full
 
-	// Connection pool (MySQL/PostgreSQL only)
+	// Connection pool (PostgreSQL only)
 	MaxOpenConns    int // Max simultaneous connections
 	MaxIdleConns    int // Idle connections to keep
 	ConnMaxLifetime int // Max connection age (minutes)
 }
 
+// DB wraps sqlx.DB and provides helper methods for cross-database compatibility
+// All queries using ? placeholders are automatically converted to the correct format
+type DB struct {
+	*sqlx.DB
+	dialect Dialect
+}
+
+// Rebind converts ? placeholders to the database-specific format ($1, $2 for postgres)
+// This should be called on all queries with ? placeholders
+func (db *DB) Rebind(query string) string {
+	return db.DB.Rebind(query)
+}
+
+// GetDialect returns the database dialect
+func (db *DB) GetDialect() Dialect {
+	return db.dialect
+}
+
+// GetDialectName returns the database type name (sqlite, mysql, postgres)
+func (db *DB) GetDialectName() string {
+	return db.dialect.Name()
+}
+
+// SqlDB returns the underlying *sql.DB for compatibility with code that needs it
+// (e.g., migrations, some third-party libraries)
+func (db *DB) SqlDB() *sql.DB {
+	return db.DB.DB
+}
+
+// SqlxDB returns the underlying *sqlx.DB for direct sqlx access
+func (db *DB) SqlxDB() *sqlx.DB {
+	return db.DB
+}
+
+// Exec executes a query with automatic placeholder rebinding
+func (db *DB) Exec(query string, args ...interface{}) (sql.Result, error) {
+	return db.DB.Exec(db.DB.Rebind(query), args...)
+}
+
+// ExecContext executes a query with context and automatic placeholder rebinding
+func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+	return db.DB.ExecContext(ctx, db.DB.Rebind(query), args...)
+}
+
+// Query executes a query that returns rows with automatic placeholder rebinding
+func (db *DB) Query(query string, args ...interface{}) (*sql.Rows, error) {
+	return db.DB.Query(db.DB.Rebind(query), args...)
+}
+
+// QueryContext executes a query with context that returns rows with automatic placeholder rebinding
+func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+	return db.DB.QueryContext(ctx, db.DB.Rebind(query), args...)
+}
+
+// QueryRow executes a query that returns at most one row with automatic placeholder rebinding
+func (db *DB) QueryRow(query string, args ...interface{}) *sql.Row {
+	return db.DB.QueryRow(db.DB.Rebind(query), args...)
+}
+
+// QueryRowContext executes a query with context that returns at most one row with automatic placeholder rebinding
+func (db *DB) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
+	return db.DB.QueryRowContext(ctx, db.DB.Rebind(query), args...)
+}
+
+// Prepare creates a prepared statement with automatic placeholder rebinding
+func (db *DB) Prepare(query string) (*sql.Stmt, error) {
+	return db.DB.Prepare(db.DB.Rebind(query))
+}
+
+// PrepareContext creates a prepared statement with context and automatic placeholder rebinding
+func (db *DB) PrepareContext(ctx context.Context, query string) (*sql.Stmt, error) {
+	return db.DB.PrepareContext(ctx, db.DB.Rebind(query))
+}
+
+// Begin starts a transaction
+func (db *DB) Begin() (*sql.Tx, error) {
+	return db.DB.Begin()
+}
+
+// BeginTx starts a transaction with options
+func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
+	return db.DB.BeginTx(ctx, opts)
+}
+
+// RebindQuery returns the rebound query for use in transactions
+func (db *DB) RebindQuery(query string) string {
+	return db.DB.Rebind(query)
+}
+
+// InsertReturningID executes an INSERT and returns the generated ID
+// For PostgreSQL, the query should NOT include RETURNING - this method adds it
+// For SQLite, uses LastInsertId()
+func (db *DB) InsertReturningID(query string, args ...interface{}) (int64, error) {
+	if db.dialect.Name() == "postgres" {
+		// PostgreSQL requires RETURNING clause
+		query = strings.TrimRight(query, " \t\n;") + " RETURNING id"
+		var id int64
+		err := db.QueryRow(query, args...).Scan(&id)
+		if err != nil {
+			return 0, err
+		}
+		return id, nil
+	}
+
+	// SQLite uses LastInsertId
+	result, err := db.Exec(query, args...)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
+// BoolValue returns the appropriate boolean representation for the database
+// PostgreSQL: true/false, SQLite: 1/0
+func (db *DB) BoolValue(b bool) interface{} {
+	if db.dialect.Name() == "postgres" {
+		return b
+	}
+	// SQLite uses integers for booleans
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// BoolPlaceholder returns the correct comparison value for boolean columns in WHERE clauses
+// For PostgreSQL, use this when comparing boolean columns
+// Example: WHERE is_active = db.BoolPlaceholder(true)
+// Returns: "true" for postgres, "1" for sqlite/mysql
+func (db *DB) BoolPlaceholder(b bool) string {
+	return db.dialect.GetBooleanDefault(b)
+}
+
 // Initialize creates and opens the database connection (OLD - backward compatible)
 // Kept for backward compatibility with existing code
 // New code should use InitializeWithConfig() for multi-database support
-func Initialize(dbPath string) (*sql.DB, error) {
+func Initialize(dbPath string) (*DB, error) {
 	config := &DBConfig{
 		Type: "sqlite",
 		Path: dbPath,
@@ -49,10 +184,19 @@ func Initialize(dbPath string) (*sql.DB, error) {
 	return db, err
 }
 
+// WrapDB creates a new DB wrapper from an existing sqlx.DB and dialect
+// This is useful for testing when you need to create a DB wrapper manually
+func WrapDB(sqlxDB *sqlx.DB, dialect Dialect) *DB {
+	return &DB{
+		DB:      sqlxDB,
+		dialect: dialect,
+	}
+}
+
 // InitializeWithConfig creates and opens the database connection with full configuration
 // Returns both the database connection and the dialect
-func InitializeWithConfig(config *DBConfig) (*sql.DB, Dialect, error) {
-	var db *sql.DB
+func InitializeWithConfig(config *DBConfig) (*DB, Dialect, error) {
+	var db *sqlx.DB
 	var err error
 
 	// Create dialect factory
@@ -71,29 +215,14 @@ func InitializeWithConfig(config *DBConfig) (*sql.DB, Dialect, error) {
 		if dsn == "" {
 			dsn = "./gassigeher.db"
 		}
-		db, err = sql.Open(dialect.GetDriverName(), dsn)
-
-	case "mysql":
-		dsn := config.ConnectionString
-		if dsn == "" {
-			dsn = buildMySQLDSN(config)
-		}
-		// Ensure multiStatements=true for running migrations with multiple SQL statements
-		if !strings.Contains(dsn, "multiStatements=true") {
-			if strings.Contains(dsn, "?") {
-				dsn = dsn + "&multiStatements=true"
-			} else {
-				dsn = dsn + "?multiStatements=true"
-			}
-		}
-		db, err = sql.Open(dialect.GetDriverName(), dsn)
+		db, err = sqlx.Open(dialect.GetDriverName(), dsn)
 
 	case "postgres":
 		dsn := config.ConnectionString
 		if dsn == "" {
 			dsn = buildPostgreSQLDSN(config)
 		}
-		db, err = sql.Open(dialect.GetDriverName(), dsn)
+		db, err = sqlx.Open(dialect.GetDriverName(), dsn)
 
 	default:
 		return nil, nil, fmt.Errorf("unsupported database type: %s", dialect.Name())
@@ -105,7 +234,7 @@ func InitializeWithConfig(config *DBConfig) (*sql.DB, Dialect, error) {
 
 	// Configure connection pool (MySQL and PostgreSQL only)
 	if dialect.Name() != "sqlite" {
-		configureConnectionPool(db, config)
+		configureConnectionPoolSqlx(db, config)
 	}
 
 	// Test connection
@@ -113,44 +242,27 @@ func InitializeWithConfig(config *DBConfig) (*sql.DB, Dialect, error) {
 		return nil, nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	// Apply database-specific settings
-	if err := dialect.ApplySettings(db); err != nil {
+	// Apply database-specific settings (needs underlying sql.DB)
+	if err := dialect.ApplySettings(db.DB); err != nil {
 		return nil, nil, fmt.Errorf("failed to apply database settings: %w", err)
 	}
 
-	return db, dialect, nil
+	// Wrap in our DB type
+	wrappedDB := &DB{
+		DB:      db,
+		dialect: dialect,
+	}
+
+	return wrappedDB, dialect, nil
 }
 
-// buildMySQLDSN builds a MySQL connection string
-// Format: username:password@tcp(host:port)/database?parseTime=true&charset=utf8mb4
-func buildMySQLDSN(config *DBConfig) string {
-	host := config.Host
-	if host == "" {
-		host = "localhost"
+// WrapSqlxDB wraps an existing sqlx.DB in our DB type with a dialect
+// This is useful for creating DB instances in tests or when you have an existing sqlx.DB
+func WrapSqlxDB(db *sqlx.DB, dialect Dialect) *DB {
+	return &DB{
+		DB:      db,
+		dialect: dialect,
 	}
-
-	port := config.Port
-	if port == 0 {
-		port = 3306 // Default MySQL port
-	}
-
-	database := config.Database
-	if database == "" {
-		database = "gassigeher"
-	}
-
-	// Build DSN
-	// parseTime=true is required for scanning time.Time fields
-	// charset=utf8mb4 for full Unicode support (including emoji)
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci",
-		config.Username,
-		config.Password,
-		host,
-		port,
-		database,
-	)
-
-	return dsn
 }
 
 // buildPostgreSQLDSN builds a PostgreSQL connection string
@@ -189,9 +301,31 @@ func buildPostgreSQLDSN(config *DBConfig) string {
 	return dsn
 }
 
-// configureConnectionPool sets connection pool parameters for MySQL and PostgreSQL
+// configureConnectionPool sets connection pool parameters for PostgreSQL
 // SQLite doesn't need connection pooling (single file database)
 func configureConnectionPool(db *sql.DB, config *DBConfig) {
+	maxOpen := config.MaxOpenConns
+	if maxOpen == 0 {
+		maxOpen = 25 // Default
+	}
+
+	maxIdle := config.MaxIdleConns
+	if maxIdle == 0 {
+		maxIdle = 5 // Default
+	}
+
+	maxLifetime := config.ConnMaxLifetime
+	if maxLifetime == 0 {
+		maxLifetime = 5 // Default: 5 minutes
+	}
+
+	db.SetMaxOpenConns(maxOpen)
+	db.SetMaxIdleConns(maxIdle)
+	db.SetConnMaxLifetime(time.Duration(maxLifetime) * time.Minute)
+}
+
+// configureConnectionPoolSqlx sets connection pool parameters for sqlx.DB
+func configureConnectionPoolSqlx(db *sqlx.DB, config *DBConfig) {
 	maxOpen := config.MaxOpenConns
 	if maxOpen == 0 {
 		maxOpen = 25 // Default

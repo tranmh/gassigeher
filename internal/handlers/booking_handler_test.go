@@ -508,7 +508,6 @@ func TestBookingHandler_CancelBooking(t *testing.T) {
 	})
 }
 
-
 // DONE: TestBookingHandler_AddNotes tests adding notes to completed bookings
 func TestBookingHandler_AddNotes(t *testing.T) {
 	db := testutil.SetupTestDB(t)
@@ -1228,10 +1227,10 @@ func TestApproveBooking(t *testing.T) {
 			},
 		},
 		{
-			name:       "TC-3.3.3-D: Regular user cannot approve",
-			bookingID:  pendingID,
-			isAdmin:    false,
-			wantStatus: http.StatusForbidden,
+			name:        "TC-3.3.3-D: Regular user cannot approve",
+			bookingID:   pendingID,
+			isAdmin:     false,
+			wantStatus:  http.StatusForbidden,
 			checkResult: nil,
 		},
 	}
@@ -1309,19 +1308,19 @@ func TestRejectBooking(t *testing.T) {
 			},
 		},
 		{
-			name:       "TC-3.3.4-B: Reject without reason fails",
-			bookingID:  pendingID,
-			reason:     "",
-			isAdmin:    true,
-			wantStatus: http.StatusBadRequest,
+			name:        "TC-3.3.4-B: Reject without reason fails",
+			bookingID:   pendingID,
+			reason:      "",
+			isAdmin:     true,
+			wantStatus:  http.StatusBadRequest,
 			checkResult: nil,
 		},
 		{
-			name:       "TC-3.3.4-D: Regular user cannot reject",
-			bookingID:  pendingID,
-			reason:     "Test",
-			isAdmin:    false,
-			wantStatus: http.StatusForbidden,
+			name:        "TC-3.3.4-D: Regular user cannot reject",
+			bookingID:   pendingID,
+			reason:      "Test",
+			isAdmin:     false,
+			wantStatus:  http.StatusForbidden,
 			checkResult: nil,
 		},
 	}

@@ -18,22 +18,22 @@ func TestParseCheckoutSessionEvent_ValidTenantID(t *testing.T) {
 	service := NewStripeService("sk_test", "pk_test", "price_monthly", "price_yearly", "https://example.com")
 
 	testCases := []struct {
-		name            string
-		tenantIDValue   string
+		name             string
+		tenantIDValue    string
 		expectedTenantID int
-		shouldError     bool
+		shouldError      bool
 	}{
 		{
-			name:            "Valid tenant ID",
-			tenantIDValue:   "123",
+			name:             "Valid tenant ID",
+			tenantIDValue:    "123",
 			expectedTenantID: 123,
-			shouldError:     false,
+			shouldError:      false,
 		},
 		{
-			name:            "Large tenant ID",
-			tenantIDValue:   "999999",
+			name:             "Large tenant ID",
+			tenantIDValue:    "999999",
 			expectedTenantID: 999999,
-			shouldError:     false,
+			shouldError:      false,
 		},
 	}
 

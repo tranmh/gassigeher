@@ -6,6 +6,8 @@ import (
 	"log"
 	"strings"
 	"time"
+
+	"github.com/tranmh/gassigeher/internal/database"
 )
 
 // parseTimestampString parses a timestamp string from the database.
@@ -65,12 +67,12 @@ func parseTimestampString(s string) (time.Time, error) {
 
 // TenantActivityChecker handles checking tenant activity and flagging inactive tenants
 type TenantActivityChecker struct {
-	db              *sql.DB
+	db              *database.DB
 	inactivityDays  int // Number of days without activity to be considered inactive
 }
 
 // NewTenantActivityChecker creates a new tenant activity checker
-func NewTenantActivityChecker(db *sql.DB, inactivityDays int) *TenantActivityChecker {
+func NewTenantActivityChecker(db *database.DB, inactivityDays int) *TenantActivityChecker {
 	if inactivityDays <= 0 {
 		inactivityDays = 30 // Default: 30 days
 	}
@@ -152,9 +154,9 @@ func (c *TenantActivityChecker) CheckAndFlagInactiveTenants() error {
 		activityQuery := `
 			SELECT MAX(last_activity_at)
 			FROM users
-			WHERE tenant_id = ? AND is_active = 1
+			WHERE tenant_id = ? AND is_active = ?
 		`
-		if err := c.db.QueryRow(activityQuery, tenantID).Scan(&lastActivity); err != nil && err != sql.ErrNoRows {
+		if err := c.db.QueryRow(activityQuery, tenantID, c.db.BoolValue(true)).Scan(&lastActivity); err != nil && err != sql.ErrNoRows {
 			log.Printf("Error querying user activity for tenant %d: %v", tenantID, err)
 			continue // Skip this tenant due to database error
 		}
@@ -216,21 +218,23 @@ func (c *TenantActivityChecker) CheckAndFlagInactiveTenants() error {
 func (c *TenantActivityChecker) GetInactiveTenants() ([]TenantActivity, error) {
 	cutoffDate := time.Now().AddDate(0, 0, -c.inactivityDays)
 
+	// Use parameterized boolean for PostgreSQL compatibility
+	isActiveTrue := c.db.BoolValue(true)
 	query := `
 		SELECT
 			t.id,
 			t.slug,
 			t.name,
 			(SELECT MAX(created_at) FROM bookings WHERE tenant_id = t.id) as last_booking,
-			(SELECT MAX(last_activity_at) FROM users WHERE tenant_id = t.id AND is_active = 1) as last_login,
+			(SELECT MAX(last_activity_at) FROM users WHERE tenant_id = t.id AND is_active = ?) as last_login,
 			(SELECT COUNT(*) FROM bookings WHERE tenant_id = t.id) as total_bookings,
-			(SELECT COUNT(*) FROM users WHERE tenant_id = t.id AND is_active = 1) as active_users
+			(SELECT COUNT(*) FROM users WHERE tenant_id = t.id AND is_active = ?) as active_users
 		FROM tenants t
 		WHERE t.status = 'active'
 		ORDER BY t.name
 	`
 
-	rows, err := c.db.Query(query)
+	rows, err := c.db.Query(query, isActiveTrue, isActiveTrue)
 	if err != nil {
 		return nil, err
 	}
@@ -304,21 +308,23 @@ func (c *TenantActivityChecker) GetInactiveTenants() ([]TenantActivity, error) {
 
 // GetAllTenantActivity returns activity info for all tenants
 func (c *TenantActivityChecker) GetAllTenantActivity() ([]TenantActivity, error) {
+	// Use parameterized boolean for PostgreSQL compatibility
+	isActiveTrue := c.db.BoolValue(true)
 	query := `
 		SELECT
 			t.id,
 			t.slug,
 			t.name,
 			(SELECT MAX(created_at) FROM bookings WHERE tenant_id = t.id) as last_booking,
-			(SELECT MAX(last_activity_at) FROM users WHERE tenant_id = t.id AND is_active = 1) as last_login,
+			(SELECT MAX(last_activity_at) FROM users WHERE tenant_id = t.id AND is_active = ?) as last_login,
 			(SELECT COUNT(*) FROM bookings WHERE tenant_id = t.id) as total_bookings,
-			(SELECT COUNT(*) FROM users WHERE tenant_id = t.id AND is_active = 1) as active_users
+			(SELECT COUNT(*) FROM users WHERE tenant_id = t.id AND is_active = ?) as active_users
 		FROM tenants t
 		WHERE t.status = 'active'
 		ORDER BY t.name
 	`
 
-	rows, err := c.db.Query(query)
+	rows, err := c.db.Query(query, isActiveTrue, isActiveTrue)
 	if err != nil {
 		return nil, err
 	}

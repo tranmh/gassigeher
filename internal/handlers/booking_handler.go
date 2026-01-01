@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -20,20 +20,20 @@ import (
 
 // BookingHandler handles booking-related HTTP requests
 type BookingHandler struct {
-	db                   *sql.DB
-	cfg                  *config.Config
-	bookingRepo          *repository.BookingRepository
-	dogRepo              *repository.DogRepository
-	userRepo             *repository.UserRepository
-	userColorRepo        *repository.UserColorRepository
-	blockedDateRepo      *repository.BlockedDateRepository
-	settingsRepo         *repository.SettingsRepository
-	bookingTimeService   *services.BookingTimeService
-	emailService         *services.EmailService
+	db                 *database.DB
+	cfg                *config.Config
+	bookingRepo        *repository.BookingRepository
+	dogRepo            *repository.DogRepository
+	userRepo           *repository.UserRepository
+	userColorRepo      *repository.UserColorRepository
+	blockedDateRepo    *repository.BlockedDateRepository
+	settingsRepo       *repository.SettingsRepository
+	bookingTimeService *services.BookingTimeService
+	emailService       *services.EmailService
 }
 
 // NewBookingHandler creates a new booking handler
-func NewBookingHandler(db *sql.DB, cfg *config.Config) *BookingHandler {
+func NewBookingHandler(db *database.DB, cfg *config.Config) *BookingHandler {
 	emailService, err := services.NewEmailService(services.ConfigToEmailConfig(cfg))
 	if err != nil {
 		// Log error but don't fail - emails will fail gracefully
@@ -48,16 +48,16 @@ func NewBookingHandler(db *sql.DB, cfg *config.Config) *BookingHandler {
 	bookingTimeService := services.NewBookingTimeService(bookingTimeRepo, holidayService, settingsRepo)
 
 	return &BookingHandler{
-		db:                   db,
-		cfg:                  cfg,
-		bookingRepo:          repository.NewBookingRepository(db),
-		dogRepo:              repository.NewDogRepository(db),
-		userRepo:             repository.NewUserRepository(db),
-		userColorRepo:        repository.NewUserColorRepository(db),
-		blockedDateRepo:      repository.NewBlockedDateRepository(db),
-		settingsRepo:         settingsRepo,
-		bookingTimeService:   bookingTimeService,
-		emailService:         emailService,
+		db:                 db,
+		cfg:                cfg,
+		bookingRepo:        repository.NewBookingRepository(db),
+		dogRepo:            repository.NewDogRepository(db),
+		userRepo:           repository.NewUserRepository(db),
+		userColorRepo:      repository.NewUserColorRepository(db),
+		blockedDateRepo:    repository.NewBlockedDateRepository(db),
+		settingsRepo:       settingsRepo,
+		bookingTimeService: bookingTimeService,
+		emailService:       emailService,
 	}
 }
 

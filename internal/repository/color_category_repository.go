@@ -10,11 +10,11 @@ import (
 
 // ColorCategoryRepository handles color category database operations
 type ColorCategoryRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
 // NewColorCategoryRepository creates a new color category repository
-func NewColorCategoryRepository(db *sql.DB) *ColorCategoryRepository {
+func NewColorCategoryRepository(db DBExecutor) *ColorCategoryRepository {
 	return &ColorCategoryRepository{db: db}
 }
 
@@ -26,14 +26,9 @@ func (r *ColorCategoryRepository) Create(tenantID int, color *models.ColorCatego
 	`
 
 	now := time.Now()
-	result, err := r.db.Exec(query, tenantID, color.Name, color.HexCode, color.PatternIcon, color.SortOrder, now, now)
+	id, err := r.db.InsertReturningID(query, tenantID, color.Name, color.HexCode, color.PatternIcon, color.SortOrder, now, now)
 	if err != nil {
 		return fmt.Errorf("failed to create color category: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get color ID: %w", err)
 	}
 
 	color.ID = int(id)

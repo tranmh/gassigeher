@@ -10,11 +10,11 @@ import (
 
 // WalkReportRepository handles walk report database operations
 type WalkReportRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
 // NewWalkReportRepository creates a new walk report repository
-func NewWalkReportRepository(db *sql.DB) *WalkReportRepository {
+func NewWalkReportRepository(db DBExecutor) *WalkReportRepository {
 	return &WalkReportRepository{db: db}
 }
 
@@ -26,7 +26,7 @@ func (r *WalkReportRepository) Create(tenantID int, report *models.WalkReport) e
 	`
 
 	now := time.Now()
-	result, err := r.db.Exec(query,
+	id, err := r.db.InsertReturningID(query,
 		tenantID,
 		report.BookingID,
 		report.BehaviorRating,
@@ -38,11 +38,6 @@ func (r *WalkReportRepository) Create(tenantID int, report *models.WalkReport) e
 
 	if err != nil {
 		return fmt.Errorf("failed to create walk report: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get walk report ID: %w", err)
 	}
 
 	report.ID = int(id)
@@ -353,14 +348,9 @@ func (r *WalkReportRepository) AddPhoto(tenantID int, reportID int, photoPath, t
 	`
 
 	now := time.Now()
-	result, err := r.db.Exec(query, tenantID, reportID, photoPath, thumbnailPath, displayOrder, now)
+	id, err := r.db.InsertReturningID(query, tenantID, reportID, photoPath, thumbnailPath, displayOrder, now)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add photo: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get photo ID: %w", err)
 	}
 
 	photo := &models.WalkReportPhoto{

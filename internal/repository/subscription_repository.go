@@ -10,11 +10,11 @@ import (
 
 // SubscriptionRepository handles subscription database operations
 type SubscriptionRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
 // NewSubscriptionRepository creates a new subscription repository
-func NewSubscriptionRepository(db *sql.DB) *SubscriptionRepository {
+func NewSubscriptionRepository(db DBExecutor) *SubscriptionRepository {
 	return &SubscriptionRepository{db: db}
 }
 
@@ -23,11 +23,11 @@ func (r *SubscriptionRepository) GetAllPlans() ([]*models.PricingPlan, error) {
 	query := `
 		SELECT id, name, slug, max_dogs, price_monthly, price_yearly, is_active, created_at
 		FROM pricing_plans
-		WHERE is_active = 1
+		WHERE is_active = ?
 		ORDER BY price_monthly ASC
 	`
 
-	rows, err := r.db.Query(query)
+	rows, err := r.db.Query(query, r.db.BoolValue(true))
 	if err != nil {
 		return nil, fmt.Errorf("failed to query pricing plans: %w", err)
 	}
@@ -68,11 +68,11 @@ func (r *SubscriptionRepository) GetPlanBySlug(slug string) (*models.PricingPlan
 	query := `
 		SELECT id, name, slug, max_dogs, price_monthly, price_yearly, is_active, created_at
 		FROM pricing_plans
-		WHERE slug = ? AND is_active = 1
+		WHERE slug = ? AND is_active = ?
 	`
 
 	plan := &models.PricingPlan{}
-	err := r.db.QueryRow(query, slug).Scan(
+	err := r.db.QueryRow(query, slug, r.db.BoolValue(true)).Scan(
 		&plan.ID,
 		&plan.Name,
 		&plan.Slug,
@@ -239,7 +239,7 @@ func (r *SubscriptionRepository) CreateSubscription(sub *models.TenantSubscripti
 	`
 
 	now := time.Now()
-	result, err := r.db.Exec(
+	id, err := r.db.InsertReturningID(
 		query,
 		sub.TenantID,
 		sub.PlanID,
@@ -254,11 +254,6 @@ func (r *SubscriptionRepository) CreateSubscription(sub *models.TenantSubscripti
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create subscription: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get subscription ID: %w", err)
 	}
 
 	sub.ID = int(id)

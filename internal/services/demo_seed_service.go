@@ -2,12 +2,12 @@ package services
 
 import (
 	"crypto/rand"
-	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"log"
 	"time"
 
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
 	"golang.org/x/crypto/bcrypt"
@@ -19,6 +19,7 @@ const (
 	DemoTenantName      = "Demo Tierheim"
 	DemoAdminEmail      = "admin@demo.gassigeher.org"
 	DemoUserPassword    = "demo1234"
+	DemoAdminPassword   = "demo1234" // Same as users for easy testing
 	DefaultFederalState = "BW"
 )
 
@@ -32,19 +33,19 @@ func formatDemoResetLogMessage(_ string, nextReset time.Time) string {
 
 // DemoSeedService handles demo tenant creation and reset
 type DemoSeedService struct {
-	db              *sql.DB
-	tenantRepo      *repository.TenantRepository
-	demoStateRepo   *repository.DemoTenantRepository
-	userRepo        *repository.UserRepository
-	dogRepo         *repository.DogRepository
-	bookingRepo     *repository.BookingRepository
-	colorRepo       *repository.ColorCategoryRepository
-	userColorRepo   *repository.UserColorRepository
-	settingsRepo    *repository.SettingsRepository
+	db            *database.DB
+	tenantRepo    *repository.TenantRepository
+	demoStateRepo *repository.DemoTenantRepository
+	userRepo      *repository.UserRepository
+	dogRepo       *repository.DogRepository
+	bookingRepo   *repository.BookingRepository
+	colorRepo     *repository.ColorCategoryRepository
+	userColorRepo *repository.UserColorRepository
+	settingsRepo  *repository.SettingsRepository
 }
 
 // NewDemoSeedService creates a new demo seed service
-func NewDemoSeedService(db *sql.DB) *DemoSeedService {
+func NewDemoSeedService(db *database.DB) *DemoSeedService {
 	return &DemoSeedService{
 		db:            db,
 		tenantRepo:    repository.NewTenantRepository(db),
@@ -73,8 +74,8 @@ func (s *DemoSeedService) EnsureDemoTenant() error {
 
 	log.Println("Creating demo tenant...")
 
-	// Generate admin password
-	adminPassword := s.generateRandomPassword()
+	// Use fixed password for easy testing
+	adminPassword := DemoAdminPassword
 
 	// Create demo tenant
 	tenant = &models.Tenant{
@@ -574,12 +575,12 @@ func (s *DemoSeedService) seedDemoBookings(tenantID int, userIDs map[string]int,
 		{"green", 3, yesterday, "15:00", "completed", "Rocky macht Fortschritte! Er hat heute einen anderen Hund gesehen und ist ruhig geblieben."},
 
 		// Future scheduled walks
-		{"green", 0, tomorrow, "09:00", "scheduled", ""},       // Anna + Max
-		{"orange", 1, tomorrow, "14:00", "scheduled", ""},      // Bernd + Luna
-		{"blue", 2, tomorrow, "11:00", "scheduled", ""},        // Clara + Bello
-		{"green", 4, dayAfter, "10:00", "scheduled", ""},       // Anna + Mia
-		{"orange", 5, dayAfter, "15:00", "scheduled", ""},      // Bernd + Bruno
-		{"blue", 7, threeDaysFromNow, "09:30", "scheduled", ""}, // Clara + Thor
+		{"green", 0, tomorrow, "09:00", "scheduled", ""},         // Anna + Max
+		{"orange", 1, tomorrow, "14:00", "scheduled", ""},        // Bernd + Luna
+		{"blue", 2, tomorrow, "11:00", "scheduled", ""},          // Clara + Bello
+		{"green", 4, dayAfter, "10:00", "scheduled", ""},         // Anna + Mia
+		{"orange", 5, dayAfter, "15:00", "scheduled", ""},        // Bernd + Bruno
+		{"blue", 7, threeDaysFromNow, "09:30", "scheduled", ""},  // Clara + Thor
 		{"green", 6, threeDaysFromNow, "14:00", "scheduled", ""}, // Anna + Lotte
 		{"orange", 0, fourDaysFromNow, "10:00", "scheduled", ""}, // Bernd + Max
 	}
@@ -668,9 +669,9 @@ func (s *DemoSeedService) seedBookingTimeRules(tenantID int) error {
 // initializeDemoSettings sets up default system settings for demo tenant
 func (s *DemoSeedService) initializeDemoSettings(tenantID int) error {
 	settings := map[string]string{
-		"booking_advance_days":     "14",
+		"booking_advance_days":      "14",
 		"cancellation_notice_hours": "12",
-		"auto_deactivation_days":   "365",
+		"auto_deactivation_days":    "365",
 	}
 
 	for key, value := range settings {
@@ -701,8 +702,8 @@ func (s *DemoSeedService) ResetDemoTenant() error {
 		return fmt.Errorf("failed to delete tenant data: %w", err)
 	}
 
-	// Generate new password
-	newPassword := s.generateRandomPassword()
+	// Use fixed password for easy testing
+	newPassword := DemoAdminPassword
 
 	// Re-seed data
 	if err := s.SeedDemoData(tenant.ID, newPassword); err != nil {

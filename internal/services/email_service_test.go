@@ -90,7 +90,7 @@ func TestEmailService_AccountDeactivation(t *testing.T) {
 
 		// Email should mention reason and reactivation process
 		expectedInfo := []string{
-			"deaktiviert", // German: deactivated
+			"deaktiviert",  // German: deactivated
 			"reaktivieren", // German: reactivate
 		}
 

@@ -9,11 +9,11 @@ import (
 type BruteForceService struct {
 	failures    map[string]*FailureRecord
 	mu          sync.RWMutex
-	maxAttempts int           // Number of failures before lockout
-	lockoutBase time.Duration // Base lockout duration
-	maxLockout  time.Duration // Maximum lockout duration
-	stopChan    chan struct{} // Channel to signal cleanup goroutine to stop
-	stopOnce    sync.Once     // BUG FIX: Prevent double-close panic
+	maxAttempts int            // Number of failures before lockout
+	lockoutBase time.Duration  // Base lockout duration
+	maxLockout  time.Duration  // Maximum lockout duration
+	stopChan    chan struct{}  // Channel to signal cleanup goroutine to stop
+	stopOnce    sync.Once      // BUG FIX: Prevent double-close panic
 	wg          sync.WaitGroup // BUG FIX: Wait for goroutine to finish
 }
 

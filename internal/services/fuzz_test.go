@@ -17,9 +17,9 @@ func FuzzValidatePassword(f *testing.F) {
 	f.Add("password with spaces")
 	f.Add("password\twith\ttabs")
 	f.Add("password\nwith\nnewlines")
-	f.Add("пароль123") // Cyrillic
-	f.Add("密码123456") // Chinese
-	f.Add("🔒🔑🗝️")  // Emoji
+	f.Add("пароль123")                        // Cyrillic
+	f.Add("密码123456")                         // Chinese
+	f.Add("🔒🔑🗝️")                             // Emoji
 	f.Add("\x00\x00\x00\x00\x00\x00\x00\x00") // Null bytes
 
 	f.Fuzz(func(t *testing.T, password string) {
@@ -98,12 +98,12 @@ func FuzzValidateJWT(f *testing.F) {
 	// Seed corpus with various malformed tokens
 	f.Add("")
 	f.Add("not.a.token")
-	f.Add("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9")                 // Header only
-	f.Add("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload")          // Missing signature
+	f.Add("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9")                   // Header only
+	f.Add("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload")           // Missing signature
 	f.Add("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.signature") // Invalid base64
-	f.Add("....") // Just dots
-	f.Add(strings.Repeat("a", 10000)) // Very long
-	f.Add("eyJ0eXAiOiJKV1QiLCJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0.") // alg:none attack
+	f.Add("....")                                                   // Just dots
+	f.Add(strings.Repeat("a", 10000))                               // Very long
+	f.Add("eyJ0eXAiOiJKV1QiLCJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0.")   // alg:none attack
 	f.Add("null")
 	f.Add("{}")
 	f.Add("\x00\x00\x00")

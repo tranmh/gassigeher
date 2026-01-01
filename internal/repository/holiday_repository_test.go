@@ -1,23 +1,22 @@
 package repository
 
 import (
-	"database/sql"
 	"fmt"
 	"testing"
 	"time"
 
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/testutil"
-	_ "modernc.org/sqlite"
 )
 
 // setupTestDBForHolidays creates a test database using standard testutil
-func setupTestDBForHolidays(t *testing.T) *sql.DB {
+func setupTestDBForHolidays(t *testing.T) *database.DB {
 	return testutil.SetupTestDB(t)
 }
 
 // seedHolidays seeds the database with test holiday data
-func seedHolidays(t *testing.T, db *sql.DB) {
+func seedHolidays(t *testing.T, db *database.DB) {
 	holidays := []struct {
 		date     string
 		name     string
@@ -527,7 +526,7 @@ func TestCacheExpiration_7Days(t *testing.T) {
 // Test 7.1.1: Holiday Lookup Performance Benchmark
 // Purpose: Verify holiday check is fast with index
 func BenchmarkIsHoliday(b *testing.B) {
-	db, err := sql.Open("sqlite", ":memory:")
+	db, err := database.Initialize(":memory:")
 	if err != nil {
 		b.Fatalf("Failed to open test database: %v", err)
 	}
@@ -567,7 +566,7 @@ func BenchmarkIsHoliday(b *testing.B) {
 
 // Test 7.1.1: Holiday Lookup Performance with Large Dataset
 func BenchmarkIsHoliday_LargeDataset(b *testing.B) {
-	db, err := sql.Open("sqlite", ":memory:")
+	db, err := database.Initialize(":memory:")
 	if err != nil {
 		b.Fatalf("Failed to open test database: %v", err)
 	}
@@ -607,7 +606,7 @@ func BenchmarkIsHoliday_LargeDataset(b *testing.B) {
 
 // Test 7.1.1: Year Holiday List Performance
 func BenchmarkGetHolidaysByYear(b *testing.B) {
-	db, err := sql.Open("sqlite", ":memory:")
+	db, err := database.Initialize(":memory:")
 	if err != nil {
 		b.Fatalf("Failed to open test database: %v", err)
 	}

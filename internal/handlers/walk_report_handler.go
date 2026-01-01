@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -21,17 +21,17 @@ import (
 
 // WalkReportHandler handles walk report-related HTTP requests
 type WalkReportHandler struct {
-	db              *sql.DB
-	cfg             *config.Config
-	walkReportRepo  *repository.WalkReportRepository
-	bookingRepo     *repository.BookingRepository
-	dogRepo         *repository.DogRepository
-	imageService    *services.ImageService
-	s3Service       *services.S3Service // SaaS: For S3 storage
+	db             *database.DB
+	cfg            *config.Config
+	walkReportRepo *repository.WalkReportRepository
+	bookingRepo    *repository.BookingRepository
+	dogRepo        *repository.DogRepository
+	imageService   *services.ImageService
+	s3Service      *services.S3Service // SaaS: For S3 storage
 }
 
 // NewWalkReportHandler creates a new walk report handler
-func NewWalkReportHandler(db *sql.DB, cfg *config.Config) *WalkReportHandler {
+func NewWalkReportHandler(db *database.DB, cfg *config.Config) *WalkReportHandler {
 	// Initialize S3 service if configured
 	var s3Service *services.S3Service
 	if cfg.UseS3 {
@@ -52,13 +52,13 @@ func NewWalkReportHandler(db *sql.DB, cfg *config.Config) *WalkReportHandler {
 	}
 
 	return &WalkReportHandler{
-		db:              db,
-		cfg:             cfg,
-		walkReportRepo:  repository.NewWalkReportRepository(db),
-		bookingRepo:     repository.NewBookingRepository(db),
-		dogRepo:         repository.NewDogRepository(db),
-		imageService:    services.NewImageService(cfg.UploadDir),
-		s3Service:       s3Service,
+		db:             db,
+		cfg:            cfg,
+		walkReportRepo: repository.NewWalkReportRepository(db),
+		bookingRepo:    repository.NewBookingRepository(db),
+		dogRepo:        repository.NewDogRepository(db),
+		imageService:   services.NewImageService(cfg.UploadDir),
+		s3Service:      s3Service,
 	}
 }
 

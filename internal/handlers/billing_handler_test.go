@@ -590,7 +590,7 @@ func TestBillingHandler_TestUpgrade_EmptyPlanSlug(t *testing.T) {
 			var response map[string]interface{}
 			json.Unmarshal(w.Body.Bytes(), &response)
 			if response["plan"] == "Pro" {
-				t.Errorf("BUG DETECTED: Empty plan_slug silently upgraded to Pro. " +
+				t.Errorf("BUG DETECTED: Empty plan_slug silently upgraded to Pro. "+
 					"Should return 400 Bad Request instead. Response: %s", w.Body.String())
 			}
 		}

@@ -1,17 +1,16 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
 	"time"
 
 	"github.com/joho/godotenv"
-	_ "modernc.org/sqlite"
 	"github.com/tranmh/gassigeher/internal/config"
 	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/services"
+	_ "modernc.org/sqlite"
 )
 
 func main() {
@@ -94,12 +93,12 @@ func testScenario1() {
 	defer db.Close()
 
 	// Run migrations
-	if err := database.RunMigrationsWithDialect(db, dialect); err != nil {
+	if err := database.RunMigrationsWithDialect(db.SqlDB(), dialect); err != nil {
 		log.Fatalf("❌ Failed to run migrations: %v", err)
 	}
 
 	// Run seed (should create Super Admin and credentials file)
-	if err := database.SeedDatabase(db, cfg.SuperAdminEmail); err != nil {
+	if err := database.SeedDatabase(db.SqlDB(), cfg.SuperAdminEmail, dialect.Name()); err != nil {
 		log.Fatalf("❌ Failed to seed database: %v", err)
 	}
 
@@ -181,7 +180,7 @@ func testScenario3() {
 	time.Sleep(2 * time.Second)
 }
 
-func checkSuperAdminExists(db *sql.DB) {
+func checkSuperAdminExists(db *database.DB) {
 	var exists bool
 	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = 1 AND is_super_admin = 1)").Scan(&exists)
 	if err != nil {

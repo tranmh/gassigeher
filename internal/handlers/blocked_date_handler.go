@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -17,7 +17,7 @@ import (
 
 // BlockedDateHandler handles blocked date-related HTTP requests
 type BlockedDateHandler struct {
-	db              *sql.DB
+	db              *database.DB
 	cfg             *config.Config
 	blockedDateRepo *repository.BlockedDateRepository
 	bookingRepo     *repository.BookingRepository
@@ -27,7 +27,7 @@ type BlockedDateHandler struct {
 }
 
 // NewBlockedDateHandler creates a new blocked date handler
-func NewBlockedDateHandler(db *sql.DB, cfg *config.Config) *BlockedDateHandler {
+func NewBlockedDateHandler(db *database.DB, cfg *config.Config) *BlockedDateHandler {
 	// Initialize email service (fail gracefully if email not configured)
 	emailService, err := services.NewEmailService(services.ConfigToEmailConfig(cfg))
 	if err != nil {

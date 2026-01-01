@@ -168,7 +168,7 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("loads values from environment", func(t *testing.T) {
-		os.Setenv("DB_TYPE", "mysql")
+		os.Setenv("DB_TYPE", "postgres")
 		os.Setenv("PORT", "3000")
 		os.Setenv("JWT_EXPIRATION_HOURS", "48")
 		os.Setenv("SAAS_MODE", "true")
@@ -183,8 +183,8 @@ func TestLoad(t *testing.T) {
 
 		cfg := Load()
 
-		if cfg.DBType != "mysql" {
-			t.Errorf("Expected DBType 'mysql', got '%s'", cfg.DBType)
+		if cfg.DBType != "postgres" {
+			t.Errorf("Expected DBType 'postgres', got '%s'", cfg.DBType)
 		}
 		if cfg.Port != "3000" {
 			t.Errorf("Expected Port '3000', got '%s'", cfg.Port)
@@ -222,10 +222,10 @@ func TestGetDBConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("builds MySQL config correctly", func(t *testing.T) {
-		os.Setenv("DB_TYPE", "mysql")
+	t.Run("builds PostgreSQL config correctly", func(t *testing.T) {
+		os.Setenv("DB_TYPE", "postgres")
 		os.Setenv("DB_HOST", "localhost")
-		os.Setenv("DB_PORT", "3306")
+		os.Setenv("DB_PORT", "5432")
 		os.Setenv("DB_NAME", "testdb")
 		os.Setenv("DB_USER", "testuser")
 		os.Setenv("DB_PASSWORD", "testpass")
@@ -245,14 +245,14 @@ func TestGetDBConfig(t *testing.T) {
 		cfg := Load()
 		dbConfig := cfg.GetDBConfig()
 
-		if dbConfig.Type != "mysql" {
-			t.Errorf("Expected Type 'mysql', got '%s'", dbConfig.Type)
+		if dbConfig.Type != "postgres" {
+			t.Errorf("Expected Type 'postgres', got '%s'", dbConfig.Type)
 		}
 		if dbConfig.Host != "localhost" {
 			t.Errorf("Expected Host 'localhost', got '%s'", dbConfig.Host)
 		}
-		if dbConfig.Port != 3306 {
-			t.Errorf("Expected Port 3306, got %d", dbConfig.Port)
+		if dbConfig.Port != 5432 {
+			t.Errorf("Expected Port 5432, got %d", dbConfig.Port)
 		}
 		if dbConfig.Database != "testdb" {
 			t.Errorf("Expected Database 'testdb', got '%s'", dbConfig.Database)
@@ -291,7 +291,7 @@ func TestGetDBConfig(t *testing.T) {
 	})
 
 	t.Run("uses connection string when provided", func(t *testing.T) {
-		connStr := "mysql://user:pass@localhost:3306/testdb"
+		connStr := "postgres://user:pass@localhost:5432/testdb"
 		os.Setenv("DB_CONNECTION_STRING", connStr)
 		defer os.Unsetenv("DB_CONNECTION_STRING")
 
@@ -616,13 +616,13 @@ func TestValidate(t *testing.T) {
 		}
 	})
 
-	t.Run("negative DB port for MySQL", func(t *testing.T) {
+	t.Run("negative DB port for PostgreSQL", func(t *testing.T) {
 		cfg := &Config{
 			JWTSecret:          "change-this-in-production-INSECURE",
 			JWTExpirationHours: 24,
 			MaxUploadSizeMB:    5,
 			Port:               "8080",
-			DBType:             "mysql",
+			DBType:             "postgres",
 			DBPort:             -1,
 			EmailProvider:      "gmail",
 		}
@@ -751,7 +751,6 @@ func TestGetDefaultDBPort(t *testing.T) {
 		dbType string
 		want   int
 	}{
-		{"MySQL default port", "mysql", 3306},
 		{"PostgreSQL default port", "postgres", 5432},
 		{"SQLite no port", "sqlite", 0},
 		{"Unknown type no port", "unknown", 0},
@@ -776,8 +775,6 @@ func TestGetEffectiveDBPort(t *testing.T) {
 		dbPort int
 		want   int
 	}{
-		{"explicit MySQL port", "mysql", 3307, 3307},
-		{"default MySQL port", "mysql", 0, 3306},
 		{"explicit PostgreSQL port", "postgres", 5433, 5433},
 		{"default PostgreSQL port", "postgres", 0, 5432},
 		{"SQLite no port", "sqlite", 0, 0},

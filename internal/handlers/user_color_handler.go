@@ -1,20 +1,20 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/repository"
 )
 
 // UserColorHandler handles user color-related HTTP requests (admin)
 type UserColorHandler struct {
-	db            *sql.DB
+	db            *database.DB
 	cfg           *config.Config
 	userColorRepo *repository.UserColorRepository
 	colorRepo     *repository.ColorCategoryRepository
@@ -22,7 +22,7 @@ type UserColorHandler struct {
 }
 
 // NewUserColorHandler creates a new user color handler
-func NewUserColorHandler(db *sql.DB, cfg *config.Config) *UserColorHandler {
+func NewUserColorHandler(db *database.DB, cfg *config.Config) *UserColorHandler {
 	return &UserColorHandler{
 		db:            db,
 		cfg:           cfg,

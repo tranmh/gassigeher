@@ -2,7 +2,6 @@ package services
 
 import (
 	"crypto/rand"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -12,18 +11,19 @@ import (
 	"time"
 
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"golang.org/x/crypto/bcrypt"
 )
 
 // SuperAdminService handles Super Admin password file management
 type SuperAdminService struct {
-	db  *sql.DB
+	db  *database.DB
 	cfg *config.Config
 }
 
 // NewSuperAdminService creates a new SuperAdminService
 // DONE
-func NewSuperAdminService(db *sql.DB, cfg *config.Config) *SuperAdminService {
+func NewSuperAdminService(db *database.DB, cfg *config.Config) *SuperAdminService {
 	return &SuperAdminService{
 		db:  db,
 		cfg: cfg,
@@ -40,7 +40,7 @@ func (s *SuperAdminService) CheckAndUpdatePassword() error {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		// Credentials file doesn't exist - check if Super Admin exists in database
 		var superAdminExists bool
-		err := s.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = 1 AND is_super_admin = 1)").Scan(&superAdminExists)
+		err := s.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = 1 AND is_super_admin = ?)", s.db.BoolValue(true)).Scan(&superAdminExists)
 		if err != nil {
 			return fmt.Errorf("failed to check if Super Admin exists: %w", err)
 		}

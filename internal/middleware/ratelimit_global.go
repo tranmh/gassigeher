@@ -12,7 +12,7 @@ import (
 type GlobalRateLimiter struct {
 	limiters  map[string]*rateLimiterEntry
 	mu        sync.RWMutex
-	rps       rate.Limit    // requests per second
+	rps       rate.Limit // requests per second
 	burst     int
 	stopChan  chan struct{} // Channel to signal cleanup goroutine to stop
 	closeOnce sync.Once     // BUG FIX: Prevent double-close panic

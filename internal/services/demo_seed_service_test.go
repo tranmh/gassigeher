@@ -223,17 +223,17 @@ func TestDemoSeedService_ResetDemoTenant(t *testing.T) {
 	var originalPassword string
 	db.QueryRow("SELECT admin_password FROM demo_tenant_state WHERE tenant_id = ?", tenantID).Scan(&originalPassword)
 
-	t.Run("reset generates new password", func(t *testing.T) {
+	t.Run("reset uses fixed password for testing", func(t *testing.T) {
 		err := service.ResetDemoTenant()
 		if err != nil {
 			t.Fatalf("ResetDemoTenant() failed: %v", err)
 		}
 
-		// Check new password is different
+		// Check password is the fixed demo password (for easy testing)
 		var newPassword string
 		db.QueryRow("SELECT admin_password FROM demo_tenant_state WHERE tenant_id = ?", tenantID).Scan(&newPassword)
-		if newPassword == originalPassword {
-			t.Error("Expected new password after reset")
+		if newPassword != DemoAdminPassword {
+			t.Errorf("Expected password to be %s, got %s", DemoAdminPassword, newPassword)
 		}
 	})
 

@@ -1,23 +1,23 @@
 package services
 
 import (
-	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/models"
 )
 
 // AuditService handles business event audit logging
 type AuditService struct {
-	db *sql.DB
+	db *database.DB
 }
 
 // NewAuditService creates a new audit service
-func NewAuditService(db *sql.DB) *AuditService {
+func NewAuditService(db *database.DB) *AuditService {
 	return &AuditService{db: db}
 }
 

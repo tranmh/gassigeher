@@ -10,11 +10,11 @@ import (
 
 // TenantRepository handles tenant database operations
 type TenantRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
 // NewTenantRepository creates a new tenant repository
-func NewTenantRepository(db *sql.DB) *TenantRepository {
+func NewTenantRepository(db DBExecutor) *TenantRepository {
 	return &TenantRepository{db: db}
 }
 
@@ -27,7 +27,7 @@ func (r *TenantRepository) Create(tenant *models.Tenant) error {
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	result, err := r.db.Exec(
+	id, err := r.db.InsertReturningID(
 		query,
 		tenant.Slug,
 		tenant.Name,
@@ -38,15 +38,10 @@ func (r *TenantRepository) Create(tenant *models.Tenant) error {
 		tenant.City,
 		tenant.PostalCode,
 		tenant.FederalState,
-		tenant.IsDemo,
+		r.db.BoolValue(tenant.IsDemo),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create tenant: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get tenant ID: %w", err)
 	}
 
 	tenant.ID = int(id)
@@ -64,6 +59,30 @@ func (r *TenantRepository) CreateTx(tx *sql.Tx, tenant *models.Tenant) (int, err
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
+	// PostgreSQL requires RETURNING clause instead of LastInsertId
+	if r.db.GetDialectName() == "postgres" {
+		query = query + " RETURNING id"
+		var id int64
+		err := tx.QueryRow(
+			query,
+			tenant.Slug,
+			tenant.Name,
+			tenant.Status,
+			tenant.ContactEmail,
+			tenant.ContactPhone,
+			tenant.Address,
+			tenant.City,
+			tenant.PostalCode,
+			tenant.FederalState,
+			r.db.BoolValue(tenant.IsDemo),
+		).Scan(&id)
+		if err != nil {
+			return 0, fmt.Errorf("failed to create tenant: %w", err)
+		}
+		return int(id), nil
+	}
+
+	// SQLite/MySQL use LastInsertId
 	result, err := tx.Exec(
 		query,
 		tenant.Slug,
@@ -75,7 +94,7 @@ func (r *TenantRepository) CreateTx(tx *sql.Tx, tenant *models.Tenant) (int, err
 		tenant.City,
 		tenant.PostalCode,
 		tenant.FederalState,
-		tenant.IsDemo,
+		r.db.BoolValue(tenant.IsDemo),
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create tenant: %w", err)
@@ -342,14 +361,14 @@ func (r *TenantRepository) SlugExists(slug string) (bool, error) {
 func (r *TenantRepository) GetStats(tenantID int) (*models.TenantStats, error) {
 	stats := &models.TenantStats{TenantID: tenantID}
 
-	// Total users
-	err := r.db.QueryRow(`SELECT COUNT(*) FROM users WHERE tenant_id = ? AND is_deleted = 0`, tenantID).Scan(&stats.TotalUsers)
+	// Total users (is_deleted = false)
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM users WHERE tenant_id = ? AND is_deleted = ?`, tenantID, r.db.BoolValue(false)).Scan(&stats.TotalUsers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count users: %w", err)
 	}
 
-	// Active users
-	err = r.db.QueryRow(`SELECT COUNT(*) FROM users WHERE tenant_id = ? AND is_deleted = 0 AND is_active = 1`, tenantID).Scan(&stats.ActiveUsers)
+	// Active users (is_deleted = false AND is_active = true)
+	err = r.db.QueryRow(`SELECT COUNT(*) FROM users WHERE tenant_id = ? AND is_deleted = ? AND is_active = ?`, tenantID, r.db.BoolValue(false), r.db.BoolValue(true)).Scan(&stats.ActiveUsers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count active users: %w", err)
 	}
@@ -360,8 +379,8 @@ func (r *TenantRepository) GetStats(tenantID int) (*models.TenantStats, error) {
 		return nil, fmt.Errorf("failed to count dogs: %w", err)
 	}
 
-	// Available dogs
-	err = r.db.QueryRow(`SELECT COUNT(*) FROM dogs WHERE tenant_id = ? AND is_available = 1`, tenantID).Scan(&stats.AvailableDogs)
+	// Available dogs (is_available = true)
+	err = r.db.QueryRow(`SELECT COUNT(*) FROM dogs WHERE tenant_id = ? AND is_available = ?`, tenantID, r.db.BoolValue(true)).Scan(&stats.AvailableDogs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count available dogs: %w", err)
 	}
@@ -398,7 +417,7 @@ func (r *TenantRepository) CreateSettings(settings *models.TenantSettings) error
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	result, err := r.db.Exec(
+	id, err := r.db.InsertReturningID(
 		query,
 		settings.TenantID,
 		settings.ThemePreset,
@@ -416,11 +435,6 @@ func (r *TenantRepository) CreateSettings(settings *models.TenantSettings) error
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create tenant settings: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get settings ID: %w", err)
 	}
 
 	settings.ID = int(id)
@@ -593,19 +607,17 @@ func (r *TenantRepository) IsDemoTenant(tenantID int) (bool, error) {
 
 // GetDemoTenant returns the demo tenant if it exists
 func (r *TenantRepository) GetDemoTenant() (*models.Tenant, error) {
-	// Use is_demo = 1 which works across SQLite, MySQL, and PostgreSQL
-	// (PostgreSQL treats 1 as truthy for boolean columns)
 	query := `
 		SELECT id, slug, name, status, contact_email, contact_phone,
 		       address, city, postal_code, federal_state, is_demo,
 		       created_at, updated_at, suspended_at, suspended_reason, deleted_at
 		FROM tenants
-		WHERE is_demo = 1
+		WHERE is_demo = ?
 		LIMIT 1
 	`
 
 	tenant := &models.Tenant{}
-	err := r.db.QueryRow(query).Scan(
+	err := r.db.QueryRow(query, r.db.BoolValue(true)).Scan(
 		&tenant.ID,
 		&tenant.Slug,
 		&tenant.Name,

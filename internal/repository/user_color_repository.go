@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"database/sql"
 	"fmt"
 	"time"
 
@@ -10,11 +9,11 @@ import (
 
 // UserColorRepository handles user-color relationship database operations
 type UserColorRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
 // NewUserColorRepository creates a new user color repository
-func NewUserColorRepository(db *sql.DB) *UserColorRepository {
+func NewUserColorRepository(db DBExecutor) *UserColorRepository {
 	return &UserColorRepository{db: db}
 }
 

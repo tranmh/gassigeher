@@ -4,21 +4,21 @@ import (
 	"context"
 	"database/sql"
 	"os"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	_ "modernc.org/sqlite"
 	"github.com/tranmh/gassigeher/internal/database"
 )
 
-// Shared database connection for MySQL/PostgreSQL tests
+// Shared database connection for PostgreSQL tests
 // This avoids recreating the schema for each test
 var (
-	sharedDB       *sql.DB
+	sharedDB       *database.DB
+	sharedRawDB    *sql.DB  // raw sql.DB for operations that need it
 	sharedDialect  database.Dialect
 	sharedDBType   string
 	sharedDBMu     sync.Mutex
@@ -35,79 +35,44 @@ const (
 )
 
 // SetupTestDB creates a test database with auto-detection
-// It checks for DB_TEST_MYSQL and DB_TEST_POSTGRES environment variables
+// It checks for DB_TEST_POSTGRES environment variable
 // and uses the corresponding database if available. Falls back to SQLite.
 // This enables running the same tests against all databases by setting env vars.
 //
-// For MySQL/PostgreSQL, this uses a shared connection with table truncation
+// For PostgreSQL, this uses a shared connection with table truncation
 // instead of dropping and recreating tables for each test (10x+ faster).
-func SetupTestDB(t *testing.T) *sql.DB {
-	// Use the fast version that reuses connections for MySQL/PostgreSQL
+func SetupTestDB(t *testing.T) *database.DB {
+	// Use the fast version that reuses connections for PostgreSQL
 	return SetupTestDBFast(t)
 }
 
 // SetupTestDBWithType creates a test database of the specified type
-// Supports: sqlite (in-memory), mysql, postgres
-// For MySQL/PostgreSQL, requires test database to be available (via Docker or local install)
-func SetupTestDBWithType(t *testing.T, dbType string) *sql.DB {
-	var db *sql.DB
+// Supports: sqlite (in-memory), postgres
+// For PostgreSQL, requires test database to be available (via Docker or local install)
+func SetupTestDBWithType(t *testing.T, dbType string) *database.DB {
+	var rawDB *sql.DB
 	var dialect database.Dialect
 	var err error
+	var driverName string
 
 	switch dbType {
 	case "sqlite", "":
 		// Use in-memory SQLite for fast testing
-		db, err = sql.Open("sqlite", ":memory:")
+		rawDB, err = sql.Open("sqlite", ":memory:")
 		if err != nil {
 			t.Fatalf("Failed to open SQLite test database: %v", err)
 		}
 		dialect = database.NewSQLiteDialect()
+		driverName = "sqlite"
 
 		// Set max connections to 1 to avoid issues with in-memory databases
 		// (each connection would get its own database otherwise)
-		db.SetMaxOpenConns(1)
+		rawDB.SetMaxOpenConns(1)
 
 		// Apply SQLite settings (PRAGMA foreign_keys, etc.)
-		if err := dialect.ApplySettings(db); err != nil {
+		if err := dialect.ApplySettings(rawDB); err != nil {
 			t.Fatalf("Failed to apply SQLite settings: %v", err)
 		}
-
-	case "mysql":
-		// Use test MySQL database (requires DB_TEST_MYSQL env var)
-		dsn := os.Getenv("DB_TEST_MYSQL")
-		if dsn == "" {
-			t.Skip("MySQL test database not configured (set DB_TEST_MYSQL env var)")
-			return nil
-		}
-
-		// Ensure multiStatements=true is enabled for running migrations with multiple statements
-		if !strings.Contains(dsn, "multiStatements=true") {
-			if strings.Contains(dsn, "?") {
-				dsn = dsn + "&multiStatements=true"
-			} else {
-				dsn = dsn + "?multiStatements=true"
-			}
-		}
-
-		db, err = sql.Open("mysql", dsn)
-		if err != nil {
-			t.Fatalf("Failed to open MySQL test database: %v", err)
-		}
-		dialect = database.NewMySQLDialect()
-
-		// Test connection
-		if err := db.Ping(); err != nil {
-			t.Skipf("MySQL test database not available: %v", err)
-			return nil
-		}
-
-		// Apply MySQL settings
-		if err := dialect.ApplySettings(db); err != nil {
-			t.Fatalf("Failed to apply MySQL settings: %v", err)
-		}
-
-		// Clean test database before use
-		cleanMySQLTestDB(t, db)
 
 	case "postgres":
 		// Use test PostgreSQL database (requires DB_TEST_POSTGRES env var)
@@ -117,32 +82,34 @@ func SetupTestDBWithType(t *testing.T, dbType string) *sql.DB {
 			return nil
 		}
 
-		db, err = sql.Open("postgres", dsn)
+		rawDB, err = sql.Open("postgres", dsn)
 		if err != nil {
 			t.Fatalf("Failed to open PostgreSQL test database: %v", err)
 		}
 		dialect = database.NewPostgreSQLDialect()
+		driverName = "postgres"
 
 		// Test connection
-		if err := db.Ping(); err != nil {
+		if err := rawDB.Ping(); err != nil {
 			t.Skipf("PostgreSQL test database not available: %v", err)
 			return nil
 		}
 
 		// Apply PostgreSQL settings
-		if err := dialect.ApplySettings(db); err != nil {
+		if err := dialect.ApplySettings(rawDB); err != nil {
 			t.Fatalf("Failed to apply PostgreSQL settings: %v", err)
 		}
 
 		// Clean test database before use
-		cleanPostgreSQLTestDB(t, db)
+		cleanPostgreSQLTestDBRaw(t, rawDB)
 
 	default:
 		t.Fatalf("Unsupported database type for testing: %s", dbType)
+		return nil
 	}
 
 	// Run migrations with dialect
-	err = database.RunMigrationsWithDialect(db, dialect)
+	err = database.RunMigrationsWithDialect(rawDB, dialect)
 	if err != nil {
 		t.Fatalf("Failed to run migrations on %s: %v", dbType, err)
 	}
@@ -152,13 +119,13 @@ func SetupTestDBWithType(t *testing.T, dbType string) *sql.DB {
 
 	// Default tenant (id=0) is already created by schema 001_schema.go
 	// Just create subscription if it doesn't exist
-	_, _ = db.Exec(`
+	_, _ = rawDB.Exec(`
 		INSERT OR IGNORE INTO tenant_subscriptions (tenant_id, plan_id, status, created_at, updated_at)
 		VALUES (0, 1, 'active', ?, ?)
 	`, now, now)
 
 	// Create tenant 1 for cross-tenant security tests (many tests need this)
-	_, _ = db.Exec(`
+	_, _ = rawDB.Exec(`
 		INSERT OR IGNORE INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
 		VALUES (1, 'tenant-1', 'Tenant 1', 'active', 'tenant1@example.com', ?, ?)
 	`, now, now)
@@ -167,7 +134,7 @@ func SetupTestDBWithType(t *testing.T, dbType string) *sql.DB {
 	// No need to insert them here
 
 	// Insert system settings for tenant 0 (default)
-	_, _ = db.Exec(`INSERT INTO system_settings (tenant_id, key, value, updated_at) VALUES
+	_, _ = rawDB.Exec(`INSERT INTO system_settings (tenant_id, key, value, updated_at) VALUES
 		(0, 'booking_advance_days', '14', ?),
 		(0, 'cancellation_notice_hours', '12', ?),
 		(0, 'auto_deactivation_days', '365', ?),
@@ -185,7 +152,7 @@ func SetupTestDBWithType(t *testing.T, dbType string) *sql.DB {
 
 	// Insert booking time rules for tenant 0 (default)
 	// Weekday rules with blocked periods (German names for error messages)
-	_, _ = db.Exec(`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked, created_at, updated_at) VALUES
+	_, _ = rawDB.Exec(`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked, created_at, updated_at) VALUES
 		(0, 'weekday', 'Vormittag', '08:30', '12:00', 0, ?, ?),
 		(0, 'weekday', 'Mittagspause', '12:00', '14:00', 1, ?, ?),
 		(0, 'weekday', 'Nachmittag', '14:00', '17:00', 0, ?, ?),
@@ -197,12 +164,16 @@ func SetupTestDBWithType(t *testing.T, dbType string) *sql.DB {
 		(0, 'holiday', 'Nachmittag', '14:00', '16:00', 0, ?, ?)
 	`, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now)
 
+	// Wrap in database.DB for cross-database support
+	sqlxDB := sqlx.NewDb(rawDB, driverName)
+	wrappedDB := database.WrapSqlxDB(sqlxDB, dialect)
+
 	// Cleanup after test
 	t.Cleanup(func() {
-		db.Close()
+		wrappedDB.Close()
 	})
 
-	return db
+	return wrappedDB
 }
 
 // allTables lists all tables in the correct order for deletion (children first, then parents)
@@ -235,22 +206,16 @@ var allTables = []string{
 	"schema_migrations",
 }
 
-// cleanMySQLTestDB drops all tables in the test database
-func cleanMySQLTestDB(t *testing.T, db *sql.DB) {
-	// Disable foreign key checks temporarily
-	_, _ = db.Exec("SET FOREIGN_KEY_CHECKS = 0")
-
-	// Drop all tables
+// cleanPostgreSQLTestDB drops all tables in the test database
+func cleanPostgreSQLTestDB(t *testing.T, db *database.DB) {
+	// Drop all tables with CASCADE to handle foreign keys
 	for _, table := range allTables {
-		_, _ = db.Exec("DROP TABLE IF EXISTS " + table)
+		_, _ = db.Exec("DROP TABLE IF EXISTS " + table + " CASCADE")
 	}
-
-	// Re-enable foreign key checks
-	_, _ = db.Exec("SET FOREIGN_KEY_CHECKS = 1")
 }
 
-// cleanPostgreSQLTestDB drops all tables in the test database
-func cleanPostgreSQLTestDB(t *testing.T, db *sql.DB) {
+// cleanPostgreSQLTestDBRaw drops all tables in the test database using raw *sql.DB
+func cleanPostgreSQLTestDBRaw(t *testing.T, db *sql.DB) {
 	// Drop all tables with CASCADE to handle foreign keys
 	for _, table := range allTables {
 		_, _ = db.Exec("DROP TABLE IF EXISTS " + table + " CASCADE")
@@ -281,18 +246,16 @@ var dataTables = []string{
 	"tenants",
 }
 
-// SetupTestDBFast returns a test database using a shared connection for MySQL/PostgreSQL
+// SetupTestDBFast returns a test database using a shared connection for PostgreSQL
 // This is MUCH faster than SetupTestDB because it:
 // 1. Reuses the database connection across tests
 // 2. Truncates tables instead of dropping and recreating them
 // 3. Only runs migrations once per test run
 // For SQLite, it still creates a fresh in-memory database (already fast)
-func SetupTestDBFast(t *testing.T) *sql.DB {
+func SetupTestDBFast(t *testing.T) *database.DB {
 	// Determine database type
 	dbType := "sqlite"
-	if os.Getenv("DB_TEST_MYSQL") != "" {
-		dbType = "mysql"
-	} else if os.Getenv("DB_TEST_POSTGRES") != "" {
+	if os.Getenv("DB_TEST_POSTGRES") != "" {
 		dbType = "postgres"
 	}
 
@@ -301,20 +264,20 @@ func SetupTestDBFast(t *testing.T) *sql.DB {
 		return SetupTestDBWithType(t, "sqlite")
 	}
 
-	// MySQL/PostgreSQL: use shared connection with truncation
+	// PostgreSQL: use shared connection with truncation
 	sharedDBMu.Lock()
 	defer sharedDBMu.Unlock()
 
 	// Initialize shared connection if needed
 	if !sharedDBInited || sharedDBType != dbType {
-		if sharedDB != nil {
-			sharedDB.Close()
+		if sharedRawDB != nil {
+			sharedRawDB.Close()
 		}
 		initSharedDB(t, dbType)
 	}
 
 	// Truncate all data tables and reset to clean state
-	truncateAndResetData(t, sharedDB, sharedDialect)
+	truncateAndResetData(t, sharedRawDB, sharedDialect)
 
 	// Don't close the shared connection in cleanup - it's reused
 	return sharedDB
@@ -323,51 +286,38 @@ func SetupTestDBFast(t *testing.T) *sql.DB {
 // initSharedDB initializes the shared database connection
 func initSharedDB(t *testing.T, dbType string) {
 	var err error
+	var driverName string
 
 	switch dbType {
-	case "mysql":
-		dsn := os.Getenv("DB_TEST_MYSQL")
-		if !strings.Contains(dsn, "multiStatements=true") {
-			if strings.Contains(dsn, "?") {
-				dsn = dsn + "&multiStatements=true"
-			} else {
-				dsn = dsn + "?multiStatements=true"
-			}
-		}
-		sharedDB, err = sql.Open("mysql", dsn)
-		if err != nil {
-			t.Fatalf("Failed to open MySQL: %v", err)
-		}
-		sharedDialect = database.NewMySQLDialect()
-
 	case "postgres":
 		dsn := os.Getenv("DB_TEST_POSTGRES")
-		sharedDB, err = sql.Open("postgres", dsn)
+		sharedRawDB, err = sql.Open("postgres", dsn)
 		if err != nil {
 			t.Fatalf("Failed to open PostgreSQL: %v", err)
 		}
 		sharedDialect = database.NewPostgreSQLDialect()
+		driverName = "postgres"
 	}
 
-	if err := sharedDB.Ping(); err != nil {
+	if err := sharedRawDB.Ping(); err != nil {
 		t.Skipf("Database not available: %v", err)
 	}
 
-	if err := sharedDialect.ApplySettings(sharedDB); err != nil {
+	if err := sharedDialect.ApplySettings(sharedRawDB); err != nil {
 		t.Fatalf("Failed to apply settings: %v", err)
 	}
 
 	// Drop all tables first to ensure clean state
-	if dbType == "mysql" {
-		cleanMySQLTestDB(t, sharedDB)
-	} else {
-		cleanPostgreSQLTestDB(t, sharedDB)
-	}
+	cleanPostgreSQLTestDBRaw(t, sharedRawDB)
 
 	// Run migrations once
-	if err := database.RunMigrationsWithDialect(sharedDB, sharedDialect); err != nil {
+	if err := database.RunMigrationsWithDialect(sharedRawDB, sharedDialect); err != nil {
 		t.Fatalf("Failed to run migrations: %v", err)
 	}
+
+	// Wrap in database.DB for cross-database support
+	sqlxDB := sqlx.NewDb(sharedRawDB, driverName)
+	sharedDB = database.WrapSqlxDB(sqlxDB, sharedDialect)
 
 	sharedDBType = dbType
 	sharedDBInited = true
@@ -377,31 +327,16 @@ func initSharedDB(t *testing.T, dbType string) {
 func truncateAndResetData(t *testing.T, db *sql.DB, dialect database.Dialect) {
 	now := time.Now().Format("2006-01-02 15:04:05")
 
-	// Disable FK checks for truncation
-	switch dialect.Name() {
-	case "mysql":
-		db.Exec("SET FOREIGN_KEY_CHECKS = 0")
-	case "postgres":
-		db.Exec("SET session_replication_role = 'replica'")
-	}
+	// Disable FK checks for truncation (PostgreSQL only)
+	db.Exec("SET session_replication_role = 'replica'")
 
 	// Truncate data tables (but not schema_migrations or pricing_plans)
 	for _, table := range dataTables {
-		switch dialect.Name() {
-		case "mysql":
-			db.Exec("TRUNCATE TABLE " + table)
-		case "postgres":
-			db.Exec("TRUNCATE TABLE " + table + " CASCADE")
-		}
+		db.Exec("TRUNCATE TABLE " + table + " CASCADE")
 	}
 
 	// Re-enable FK checks
-	switch dialect.Name() {
-	case "mysql":
-		db.Exec("SET FOREIGN_KEY_CHECKS = 1")
-	case "postgres":
-		db.Exec("SET session_replication_role = 'origin'")
-	}
+	db.Exec("SET session_replication_role = 'origin'")
 
 	// Insert base test data
 	// 1. Test tenant
@@ -459,7 +394,7 @@ func truncateAndResetData(t *testing.T, db *sql.DB, dialect database.Dialect) {
 // DONE: SeedTestUser creates a test user and returns the ID
 // Name is split: first word = first_name, rest = last_name
 // Also assigns colors based on level parameter for the color system
-func SeedTestUser(t *testing.T, db *sql.DB, email, name, level string) int {
+func SeedTestUser(t *testing.T, db *database.DB, email, name, level string) int {
 	now := time.Now()
 
 	// Split name into first_name and last_name
@@ -511,7 +446,7 @@ func SeedTestUser(t *testing.T, db *sql.DB, email, name, level string) int {
 
 // SeedTestUserWithoutColors creates a test user without assigning any colors
 // Use this for tests that specifically need to test users with no color assignments
-func SeedTestUserWithoutColors(t *testing.T, db *sql.DB, email, name, level string) int {
+func SeedTestUserWithoutColors(t *testing.T, db *database.DB, email, name, level string) int {
 	now := time.Now()
 
 	// Split name into first_name and last_name
@@ -575,7 +510,7 @@ func splitName(name string) []string {
 
 // DONE: SeedTestDog creates a test dog and returns the ID
 // Sets color_id based on category parameter for the color system
-func SeedTestDog(t *testing.T, db *sql.DB, name, breed, category string) int {
+func SeedTestDog(t *testing.T, db *database.DB, name, breed, category string) int {
 	now := time.Now()
 
 	// Map category to color name for the color system
@@ -610,7 +545,7 @@ func SeedTestDog(t *testing.T, db *sql.DB, name, breed, category string) int {
 }
 
 // DONE: SeedTestBooking creates a test booking and returns the ID
-func SeedTestBooking(t *testing.T, db *sql.DB, userID, dogID int, date, scheduledTime, status string) int {
+func SeedTestBooking(t *testing.T, db *database.DB, userID, dogID int, date, scheduledTime, status string) int {
 	now := time.Now()
 	result, err := db.Exec(`
 		INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at)
@@ -626,7 +561,7 @@ func SeedTestBooking(t *testing.T, db *sql.DB, userID, dogID int, date, schedule
 }
 
 // DONE: SeedTestBlockedDate creates a test blocked date and returns the ID
-func SeedTestBlockedDate(t *testing.T, db *sql.DB, date, reason string, createdBy int) int {
+func SeedTestBlockedDate(t *testing.T, db *database.DB, date, reason string, createdBy int) int {
 	now := time.Now()
 	result, err := db.Exec(`
 		INSERT INTO blocked_dates (tenant_id, date, reason, created_by, created_at)
@@ -642,7 +577,7 @@ func SeedTestBlockedDate(t *testing.T, db *sql.DB, date, reason string, createdB
 }
 
 // SeedTestBlockedDateForDog creates a test blocked date for a specific dog and returns the ID
-func SeedTestBlockedDateForDog(t *testing.T, db *sql.DB, date, reason string, createdBy int, dogID int) int {
+func SeedTestBlockedDateForDog(t *testing.T, db *database.DB, date, reason string, createdBy int, dogID int) int {
 	now := time.Now()
 	result, err := db.Exec(`
 		INSERT INTO blocked_dates (tenant_id, date, reason, created_by, dog_id, created_at)
@@ -658,7 +593,7 @@ func SeedTestBlockedDateForDog(t *testing.T, db *sql.DB, date, reason string, cr
 }
 
 // DONE: SeedTestExperienceRequest creates a test experience request and returns the ID
-func SeedTestExperienceRequest(t *testing.T, db *sql.DB, userID int, requestedLevel, status string) int {
+func SeedTestExperienceRequest(t *testing.T, db *database.DB, userID int, requestedLevel, status string) int {
 	now := time.Now()
 	result, err := db.Exec(`
 		INSERT INTO experience_requests (tenant_id, user_id, requested_level, status, created_at)
@@ -674,7 +609,7 @@ func SeedTestExperienceRequest(t *testing.T, db *sql.DB, userID int, requestedLe
 }
 
 // SeedTestWalkReport creates a test walk report and returns the ID
-func SeedTestWalkReport(t *testing.T, db *sql.DB, bookingID int, behaviorRating int, energyLevel, notes string) int {
+func SeedTestWalkReport(t *testing.T, db *database.DB, bookingID int, behaviorRating int, energyLevel, notes string) int {
 	now := time.Now()
 	result, err := db.Exec(`
 		INSERT INTO walk_reports (tenant_id, booking_id, behavior_rating, energy_level, notes, created_at, updated_at)
@@ -690,7 +625,7 @@ func SeedTestWalkReport(t *testing.T, db *sql.DB, bookingID int, behaviorRating 
 }
 
 // SeedTestColorCategory creates a test color category and returns the ID
-func SeedTestColorCategory(t *testing.T, db *sql.DB, name, hexCode string, sortOrder int) int {
+func SeedTestColorCategory(t *testing.T, db *database.DB, name, hexCode string, sortOrder int) int {
 	now := time.Now()
 	result, err := db.Exec(`
 		INSERT INTO color_categories (tenant_id, name, hex_code, pattern_icon, sort_order, created_at, updated_at)
@@ -706,7 +641,7 @@ func SeedTestColorCategory(t *testing.T, db *sql.DB, name, hexCode string, sortO
 }
 
 // SeedTestUserColor adds a color to a user
-func SeedTestUserColor(t *testing.T, db *sql.DB, userID, colorID int) {
+func SeedTestUserColor(t *testing.T, db *database.DB, userID, colorID int) {
 	now := time.Now()
 	_, err := db.Exec(`
 		INSERT INTO user_colors (tenant_id, user_id, color_id, granted_at)
@@ -719,7 +654,7 @@ func SeedTestUserColor(t *testing.T, db *sql.DB, userID, colorID int) {
 }
 
 // SeedTestColorRequest creates a test color request and returns the ID
-func SeedTestColorRequest(t *testing.T, db *sql.DB, userID, colorID int, status string) int {
+func SeedTestColorRequest(t *testing.T, db *database.DB, userID, colorID int, status string) int {
 	now := time.Now()
 	result, err := db.Exec(`
 		INSERT INTO color_requests (tenant_id, user_id, color_id, status, created_at)
@@ -736,7 +671,7 @@ func SeedTestColorRequest(t *testing.T, db *sql.DB, userID, colorID int, status 
 
 // SeedTestDogCustom creates a test dog with custom parameters and returns the ID
 // colorID should be a valid color ID from color_categories table
-func SeedTestDogCustom(t *testing.T, db *sql.DB, name, breed, size string, age int, colorID int) int {
+func SeedTestDogCustom(t *testing.T, db *database.DB, name, breed, size string, age int, colorID int) int {
 	now := time.Now()
 	result, err := db.Exec(`
 		INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at, updated_at)
@@ -752,7 +687,7 @@ func SeedTestDogCustom(t *testing.T, db *sql.DB, name, breed, size string, age i
 }
 
 // SeedUserColor is an alias for SeedTestUserColor for backward compatibility
-func SeedUserColor(t *testing.T, db *sql.DB, userID, colorID int) {
+func SeedUserColor(t *testing.T, db *database.DB, userID, colorID int) {
 	SeedTestUserColor(t, db, userID, colorID)
 }
 
@@ -775,7 +710,7 @@ func NowTime() time.Time {
 // InsertAndGetID executes an INSERT statement and returns the last inserted ID
 // This is a cross-database compatible way to handle INSERT ... RETURNING id
 // which is not supported in MySQL
-func InsertAndGetID(t *testing.T, db *sql.DB, query string, args ...interface{}) int {
+func InsertAndGetID(t *testing.T, db *database.DB, query string, args ...interface{}) int {
 	result, err := db.Exec(query, args...)
 	if err != nil {
 		t.Fatalf("Failed to execute INSERT: %v", err)
@@ -788,7 +723,7 @@ func InsertAndGetID(t *testing.T, db *sql.DB, query string, args ...interface{})
 }
 
 // DONE: CountRows returns the count of rows in a table
-func CountRows(t *testing.T, db *sql.DB, table string) int {
+func CountRows(t *testing.T, db *database.DB, table string) int {
 	var count int
 	err := db.QueryRow("SELECT COUNT(*) FROM " + table).Scan(&count)
 	if err != nil {
@@ -798,7 +733,7 @@ func CountRows(t *testing.T, db *sql.DB, table string) int {
 }
 
 // DONE: ClearTable deletes all rows from a table
-func ClearTable(t *testing.T, db *sql.DB, table string) {
+func ClearTable(t *testing.T, db *database.DB, table string) {
 	_, err := db.Exec("DELETE FROM " + table)
 	if err != nil {
 		t.Fatalf("Failed to clear table %s: %v", table, err)
@@ -835,4 +770,62 @@ func GetTenantIDKey() interface{} {
 // GetUserIDKey returns the user ID context key for use in handler tests
 func GetUserIDKey() interface{} {
 	return testUserIDKey
+}
+
+// SetupBenchmarkDB creates a test database for benchmark tests
+// This function is similar to SetupTestDB but uses *testing.B for error handling
+func SetupBenchmarkDB(b *testing.B) *database.DB {
+	b.Helper()
+
+	// Use in-memory SQLite for benchmarks
+	rawDB, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		b.Fatalf("Failed to open SQLite test database: %v", err)
+	}
+
+	dialect := database.NewSQLiteDialect()
+
+	// Set max connections to 1 for in-memory database
+	rawDB.SetMaxOpenConns(1)
+
+	// Apply SQLite settings
+	if err := dialect.ApplySettings(rawDB); err != nil {
+		b.Fatalf("Failed to apply SQLite settings: %v", err)
+	}
+
+	// Wrap in sqlx.DB
+	sqlxDB := sqlx.NewDb(rawDB, "sqlite")
+
+	// Create wrapped database.DB
+	db := database.WrapDB(sqlxDB, dialect)
+
+	// Run migrations
+	if err := database.RunMigrationsWithDialect(rawDB, dialect); err != nil {
+		b.Fatalf("Failed to run migrations: %v", err)
+	}
+
+	// Seed basic test data
+	seedBenchmarkDB(b, db)
+
+	return db
+}
+
+// seedBenchmarkDB seeds the benchmark database with minimal required data
+func seedBenchmarkDB(b *testing.B, db *database.DB) {
+	b.Helper()
+
+	now := time.Now()
+
+	// Create default tenant for tenant_id=0
+	_, _ = db.Exec(`INSERT OR IGNORE INTO tenants (id, slug, name, status, contact_email, created_at, updated_at) VALUES (0, 'default', 'Default', 'active', 'admin@test.com', ?, ?)`, now, now)
+
+	// Create subscription for tenant
+	_, _ = db.Exec(`INSERT INTO tenant_subscriptions (tenant_id, plan_id, status, created_at, updated_at) VALUES (0, 1, 'active', ?, ?)`, now, now)
+
+	// Seed color categories for tenant_id=0
+	_, _ = db.Exec(`INSERT OR IGNORE INTO color_categories (id, tenant_id, name, hex_code, description, experience_level, display_order, created_at, updated_at) VALUES
+		(1, 0, 'gruen', '#22c55e', 'Anfänger-Hunde', 1, 1, ?, ?),
+		(2, 0, 'dunkelblau', '#3b82f6', 'Fortgeschrittene Hunde', 2, 2, ?, ?),
+		(3, 0, 'orange', '#f97316', 'Erfahrene Gassigeher', 3, 3, ?, ?)
+	`, now, now, now, now, now, now)
 }

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/services"
 )
 
@@ -97,9 +98,9 @@ func TestExtractSubdomain_DangerousPatterns(t *testing.T) {
 	baseDomain := "gassigeher.org"
 
 	dangerousPatterns := []struct {
-		name       string
-		subdomain  string
-		concern    string
+		name      string
+		subdomain string
+		concern   string
 	}{
 		{"null byte", "tier\x00heim", "Null byte injection"},
 		{"SQL comment double dash", "tier--heim", "SQL comment injection"},
@@ -322,7 +323,7 @@ func TestRequireAdminWithVerification(t *testing.T) {
 	t.Run("middleware exists and is callable", func(t *testing.T) {
 		// Verify the middleware can be created (requires db)
 		// In unit tests without DB, we just verify the function signature
-		var db *sql.DB = nil
+		var db *database.DB = nil
 		middleware := RequireAdminWithVerification(db)
 		if middleware == nil {
 			t.Error("RequireAdminWithVerification should return a middleware function")

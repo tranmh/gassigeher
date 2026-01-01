@@ -11,7 +11,6 @@ import (
 func TestAllDialects_InterfaceCompliance(t *testing.T) {
 	dialects := []Dialect{
 		NewSQLiteDialect(),
-		NewMySQLDialect(),
 		NewPostgreSQLDialect(),
 	}
 
@@ -112,84 +111,6 @@ func TestSQLiteDialect(t *testing.T) {
 	})
 }
 
-// TestMySQLDialect tests MySQL-specific behavior
-func TestMySQLDialect(t *testing.T) {
-	dialect := NewMySQLDialect()
-
-	t.Run("Name", func(t *testing.T) {
-		assert.Equal(t, "mysql", dialect.Name())
-	})
-
-	t.Run("DriverName", func(t *testing.T) {
-		assert.Equal(t, "mysql", dialect.GetDriverName())
-	})
-
-	t.Run("AutoIncrement", func(t *testing.T) {
-		result := dialect.GetAutoIncrement()
-		assert.Equal(t, "INT AUTO_INCREMENT PRIMARY KEY", result)
-		assert.Contains(t, result, "AUTO_INCREMENT")
-		assert.NotContains(t, result, "AUTOINCREMENT") // SQLite syntax
-	})
-
-	t.Run("BooleanType", func(t *testing.T) {
-		assert.Equal(t, "TINYINT(1)", dialect.GetBooleanType())
-	})
-
-	t.Run("BooleanDefault", func(t *testing.T) {
-		assert.Equal(t, "1", dialect.GetBooleanDefault(true))
-		assert.Equal(t, "0", dialect.GetBooleanDefault(false))
-	})
-
-	t.Run("TextType", func(t *testing.T) {
-		assert.Equal(t, "TEXT", dialect.GetTextType(0))
-		assert.Equal(t, "VARCHAR(255)", dialect.GetTextType(255))
-		assert.Equal(t, "VARCHAR(100)", dialect.GetTextType(100))
-	})
-
-	t.Run("TimestampType", func(t *testing.T) {
-		assert.Equal(t, "DATETIME", dialect.GetTimestampType())
-	})
-
-	t.Run("CurrentDate", func(t *testing.T) {
-		assert.Equal(t, "CURDATE()", dialect.GetCurrentDate())
-	})
-
-	t.Run("CurrentTimestamp", func(t *testing.T) {
-		assert.Equal(t, "CURRENT_TIMESTAMP", dialect.GetCurrentTimestamp())
-	})
-
-	t.Run("Placeholder", func(t *testing.T) {
-		assert.Equal(t, "?", dialect.GetPlaceholder(1))
-		assert.Equal(t, "?", dialect.GetPlaceholder(2))
-		// MySQL uses ? like SQLite
-	})
-
-	t.Run("SupportsIfNotExistsColumn", func(t *testing.T) {
-		assert.False(t, dialect.SupportsIfNotExistsColumn())
-		// MySQL doesn't reliably support IF NOT EXISTS for ADD COLUMN
-	})
-
-	t.Run("InsertOrIgnore", func(t *testing.T) {
-		result := dialect.GetInsertOrIgnore("settings", []string{"key", "value"}, "?, ?")
-		assert.Equal(t, "INSERT IGNORE INTO settings (key, value) VALUES (?, ?)", result)
-		assert.Contains(t, result, "INSERT IGNORE")
-		assert.NotContains(t, result, "OR IGNORE") // SQLite syntax
-	})
-
-	t.Run("AddColumnSyntax", func(t *testing.T) {
-		result := dialect.GetAddColumnSyntax("dogs", "photo_thumbnail", "TEXT")
-		assert.Equal(t, "ALTER TABLE dogs ADD COLUMN photo_thumbnail TEXT", result)
-		assert.NotContains(t, result, "IF NOT EXISTS")
-	})
-
-	t.Run("TableCreationSuffix", func(t *testing.T) {
-		suffix := dialect.GetTableCreationSuffix()
-		assert.NotEmpty(t, suffix)
-		assert.Contains(t, suffix, "ENGINE=InnoDB")
-		assert.Contains(t, suffix, "CHARSET=utf8mb4")
-	})
-}
-
 // TestPostgreSQLDialect tests PostgreSQL-specific behavior
 func TestPostgreSQLDialect(t *testing.T) {
 	dialect := NewPostgreSQLDialect()
@@ -277,13 +198,6 @@ func TestDialectFactory(t *testing.T) {
 		assert.Equal(t, "sqlite", dialect.Name())
 	})
 
-	t.Run("GetDialect_MySQL", func(t *testing.T) {
-		dialect, err := factory.GetDialect("mysql")
-		assert.NoError(t, err)
-		assert.NotNil(t, dialect)
-		assert.Equal(t, "mysql", dialect.Name())
-	})
-
 	t.Run("GetDialect_PostgreSQL", func(t *testing.T) {
 		dialect, err := factory.GetDialect("postgres")
 		assert.NoError(t, err)
@@ -306,7 +220,7 @@ func TestDialectFactory(t *testing.T) {
 	})
 
 	t.Run("GetDialect_CaseInsensitive", func(t *testing.T) {
-		testCases := []string{"SQLITE", "SQLite", "MySQL", "MYSQL", "Postgres", "POSTGRES"}
+		testCases := []string{"SQLITE", "SQLite", "Postgres", "POSTGRES"}
 		for _, dbType := range testCases {
 			dialect, err := factory.GetDialect(dbType)
 			assert.NoError(t, err, "Should handle case: %s", dbType)
@@ -321,19 +235,25 @@ func TestDialectFactory(t *testing.T) {
 		assert.Contains(t, err.Error(), "unsupported database type")
 	})
 
+	t.Run("GetDialect_MySQL_Unsupported", func(t *testing.T) {
+		dialect, err := factory.GetDialect("mysql")
+		assert.Error(t, err)
+		assert.Nil(t, dialect)
+		assert.Contains(t, err.Error(), "unsupported database type")
+	})
+
 	t.Run("GetSupportedDatabases", func(t *testing.T) {
 		databases := factory.GetSupportedDatabases()
-		assert.Len(t, databases, 3) // sqlite, mysql, postgres (not postgresql alias)
+		assert.Len(t, databases, 2) // sqlite, postgres (not postgresql alias)
 		assert.Contains(t, databases, "sqlite")
-		assert.Contains(t, databases, "mysql")
 		assert.Contains(t, databases, "postgres")
 	})
 
 	t.Run("IsSupported", func(t *testing.T) {
 		assert.True(t, factory.IsSupported("sqlite"))
-		assert.True(t, factory.IsSupported("mysql"))
 		assert.True(t, factory.IsSupported("postgres"))
 		assert.True(t, factory.IsSupported("postgresql")) // Alias
+		assert.False(t, factory.IsSupported("mysql"))
 		assert.False(t, factory.IsSupported("oracle"))
 		assert.False(t, factory.IsSupported("mssql"))
 	})
@@ -347,7 +267,6 @@ func TestDialect_AutoIncrementSyntax(t *testing.T) {
 		expected string
 	}{
 		{"SQLite", NewSQLiteDialect(), "INTEGER PRIMARY KEY AUTOINCREMENT"},
-		{"MySQL", NewMySQLDialect(), "INT AUTO_INCREMENT PRIMARY KEY"},
 		{"PostgreSQL", NewPostgreSQLDialect(), "SERIAL PRIMARY KEY"},
 	}
 
@@ -362,14 +281,13 @@ func TestDialect_AutoIncrementSyntax(t *testing.T) {
 // TestDialect_BooleanHandling tests boolean type differences
 func TestDialect_BooleanHandling(t *testing.T) {
 	testCases := []struct {
-		name         string
-		dialect      Dialect
-		expectedType string
-		expectedTrue string
+		name          string
+		dialect       Dialect
+		expectedType  string
+		expectedTrue  string
 		expectedFalse string
 	}{
 		{"SQLite", NewSQLiteDialect(), "INTEGER", "1", "0"},
-		{"MySQL", NewMySQLDialect(), "TINYINT(1)", "1", "0"},
 		{"PostgreSQL", NewPostgreSQLDialect(), "BOOLEAN", "TRUE", "FALSE"},
 	}
 
@@ -385,16 +303,14 @@ func TestDialect_BooleanHandling(t *testing.T) {
 // TestDialect_TextTypeHandling tests text type with size limits
 func TestDialect_TextTypeHandling(t *testing.T) {
 	testCases := []struct {
-		name             string
-		dialect          Dialect
-		maxLength        int
-		expected         string
-		description      string
+		name        string
+		dialect     Dialect
+		maxLength   int
+		expected    string
+		description string
 	}{
 		{"SQLite_Unlimited", NewSQLiteDialect(), 0, "TEXT", "Unlimited text"},
 		{"SQLite_Sized", NewSQLiteDialect(), 255, "TEXT", "SQLite ignores size"},
-		{"MySQL_Unlimited", NewMySQLDialect(), 0, "TEXT", "Unlimited text"},
-		{"MySQL_Sized", NewMySQLDialect(), 255, "VARCHAR(255)", "Sized text"},
 		{"PostgreSQL_Unlimited", NewPostgreSQLDialect(), 0, "TEXT", "Unlimited text"},
 		{"PostgreSQL_Sized", NewPostgreSQLDialect(), 255, "VARCHAR(255)", "Sized text"},
 	}
@@ -416,7 +332,6 @@ func TestDialect_DateTimeFunctions(t *testing.T) {
 		expectedTimestamp string
 	}{
 		{"SQLite", NewSQLiteDialect(), "date('now')", "CURRENT_TIMESTAMP"},
-		{"MySQL", NewMySQLDialect(), "CURDATE()", "CURRENT_TIMESTAMP"},
 		{"PostgreSQL", NewPostgreSQLDialect(), "CURRENT_DATE", "CURRENT_TIMESTAMP"},
 	}
 
@@ -438,8 +353,6 @@ func TestDialect_PlaceholderSyntax(t *testing.T) {
 	}{
 		{"SQLite_Pos1", NewSQLiteDialect(), 1, "?"},
 		{"SQLite_Pos5", NewSQLiteDialect(), 5, "?"},
-		{"MySQL_Pos1", NewMySQLDialect(), 1, "?"},
-		{"MySQL_Pos5", NewMySQLDialect(), 5, "?"},
 		{"PostgreSQL_Pos1", NewPostgreSQLDialect(), 1, "?"},
 		{"PostgreSQL_Pos5", NewPostgreSQLDialect(), 5, "?"},
 		// Note: We use ? everywhere, drivers handle conversion
@@ -464,7 +377,6 @@ func TestDialect_InsertOrIgnoreSyntax(t *testing.T) {
 		contains []string
 	}{
 		{"SQLite", NewSQLiteDialect(), []string{"INSERT OR IGNORE"}},
-		{"MySQL", NewMySQLDialect(), []string{"INSERT IGNORE"}},
 		{"PostgreSQL", NewPostgreSQLDialect(), []string{"INSERT INTO", "ON CONFLICT DO NOTHING"}},
 	}
 
@@ -486,12 +398,11 @@ func TestDialect_InsertOrIgnoreSyntax(t *testing.T) {
 // TestDialect_AddColumnSyntax tests ADD COLUMN differences
 func TestDialect_AddColumnSyntax(t *testing.T) {
 	testCases := []struct {
-		name            string
-		dialect         Dialect
+		name                string
+		dialect             Dialect
 		supportsIfNotExists bool
 	}{
 		{"SQLite", NewSQLiteDialect(), false},
-		{"MySQL", NewMySQLDialect(), false},
 		{"PostgreSQL", NewPostgreSQLDialect(), true},
 	}
 
@@ -523,7 +434,6 @@ func TestDialect_TableCreationSuffix(t *testing.T) {
 		contains []string
 	}{
 		{"SQLite", NewSQLiteDialect(), true, nil},
-		{"MySQL", NewMySQLDialect(), false, []string{"ENGINE=InnoDB", "CHARSET=utf8mb4"}},
 		{"PostgreSQL", NewPostgreSQLDialect(), true, nil},
 	}
 
@@ -547,7 +457,6 @@ func TestDialect_TableCreationSuffix(t *testing.T) {
 func TestDialect_Consistency(t *testing.T) {
 	dialects := []Dialect{
 		NewSQLiteDialect(),
-		NewMySQLDialect(),
 		NewPostgreSQLDialect(),
 	}
 
@@ -585,7 +494,6 @@ func TestDialect_Consistency(t *testing.T) {
 func TestDialect_RealWorldQueries(t *testing.T) {
 	dialects := []Dialect{
 		NewSQLiteDialect(),
-		NewMySQLDialect(),
 		NewPostgreSQLDialect(),
 	}
 

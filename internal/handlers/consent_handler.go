@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"database/sql"
 	"net/http"
 	"strings"
 
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -16,7 +16,7 @@ type ConsentHandler struct {
 }
 
 // NewConsentHandler creates a new consent handler
-func NewConsentHandler(db *sql.DB) *ConsentHandler {
+func NewConsentHandler(db *database.DB) *ConsentHandler {
 	return &ConsentHandler{
 		consentRepo: repository.NewConsentRepository(db),
 	}

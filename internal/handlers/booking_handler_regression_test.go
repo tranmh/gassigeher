@@ -11,34 +11,40 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/tranmh/gassigeher/internal/config"
 	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
+	_ "modernc.org/sqlite"
 )
 
 // Phase 8: Regression Testing
 // Purpose: Ensure existing booking features still work after time restrictions added
 
 // setupRegressionTest creates a test database with necessary tables and seed data
-func setupRegressionTest(t *testing.T) (*sql.DB, func()) {
-	db, err := sql.Open("sqlite", ":memory:")
+func setupRegressionTest(t *testing.T) (*database.DB, func()) {
+	rawDB, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
 
 	// Enable foreign keys for SQLite
-	_, err = db.Exec("PRAGMA foreign_keys = ON")
+	_, err = rawDB.Exec("PRAGMA foreign_keys = ON")
 	if err != nil {
 		t.Fatalf("Failed to enable foreign keys: %v", err)
 	}
 
 	// Run migrations with dialect
 	dialect := database.NewSQLiteDialect()
-	if err := database.RunMigrationsWithDialect(db, dialect); err != nil {
+	if err := database.RunMigrationsWithDialect(rawDB, dialect); err != nil {
 		t.Fatalf("Failed to run migrations: %v", err)
 	}
+
+	// Wrap in database.DB for auto-rebinding
+	sqlxDB := sqlx.NewDb(rawDB, "sqlite")
+	db := database.WrapSqlxDB(sqlxDB, dialect)
 
 	// Default tenant (id=0) is already created by migrations/seed
 	// Just use timestamp for test data

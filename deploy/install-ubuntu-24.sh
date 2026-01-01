@@ -6,7 +6,8 @@
 #
 # Usage:
 #   chmod +x install-ubuntu-24.sh
-#   sudo ./install-ubuntu-24.sh
+#   ./install-ubuntu-24.sh          # Runs without root (Docker must be pre-installed)
+#   sudo ./install-ubuntu-24.sh     # Full install including Docker
 #
 # Prerequisites:
 #   - Fresh Ubuntu 24.04 LTS server (Hetzner Cloud recommended)
@@ -57,10 +58,19 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-check_root() {
-    if [[ $EUID -ne 0 ]]; then
-        log_error "This script must be run as root (use sudo)"
-        exit 1
+check_sudo() {
+    # Check if we can use sudo (needed for some operations)
+    if [[ $EUID -eq 0 ]]; then
+        SUDO=""
+        CAN_SUDO=true
+    elif sudo -n true 2>/dev/null; then
+        SUDO="sudo"
+        CAN_SUDO=true
+    else
+        SUDO=""
+        CAN_SUDO=false
+        log_warn "Running without root privileges. Some features may be limited."
+        log_warn "Docker must already be installed and accessible."
     fi
 }
 
@@ -81,30 +91,36 @@ generate_password() {
 # ============================================
 
 install_docker() {
+    if [[ "$CAN_SUDO" != "true" ]]; then
+        log_error "Cannot install Docker without root privileges"
+        log_error "Please install Docker manually or run with sudo"
+        exit 1
+    fi
+
     log_info "Installing Docker..."
 
     # Remove old versions
-    apt-get remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
+    $SUDO apt-get remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
 
     # Install prerequisites
-    apt-get update
-    apt-get install -y ca-certificates curl gnupg lsb-release
+    $SUDO apt-get update
+    $SUDO apt-get install -y ca-certificates curl gnupg lsb-release
 
     # Add Docker GPG key
-    install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    chmod a+r /etc/apt/keyrings/docker.gpg
+    $SUDO install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | $SUDO gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    $SUDO chmod a+r /etc/apt/keyrings/docker.gpg
 
     # Add Docker repository
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | $SUDO tee /etc/apt/sources.list.d/docker.list > /dev/null
 
     # Install Docker
-    apt-get update
-    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    $SUDO apt-get update
+    $SUDO apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
     # Start Docker
-    systemctl enable docker
-    systemctl start docker
+    $SUDO systemctl enable docker
+    $SUDO systemctl start docker
 
     log_success "Docker installed successfully"
 }
@@ -112,8 +128,17 @@ install_docker() {
 create_directories() {
     log_info "Creating directories..."
 
-    mkdir -p "$INSTALL_DIR"/{data,logs,backups,uploads}
-    chmod 750 "$INSTALL_DIR"
+    if [[ "$CAN_SUDO" == "true" ]]; then
+        $SUDO mkdir -p "$INSTALL_DIR"/{data,logs,backups,uploads}
+        $SUDO chmod 750 "$INSTALL_DIR"
+        # Make current user the owner if using sudo
+        if [[ -n "$SUDO" ]]; then
+            $SUDO chown -R "$(id -u):$(id -g)" "$INSTALL_DIR"
+        fi
+    else
+        mkdir -p "$INSTALL_DIR"/{data,logs,backups,uploads}
+        chmod 750 "$INSTALL_DIR"
+    fi
 
     log_success "Directories created at $INSTALL_DIR"
 }
@@ -422,81 +447,10 @@ EOF
 }
 
 create_docker_compose() {
-    log_info "Creating docker-compose.yml..."
-
-    cat > "$INSTALL_DIR/docker-compose.yml" << 'EOF'
-# Gassigeher SaaS Production Stack
-# PostgreSQL + Caddy (wildcard SSL) + Go App
-
-services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    env_file: .env
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - ./uploads:/app/uploads
-      - ./logs:/app/logs
-    networks:
-      - internal
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/health"]
-      interval: 30s
-      timeout: 3s
-      start_period: 10s
-      retries: 3
-
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${DB_NAME:-gassigeher}
-      POSTGRES_USER: ${DB_USER:-gassigeher}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - ./data/postgres:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-gassigeher} -d ${DB_NAME:-gassigeher}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - internal
-
-  caddy:
-    build:
-      context: .
-      dockerfile: Dockerfile.caddy
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./data/caddy:/data
-      - ./data/caddy-config:/config
-      - ./logs/caddy:/var/log/caddy
-    environment:
-      HETZNER_DNS_TOKEN: ${HETZNER_DNS_TOKEN}
-    depends_on:
-      app:
-        condition: service_healthy
-    networks:
-      - internal
-      - external
-
-networks:
-  internal:
-    driver: bridge
-  external:
-    driver: bridge
-EOF
-
-    log_success "docker-compose.yml created"
+    log_info "Copying docker-compose.yml..."
+    cp "$INSTALL_DIR/docker-compose.yml" "$INSTALL_DIR/docker-compose.yml.bak" 2>/dev/null || true
+    # docker-compose.yml is already in the repo, no need to generate
+    log_success "docker-compose.yml ready"
 }
 
 create_backup_script() {
@@ -551,21 +505,21 @@ cd "$INSTALL_DIR"
 case "$1" in
     start)
         echo "Starting Gassigeher..."
-        docker compose up -d
+        docker compose --profile production up -d
         ;;
     stop)
         echo "Stopping Gassigeher..."
-        docker compose down
+        docker compose --profile production down
         ;;
     restart)
         echo "Restarting Gassigeher..."
-        docker compose restart
+        docker compose --profile production restart
         ;;
     logs)
-        docker compose logs -f ${2:-}
+        docker compose --profile production logs -f ${2:-}
         ;;
     status)
-        docker compose ps
+        docker compose --profile production ps
         ;;
     backup)
         ./backup.sh
@@ -573,15 +527,15 @@ case "$1" in
     update)
         echo "Updating Gassigeher..."
         git pull 2>/dev/null || echo "Not a git repo, skipping git pull"
-        docker compose build --no-cache app
-        docker compose up -d
+        docker compose --profile production build --no-cache app
+        docker compose --profile production up -d
         echo "Update complete!"
         ;;
     shell)
-        docker compose exec app sh
+        docker compose --profile production exec app sh
         ;;
     db)
-        docker compose exec db psql -U gassigeher gassigeher
+        docker compose --profile production exec db psql -U gassigeher gassigeher
         ;;
     health)
         curl -s http://localhost:8080/api/health | jq .
@@ -608,32 +562,50 @@ esac
 EOF
 
     chmod +x "$INSTALL_DIR/gassigeher"
-    ln -sf "$INSTALL_DIR/gassigeher" /usr/local/bin/gassigeher
-    log_success "Management script created (use: gassigeher [command])"
+
+    # Create symlink in /usr/local/bin if we have sudo access
+    if [[ "$CAN_SUDO" == "true" ]]; then
+        $SUDO ln -sf "$INSTALL_DIR/gassigeher" /usr/local/bin/gassigeher
+        log_success "Management script created (use: gassigeher [command])"
+    else
+        log_success "Management script created (use: $INSTALL_DIR/gassigeher [command])"
+        log_info "Add to PATH: export PATH=\"$INSTALL_DIR:\$PATH\""
+    fi
 }
 
 setup_cron_backup() {
     log_info "Setting up daily backup cron job..."
 
     # Add cron job for daily backup at 3 AM
-    (crontab -l 2>/dev/null | grep -v "gassigeher/backup.sh"; echo "0 3 * * * $INSTALL_DIR/backup.sh >> $INSTALL_DIR/logs/backup.log 2>&1") | crontab -
+    CRON_JOB="0 3 * * * $INSTALL_DIR/backup.sh >> $INSTALL_DIR/logs/backup.log 2>&1"
+
+    # Get existing crontab (without our job), add our job, then install
+    {
+        crontab -l 2>/dev/null | grep -v "gassigeher/backup.sh" || true
+        echo "$CRON_JOB"
+    } | crontab - 2>/dev/null || log_warn "Could not set up cron job (non-fatal)"
 
     log_success "Daily backup scheduled at 3:00 AM"
 }
 
 setup_firewall() {
+    if [[ "$CAN_SUDO" != "true" ]]; then
+        log_warn "Skipping firewall setup (requires root privileges)"
+        return
+    fi
+
     log_info "Configuring firewall..."
 
     # Install ufw if not present
-    apt-get install -y ufw
+    $SUDO apt-get install -y ufw
 
     # Allow SSH, HTTP, HTTPS
-    ufw allow ssh
-    ufw allow http
-    ufw allow https
+    $SUDO ufw allow ssh
+    $SUDO ufw allow http
+    $SUDO ufw allow https
 
     # Enable firewall
-    ufw --force enable
+    $SUDO ufw --force enable
 
     log_success "Firewall configured (SSH, HTTP, HTTPS allowed)"
 }
@@ -646,11 +618,11 @@ copy_source_code() {
     SOURCE_DIR="$(dirname "$SCRIPT_DIR")"
 
     if [[ -f "$SOURCE_DIR/go.mod" ]]; then
-        cp -r "$SOURCE_DIR"/{cmd,internal,go.mod,go.sum} "$INSTALL_DIR/"
+        cp -r "$SOURCE_DIR"/{cmd,internal,go.mod,go.sum,docker-compose.yml} "$INSTALL_DIR/"
         log_success "Source code copied from $SOURCE_DIR"
     else
         log_warn "Source code not found. You'll need to copy it manually."
-        echo "  cp -r /path/to/gassigeher/{cmd,internal,go.mod,go.sum} $INSTALL_DIR/"
+        echo "  cp -r /path/to/gassigeher/{cmd,internal,go.mod,go.sum,docker-compose.yml} $INSTALL_DIR/"
     fi
 }
 
@@ -659,9 +631,9 @@ start_services() {
 
     cd "$INSTALL_DIR"
 
-    # Build and start
-    docker compose build
-    docker compose up -d
+    # Build and start with production profile (includes Caddy for SSL)
+    log_info "Running: docker compose --profile production up --build -d"
+    docker compose --profile production up --build -d
 
     # Wait for services to be healthy
     log_info "Waiting for services to start..."
@@ -730,20 +702,76 @@ show_help() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  --force       Force reconfiguration (regenerate .env with new passwords)"
+    echo "  --force       Force complete reinstall (stops containers, deletes target dir, rebuilds)"
     echo "  --help        Show this help message"
     echo ""
     echo "The script is idempotent - safe to run multiple times."
     echo "Existing .env configuration is preserved unless --force is used."
+    echo ""
+    echo "WARNING: --force will DELETE all data including database, uploads, and backups!"
+}
+
+force_cleanup() {
+    log_warn "============================================"
+    log_warn "  FORCE MODE - DESTRUCTIVE OPERATION"
+    log_warn "============================================"
+    echo ""
+    log_warn "This will:"
+    log_warn "  1. Stop all running containers"
+    log_warn "  2. DELETE the entire directory: $INSTALL_DIR"
+    log_warn "  3. This includes: database, uploads, backups, logs, .env"
+    echo ""
+    log_error "ALL DATA WILL BE PERMANENTLY LOST!"
+    echo ""
+
+    read -p "Type 'yes' to confirm deletion: " CONFIRM
+    if [[ "$CONFIRM" != "yes" ]]; then
+        log_info "Aborted. No changes made."
+        exit 0
+    fi
+
+    echo ""
+    log_info "Proceeding with force cleanup..."
+
+    # Stop containers and remove volumes if docker-compose.yml exists
+    if [[ -f "$INSTALL_DIR/docker-compose.yml" ]]; then
+        log_info "Stopping containers and removing volumes..."
+        cd "$INSTALL_DIR"
+        docker compose --profile production down -v --remove-orphans || true
+        cd - > /dev/null
+        log_success "Containers and volumes removed"
+    else
+        log_info "No docker-compose.yml found, skipping container stop"
+    fi
+
+    # Also prune any orphaned volumes with gassigeher in the name
+    log_info "Cleaning up orphaned Docker volumes..."
+    docker volume ls -q | grep -i gassi | xargs -r docker volume rm 2>/dev/null || true
+
+    # Delete the entire target directory
+    if [[ -d "$INSTALL_DIR" ]]; then
+        log_info "Deleting $INSTALL_DIR..."
+        if [[ "$CAN_SUDO" == "true" ]]; then
+            $SUDO rm -rf "$INSTALL_DIR"
+        else
+            rm -rf "$INSTALL_DIR"
+        fi
+        log_success "Directory deleted"
+    else
+        log_info "Directory does not exist, nothing to delete"
+    fi
+
+    log_success "Force cleanup completed"
+    echo ""
 }
 
 main() {
     # Parse arguments
-    FORCE_RECONFIGURE=false
+    FORCE_MODE=false
     for arg in "$@"; do
         case $arg in
             --force)
-                FORCE_RECONFIGURE=true
+                FORCE_MODE=true
                 ;;
             --help|-h)
                 show_help
@@ -759,8 +787,13 @@ main() {
     echo "============================================"
     echo ""
 
-    check_root
+    check_sudo
     check_ubuntu
+
+    # Force mode: cleanup before installation
+    if [[ "$FORCE_MODE" == "true" ]]; then
+        force_cleanup
+    fi
 
     # Install Docker
     if ! command -v docker &> /dev/null; then
@@ -773,19 +806,13 @@ main() {
     create_directories
 
     # Configuration handling (idempotent)
-    if [[ -f "$INSTALL_DIR/.env" ]] && [[ "$FORCE_RECONFIGURE" == "false" ]]; then
+    if [[ -f "$INSTALL_DIR/.env" ]]; then
         log_success "Existing .env found - preserving configuration"
-        log_info "Use --force to reconfigure with new credentials"
+        log_info "Use --force to do a complete reinstall"
         # Source existing env to get variables for summary
         source "$INSTALL_DIR/.env"
     else
-        if [[ -f "$INSTALL_DIR/.env" ]]; then
-            log_warn "Existing .env will be overwritten (--force specified)"
-            # Backup existing .env
-            cp "$INSTALL_DIR/.env" "$INSTALL_DIR/.env.backup.$(date +%Y%m%d_%H%M%S)"
-            log_info "Backup created: .env.backup.$(date +%Y%m%d_%H%M%S)"
-        fi
-        # Collect configuration
+        # Collect configuration (fresh install or after --force cleanup)
         collect_configuration
         # Create .env file
         create_env_file
@@ -815,4 +842,3 @@ main() {
 
 # Run main function
 main "$@"
-EOF

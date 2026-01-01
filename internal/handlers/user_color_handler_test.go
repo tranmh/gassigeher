@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,11 +10,12 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/testutil"
 )
 
 // getColorIDByName looks up a color ID by name for tenant 1
-func getColorIDByName(t *testing.T, db *sql.DB, colorName string) int {
+func getColorIDByName(t *testing.T, db *database.DB, colorName string) int {
 	var colorID int
 	err := db.QueryRow(`SELECT id FROM color_categories WHERE tenant_id = 0 AND LOWER(name) = LOWER(?)`, colorName).Scan(&colorID)
 	if err != nil {

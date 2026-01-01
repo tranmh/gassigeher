@@ -82,13 +82,13 @@ func TestImageService_ProcessDogPhoto(t *testing.T) {
 	service := NewImageService(tempDir)
 
 	tests := []struct {
-		name          string
-		dogID         int
-		imageWidth    int
-		imageHeight   int
-		format        string
-		expectError   bool
-		validateFunc  func(t *testing.T, fullPath, thumbPath string)
+		name         string
+		dogID        int
+		imageWidth   int
+		imageHeight  int
+		format       string
+		expectError  bool
+		validateFunc func(t *testing.T, fullPath, thumbPath string)
 	}{
 		{
 			name:        "Process large JPEG successfully",
@@ -542,7 +542,7 @@ func TestImageService_AspectRatioPreservation(t *testing.T) {
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr ||
 		(len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-		len(s) > 2*len(substr) && contains(s[1:], substr))))
+			len(s) > 2*len(substr) && contains(s[1:], substr))))
 }
 
 // TestImageService_ProcessLogo tests logo processing

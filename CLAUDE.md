@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Gassigeher is a **complete production-ready** dog walking booking system for animal shelters. Built with Go 1.24+ backend and Vanilla JavaScript frontend. Available in two deployment modes:
 
-- **Simple-Mode**: Single-tenant for individual shelters (SQLite/MySQL/PostgreSQL)
+- **Simple-Mode**: Single-tenant for individual shelters (SQLite/PostgreSQL)
 - **SaaS-Mode**: Multi-tenant platform for 500+ shelters (PostgreSQL with RLS)
 
 **Status**: ✅ Production ready | 85+ API endpoints | 30+ pages | 18+ email types | 350+ tests | GDPR-compliant
@@ -31,7 +31,7 @@ BASE_URL=https://gassigeher.yourshelter.com
 ```
 
 - Single organization deployment
-- All three databases supported (SQLite, MySQL, PostgreSQL)
+- Both databases supported (SQLite, PostgreSQL)
 - Local filesystem storage
 - Global rate limiting
 
@@ -399,14 +399,14 @@ After load, call: `window.i18n.updateElement(element)`
 
 Auto-run on startup via migration system in `internal/database/`:
 - 21 migrations defined in `internal/database/00X_*.go` files
-- Each migration has SQL for all three databases (SQLite, MySQL, PostgreSQL)
+- Each migration has SQL for both databases (SQLite and PostgreSQL)
 - Creates 11 tables with indexes
 - Schema versioning via `schema_migrations` table
 - Idempotent (safe to run multiple times)
 
 **When modifying schema:**
 1. Create new migration file in `internal/database/`
-2. Add SQL for all three databases
+2. Add SQL for both databases (SQLite and PostgreSQL)
 3. Use `IF NOT EXISTS` for safety
 4. Test with fresh database (delete gassigeher.db)
 
@@ -581,12 +581,11 @@ Admins can change via settings page → updates take effect immediately.
 
 ### Overview
 
-The application supports **three database backends** with complete feature parity:
+The application supports **two database backends** with complete feature parity:
 - **SQLite** (default) - Zero-config, perfect for development and small deployments (<1,000 users)
-- **MySQL** - Web-scale performance for medium deployments (1,000-50,000 users)
-- **PostgreSQL** - Enterprise-grade for large deployments (10,000+ users)
+- **PostgreSQL** - Enterprise-grade for large deployments (10,000+ users), required for SaaS-Mode
 
-**Key Principle**: All SQL is database-agnostic. Repositories use standard SQL that works identically across all three databases.
+**Key Principle**: All SQL is database-agnostic. Repositories use standard SQL that works identically across both databases.
 
 ### Configuration
 
@@ -596,16 +595,6 @@ Set database type via environment variable:
 # SQLite (default)
 DB_TYPE=sqlite
 DATABASE_PATH=./gassigeher.db
-
-# MySQL
-DB_TYPE=mysql
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=gassigeher
-DB_USER=gassigeher_user
-DB_PASSWORD=secure_password
-DB_MAX_OPEN_CONNS=25
-DB_MAX_IDLE_CONNS=5
 
 # PostgreSQL
 DB_TYPE=postgres
@@ -625,13 +614,13 @@ See `.env.example` for complete configuration options.
 
 **Dialect System** (`internal/database/dialect*.go`):
 - `Dialect` interface defines database-specific SQL syntax
-- `SQLiteDialect`, `MySQLDialect`, `PostgreSQLDialect` implementations
+- `SQLiteDialect` and `PostgreSQLDialect` implementations
 - Handles differences in: auto-increment, boolean types, text types, placeholders
 - Factory pattern creates correct dialect based on `DB_TYPE`
 
 **Migration System** (`internal/database/migrations.go`):
 - Migrations defined in `internal/database/00X_*.go` files
-- Each migration has SQL for all three databases
+- Each migration has SQL for both databases (SQLite and PostgreSQL)
 - Schema versioning via `schema_migrations` table
 - Idempotent - safe to run multiple times
 - Auto-runs on application startup
@@ -639,7 +628,7 @@ See `.env.example` for complete configuration options.
 **Repository Layer** (`internal/repository/*.go`):
 - Uses **100% standard SQL** (SELECT, INSERT, UPDATE, DELETE)
 - **No database-specific functions** in queries
-- Parameterized queries with `?` placeholders (works on all databases)
+- Parameterized queries with `?` placeholders (works on both databases)
 - Date/time operations use Go's `time.Now()` instead of SQL functions
 
 ### Database-Agnostic SQL Patterns
@@ -660,14 +649,11 @@ db.Query(query, 1, cutoffTime)
 query := `SELECT COUNT(*) FROM bookings WHERE dog_id = ?`
 ```
 
-**❌ INCORRECT - Database-specific SQL:**
+**INCORRECT - Database-specific SQL:**
 
 ```go
 // SQLite-specific (don't use!)
 query := `SELECT * FROM bookings WHERE date >= date('now')`
-
-// MySQL-specific (don't use!)
-query := `SELECT * FROM bookings WHERE date >= CURDATE()`
 
 // PostgreSQL-specific (don't use!)
 query := `SELECT * FROM bookings WHERE date >= CURRENT_DATE`
@@ -675,14 +661,11 @@ query := `SELECT * FROM bookings WHERE date >= CURRENT_DATE`
 
 ### Testing Across Databases
 
-**Run tests on all databases:**
+**Run tests on both databases:**
 
 ```bash
 # SQLite (default)
 go test ./... -v
-
-# MySQL (requires running MySQL server)
-DB_TYPE=mysql DB_TEST_MYSQL="user:pass@tcp(localhost:3306)/test_db" go test ./... -v
 
 # PostgreSQL (requires running PostgreSQL server)
 DB_TYPE=postgres DB_TEST_POSTGRES="postgres://user:pass@localhost:5432/test_db" go test ./... -v
@@ -691,15 +674,12 @@ DB_TYPE=postgres DB_TEST_POSTGRES="postgres://user:pass@localhost:5432/test_db" 
 **Docker Compose for testing:**
 
 ```bash
-# Start test databases
-docker-compose -f docker-compose.test.yml up -d
+# Start PostgreSQL via docker-compose
+docker compose up -d db
 
-# Run tests against all databases
-./scripts/test_all_databases.sh  # Linux/Mac
-./scripts/test_all_databases.ps1  # Windows
+# Run tests against PostgreSQL
+DB_TYPE=postgres DB_TEST_POSTGRES="postgres://gassigeher:localdev123@localhost:5432/gassigeher?sslmode=disable" go test ./... -v
 ```
-
-See **[MultiDatabase_Testing_Guide.md](docs/MultiDatabase_Testing_Guide.md)** for comprehensive testing instructions.
 
 ### When to Add Database-Specific Code
 
@@ -729,11 +709,6 @@ func init() {
                 name TEXT NOT NULL,
                 is_active INTEGER DEFAULT 0
             )`,
-            "mysql": `CREATE TABLE IF NOT EXISTS users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                is_active TINYINT(1) DEFAULT 0
-            )`,
             "postgres": `CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(255) NOT NULL,
@@ -746,9 +721,9 @@ func init() {
 
 ### Migration Best Practices
 
-1. **Always add SQL for all three databases** in every migration
+1. **Always add SQL for both databases** (SQLite and PostgreSQL) in every migration
 2. **Use IF NOT EXISTS** for CREATE TABLE (idempotency)
-3. **Test migration on all databases** before committing
+3. **Test migration on both databases** before committing
 4. **Keep schema identical** across databases (same tables, columns, constraints)
 5. **Use schema_migrations table** for version tracking (automatic)
 
@@ -756,7 +731,7 @@ func init() {
 
 **SQLite**: No pooling needed (file-based, single connection optimal)
 
-**MySQL/PostgreSQL**: Connection pooling configured automatically
+**PostgreSQL**: Connection pooling configured automatically
 - `DB_MAX_OPEN_CONNS=25` - Maximum simultaneous connections
 - `DB_MAX_IDLE_CONNS=5` - Idle connections to keep in pool
 - `DB_CONN_MAX_LIFETIME=5` - Connection lifetime in minutes
@@ -770,26 +745,19 @@ func init() {
 - Zero setup time required
 - File-based backup preferred
 
-**Choose MySQL if:**
-- Medium to large shelter (1,000-50,000 users)
-- Proven web-scale performance needed
-- Replication/clustering required
-- Familiar with MySQL administration
-- Widely supported hosting
-
 **Choose PostgreSQL if:**
 - Enterprise deployment (10,000+ users)
 - Advanced features needed (full-text search, JSON columns)
 - Complex analytics queries
 - Strong ACID compliance critical
 - Multiple concurrent writes
+- SaaS-Mode deployment (required for Row-Level Security)
 
 See **[Database_Selection_Guide.md](docs/Database_Selection_Guide.md)** for detailed comparison and migration procedures.
 
 ### Related Documentation
 
 - **[DatabasesSupportPlan.md](docs/DatabasesSupportPlan.md)** - Complete implementation plan (2,300+ lines)
-- **[MySQL_Setup_Guide.md](docs/MySQL_Setup_Guide.md)** - MySQL installation and configuration
 - **[PostgreSQL_Setup_Guide.md](docs/PostgreSQL_Setup_Guide.md)** - PostgreSQL installation and configuration
 - **[Database_Selection_Guide.md](docs/Database_Selection_Guide.md)** - Choosing the right database
 - **[MultiDatabase_Testing_Guide.md](docs/MultiDatabase_Testing_Guide.md)** - Testing across databases
@@ -1198,8 +1166,7 @@ docs/                           # 18+ documentation files
 deploy/                         # Simple-Mode production configs
 uploads/                        # User and dog photos (Simple-Mode)
 Dockerfile                      # SaaS: Docker build
-docker-compose.yml              # SaaS: Development stack
-docker-compose.prod.yml         # SaaS: Production stack
+docker-compose.yml              # Docker stack (--profile production for Caddy)
 Caddyfile                       # SaaS: Wildcard SSL reverse proxy
 ```
 

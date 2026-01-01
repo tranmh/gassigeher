@@ -7,17 +7,23 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/tranmh/gassigeher/internal/database"
 )
 
 // TestHealthHandler_Health tests the health check endpoint
 func TestHealthHandler_Health(t *testing.T) {
 	// Create in-memory database for testing
-	db, err := sql.Open("sqlite3", ":memory:")
+	rawDB, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to create test database: %v", err)
 	}
-	defer db.Close()
+	defer rawDB.Close()
+
+	// Wrap in database.DB for auto-rebinding
+	sqlxDB := sqlx.NewDb(rawDB, "sqlite3")
+	db := database.WrapSqlxDB(sqlxDB, database.NewSQLiteDialect())
 
 	handler := NewHealthHandler(db)
 

@@ -25,11 +25,11 @@ func SafeInt64ToInt(val int64) (int, error) {
 
 // PromoCodeRepository handles promo code database operations
 type PromoCodeRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
 // NewPromoCodeRepository creates a new promo code repository
-func NewPromoCodeRepository(db *sql.DB) *PromoCodeRepository {
+func NewPromoCodeRepository(db DBExecutor) *PromoCodeRepository {
 	return &PromoCodeRepository{db: db}
 }
 
@@ -49,7 +49,7 @@ func (r *PromoCodeRepository) Create(code *models.PromoCode) error {
 		expiresAt = FormatTimestamp(*code.ExpiresAt)
 	}
 
-	result, err := r.db.Exec(query,
+	id, err := r.db.InsertReturningID(query,
 		strings.ToUpper(code.Code),
 		code.Description,
 		code.DiscountType,
@@ -57,7 +57,7 @@ func (r *PromoCodeRepository) Create(code *models.PromoCode) error {
 		code.MaxUses,
 		code.UsesCount,
 		code.ValidForPlans,
-		code.IsActive,
+		r.db.BoolValue(code.IsActive),
 		code.StripeCouponID,
 		expiresAt,
 		FormatTimestamp(now),
@@ -67,10 +67,6 @@ func (r *PromoCodeRepository) Create(code *models.PromoCode) error {
 		return fmt.Errorf("failed to create promo code: %w", err)
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get promo code ID: %w", err)
-	}
 	code.ID = int(id)
 	code.CreatedAt = now
 	code.UpdatedAt = now
@@ -216,18 +212,28 @@ func (r *PromoCodeRepository) GetByCode(codeStr string) (*models.PromoCode, erro
 
 // GetAll returns all promo codes with optional filtering
 func (r *PromoCodeRepository) GetAll(activeOnly bool) ([]*models.PromoCode, error) {
-	query := `
-		SELECT id, code, description, discount_type, discount_value, max_uses,
-		       uses_count, valid_for_plans, is_active, stripe_coupon_id, expires_at,
-		       created_at, updated_at
-		FROM promo_codes
-	`
+	var rows *sql.Rows
+	var err error
 	if activeOnly {
-		query += " WHERE is_active = 1"
+		query := `
+			SELECT id, code, description, discount_type, discount_value, max_uses,
+			       uses_count, valid_for_plans, is_active, stripe_coupon_id, expires_at,
+			       created_at, updated_at
+			FROM promo_codes
+			WHERE is_active = ?
+			ORDER BY created_at DESC
+		`
+		rows, err = r.db.Query(query, r.db.BoolValue(true))
+	} else {
+		query := `
+			SELECT id, code, description, discount_type, discount_value, max_uses,
+			       uses_count, valid_for_plans, is_active, stripe_coupon_id, expires_at,
+			       created_at, updated_at
+			FROM promo_codes
+			ORDER BY created_at DESC
+		`
+		rows, err = r.db.Query(query)
 	}
-	query += " ORDER BY created_at DESC"
-
-	rows, err := r.db.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query promo codes: %w", err)
 	}

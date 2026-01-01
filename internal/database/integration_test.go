@@ -37,76 +37,13 @@ func TestInitializeWithConfig_SQLite(t *testing.T) {
 	assert.Equal(t, 1, fkEnabled, "Foreign keys should be enabled")
 
 	// Run migrations
-	err = RunMigrationsWithDialect(db, dialect)
+	err = RunMigrationsWithDialect(db.SqlDB(), dialect)
 	assert.NoError(t, err)
 
 	// Verify tables created
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
 	assert.NoError(t, err)
-}
-
-// TestInitializeWithConfig_MySQL tests MySQL initialization (if available)
-func TestInitializeWithConfig_MySQL(t *testing.T) {
-	// Get MySQL test connection string
-	dsn := os.Getenv("DB_TEST_MYSQL")
-	if dsn == "" {
-		t.Skip("MySQL test database not configured (set DB_TEST_MYSQL)")
-	}
-
-	config := &DBConfig{
-		Type:             "mysql",
-		ConnectionString: dsn,
-	}
-
-	db, dialect, err := InitializeWithConfig(config)
-	if err != nil {
-		t.Skipf("MySQL not available: %v", err)
-	}
-	defer db.Close()
-
-	// Clean database first - drop ALL tables in correct order
-	tables := []string{
-		"walk_report_photos", "walk_reports", "color_requests", "user_colors",
-		"bookings", "blocked_dates", "experience_requests", "reactivation_requests",
-		"dogs", "demo_tenant_state", "tenant_subscriptions", "tenant_settings",
-		"pricing_plans", "users", "color_categories", "booking_time_rules",
-		"custom_holidays", "feiertage_cache", "system_settings", "tenants",
-		"schema_migrations",
-	}
-	db.Exec("SET FOREIGN_KEY_CHECKS = 0")
-	for _, table := range tables {
-		db.Exec("DROP TABLE IF EXISTS " + table)
-	}
-	db.Exec("SET FOREIGN_KEY_CHECKS = 1")
-
-	// Verify dialect
-	assert.Equal(t, "mysql", dialect.Name())
-
-	// Verify connection works
-	err = db.Ping()
-	assert.NoError(t, err)
-
-	// Run migrations
-	err = RunMigrationsWithDialect(db, dialect)
-	assert.NoError(t, err)
-
-	// Verify tables created
-	var count int
-	err = db.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
-	assert.NoError(t, err)
-
-	// Verify charset
-	var charset string
-	err = db.QueryRow("SHOW VARIABLES LIKE 'character_set_client'").Scan(&charset, &charset)
-	if err == nil {
-		// Note: Scan scans 2 columns (Variable_name, Value)
-		// We only care about the value
-	}
-
-	// Verify connection pool configured
-	stats := db.Stats()
-	assert.Equal(t, 25, stats.MaxOpenConnections, "MaxOpenConns should be 25")
 }
 
 // TestInitializeWithConfig_PostgreSQL tests PostgreSQL initialization (if available)
@@ -143,7 +80,7 @@ func TestInitializeWithConfig_PostgreSQL(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Run migrations
-	err = RunMigrationsWithDialect(db, dialect)
+	err = RunMigrationsWithDialect(db.SqlDB(), dialect)
 	assert.NoError(t, err)
 
 	// Verify tables created
@@ -161,56 +98,6 @@ func TestInitializeWithConfig_PostgreSQL(t *testing.T) {
 	// Verify connection pool configured
 	stats := db.Stats()
 	assert.Equal(t, 25, stats.MaxOpenConnections, "MaxOpenConns should be 25")
-}
-
-// TestBuildMySQLDSN tests MySQL connection string builder
-func TestBuildMySQLDSN(t *testing.T) {
-	testCases := []struct {
-		name     string
-		config   *DBConfig
-		expected string
-	}{
-		{
-			name: "All fields specified",
-			config: &DBConfig{
-				Host:     "db.example.com",
-				Port:     3306,
-				Database: "mydb",
-				Username: "myuser",
-				Password: "mypass",
-			},
-			expected: "myuser:mypass@tcp(db.example.com:3306)/mydb?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci",
-		},
-		{
-			name: "Default port",
-			config: &DBConfig{
-				Host:     "localhost",
-				Port:     0, // Should use default 3306
-				Database: "gassigeher",
-				Username: "user",
-				Password: "pass",
-			},
-			expected: "user:pass@tcp(localhost:3306)/gassigeher?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci",
-		},
-		{
-			name: "Empty host defaults to localhost",
-			config: &DBConfig{
-				Host:     "",
-				Port:     3306,
-				Database: "gassigeher",
-				Username: "user",
-				Password: "pass",
-			},
-			expected: "user:pass@tcp(localhost:3306)/gassigeher?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			result := buildMySQLDSN(tc.config)
-			assert.Equal(t, tc.expected, result)
-		})
-	}
 }
 
 // TestBuildPostgreSQLDSN tests PostgreSQL connection string builder
@@ -280,7 +167,7 @@ func TestBackwardCompatibility_Initialize(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Run old migrations (should still work)
-	err = RunMigrations(db)
+	err = RunMigrations(db.SqlDB())
 	assert.NoError(t, err)
 
 	// Verify tables created
@@ -292,16 +179,14 @@ func TestBackwardCompatibility_Initialize(t *testing.T) {
 // TestDialectFactory_Integration tests dialect creation in real scenario
 func TestDialectFactory_Integration(t *testing.T) {
 	testCases := []struct {
-		dbType         string
+		dbType          string
 		expectedDialect string
 	}{
 		{"sqlite", "sqlite"},
 		{"", "sqlite"}, // Empty defaults to SQLite
-		{"mysql", "mysql"},
 		{"postgres", "postgres"},
 		{"postgresql", "postgres"}, // Alias
 		{"SQLITE", "sqlite"},       // Case insensitive
-		{"MySQL", "mysql"},
 		{"POSTGRES", "postgres"},
 	}
 

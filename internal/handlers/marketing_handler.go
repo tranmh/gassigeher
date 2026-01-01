@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"crypto/rand"
-	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
 )
@@ -24,12 +24,12 @@ var referralCodePattern = regexp.MustCompile(`^[A-Z0-9-]+$`)
 
 // MarketingHandler handles marketing-related requests
 type MarketingHandler struct {
-	db            *sql.DB
+	db            *database.DB
 	marketingRepo *repository.MarketingRepository
 }
 
 // NewMarketingHandler creates a new marketing handler
-func NewMarketingHandler(db *sql.DB) *MarketingHandler {
+func NewMarketingHandler(db *database.DB) *MarketingHandler {
 	return &MarketingHandler{
 		db:            db,
 		marketingRepo: repository.NewMarketingRepository(db),
@@ -517,9 +517,9 @@ func (h *MarketingHandler) ValidateReferralCode(w http.ResponseWriter, r *http.R
 	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"valid":          true,
+		"valid":           true,
 		"discount_months": code.DiscountMonthsReferee,
-		"message":        "Code gültig! Sie erhalten " + strconv.Itoa(code.DiscountMonthsReferee) + " Monat(e) kostenlos.",
+		"message":         "Code gültig! Sie erhalten " + strconv.Itoa(code.DiscountMonthsReferee) + " Monat(e) kostenlos.",
 	})
 }
 

@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"database/sql"
 	"fmt"
 	"time"
 
@@ -9,10 +8,10 @@ import (
 )
 
 type BookingTimeRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
-func NewBookingTimeRepository(db *sql.DB) *BookingTimeRepository {
+func NewBookingTimeRepository(db DBExecutor) *BookingTimeRepository {
 	return &BookingTimeRepository{db: db}
 }
 
@@ -105,12 +104,7 @@ func (r *BookingTimeRepository) UpdateRule(tenantID int, id int, rule *models.Bo
 		WHERE id = ? AND tenant_id = ?
 	`
 
-	isBlocked := 0
-	if rule.IsBlocked {
-		isBlocked = 1
-	}
-
-	_, err := r.db.Exec(query, rule.StartTime, rule.EndTime, isBlocked, time.Now(), id, tenantID)
+	_, err := r.db.Exec(query, rule.StartTime, rule.EndTime, r.db.BoolValue(rule.IsBlocked), time.Now(), id, tenantID)
 	return err
 }
 
@@ -121,20 +115,11 @@ func (r *BookingTimeRepository) CreateRule(tenantID int, rule *models.BookingTim
 		VALUES (?, ?, ?, ?, ?, ?)
 	`
 
-	isBlocked := 0
-	if rule.IsBlocked {
-		isBlocked = 1
-	}
-
-	result, err := r.db.Exec(query, tenantID, rule.DayType, rule.RuleName, rule.StartTime, rule.EndTime, isBlocked)
+	id, err := r.db.InsertReturningID(query, tenantID, rule.DayType, rule.RuleName, rule.StartTime, rule.EndTime, r.db.BoolValue(rule.IsBlocked))
 	if err != nil {
 		return err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get inserted rule ID: %w", err)
-	}
 	rule.ID = int(id)
 	rule.TenantID = tenantID
 	return nil

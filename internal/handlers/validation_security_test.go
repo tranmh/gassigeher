@@ -74,10 +74,10 @@ func TestSanitizeString_JavascriptProtocol(t *testing.T) {
 // TestValidateDogName_JavascriptProtocol tests dog name validation blocks javascript:
 func TestValidateDogName_JavascriptProtocol(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       string
-		wantError   bool
-		errorField  string
+		name       string
+		input      string
+		wantError  bool
+		errorField string
 	}{
 		{
 			name:      "javascript: protocol should be rejected or sanitized to empty",

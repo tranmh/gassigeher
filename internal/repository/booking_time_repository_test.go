@@ -1,22 +1,22 @@
 package repository
 
 import (
-	"database/sql"
 	"testing"
 	"time"
 
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/testutil"
 	_ "modernc.org/sqlite"
 )
 
 // setupTestDBForBookingTime creates a test database using standard testutil
-func setupTestDBForBookingTime(t *testing.T) *sql.DB {
+func setupTestDBForBookingTime(t *testing.T) *database.DB {
 	return testutil.SetupTestDB(t)
 }
 
 // seedBookingTimeRules seeds the database with test data
-func seedBookingTimeRules(t *testing.T, db *sql.DB) {
+func seedBookingTimeRules(t *testing.T, db *database.DB) {
 	// First, clear any default rules from migration that might conflict
 	db.Exec(`DELETE FROM booking_time_rules WHERE tenant_id = 0`)
 

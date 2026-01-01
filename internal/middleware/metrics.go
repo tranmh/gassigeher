@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"database/sql"
 	"log"
 	"net/http"
 	"regexp"
@@ -10,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/tranmh/gassigeher/internal/database"
 )
 
 // MetricsCollector collects HTTP metrics
@@ -44,14 +45,14 @@ type MetricsCollector struct {
 	tenantActiveRequests map[int]int64
 
 	// Business metrics (refreshed periodically from database)
-	db              *sql.DB
-	totalBookings   int64
-	totalDogs       int64
-	totalTenants    int64
-	activeTenants   int64
-	activeUsers     int64 // users active in last 30 days
-	successLogins   int64
-	failedLogins    int64
+	db            *database.DB
+	totalBookings int64
+	totalDogs     int64
+	totalTenants  int64
+	activeTenants int64
+	activeUsers   int64 // users active in last 30 days
+	successLogins int64
+	failedLogins  int64
 }
 
 type durationStats struct {
@@ -177,14 +178,14 @@ func normalizePath(path string) string {
 
 // MetricsResponse represents the /metrics endpoint response
 type MetricsResponse struct {
-	Uptime            string                    `json:"uptime"`
-	ActiveConnections int64                     `json:"active_connections"`
-	TotalRequests     int64                     `json:"total_requests"`
-	RequestsByStatus  map[string]int64          `json:"requests_by_status"`
-	RequestsByMethod  map[string]int64          `json:"requests_by_method"`
-	RequestsByPath    map[string]int64          `json:"requests_by_path"`
-	ErrorCounts       map[string]int64          `json:"error_counts"`
-	Latency           map[string]LatencyStats   `json:"latency"`
+	Uptime            string                  `json:"uptime"`
+	ActiveConnections int64                   `json:"active_connections"`
+	TotalRequests     int64                   `json:"total_requests"`
+	RequestsByStatus  map[string]int64        `json:"requests_by_status"`
+	RequestsByMethod  map[string]int64        `json:"requests_by_method"`
+	RequestsByPath    map[string]int64        `json:"requests_by_path"`
+	ErrorCounts       map[string]int64        `json:"error_counts"`
+	Latency           map[string]LatencyStats `json:"latency"`
 }
 
 type LatencyStats struct {
@@ -378,7 +379,7 @@ func (m *MetricsCollector) GetPrometheusMetrics() string {
 
 // InitBusinessMetrics initializes database-backed business metrics
 // and starts a background goroutine to refresh them periodically
-func InitBusinessMetrics(db *sql.DB) {
+func InitBusinessMetrics(db *database.DB) {
 	Metrics.mu.Lock()
 	Metrics.db = db
 	Metrics.mu.Unlock()

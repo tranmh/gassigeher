@@ -9,11 +9,11 @@ import (
 
 // FeatureFlagRepository handles feature flag database operations
 type FeatureFlagRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
 // NewFeatureFlagRepository creates a new feature flag repository
-func NewFeatureFlagRepository(db *sql.DB) *FeatureFlagRepository {
+func NewFeatureFlagRepository(db DBExecutor) *FeatureFlagRepository {
 	return &FeatureFlagRepository{db: db}
 }
 
@@ -92,18 +92,15 @@ func (r *FeatureFlagRepository) GetByID(id int) (*models.FeatureFlag, error) {
 // Create creates a new feature flag
 func (r *FeatureFlagRepository) Create(f *models.FeatureFlag) error {
 	now := time.Now()
-	result, err := r.db.Exec(`
+	query := `
 		INSERT INTO feature_flags (key, name, description, is_global, is_enabled, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`, f.Key, f.Name, f.Description, f.IsGlobal, f.IsEnabled, now, now)
+	`
+	id, err := r.db.InsertReturningID(query, f.Key, f.Name, f.Description, r.db.BoolValue(f.IsGlobal), r.db.BoolValue(f.IsEnabled), now, now)
 	if err != nil {
 		return err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return err
-	}
 	f.ID = int(id)
 	f.CreatedAt = now
 	f.UpdatedAt = now
@@ -117,7 +114,7 @@ func (r *FeatureFlagRepository) Update(f *models.FeatureFlag) error {
 		UPDATE feature_flags
 		SET name = ?, description = ?, is_global = ?, is_enabled = ?, updated_at = ?
 		WHERE id = ?
-	`, f.Name, f.Description, f.IsGlobal, f.IsEnabled, now, f.ID)
+	`, f.Name, f.Description, r.db.BoolValue(f.IsGlobal), r.db.BoolValue(f.IsEnabled), now, f.ID)
 	if err != nil {
 		return err
 	}
@@ -223,6 +220,7 @@ func (r *FeatureFlagRepository) IsEnabled(key string, tenantID int) (bool, error
 // SetTenantFlag sets a feature flag for a specific tenant
 func (r *FeatureFlagRepository) SetTenantFlag(tenantID, flagID int, isEnabled bool, enabledBy *int) error {
 	now := time.Now()
+	boolVal := r.db.BoolValue(isEnabled)
 
 	// Try to insert, if exists update
 	result, err := r.db.Exec(`
@@ -230,7 +228,7 @@ func (r *FeatureFlagRepository) SetTenantFlag(tenantID, flagID int, isEnabled bo
 		VALUES (?, ?, ?, ?, ?)
 		ON CONFLICT(tenant_id, feature_flag_id) DO UPDATE SET
 			is_enabled = ?, enabled_at = ?, enabled_by = ?
-	`, tenantID, flagID, isEnabled, now, enabledBy, isEnabled, now, enabledBy)
+	`, tenantID, flagID, boolVal, now, enabledBy, boolVal, now, enabledBy)
 
 	if err != nil {
 		// Fallback for MySQL which uses different syntax
@@ -238,7 +236,7 @@ func (r *FeatureFlagRepository) SetTenantFlag(tenantID, flagID int, isEnabled bo
 			INSERT INTO tenant_feature_flags (tenant_id, feature_flag_id, is_enabled, enabled_at, enabled_by)
 			VALUES (?, ?, ?, ?, ?)
 			ON DUPLICATE KEY UPDATE is_enabled = ?, enabled_at = ?, enabled_by = ?
-		`, tenantID, flagID, isEnabled, now, enabledBy, isEnabled, now, enabledBy)
+		`, tenantID, flagID, boolVal, now, enabledBy, boolVal, now, enabledBy)
 		if err != nil {
 			return err
 		}
@@ -251,7 +249,7 @@ func (r *FeatureFlagRepository) SetTenantFlag(tenantID, flagID int, isEnabled bo
 				UPDATE tenant_feature_flags
 				SET is_enabled = ?, enabled_at = ?, enabled_by = ?
 				WHERE tenant_id = ? AND feature_flag_id = ?
-			`, isEnabled, now, enabledBy, tenantID, flagID)
+			`, boolVal, now, enabledBy, tenantID, flagID)
 			if err != nil {
 				return err
 			}

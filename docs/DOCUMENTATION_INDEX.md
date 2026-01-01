@@ -12,7 +12,7 @@ Gassigeher supports two deployment modes:
 
 | Mode | Description | Database | Use Case |
 |------|-------------|----------|----------|
-| **Simple-Mode** | Single-tenant | SQLite/MySQL/PostgreSQL | Individual shelters |
+| **Simple-Mode** | Single-tenant | SQLite or PostgreSQL | Individual shelters |
 | **SaaS-Mode** | Multi-tenant | PostgreSQL with RLS | Platform for 500+ shelters |
 
 ---
@@ -154,7 +154,6 @@ Gassigeher supports two deployment modes:
 
 ### Database
 - [Database_Selection_Guide.md](Database_Selection_Guide.md) - Choosing the right DB
-- [MySQL_Setup_Guide.md](MySQL_Setup_Guide.md) - MySQL configuration
 - [PostgreSQL_Setup_Guide.md](PostgreSQL_Setup_Guide.md) - PostgreSQL + RLS for SaaS
 
 ### Legal & Compliance
@@ -242,7 +241,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for complete guide.
 - 85+ API endpoints implemented
 - 26+ pages (user + admin)
 - 18+ email notification types
-- SQLite/MySQL/PostgreSQL support
+- SQLite and PostgreSQL support
 - Color-based access control
 - Configurable booking time rules
 - German holiday integration

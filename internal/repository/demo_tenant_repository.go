@@ -10,11 +10,11 @@ import (
 
 // DemoTenantRepository handles demo tenant state database operations
 type DemoTenantRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
 // NewDemoTenantRepository creates a new demo tenant repository
-func NewDemoTenantRepository(db *sql.DB) *DemoTenantRepository {
+func NewDemoTenantRepository(db DBExecutor) *DemoTenantRepository {
 	return &DemoTenantRepository{db: db}
 }
 
@@ -53,7 +53,7 @@ func (r *DemoTenantRepository) CreateState(state *models.DemoTenantState) error 
 		VALUES (?, ?, ?, ?)
 	`
 
-	result, err := r.db.Exec(
+	id, err := r.db.InsertReturningID(
 		query,
 		state.TenantID,
 		state.AdminPassword,
@@ -62,11 +62,6 @@ func (r *DemoTenantRepository) CreateState(state *models.DemoTenantState) error 
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create demo state: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get demo state ID: %w", err)
 	}
 
 	state.ID = int(id)
@@ -100,7 +95,7 @@ func (r *DemoTenantRepository) GetCredentials(tenantID int) (*models.DemoCredent
 	query := `
 		SELECT dts.admin_password, dts.last_reset_at, dts.next_reset_at, u.email
 		FROM demo_tenant_state dts
-		JOIN users u ON u.tenant_id = dts.tenant_id AND u.is_super_admin = 1
+		JOIN users u ON u.tenant_id = dts.tenant_id AND u.is_super_admin = ?
 		WHERE dts.tenant_id = ?
 		LIMIT 1
 	`
@@ -109,7 +104,7 @@ func (r *DemoTenantRepository) GetCredentials(tenantID int) (*models.DemoCredent
 	var lastReset, nextReset *time.Time
 	var email string
 
-	err := r.db.QueryRow(query, tenantID).Scan(&password, &lastReset, &nextReset, &email)
+	err := r.db.QueryRow(query, r.db.BoolValue(true), tenantID).Scan(&password, &lastReset, &nextReset, &email)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

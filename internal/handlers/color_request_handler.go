@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"io"
 	"log"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -17,15 +17,15 @@ import (
 
 // ColorRequestHandler handles color request-related HTTP requests
 type ColorRequestHandler struct {
-	db               *sql.DB
-	cfg              *config.Config
-	requestRepo      *repository.ColorRequestRepository
-	colorRepo        *repository.ColorCategoryRepository
-	userColorRepo    *repository.UserColorRepository
+	db            *database.DB
+	cfg           *config.Config
+	requestRepo   *repository.ColorRequestRepository
+	colorRepo     *repository.ColorCategoryRepository
+	userColorRepo *repository.UserColorRepository
 }
 
 // NewColorRequestHandler creates a new color request handler
-func NewColorRequestHandler(db *sql.DB, cfg *config.Config) *ColorRequestHandler {
+func NewColorRequestHandler(db *database.DB, cfg *config.Config) *ColorRequestHandler {
 	return &ColorRequestHandler{
 		db:            db,
 		cfg:           cfg,

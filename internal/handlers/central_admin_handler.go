@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
 	"github.com/tranmh/gassigeher/internal/cron"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/logging"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
@@ -33,7 +34,7 @@ func escapeSQLLikeWildcards(s string) string {
 
 // CentralAdminHandler handles platform-wide administration
 type CentralAdminHandler struct {
-	db          *sql.DB
+	db          *database.DB
 	cfg         *config.Config
 	tenantRepo  *repository.TenantRepository
 	userRepo    *repository.UserRepository
@@ -41,7 +42,7 @@ type CentralAdminHandler struct {
 }
 
 // NewCentralAdminHandler creates a new central admin handler
-func NewCentralAdminHandler(db *sql.DB, cfg *config.Config) *CentralAdminHandler {
+func NewCentralAdminHandler(db *database.DB, cfg *config.Config) *CentralAdminHandler {
 	return &CentralAdminHandler{
 		db:          db,
 		cfg:         cfg,
@@ -96,7 +97,7 @@ func (h *CentralAdminHandler) GetPlatformStats(w http.ResponseWriter, r *http.Re
 	}
 
 	// Total users
-	err = h.db.QueryRow(`SELECT COUNT(*) FROM users WHERE is_deleted = 0`).Scan(&stats.TotalUsers)
+	err = h.db.QueryRow(`SELECT COUNT(*) FROM users WHERE is_deleted = ?`, h.db.BoolValue(false)).Scan(&stats.TotalUsers)
 	if err != nil {
 		log.Printf("Error getting total users: %v", err)
 	}
@@ -137,16 +138,18 @@ func (h *CentralAdminHandler) ListTenants(w http.ResponseWriter, r *http.Request
 	activeOnly := r.URL.Query().Get("active_only") == "true"
 	searchTerm := r.URL.Query().Get("search")
 
+	// Use parameterized boolean for PostgreSQL compatibility
+	isDeletedFalse := h.db.BoolValue(false)
 	query := `
 		SELECT
 			t.id, t.slug, t.name, t.contact_email, t.status, t.created_at,
-			(SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id AND u.is_deleted = 0) as user_count,
+			(SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id AND u.is_deleted = ?) as user_count,
 			(SELECT COUNT(*) FROM dogs d WHERE d.tenant_id = t.id) as dog_count,
 			(SELECT MAX(u.last_activity_at) FROM users u WHERE u.tenant_id = t.id) as last_login_at
 		FROM tenants t
 		WHERE 1=1
 	`
-	args := []interface{}{}
+	args := []interface{}{isDeletedFalse}
 
 	if activeOnly {
 		query += ` AND t.status = 'active'`
@@ -211,7 +214,7 @@ func (h *CentralAdminHandler) GetTenant(w http.ResponseWriter, r *http.Request) 
 
 	// Get additional stats (log errors but don't fail the request - stats are supplementary)
 	var userCount, dogCount, bookingCount int
-	if err := h.db.QueryRow(`SELECT COUNT(*) FROM users WHERE tenant_id = ? AND is_deleted = 0`, tenantID).Scan(&userCount); err != nil {
+	if err := h.db.QueryRow(`SELECT COUNT(*) FROM users WHERE tenant_id = ? AND is_deleted = ?`, tenantID, h.db.BoolValue(false)).Scan(&userCount); err != nil {
 		log.Printf("Warning: Failed to get user count for tenant %d: %v", tenantID, err)
 	}
 	if err := h.db.QueryRow(`SELECT COUNT(*) FROM dogs WHERE tenant_id = ?`, tenantID).Scan(&dogCount); err != nil {
@@ -352,9 +355,9 @@ func (h *CentralAdminHandler) ListCentralAdmins(w http.ResponseWriter, r *http.R
 	rows, err := h.db.Query(`
 		SELECT id, first_name, last_name, email, is_active, created_at, last_activity_at
 		FROM users
-		WHERE is_central_admin = 1 AND is_deleted = 0
+		WHERE is_central_admin = ? AND is_deleted = ?
 		ORDER BY created_at ASC
-	`)
+	`, h.db.BoolValue(true), h.db.BoolValue(false))
 	if err != nil {
 		log.Printf("Error listing central admins: %v", err)
 		respondError(w, http.StatusInternalServerError, "Fehler beim Laden der Administratoren")
@@ -414,7 +417,7 @@ func (h *CentralAdminHandler) PromoteToCentralAdmin(w http.ResponseWriter, r *ht
 	}
 
 	// Update user
-	_, err = h.db.Exec(`UPDATE users SET is_central_admin = 1 WHERE id = ?`, userID)
+	_, err = h.db.Exec(`UPDATE users SET is_central_admin = ? WHERE id = ?`, h.db.BoolValue(true), userID)
 	if err != nil {
 		log.Printf("Error promoting to central admin: %v", err)
 		respondError(w, http.StatusInternalServerError, "Fehler beim Befördern")
@@ -457,7 +460,7 @@ func (h *CentralAdminHandler) DemoteFromCentralAdmin(w http.ResponseWriter, r *h
 	}
 
 	// Update user
-	_, err = h.db.Exec(`UPDATE users SET is_central_admin = 0 WHERE id = ?`, userID)
+	_, err = h.db.Exec(`UPDATE users SET is_central_admin = ? WHERE id = ?`, h.db.BoolValue(false), userID)
 	if err != nil {
 		log.Printf("Error demoting from central admin: %v", err)
 		respondError(w, http.StatusInternalServerError, "Fehler beim Degradieren")
@@ -542,9 +545,12 @@ func (h *CentralAdminHandler) SearchUsers(w http.ResponseWriter, r *http.Request
 	var err error
 	var totalCount int
 
+	// Use parameterized boolean for PostgreSQL compatibility
+	isDeletedFalse := h.db.BoolValue(false)
+
 	if searchTerm == "" {
 		// No search term - return all users with pagination
-		err = h.db.QueryRow(`SELECT COUNT(*) FROM users WHERE is_deleted = 0`).Scan(&totalCount)
+		err = h.db.QueryRow(`SELECT COUNT(*) FROM users WHERE is_deleted = ?`, isDeletedFalse).Scan(&totalCount)
 		if err != nil {
 			log.Printf("Error counting users: %v", err)
 			respondError(w, http.StatusInternalServerError, "Fehler bei der Abfrage")
@@ -556,19 +562,19 @@ func (h *CentralAdminHandler) SearchUsers(w http.ResponseWriter, r *http.Request
 			       u.is_central_admin, u.is_active, u.created_at, t.name as tenant_name
 			FROM users u
 			LEFT JOIN tenants t ON u.tenant_id = t.id
-			WHERE u.is_deleted = 0
+			WHERE u.is_deleted = ?
 			ORDER BY u.last_name, u.first_name
 			LIMIT ? OFFSET ?
-		`, limit, offset)
+		`, isDeletedFalse, limit, offset)
 	} else {
 		// Search with term - escape LIKE wildcards to prevent injection
 		escapedTerm := escapeSQLLikeWildcards(searchTerm)
 		searchPattern := "%" + escapedTerm + "%"
 		err = h.db.QueryRow(`
 			SELECT COUNT(*) FROM users u
-			WHERE u.is_deleted = 0
+			WHERE u.is_deleted = ?
 			  AND (u.first_name LIKE ? ESCAPE '!' OR u.last_name LIKE ? ESCAPE '!' OR u.email LIKE ? ESCAPE '!')
-		`, searchPattern, searchPattern, searchPattern).Scan(&totalCount)
+		`, isDeletedFalse, searchPattern, searchPattern, searchPattern).Scan(&totalCount)
 		if err != nil {
 			log.Printf("Error counting users: %v", err)
 			respondError(w, http.StatusInternalServerError, "Fehler bei der Abfrage")
@@ -580,11 +586,11 @@ func (h *CentralAdminHandler) SearchUsers(w http.ResponseWriter, r *http.Request
 			       u.is_central_admin, u.is_active, u.created_at, t.name as tenant_name
 			FROM users u
 			LEFT JOIN tenants t ON u.tenant_id = t.id
-			WHERE u.is_deleted = 0
+			WHERE u.is_deleted = ?
 			  AND (u.first_name LIKE ? ESCAPE '!' OR u.last_name LIKE ? ESCAPE '!' OR u.email LIKE ? ESCAPE '!')
 			ORDER BY u.last_name, u.first_name
 			LIMIT ? OFFSET ?
-		`, searchPattern, searchPattern, searchPattern, limit, offset)
+		`, isDeletedFalse, searchPattern, searchPattern, searchPattern, limit, offset)
 	}
 
 	if err != nil {
@@ -641,9 +647,9 @@ func (h *CentralAdminHandler) ExportTenantData(w http.ResponseWriter, r *http.Re
 
 	// Collect all tenant data
 	export := map[string]interface{}{
-		"tenant":       tenant,
-		"exported_at":  time.Now(),
-		"exported_by":  r.Context().Value(middleware.UserIDKey),
+		"tenant":      tenant,
+		"exported_at": time.Now(),
+		"exported_by": r.Context().Value(middleware.UserIDKey),
 	}
 
 	// Get users
@@ -778,9 +784,9 @@ func (h *CentralAdminHandler) GetInactiveTenants(w http.ResponseWriter, r *http.
 	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"inactive_tenants":   tenants,
-		"inactivity_days":    days,
-		"total_inactive":     len(tenants),
+		"inactive_tenants": tenants,
+		"inactivity_days":  days,
+		"total_inactive":   len(tenants),
 	})
 }
 
@@ -813,10 +819,10 @@ func (h *CentralAdminHandler) GetTenantActivity(w http.ResponseWriter, r *http.R
 	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"tenants":          tenants,
-		"inactivity_days":  days,
-		"total_tenants":    len(tenants),
-		"inactive_count":   inactiveCount,
+		"tenants":         tenants,
+		"inactivity_days": days,
+		"total_tenants":   len(tenants),
+		"inactive_count":  inactiveCount,
 	})
 }
 

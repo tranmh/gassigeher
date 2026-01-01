@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -91,7 +91,7 @@ func getClientIP(r *http.Request) string {
 
 // TenantHandler handles tenant-related endpoints
 type TenantHandler struct {
-	db                  *sql.DB
+	db                  *database.DB
 	cfg                 *config.Config
 	tenantRepo          *repository.TenantRepository
 	userRepo            *repository.UserRepository
@@ -104,7 +104,7 @@ type TenantHandler struct {
 }
 
 // NewTenantHandler creates a new tenant handler
-func NewTenantHandler(db *sql.DB, cfg *config.Config) *TenantHandler {
+func NewTenantHandler(db *database.DB, cfg *config.Config) *TenantHandler {
 	emailService, _ := services.NewEmailService(services.ConfigToEmailConfig(cfg))
 	return &TenantHandler{
 		db:                  db,

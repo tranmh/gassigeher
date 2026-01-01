@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -26,8 +26,8 @@ type DogHandler struct {
 	dogRepo          *repository.DogRepository
 	userRepo         *repository.UserRepository
 	bookingRepo      *repository.BookingRepository
-	subscriptionRepo *repository.SubscriptionRepository    // SaaS: For checking dog limits
-	colorRepo        *repository.ColorCategoryRepository   // For resolving legacy category to color_id
+	subscriptionRepo *repository.SubscriptionRepository  // SaaS: For checking dog limits
+	colorRepo        *repository.ColorCategoryRepository // For resolving legacy category to color_id
 	imageService     *services.ImageService
 	emailService     *services.EmailService
 	s3Service        *services.S3Service // SaaS: For S3 storage
@@ -35,7 +35,7 @@ type DogHandler struct {
 }
 
 // NewDogHandler creates a new dog handler
-func NewDogHandler(db *sql.DB, cfg *config.Config) *DogHandler {
+func NewDogHandler(db *database.DB, cfg *config.Config) *DogHandler {
 	// Handle nil config gracefully
 	if cfg == nil {
 		log.Printf("WARNING: DogHandler created with nil config, using defaults")
@@ -72,8 +72,8 @@ func NewDogHandler(db *sql.DB, cfg *config.Config) *DogHandler {
 		dogRepo:          repository.NewDogRepository(db),
 		userRepo:         repository.NewUserRepository(db),
 		bookingRepo:      repository.NewBookingRepository(db),
-		subscriptionRepo: repository.NewSubscriptionRepository(db),    // SaaS: For dog limit checks
-		colorRepo:        repository.NewColorCategoryRepository(db),   // For resolving legacy category to color_id
+		subscriptionRepo: repository.NewSubscriptionRepository(db),  // SaaS: For dog limit checks
+		colorRepo:        repository.NewColorCategoryRepository(db), // For resolving legacy category to color_id
 		imageService:     services.NewImageService(cfg.UploadDir),
 		emailService:     emailService,
 		s3Service:        s3Service,
@@ -521,8 +521,8 @@ func (h *DogHandler) DeleteDog(w http.ResponseWriter, r *http.Request) {
 		}
 
 		respondJSON(w, http.StatusOK, map[string]interface{}{
-			"message":          "Hund erfolgreich gelöscht",
-			"cancelled_count":  len(bookings),
+			"message":         "Hund erfolgreich gelöscht",
+			"cancelled_count": len(bookings),
 		})
 		return
 	}

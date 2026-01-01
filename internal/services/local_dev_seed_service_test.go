@@ -4,30 +4,33 @@ import (
 	"database/sql"
 	"testing"
 
+	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/tranmh/gassigeher/internal/database"
 )
 
 // setupTestDB creates an in-memory SQLite database with migrations
-func setupTestDB(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite3", ":memory:")
+func setupTestDB(t *testing.T) *database.DB {
+	rawDB, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
 
 	// Run migrations
 	dialect := &database.SQLiteDialect{}
-	if err := database.RunMigrationsWithDialect(db, dialect); err != nil {
+	if err := database.RunMigrationsWithDialect(rawDB, dialect); err != nil {
 		t.Fatalf("Failed to run migrations: %v", err)
 	}
 
 	// Clear global data from migrations to start fresh for tenant-specific tests
 	// This removes colors, settings, etc. that were inserted without tenant_id
-	db.Exec("DELETE FROM color_categories WHERE tenant_id IS NULL OR tenant_id = 0")
-	db.Exec("DELETE FROM system_settings WHERE tenant_id IS NULL OR tenant_id = 0")
-	db.Exec("DELETE FROM booking_time_rules WHERE tenant_id IS NULL OR tenant_id = 0")
+	rawDB.Exec("DELETE FROM color_categories WHERE tenant_id IS NULL OR tenant_id = 0")
+	rawDB.Exec("DELETE FROM system_settings WHERE tenant_id IS NULL OR tenant_id = 0")
+	rawDB.Exec("DELETE FROM booking_time_rules WHERE tenant_id IS NULL OR tenant_id = 0")
 
-	return db
+	// Wrap in database.DB for cross-database support
+	sqlxDB := sqlx.NewDb(rawDB, "sqlite3")
+	return database.WrapSqlxDB(sqlxDB, dialect)
 }
 
 // TestLocalDevTenantConfigs verifies the tenant configurations
@@ -60,16 +63,16 @@ func TestLocalDevTenantConfigs(t *testing.T) {
 // TestGetProfileFromSlug tests the profile lookup function
 func TestGetProfileFromSlug(t *testing.T) {
 	tests := []struct {
-		slug    string
-		want    LocalDevProfile
+		slug string
+		want LocalDevProfile
 	}{
 		{"demo1", ProfileEmpty},
 		{"demo2", ProfileSmall},
 		{"demo3", ProfileMedium},
 		{"demo4", ProfileStress},
-		{"unknown", ProfileEmpty},  // Default
-		{"demo", ProfileEmpty},     // Not a local dev tenant
-		{"", ProfileEmpty},         // Empty slug
+		{"unknown", ProfileEmpty}, // Default
+		{"demo", ProfileEmpty},    // Not a local dev tenant
+		{"", ProfileEmpty},        // Empty slug
 	}
 
 	for _, tt := range tests {

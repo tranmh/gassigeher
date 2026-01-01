@@ -323,4 +323,3 @@ func TestReactivationRequestRepository_HasPendingRequest(t *testing.T) {
 		}
 	})
 }
-

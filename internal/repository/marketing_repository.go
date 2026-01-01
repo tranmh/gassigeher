@@ -10,11 +10,11 @@ import (
 
 // MarketingRepository handles marketing data operations
 type MarketingRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
 // NewMarketingRepository creates a new marketing repository
-func NewMarketingRepository(db *sql.DB) *MarketingRepository {
+func NewMarketingRepository(db DBExecutor) *MarketingRepository {
 	return &MarketingRepository{db: db}
 }
 
@@ -70,12 +70,12 @@ func (r *MarketingRepository) GetActiveCampaignByType(campaignType string) (*mod
 	now := FormatTimestamp(time.Now())
 	query := `SELECT id, type, name, description, config, is_active, start_date, end_date, created_at, updated_at
 			  FROM marketing_campaigns
-			  WHERE type = ? AND is_active = 1
+			  WHERE type = ? AND is_active = ?
 			  AND (start_date IS NULL OR start_date <= ?)
 			  AND (end_date IS NULL OR end_date >= ?)
 			  LIMIT 1`
 	c := &models.MarketingCampaign{}
-	err := r.db.QueryRow(query, campaignType, now, now).Scan(&c.ID, &c.Type, &c.Name, &c.Description, &c.Config, &c.IsActive, &c.StartDate, &c.EndDate, &c.CreatedAt, &c.UpdatedAt)
+	err := r.db.QueryRow(query, campaignType, r.db.BoolValue(true), now, now).Scan(&c.ID, &c.Type, &c.Name, &c.Description, &c.Config, &c.IsActive, &c.StartDate, &c.EndDate, &c.CreatedAt, &c.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -102,13 +102,9 @@ func (r *MarketingRepository) CreateCampaign(c *models.MarketingCampaign) error 
 
 	query := `INSERT INTO marketing_campaigns (type, name, description, config, is_active, start_date, end_date, created_at, updated_at)
 			  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	result, err := r.db.Exec(query, c.Type, c.Name, c.Description, c.Config, c.IsActive, startDateFormatted, endDateFormatted, nowFormatted, nowFormatted)
+	id, err := r.db.InsertReturningID(query, c.Type, c.Name, c.Description, c.Config, r.db.BoolValue(c.IsActive), startDateFormatted, endDateFormatted, nowFormatted, nowFormatted)
 	if err != nil {
 		return err
-	}
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get inserted campaign ID: %w", err)
 	}
 	c.ID = int(id)
 	c.CreatedAt = now
@@ -130,7 +126,7 @@ func (r *MarketingRepository) UpdateCampaign(c *models.MarketingCampaign) error 
 
 	query := `UPDATE marketing_campaigns SET name = ?, description = ?, config = ?, is_active = ?, start_date = ?, end_date = ?, updated_at = ?
 			  WHERE id = ?`
-	_, err := r.db.Exec(query, c.Name, c.Description, c.Config, c.IsActive, startDateFormatted, endDateFormatted, FormatTimestamp(time.Now()), c.ID)
+	_, err := r.db.Exec(query, c.Name, c.Description, c.Config, r.db.BoolValue(c.IsActive), startDateFormatted, endDateFormatted, FormatTimestamp(time.Now()), c.ID)
 	return err
 }
 
@@ -312,14 +308,10 @@ func (r *MarketingRepository) CreateReferralCode(c *models.ReferralCode) error {
 	query := `INSERT INTO referral_codes (code, referrer_tenant_id, referrer_email, discount_months_referrer,
 			  discount_months_referee, max_uses, is_active, expires_at, created_at, updated_at)
 			  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	result, err := r.db.Exec(query, c.Code, c.ReferrerTenantID, c.ReferrerEmail, c.DiscountMonthsReferrer,
-		c.DiscountMonthsReferee, c.MaxUses, c.IsActive, expiresAtFormatted, nowFormatted, nowFormatted)
+	id, err := r.db.InsertReturningID(query, c.Code, c.ReferrerTenantID, c.ReferrerEmail, c.DiscountMonthsReferrer,
+		c.DiscountMonthsReferee, c.MaxUses, r.db.BoolValue(c.IsActive), expiresAtFormatted, nowFormatted, nowFormatted)
 	if err != nil {
-		return err
-	}
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get inserted referral code ID: %w", err)
+		return fmt.Errorf("failed to create referral code: %w", err)
 	}
 	c.ID = int(id)
 	c.CreatedAt = now
@@ -339,7 +331,7 @@ func (r *MarketingRepository) UpdateReferralCode(c *models.ReferralCode) error {
 			  discount_months_referee = ?, max_uses = ?, is_active = ?, expires_at = ?, updated_at = ?
 			  WHERE id = ?`
 	_, err := r.db.Exec(query, c.Code, c.ReferrerEmail, c.DiscountMonthsReferrer, c.DiscountMonthsReferee,
-		c.MaxUses, c.IsActive, expiresAtFormatted, FormatTimestamp(time.Now()), c.ID)
+		c.MaxUses, r.db.BoolValue(c.IsActive), expiresAtFormatted, FormatTimestamp(time.Now()), c.ID)
 	return err
 }
 
@@ -428,14 +420,17 @@ func (r *MarketingRepository) HasTenantUsedReferral(tenantID int) (bool, error) 
 
 // ListReferenceEntries returns reference entries (optionally filtered by approval status)
 func (r *MarketingRepository) ListReferenceEntries(approvedOnly bool) ([]*models.ReferenceEntry, error) {
-	query := `SELECT id, tenant_id, display_name, city, federal_state, website_url, testimonial, logo_url, is_approved, display_order, created_at, updated_at
-			  FROM reference_entries`
+	var rows *sql.Rows
+	var err error
 	if approvedOnly {
-		query += " WHERE is_approved = 1"
+		query := `SELECT id, tenant_id, display_name, city, federal_state, website_url, testimonial, logo_url, is_approved, display_order, created_at, updated_at
+			  FROM reference_entries WHERE is_approved = ? ORDER BY display_order ASC, display_name ASC`
+		rows, err = r.db.Query(query, r.db.BoolValue(true))
+	} else {
+		query := `SELECT id, tenant_id, display_name, city, federal_state, website_url, testimonial, logo_url, is_approved, display_order, created_at, updated_at
+			  FROM reference_entries ORDER BY display_order ASC, display_name ASC`
+		rows, err = r.db.Query(query)
 	}
-	query += " ORDER BY display_order ASC, display_name ASC"
-
-	rows, err := r.db.Query(query)
 	if err != nil {
 		return nil, err
 	}
@@ -487,13 +482,9 @@ func (r *MarketingRepository) CreateReferenceEntry(e *models.ReferenceEntry) err
 	now := FormatTimestamp(time.Now())
 	query := `INSERT INTO reference_entries (tenant_id, display_name, city, federal_state, website_url, testimonial, logo_url, is_approved, display_order, created_at, updated_at)
 			  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	result, err := r.db.Exec(query, e.TenantID, e.DisplayName, e.City, e.FederalState, e.WebsiteURL, e.Testimonial, e.LogoURL, e.IsApproved, e.DisplayOrder, now, now)
+	id, err := r.db.InsertReturningID(query, e.TenantID, e.DisplayName, e.City, e.FederalState, e.WebsiteURL, e.Testimonial, e.LogoURL, r.db.BoolValue(e.IsApproved), e.DisplayOrder, now, now)
 	if err != nil {
-		return err
-	}
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get inserted reference entry ID: %w", err)
+		return fmt.Errorf("failed to create reference entry: %w", err)
 	}
 	e.ID = int(id)
 	return nil
@@ -503,13 +494,13 @@ func (r *MarketingRepository) CreateReferenceEntry(e *models.ReferenceEntry) err
 func (r *MarketingRepository) UpdateReferenceEntry(e *models.ReferenceEntry) error {
 	query := `UPDATE reference_entries SET display_name = ?, city = ?, federal_state = ?, website_url = ?, testimonial = ?, logo_url = ?, is_approved = ?, display_order = ?, updated_at = ?
 			  WHERE id = ?`
-	_, err := r.db.Exec(query, e.DisplayName, e.City, e.FederalState, e.WebsiteURL, e.Testimonial, e.LogoURL, e.IsApproved, e.DisplayOrder, FormatTimestamp(time.Now()), e.ID)
+	_, err := r.db.Exec(query, e.DisplayName, e.City, e.FederalState, e.WebsiteURL, e.Testimonial, e.LogoURL, r.db.BoolValue(e.IsApproved), e.DisplayOrder, FormatTimestamp(time.Now()), e.ID)
 	return err
 }
 
 // ApproveReferenceEntry approves a reference entry
 func (r *MarketingRepository) ApproveReferenceEntry(id int) error {
-	_, err := r.db.Exec("UPDATE reference_entries SET is_approved = 1, updated_at = ? WHERE id = ?", FormatTimestamp(time.Now()), id)
+	_, err := r.db.Exec("UPDATE reference_entries SET is_approved = ?, updated_at = ? WHERE id = ?", r.db.BoolValue(true), FormatTimestamp(time.Now()), id)
 	return err
 }
 
@@ -526,7 +517,7 @@ func (r *MarketingRepository) GetMarketingStats() (*models.MarketingStatsRespons
 	stats := &models.MarketingStatsResponse{}
 
 	// Active campaigns
-	r.db.QueryRow("SELECT COUNT(*) FROM marketing_campaigns WHERE is_active = 1").Scan(&stats.ActiveCampaigns)
+	r.db.QueryRow("SELECT COUNT(*) FROM marketing_campaigns WHERE is_active = ?", r.db.BoolValue(true)).Scan(&stats.ActiveCampaigns)
 
 	// Total referral codes
 	r.db.QueryRow("SELECT COUNT(*) FROM referral_codes").Scan(&stats.TotalReferralCodes)
@@ -535,10 +526,10 @@ func (r *MarketingRepository) GetMarketingStats() (*models.MarketingStatsRespons
 	r.db.QueryRow("SELECT COUNT(*) FROM referral_uses").Scan(&stats.TotalReferralUses)
 
 	// Approved references
-	r.db.QueryRow("SELECT COUNT(*) FROM reference_entries WHERE is_approved = 1").Scan(&stats.ApprovedReferences)
+	r.db.QueryRow("SELECT COUNT(*) FROM reference_entries WHERE is_approved = ?", r.db.BoolValue(true)).Scan(&stats.ApprovedReferences)
 
 	// Pending references
-	r.db.QueryRow("SELECT COUNT(*) FROM reference_entries WHERE is_approved = 0").Scan(&stats.PendingReferences)
+	r.db.QueryRow("SELECT COUNT(*) FROM reference_entries WHERE is_approved = ?", r.db.BoolValue(false)).Scan(&stats.PendingReferences)
 
 	return stats, nil
 }

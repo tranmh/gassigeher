@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"database/sql"
 	"net/http"
 	"strconv"
 	"sync"
@@ -10,6 +9,7 @@ import (
 	"golang.org/x/sync/singleflight"
 	"golang.org/x/time/rate"
 
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/repository"
 )
 
@@ -30,10 +30,10 @@ type TenantRateLimitConfig struct {
 // TenantRateLimitConfigs defines rate limits per subscription tier
 var TenantRateLimitConfigs = map[string]TenantRateLimitConfig{
 	"free": {
-		TenantRPS:   30,  // 30 req/s tenant-wide
-		TenantBurst: 60,  // Allow burst of 60
-		PerIPRPS:    20,  // 20 req/s per IP within tenant
-		PerIPBurst:  40,  // Allow burst of 40
+		TenantRPS:   30, // 30 req/s tenant-wide
+		TenantBurst: 60, // Allow burst of 60
+		PerIPRPS:    20, // 20 req/s per IP within tenant
+		PerIPBurst:  40, // Allow burst of 40
 	},
 	"pro": {
 		TenantRPS:   100, // 100 req/s tenant-wide
@@ -85,7 +85,7 @@ type ipLimiterEntry struct {
 }
 
 // NewTenantRateLimiter creates a new tenant-aware rate limiter
-func NewTenantRateLimiter(db *sql.DB) *TenantRateLimiter {
+func NewTenantRateLimiter(db *database.DB) *TenantRateLimiter {
 	trl := &TenantRateLimiter{
 		tenantLimiters:   make(map[int]*tenantLimiterEntry),
 		ipLimiters:       make(map[tenantIPKey]*ipLimiterEntry),
@@ -244,7 +244,7 @@ func CloseTenantRateLimiter() {
 
 // TenantRateLimit creates middleware that enforces both tenant-wide and per-IP limits
 // Must be applied after TenantMiddleware (requires tenant ID in context)
-func TenantRateLimit(db *sql.DB) func(http.Handler) http.Handler {
+func TenantRateLimit(db *database.DB) func(http.Handler) http.Handler {
 	// Use sync.Once to ensure single instance even if called multiple times
 	tenantRateLimiterOnce.Do(func() {
 		tenantRateLimiterInstance = NewTenantRateLimiter(db)
@@ -307,7 +307,7 @@ func GetTenantRateLimiterInstance() *TenantRateLimiter {
 
 // InitTenantRateLimiterForTest initializes the tenant rate limiter for testing
 // This allows tests to inject a mock database connection
-func InitTenantRateLimiterForTest(db *sql.DB) {
+func InitTenantRateLimiterForTest(db *database.DB) {
 	tenantRateLimiterOnce = sync.Once{} // Reset once for testing
 	tenantRateLimiterOnce.Do(func() {
 		tenantRateLimiterInstance = NewTenantRateLimiter(db)

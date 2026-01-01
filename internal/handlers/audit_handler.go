@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"database/sql"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/services"
@@ -17,7 +17,7 @@ type AuditHandler struct {
 }
 
 // NewAuditHandler creates a new audit handler
-func NewAuditHandler(db *sql.DB) *AuditHandler {
+func NewAuditHandler(db *database.DB) *AuditHandler {
 	return &AuditHandler{
 		auditService: services.NewAuditService(db),
 	}

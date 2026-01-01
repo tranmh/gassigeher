@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -18,14 +18,14 @@ import (
 
 // SettingsHandler handles system settings-related HTTP requests
 type SettingsHandler struct {
-	db           *sql.DB
+	db           *database.DB
 	cfg          *config.Config
 	settingsRepo *repository.SettingsRepository
 	imageService *services.ImageService
 }
 
 // NewSettingsHandler creates a new settings handler
-func NewSettingsHandler(db *sql.DB, cfg *config.Config) *SettingsHandler {
+func NewSettingsHandler(db *database.DB, cfg *config.Config) *SettingsHandler {
 	return &SettingsHandler{
 		db:           db,
 		cfg:          cfg,

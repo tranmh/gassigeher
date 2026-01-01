@@ -18,7 +18,9 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
+	"github.com/jmoiron/sqlx"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -28,14 +30,14 @@ import (
 )
 
 // setupTestDB creates a test database
-func setupTestDB(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite", ":memory:")
+func setupTestDB(t *testing.T) *database.DB {
+	rawDB, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
 
 	// Create dogs table (with tenant_id for SaaS support)
-	_, err = db.Exec(`
+	_, err = rawDB.Exec(`
 		CREATE TABLE dogs (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			tenant_id INTEGER,
@@ -67,7 +69,9 @@ func setupTestDB(t *testing.T) *sql.DB {
 		t.Fatalf("Failed to create dogs table: %v", err)
 	}
 
-	return db
+	// Wrap in database.DB for auto-rebinding
+	sqlxDB := sqlx.NewDb(rawDB, "sqlite")
+	return database.WrapSqlxDB(sqlxDB, database.NewSQLiteDialect())
 }
 
 // createTestImage creates a test image in memory

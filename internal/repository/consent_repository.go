@@ -9,17 +9,17 @@ import (
 
 // ConsentRepository handles consent database operations
 type ConsentRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
 // NewConsentRepository creates a new consent repository
-func NewConsentRepository(db *sql.DB) *ConsentRepository {
+func NewConsentRepository(db DBExecutor) *ConsentRepository {
 	return &ConsentRepository{db: db}
 }
 
 // Create records a new consent
 func (r *ConsentRepository) Create(consent *models.Consent) error {
-	result, err := r.db.Exec(`
+	id, err := r.db.InsertReturningID(`
 		INSERT INTO consents (user_id, tenant_id, consent_type, version, ip_address, user_agent, accepted_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		consent.UserID, consent.TenantID, consent.ConsentType, consent.Version,
@@ -29,10 +29,6 @@ func (r *ConsentRepository) Create(consent *models.Consent) error {
 		return err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return err
-	}
 	consent.ID = int(id)
 	return nil
 }

@@ -1,13 +1,13 @@
 package services
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"math/rand"
 	"strings"
 	"time"
 
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
 	"golang.org/x/crypto/bcrypt"
@@ -47,7 +47,7 @@ var LocalDevTenants = []LocalDevTenantConfig{
 
 // LocalDevSeedService handles local development tenant creation and reset
 type LocalDevSeedService struct {
-	db            *sql.DB
+	db            *database.DB
 	tenantRepo    *repository.TenantRepository
 	userRepo      *repository.UserRepository
 	dogRepo       *repository.DogRepository
@@ -59,7 +59,7 @@ type LocalDevSeedService struct {
 }
 
 // NewLocalDevSeedService creates a new local dev seed service
-func NewLocalDevSeedService(db *sql.DB) *LocalDevSeedService {
+func NewLocalDevSeedService(db *database.DB) *LocalDevSeedService {
 	return &LocalDevSeedService{
 		db:            db,
 		tenantRepo:    repository.NewTenantRepository(db),

@@ -10,11 +10,11 @@ import (
 
 // UserRepository handles user database operations
 type UserRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
 // NewUserRepository creates a new user repository
-func NewUserRepository(db *sql.DB) *UserRepository {
+func NewUserRepository(db DBExecutor) *UserRepository {
 	return &UserRepository{db: db}
 }
 
@@ -31,7 +31,7 @@ func (r *UserRepository) Create(user *models.User) error {
 	`
 
 	// tenant_id=0 is valid for Simple-Mode (non-SaaS)
-	result, err := r.db.Exec(
+	id, err := r.db.InsertReturningID(
 		query,
 		user.TenantID,
 		user.FirstName,
@@ -39,12 +39,12 @@ func (r *UserRepository) Create(user *models.User) error {
 		user.Email,
 		user.Phone,
 		user.PasswordHash,
-		user.IsAdmin,
-		user.IsSuperAdmin,
-		user.IsCentralAdmin,
-		user.IsVerified,
-		user.IsActive,
-		user.MustChangePassword,
+		r.db.BoolValue(user.IsAdmin),
+		r.db.BoolValue(user.IsSuperAdmin),
+		r.db.BoolValue(user.IsCentralAdmin),
+		r.db.BoolValue(user.IsVerified),
+		r.db.BoolValue(user.IsActive),
+		r.db.BoolValue(user.MustChangePassword),
 		user.VerificationToken,
 		user.VerificationTokenExpires,
 		user.TermsAcceptedAt,
@@ -52,11 +52,6 @@ func (r *UserRepository) Create(user *models.User) error {
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get user ID: %w", err)
 	}
 
 	user.ID = int(id)
@@ -74,7 +69,37 @@ func (r *UserRepository) CreateTx(tx *sql.Tx, user *models.User) error {
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	// tenant_id=0 is valid for Simple-Mode (non-SaaS)
+	// PostgreSQL requires RETURNING clause instead of LastInsertId
+	if r.db.GetDialectName() == "postgres" {
+		query = query + " RETURNING id"
+		var id int64
+		err := tx.QueryRow(
+			query,
+			user.TenantID,
+			user.FirstName,
+			user.LastName,
+			user.Email,
+			user.Phone,
+			user.PasswordHash,
+			r.db.BoolValue(user.IsAdmin),
+			r.db.BoolValue(user.IsSuperAdmin),
+			r.db.BoolValue(user.IsCentralAdmin),
+			r.db.BoolValue(user.IsVerified),
+			r.db.BoolValue(user.IsActive),
+			r.db.BoolValue(user.MustChangePassword),
+			user.VerificationToken,
+			user.VerificationTokenExpires,
+			user.TermsAcceptedAt,
+			user.LastActivityAt,
+		).Scan(&id)
+		if err != nil {
+			return fmt.Errorf("failed to create user: %w", err)
+		}
+		user.ID = int(id)
+		return nil
+	}
+
+	// SQLite/MySQL use LastInsertId
 	result, err := tx.Exec(
 		query,
 		user.TenantID,
@@ -83,12 +108,12 @@ func (r *UserRepository) CreateTx(tx *sql.Tx, user *models.User) error {
 		user.Email,
 		user.Phone,
 		user.PasswordHash,
-		user.IsAdmin,
-		user.IsSuperAdmin,
-		user.IsCentralAdmin,
-		user.IsVerified,
-		user.IsActive,
-		user.MustChangePassword,
+		r.db.BoolValue(user.IsAdmin),
+		r.db.BoolValue(user.IsSuperAdmin),
+		r.db.BoolValue(user.IsCentralAdmin),
+		r.db.BoolValue(user.IsVerified),
+		r.db.BoolValue(user.IsActive),
+		r.db.BoolValue(user.MustChangePassword),
 		user.VerificationToken,
 		user.VerificationTokenExpires,
 		user.TermsAcceptedAt,
@@ -119,9 +144,9 @@ func (r *UserRepository) FindByEmail(email string, tenantID int) (*models.User, 
 		       deactivation_reason, reactivated_at, deleted_at,
 		       created_at, updated_at
 		FROM users
-		WHERE email = ? AND tenant_id = ? AND is_deleted = 0
+		WHERE email = ? AND tenant_id = ? AND is_deleted = ?
 	`
-	args := []interface{}{email, tenantID}
+	args := []interface{}{email, tenantID, r.db.BoolValue(false)}
 
 	user := &models.User{}
 	var firstName, lastName sql.NullString
@@ -180,9 +205,9 @@ func (r *UserRepository) FindByEmail(email string, tenantID int) (*models.User, 
 // Used during tenant registration to prevent the same email from being used as admin
 // in multiple tenants, which would create login ambiguity.
 func (r *UserRepository) EmailExistsGlobally(email string) (bool, error) {
-	query := `SELECT COUNT(*) FROM users WHERE email = ? AND is_deleted = 0`
+	query := `SELECT COUNT(*) FROM users WHERE email = ? AND is_deleted = ?`
 	var count int
-	err := r.db.QueryRow(query, email).Scan(&count)
+	err := r.db.QueryRow(query, email, r.db.BoolValue(false)).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check email existence: %w", err)
 	}
@@ -287,13 +312,13 @@ func (r *UserRepository) FindByVerificationToken(token string) (*models.User, er
 		       deactivation_reason, reactivated_at, deleted_at,
 		       created_at, updated_at
 		FROM users
-		WHERE verification_token = ? AND is_deleted = 0
+		WHERE verification_token = ? AND is_deleted = ?
 	`
 
 	user := &models.User{}
 	var firstName, lastName sql.NullString
 	var tenantID sql.NullInt64
-	err := r.db.QueryRow(query, token).Scan(
+	err := r.db.QueryRow(query, token, r.db.BoolValue(false)).Scan(
 		&user.ID,
 		&tenantID,
 		&firstName,
@@ -355,13 +380,13 @@ func (r *UserRepository) FindByPasswordResetToken(token string) (*models.User, e
 		       deactivation_reason, reactivated_at, deleted_at,
 		       created_at, updated_at
 		FROM users
-		WHERE password_reset_token = ? AND is_deleted = 0
+		WHERE password_reset_token = ? AND is_deleted = ?
 	`
 
 	user := &models.User{}
 	var firstName, lastName sql.NullString
 	var tenantID sql.NullInt64
-	err := r.db.QueryRow(query, token).Scan(
+	err := r.db.QueryRow(query, token, r.db.BoolValue(false)).Scan(
 		&user.ID,
 		&tenantID,
 		&firstName,
@@ -486,14 +511,14 @@ func (r *UserRepository) UpdateLastActivity(userID int) error {
 // DeleteAccount performs GDPR-compliant account deletion (anonymization)
 func (r *UserRepository) DeleteAccount(userID int) error {
 	// Check if user is Super Admin by querying the database
-	var isSuperAdmin int
+	var isSuperAdmin bool
 	err := r.db.QueryRow("SELECT is_super_admin FROM users WHERE id = ?", userID).Scan(&isSuperAdmin)
 	if err != nil {
 		return fmt.Errorf("failed to check user status: %w", err)
 	}
 
 	// Prevent Super Admin deletion
-	if isSuperAdmin == 1 {
+	if isSuperAdmin {
 		return fmt.Errorf("cannot delete Super Admin account")
 	}
 
@@ -508,7 +533,7 @@ func (r *UserRepository) DeleteAccount(userID int) error {
 			phone = NULL,
 			password_hash = NULL,
 			profile_photo = NULL,
-			is_deleted = 1,
+			is_deleted = ?,
 			anonymous_id = ?,
 			deleted_at = ?,
 			updated_at = ?
@@ -516,7 +541,7 @@ func (r *UserRepository) DeleteAccount(userID int) error {
 	`
 
 	now := time.Now()
-	_, err = r.db.Exec(query, anonymousID, now, now, userID)
+	_, err = r.db.Exec(query, r.db.BoolValue(true), anonymousID, now, now, userID)
 	if err != nil {
 		return fmt.Errorf("failed to delete account: %w", err)
 	}
@@ -528,7 +553,7 @@ func (r *UserRepository) DeleteAccount(userID int) error {
 func (r *UserRepository) Deactivate(userID int, reason string) error {
 	query := `
 		UPDATE users SET
-			is_active = 0,
+			is_active = ?,
 			deactivated_at = ?,
 			deactivation_reason = ?,
 			updated_at = ?
@@ -536,7 +561,7 @@ func (r *UserRepository) Deactivate(userID int, reason string) error {
 	`
 
 	now := time.Now()
-	_, err := r.db.Exec(query, now, reason, now, userID)
+	_, err := r.db.Exec(query, r.db.BoolValue(false), now, reason, now, userID)
 	if err != nil {
 		return fmt.Errorf("failed to deactivate user: %w", err)
 	}
@@ -548,7 +573,7 @@ func (r *UserRepository) Deactivate(userID int, reason string) error {
 func (r *UserRepository) Activate(userID int) error {
 	query := `
 		UPDATE users SET
-			is_active = 1,
+			is_active = ?,
 			reactivated_at = ?,
 			deactivated_at = NULL,
 			deactivation_reason = NULL,
@@ -557,7 +582,7 @@ func (r *UserRepository) Activate(userID int) error {
 	`
 
 	now := time.Now()
-	_, err := r.db.Exec(query, now, now, userID)
+	_, err := r.db.Exec(query, r.db.BoolValue(true), now, now, userID)
 	if err != nil {
 		return fmt.Errorf("failed to activate user: %w", err)
 	}
@@ -577,16 +602,16 @@ func (r *UserRepository) FindInactiveUsers(tenantID int, days int) ([]*models.Us
 		       deactivation_reason, reactivated_at, deleted_at,
 		       created_at, updated_at
 		FROM users
-		WHERE is_active = 1
-		  AND is_deleted = 0
-		  AND is_admin = 0
-		  AND is_super_admin = 0
+		WHERE is_active = ?
+		  AND is_deleted = ?
+		  AND is_admin = ?
+		  AND is_super_admin = ?
 		  AND tenant_id = ?
 		  AND last_activity_at < ?
 	`
 
 	cutoffDate := time.Now().AddDate(0, 0, -days)
-	rows, err := r.db.Query(query, tenantID, cutoffDate)
+	rows, err := r.db.Query(query, r.db.BoolValue(true), r.db.BoolValue(false), r.db.BoolValue(false), r.db.BoolValue(false), tenantID, cutoffDate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query inactive users: %w", err)
 	}
@@ -661,17 +686,14 @@ func (r *UserRepository) FindAll(activeOnly *bool, tenantID int) ([]*models.User
 		       deactivation_reason, reactivated_at, deleted_at,
 		       created_at, updated_at
 		FROM users
-		WHERE is_deleted = 0 AND tenant_id = ?
+		WHERE is_deleted = ? AND tenant_id = ?
 	`
 
-	args := []interface{}{tenantID}
+	args := []interface{}{r.db.BoolValue(false), tenantID}
 
 	if activeOnly != nil {
-		if *activeOnly {
-			query += " AND is_active = 1"
-		} else {
-			query += " AND is_active = 0"
-		}
+		query += " AND is_active = ?"
+		args = append(args, r.db.BoolValue(*activeOnly))
 	}
 
 	query += " ORDER BY created_at DESC"
@@ -778,8 +800,8 @@ func (r *UserRepository) IsSuperAdmin(userID int) (bool, error) {
 
 // ClearMustChangePassword clears the must_change_password flag after password change
 func (r *UserRepository) ClearMustChangePassword(userID int) error {
-	query := `UPDATE users SET must_change_password = 0, updated_at = ? WHERE id = ?`
-	_, err := r.db.Exec(query, time.Now(), userID)
+	query := `UPDATE users SET must_change_password = ?, updated_at = ? WHERE id = ?`
+	_, err := r.db.Exec(query, r.db.BoolValue(false), time.Now(), userID)
 	if err != nil {
 		return fmt.Errorf("failed to clear must_change_password flag: %w", err)
 	}

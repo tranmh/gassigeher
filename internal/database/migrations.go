@@ -18,7 +18,7 @@ var validIdentifier = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 type Migration struct {
 	ID          string            // Unique identifier (e.g., "001_create_users_table")
 	Description string            // Human-readable description
-	Up          map[string]string // SQL statements for each database type (sqlite, mysql, postgres)
+	Up          map[string]string // SQL statements for each database type (sqlite, postgres)
 }
 
 // migrationRegistry stores all registered migrations
@@ -187,12 +187,6 @@ func isAlreadyExistsError(err error, dialect Dialect) bool {
 		return contains(errMsg, "already exists") ||
 			contains(errMsg, "duplicate column name")
 
-	case "mysql":
-		// MySQL errors
-		return contains(errMsg, "already exists") ||
-			contains(errMsg, "Duplicate column name") ||
-			contains(errMsg, "duplicate key")
-
 	case "postgres":
 		// PostgreSQL errors
 		return contains(errMsg, "already exists") ||
@@ -258,12 +252,10 @@ func GetMigrationStatus(db *sql.DB, dialect Dialect) (applied int, pending int, 
 }
 
 // createIndexIfNotExists creates an index if it doesn't already exist
-// Uses dialect-specific approach since MySQL doesn't support IF NOT EXISTS for indexes
+// SQLite and PostgreSQL support IF NOT EXISTS for indexes
 // BUG FIX: Validates identifiers to prevent SQL injection attacks
 func createIndexIfNotExists(db *sql.DB, dialect Dialect, indexName, tableName, columnName string) error {
 	// Validate identifiers to prevent SQL injection
-	// These values are interpolated into SQL strings because MySQL doesn't support
-	// parameterized identifiers (table names, column names, index names)
 	if !validIdentifier.MatchString(indexName) {
 		return fmt.Errorf("invalid index name: %q", indexName)
 	}
@@ -274,34 +266,7 @@ func createIndexIfNotExists(db *sql.DB, dialect Dialect, indexName, tableName, c
 		return fmt.Errorf("invalid column name: %q", columnName)
 	}
 
-	switch dialect.Name() {
-	case "mysql":
-		// MySQL: Check if index exists first using information_schema
-		var count int
-		err := db.QueryRow(`
-			SELECT COUNT(*) FROM information_schema.statistics
-			WHERE table_schema = DATABASE()
-			AND table_name = ?
-			AND index_name = ?`, tableName, indexName).Scan(&count)
-		if err != nil {
-			return fmt.Errorf("failed to check index existence: %w", err)
-		}
-		if count > 0 {
-			// Index already exists
-			return nil
-		}
-		// Create the index
-		_, err = db.Exec(fmt.Sprintf("CREATE INDEX %s ON %s(%s)", indexName, tableName, columnName))
-		return err
-
-	case "sqlite", "postgres":
-		// SQLite and PostgreSQL support IF NOT EXISTS
-		_, err := db.Exec(fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s ON %s(%s)", indexName, tableName, columnName))
-		return err
-
-	default:
-		// Fallback: try CREATE INDEX IF NOT EXISTS
-		_, err := db.Exec(fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s ON %s(%s)", indexName, tableName, columnName))
-		return err
-	}
+	// SQLite and PostgreSQL support IF NOT EXISTS
+	_, err := db.Exec(fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s ON %s(%s)", indexName, tableName, columnName))
+	return err
 }

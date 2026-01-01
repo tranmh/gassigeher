@@ -3,19 +3,19 @@ package repository
 import (
 	"database/sql"
 	"fmt"
-	"time"
 	"strings"
+	"time"
 
 	"github.com/tranmh/gassigeher/internal/models"
 )
 
 // BlockedDateRepository handles blocked date database operations
 type BlockedDateRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
 // NewBlockedDateRepository creates a new blocked date repository
-func NewBlockedDateRepository(db *sql.DB) *BlockedDateRepository {
+func NewBlockedDateRepository(db DBExecutor) *BlockedDateRepository {
 	return &BlockedDateRepository{db: db}
 }
 
@@ -30,7 +30,7 @@ func (r *BlockedDateRepository) Create(blockedDate *models.BlockedDate) error {
 	now := time.Now()
 
 	// tenant_id=0 is valid for Simple-Mode (non-SaaS)
-	result, err := r.db.Exec(query,
+	id, err := r.db.InsertReturningID(query,
 		blockedDate.TenantID,
 		blockedDate.Date,
 		blockedDate.DogID, // Can be nil for global block
@@ -49,11 +49,6 @@ func (r *BlockedDateRepository) Create(blockedDate *models.BlockedDate) error {
 			return fmt.Errorf("this date is already globally blocked")
 		}
 		return fmt.Errorf("failed to create blocked date: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get blocked date ID: %w", err)
 	}
 
 	blockedDate.ID = int(id)

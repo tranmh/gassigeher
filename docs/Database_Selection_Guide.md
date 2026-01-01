@@ -1,8 +1,8 @@
 # Database Selection Guide for Gassigeher
 
 **Purpose:** Help you choose the right database for your deployment
-**Last Updated:** 2025-01-22
-**Supported Databases:** SQLite, MySQL, PostgreSQL
+**Last Updated:** 2025-12-31
+**Supported Databases:** SQLite and PostgreSQL
 
 ---
 
@@ -11,12 +11,10 @@
 | Your Situation | Recommended Database | Why |
 |----------------|---------------------|-----|
 | **Development** | SQLite | Zero setup, fast, file-based |
-| **Small shelter (<500 users)** | SQLite | Simple, reliable, no server needed |
-| **Medium shelter (500-5000 users)** | MySQL | Proven, scalable, easy hosting |
-| **Large shelter (5000+ users)** | PostgreSQL | Enterprise-grade, highly concurrent |
-| **Multiple shelters** | PostgreSQL | Advanced features, better performance |
-| **Shared hosting** | MySQL | Most hosting providers support it |
-| **Cloud deployment** | MySQL or PostgreSQL | Both well-supported on cloud platforms |
+| **Small shelter (<1,000 users)** | SQLite | Simple, reliable, no server needed |
+| **Large shelter (1,000+ users)** | PostgreSQL | Enterprise-grade, highly concurrent |
+| **Multiple shelters (SaaS-Mode)** | PostgreSQL | Required for Row-Level Security |
+| **Cloud deployment** | PostgreSQL | Well-supported on cloud platforms |
 
 ---
 
@@ -27,79 +25,52 @@
 **Best For:** Development, small deployments, simple setups
 
 **Advantages:**
-- ✅ **Zero configuration** - No server to install or configure
-- ✅ **File-based** - Single file database (easy backup)
-- ✅ **Fast for small datasets** - Excellent performance up to 1000 users
-- ✅ **Portable** - Works on Windows, Linux, Mac
-- ✅ **No cost** - Free, no licensing
-- ✅ **Easy backup** - Just copy the file
+- Zero configuration - No server to install or configure
+- File-based - Single file database (easy backup)
+- Fast for small datasets - Excellent performance up to 1,000 users
+- Portable - Works on Windows, Linux, Mac
+- No cost - Free, no licensing
+- Easy backup - Just copy the file
 
 **Limitations:**
-- ❌ **Limited concurrency** - One writer at a time
-- ❌ **No network access** - Can't connect from remote clients
-- ❌ **Not for large scale** - Performance degrades above 1000 users
-- ❌ **Single server only** - Can't distribute across servers
+- Limited concurrency - One writer at a time
+- No network access - Cannot connect from remote clients
+- Not for large scale - Performance degrades above 1,000 users
+- Single server only - Cannot distribute across servers
 
 **Recommended For:**
 - Development and testing
 - Single-server deployments
-- Shelters with <500 users
+- Shelters with <1,000 users
 - Simple hosting requirements
 
 **Max Recommended Users:** 1,000
 
 ---
 
-### MySQL
-
-**Best For:** Web applications, medium to large deployments
-
-**Advantages:**
-- ✅ **Proven technology** - Used by millions of websites
-- ✅ **Great concurrency** - Handles many simultaneous users
-- ✅ **Wide hosting support** - Available on most web hosts
-- ✅ **Replication** - Can set up read replicas
-- ✅ **Good performance** - Optimized for web workloads
-- ✅ **Large community** - Extensive documentation and support
-
-**Limitations:**
-- ⚠️ **Requires server** - Need to install and maintain MySQL server
-- ⚠️ **More complex** - Configuration and tuning needed
-- ⚠️ **Memory usage** - Needs dedicated server resources
-- ⚠️ **Cost** - May require paid hosting or server
-
-**Recommended For:**
-- Production web applications
-- Shelters with 500-50,000 users
-- Shared hosting environments
-- Deployments requiring high availability
-
-**Max Recommended Users:** 100,000+
-
----
-
 ### PostgreSQL
 
-**Best For:** Enterprise applications, complex queries, high concurrency
+**Best For:** Enterprise applications, SaaS-Mode, high concurrency
 
 **Advantages:**
-- ✅ **Advanced features** - JSON, full-text search, geospatial
-- ✅ **Excellent concurrency** - Best for many simultaneous writers
-- ✅ **ACID compliant** - Strong data integrity guarantees
-- ✅ **Extensible** - Can add custom functions and types
-- ✅ **Standards compliant** - Follows SQL standards closely
-- ✅ **Great for analytics** - Complex queries perform well
+- Advanced features - JSON, full-text search, geospatial
+- Excellent concurrency - Best for many simultaneous writers
+- ACID compliant - Strong data integrity guarantees
+- Extensible - Can add custom functions and types
+- Standards compliant - Follows SQL standards closely
+- Great for analytics - Complex queries perform well
+- Row-Level Security - Required for SaaS multi-tenancy
 
 **Limitations:**
-- ⚠️ **More complex setup** - Requires PostgreSQL server
-- ⚠️ **Steeper learning curve** - More configuration options
-- ⚠️ **Resource intensive** - Needs more RAM than MySQL
-- ⚠️ **Less common on shared hosting** - May need VPS or cloud
+- More complex setup - Requires PostgreSQL server
+- Steeper learning curve - More configuration options
+- Resource intensive - Needs more RAM than SQLite
+- Less common on shared hosting - May need VPS or cloud
 
 **Recommended For:**
 - Enterprise deployments
-- Multiple shelter network
-- Shelters with 10,000+ users
+- SaaS-Mode deployments (required)
+- Shelters with 1,000+ users
 - Applications with complex data requirements
 - Cloud deployments (AWS RDS, Google Cloud SQL, etc.)
 
@@ -109,18 +80,19 @@
 
 ## Feature Comparison
 
-| Feature | SQLite | MySQL | PostgreSQL |
-|---------|--------|-------|------------|
-| **Setup Time** | 0 min | 15-30 min | 30-45 min |
-| **Maintenance** | None | Low-Medium | Medium |
-| **Backup** | File copy | mysqldump | pg_dump |
-| **Replication** | No | Yes | Yes |
-| **Clustering** | No | Yes | Yes |
-| **Full-Text Search** | Yes (FTS5) | Yes | Yes (Better) |
-| **JSON Support** | Yes | Yes | Yes (Better) |
-| **Concurrent Writes** | Limited | Good | Excellent |
-| **Transaction Performance** | Excellent | Good | Excellent |
-| **Storage Limit** | 281 TB | Unlimited | Unlimited |
+| Feature | SQLite | PostgreSQL |
+|---------|--------|------------|
+| **Setup Time** | 0 min | 30-45 min |
+| **Maintenance** | None | Medium |
+| **Backup** | File copy | pg_dump |
+| **Replication** | No | Yes |
+| **Clustering** | No | Yes |
+| **Full-Text Search** | Yes (FTS5) | Yes (Better) |
+| **JSON Support** | Yes | Yes (Better) |
+| **Concurrent Writes** | Limited | Excellent |
+| **Transaction Performance** | Excellent | Excellent |
+| **Storage Limit** | 281 TB | Unlimited |
+| **Row-Level Security** | No | Yes |
 
 ---
 
@@ -128,22 +100,21 @@
 
 ### Expected Response Times (Typical Queries)
 
-| Operation | SQLite | MySQL | PostgreSQL |
-|-----------|--------|-------|------------|
-| **Simple SELECT** | 0.1-0.5ms | 0.5-2ms | 0.5-2ms |
-| **Complex JOIN** | 1-5ms | 2-10ms | 2-8ms |
-| **INSERT** | 0.5-1ms | 1-3ms | 1-3ms |
-| **UPDATE** | 0.5-1ms | 1-3ms | 1-3ms |
-| **Transaction** | 1-2ms | 2-5ms | 2-5ms |
+| Operation | SQLite | PostgreSQL |
+|-----------|--------|------------|
+| **Simple SELECT** | 0.1-0.5ms | 0.5-2ms |
+| **Complex JOIN** | 1-5ms | 2-8ms |
+| **INSERT** | 0.5-1ms | 1-3ms |
+| **UPDATE** | 0.5-1ms | 1-3ms |
+| **Transaction** | 1-2ms | 2-5ms |
 
-**Note:** Network latency adds ~0.5-1ms for MySQL/PostgreSQL on remote servers
+**Note:** Network latency adds ~0.5-1ms for PostgreSQL on remote servers
 
 ### Concurrent User Support
 
 | Database | Concurrent Reads | Concurrent Writes | Max Users* |
 |----------|------------------|-------------------|------------|
 | **SQLite** | Unlimited | 1 at a time | 1,000 |
-| **MySQL** | Excellent | Good | 100,000+ |
 | **PostgreSQL** | Excellent | Excellent | 1,000,000+ |
 
 *Max users = realistic limit for Gassigeher use case
@@ -160,21 +131,6 @@
 **Backup Cost:** $0 (file copy)
 
 **Total:** ~$5-10/month (app server only)
-
----
-
-### MySQL
-
-**Server Cost:**
-- Shared hosting: Included
-- VPS: $10-50/month
-- Cloud (AWS RDS): $15-100/month
-
-**Hosting Cost:** Depends on size
-**Maintenance Cost:** Low
-**Backup Cost:** Included in hosting
-
-**Total:** ~$20-100/month (varies by hosting)
 
 ---
 
@@ -199,19 +155,17 @@
 
 **Recommended Path:**
 ```
-Development → SQLite
-  ↓
-Small Deployment (< 500 users) → SQLite
-  ↓
-Growing (500-5000 users) → Migrate to MySQL
-  ↓
-Enterprise (5000+ users) → Migrate to PostgreSQL (or stay on MySQL)
+Development -> SQLite
+  |
+Small Deployment (< 1,000 users) -> SQLite
+  |
+Growing (1,000+ users) -> Migrate to PostgreSQL
+  |
+SaaS-Mode -> PostgreSQL (required)
 ```
 
 **Migration Difficulty:**
-- SQLite → MySQL: Easy (1-2 hours)
-- SQLite → PostgreSQL: Easy (1-2 hours)
-- MySQL → PostgreSQL: Medium (2-4 hours)
+- SQLite -> PostgreSQL: Easy (1-2 hours)
 
 ---
 
@@ -219,26 +173,15 @@ Enterprise (5000+ users) → Migrate to PostgreSQL (or stay on MySQL)
 
 ### Signs You've Outgrown SQLite
 
-- ⚠️ Database file > 1 GB
-- ⚠️ Frequent "database locked" errors
-- ⚠️ Slow queries (>100ms for simple SELECTs)
-- ⚠️ More than 10 concurrent users
-- ⚠️ Need remote database access
-- ⚠️ Plan to exceed 1000 users
+- Database file > 1 GB
+- Frequent "database locked" errors
+- Slow queries (>100ms for simple SELECTs)
+- More than 10 concurrent users
+- Need remote database access
+- Plan to exceed 1,000 users
+- Want to deploy SaaS-Mode
 
-**Solution:** Migrate to MySQL or PostgreSQL
-
----
-
-### Signs You Need PostgreSQL Over MySQL
-
-- ⚠️ Complex queries (many JOINs, subqueries)
-- ⚠️ Need for advanced features (JSON, arrays, custom types)
-- ⚠️ High write concurrency (many simultaneous bookings)
-- ⚠️ Enterprise compliance requirements
-- ⚠️ Multi-region deployment planned
-
-**Solution:** Choose PostgreSQL or migrate from MySQL
+**Solution:** Migrate to PostgreSQL
 
 ---
 
@@ -246,29 +189,26 @@ Enterprise (5000+ users) → Migrate to PostgreSQL (or stay on MySQL)
 
 ```
 Start Here
-   ↓
-Do you have < 500 users?
-   ├─ Yes → Use SQLite ✅
-   │         (Simple, free, fast)
-   │
-   └─ No → Do you need enterprise features?
-            ├─ Yes → Use PostgreSQL ✅
-            │         (Advanced, scalable)
-            │
-            └─ No → Use MySQL ✅
-                      (Proven, widely supported)
+   |
+Do you need SaaS-Mode?
+   |-- Yes -> Use PostgreSQL (required for RLS)
+   |
+   +-- No -> Do you have < 1,000 users?
+               |-- Yes -> Use SQLite (Simple, free, fast)
+               |
+               +-- No -> Use PostgreSQL (Scalable, enterprise-grade)
 ```
 
 ---
 
 ## Detailed Comparison
 
-### SQLite Use Cases ✅
+### SQLite Use Cases
 
 **Perfect For:**
 - Local development
 - Demo/staging environments
-- Small animal shelters (1-50 dogs, <500 volunteers)
+- Small animal shelters (1-50 dogs, <1,000 volunteers)
 - Single-server deployments
 - Embedded applications
 
@@ -280,38 +220,14 @@ Do you have < 500 users?
 - Single VPS server
 
 **Database Size After 1 Year:**
-- Users: 100 × ~1KB = 100KB
-- Dogs: 20 × ~2KB = 40KB
-- Bookings: 1200 × ~500 bytes = 600KB
-- **Total: ~1MB** ✅ SQLite handles this easily
+- Users: 100 x ~1KB = 100KB
+- Dogs: 20 x ~2KB = 40KB
+- Bookings: 1200 x ~500 bytes = 600KB
+- **Total: ~1MB** - SQLite handles this easily
 
 ---
 
-### MySQL Use Cases ✅
-
-**Perfect For:**
-- Growing shelters (100-500 dogs, 500-10,000 volunteers)
-- Multiple concurrent users (10-100)
-- Web hosting environments
-- Moderate write load
-- Standard web applications
-
-**Example Deployment:**
-- Medium shelter with 200 dogs
-- 2,000 registered volunteers
-- 10-30 concurrent users typically
-- ~1,000 bookings per month
-- Cloud hosting (AWS, DigitalOcean, etc.)
-
-**Database Size After 1 Year:**
-- Users: 2,000 × ~1KB = 2MB
-- Dogs: 200 × ~2KB = 400KB
-- Bookings: 12,000 × ~500 bytes = 6MB
-- **Total: ~10MB** ✅ MySQL handles this with ease
-
----
-
-### PostgreSQL Use Cases ✅
+### PostgreSQL Use Cases
 
 **Perfect For:**
 - Large shelters or shelter networks
@@ -320,6 +236,7 @@ Do you have < 500 users?
 - Heavy write load
 - Complex reporting needs
 - Multi-region deployments
+- SaaS-Mode deployments
 
 **Example Deployment:**
 - Shelter network with 1,000+ dogs
@@ -330,10 +247,10 @@ Do you have < 500 users?
 - Advanced analytics
 
 **Database Size After 1 Year:**
-- Users: 10,000 × ~1KB = 10MB
-- Dogs: 1,000 × ~2KB = 2MB
-- Bookings: 120,000 × ~500 bytes = 60MB
-- **Total: ~75MB** ✅ PostgreSQL excels at this scale
+- Users: 10,000 x ~1KB = 10MB
+- Dogs: 1,000 x ~2KB = 2MB
+- Bookings: 120,000 x ~500 bytes = 60MB
+- **Total: ~75MB** - PostgreSQL excels at this scale
 
 ---
 
@@ -344,28 +261,11 @@ Do you have < 500 users?
 **.env:**
 ```bash
 # Minimal configuration (or no .env at all)
+DB_TYPE=sqlite
 DATABASE_PATH=./gassigeher.db
 ```
 
 **That's it!** No server, no additional configuration.
-
----
-
-### MySQL
-
-**.env:**
-```bash
-DB_TYPE=mysql
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=gassigeher
-DB_USER=gassigeher_user
-DB_PASSWORD=your_secure_password
-DB_MAX_OPEN_CONNS=25
-DB_MAX_IDLE_CONNS=5
-```
-
-**Setup Time:** 15-30 minutes (install MySQL, create database, configure)
 
 ---
 
@@ -406,22 +306,6 @@ DB_MAX_IDLE_CONNS=5
 
 ---
 
-### For MySQL
-
-**Best Hosting:**
-- Managed MySQL (AWS RDS, DigitalOcean Managed Databases)
-- VPS with MySQL installed
-- Shared hosting with MySQL
-
-**Requirements:**
-- 1GB RAM minimum (2GB recommended)
-- 20GB disk space
-- Reliable network
-
-**Cost:** $15-50/month (managed), $10-30/month (VPS + self-managed)
-
----
-
 ### For PostgreSQL
 
 **Best Hosting:**
@@ -442,23 +326,12 @@ DB_MAX_IDLE_CONNS=5
 
 ### When to Migrate
 
-**SQLite → MySQL:**
-- Reaching 500-1000 users
+**SQLite -> PostgreSQL:**
+- Reaching 500-1,000 users
 - Need for concurrent write access
 - Remote database access needed
 - Approaching 1GB database size
-
-**SQLite → PostgreSQL:**
-- Enterprise requirements
-- Need advanced features
-- High concurrency expected
-- Complex query requirements
-
-**MySQL → PostgreSQL:**
-- Outgrowing MySQL performance
-- Need PostgreSQL-specific features
-- Higher concurrency requirements
-- Complex data relationships
+- Planning SaaS-Mode deployment
 
 **Timeline:** Plan migration before hitting limits, not after
 
@@ -468,23 +341,24 @@ DB_MAX_IDLE_CONNS=5
 
 ### Technical Factors
 
-| Factor | SQLite | MySQL | PostgreSQL |
-|--------|--------|-------|------------|
-| **Concurrent Writers** | 1 | 100+ | 500+ |
-| **Query Complexity** | Simple-Medium | Medium-Complex | Very Complex |
-| **Data Size** | <10 GB | <1 TB | Unlimited |
-| **Setup Complexity** | ⭐ Easy | ⭐⭐⭐ Medium | ⭐⭐⭐⭐ Medium-Hard |
-| **Maintenance** | ⭐ None | ⭐⭐⭐ Regular | ⭐⭐⭐⭐ Regular |
+| Factor | SQLite | PostgreSQL |
+|--------|--------|------------|
+| **Concurrent Writers** | 1 | 500+ |
+| **Query Complexity** | Simple-Medium | Very Complex |
+| **Data Size** | <10 GB | Unlimited |
+| **Setup Complexity** | Easy | Medium-Hard |
+| **Maintenance** | None | Regular |
+| **Row-Level Security** | No | Yes |
 
 ### Business Factors
 
-| Factor | SQLite | MySQL | PostgreSQL |
-|--------|--------|-------|------------|
-| **Initial Cost** | $0 | $$ | $$$ |
-| **Ongoing Cost** | $ | $$ | $$$ |
-| **Team Expertise** | Easy | Common | Less Common |
-| **Vendor Support** | Limited | Excellent | Good |
-| **Cloud Options** | Limited | Excellent | Excellent |
+| Factor | SQLite | PostgreSQL |
+|--------|--------|------------|
+| **Initial Cost** | $0 | $$$ |
+| **Ongoing Cost** | $ | $$$ |
+| **Team Expertise** | Easy | Less Common |
+| **Vendor Support** | Limited | Good |
+| **Cloud Options** | Limited | Excellent |
 
 ---
 
@@ -506,30 +380,26 @@ DB_MAX_IDLE_CONNS=5
 
 ---
 
-### Medium Shelter (50-200 dogs, 500-5000 users)
+### Medium Shelter (50-200 dogs, 500-5,000 users)
 
-**Recommended:** MySQL
-**Why:** Better concurrency, scalability, hosting options
-**Cost:** ~$30-80/month (managed MySQL or VPS)
-
-**Alternative:** PostgreSQL if you have the expertise
+**Recommended:** PostgreSQL
+**Why:** Better concurrency, scalability, cloud support
+**Cost:** ~$30-80/month (managed PostgreSQL or VPS)
 
 ---
 
-### Large Shelter (200+ dogs, 5000+ users)
+### Large Shelter (200+ dogs, 5,000+ users)
 
 **Recommended:** PostgreSQL
 **Why:** Best performance at scale, advanced features
 **Cost:** ~$50-150/month (managed PostgreSQL)
 
-**Alternative:** MySQL if already invested in it
-
 ---
 
-### Shelter Network (Multiple Locations)
+### Shelter Network (Multiple Locations / SaaS-Mode)
 
-**Recommended:** PostgreSQL
-**Why:** Multi-region support, advanced features, scalability
+**Recommended:** PostgreSQL (Required)
+**Why:** Row-Level Security for multi-tenancy, scalability
 **Cost:** ~$100-500/month (cloud deployment with replication)
 
 ---
@@ -551,32 +421,6 @@ cp .env.example .env
 go run cmd/server/main.go
 
 # Done! Database created automatically
-```
-
----
-
-### Use MySQL (With Docker)
-
-```bash
-# 1. Start MySQL
-docker run --name gassigeher-mysql \
-  -e MYSQL_ROOT_PASSWORD=rootpass \
-  -e MYSQL_DATABASE=gassigeher \
-  -e MYSQL_USER=gassigeher_user \
-  -e MYSQL_PASSWORD=gassigeher_pass \
-  -p 3306:3306 -d mysql:8.0
-
-# 2. Configure .env
-DB_TYPE=mysql
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=gassigeher
-DB_USER=gassigeher_user
-DB_PASSWORD=gassigeher_pass
-
-# 3. Run application
-go run cmd/server/main.go
-# Tables created automatically!
 ```
 
 ---
@@ -611,7 +455,7 @@ go run cmd/server/main.go
 
 ### Can I switch databases later?
 
-**Yes!** Gassigeher supports all three databases. See the [Migration Guide](Database_Migration_Guide.md) for step-by-step instructions.
+**Yes!** Gassigeher supports both databases. You can migrate from SQLite to PostgreSQL when needed.
 
 ---
 
@@ -634,16 +478,15 @@ When you outgrow SQLite, you'll know (slow queries, database locked errors).
 
 ### Can I use a different database not listed?
 
-**Not currently.** Gassigeher supports SQLite, MySQL, and PostgreSQL. These cover 99% of use cases. To add another database (e.g., SQL Server, Oracle), you'd need to implement a dialect - see CLAUDE.md for details.
+**Not currently.** Gassigeher supports SQLite and PostgreSQL. These cover 99% of use cases.
 
 ---
 
 ### Which database is most reliable?
 
-All three are **extremely reliable** when properly configured. Choose based on your needs, not reliability concerns.
+Both are **extremely reliable** when properly configured. Choose based on your needs, not reliability concerns.
 
 - SQLite: Billions of deployments, rock-solid
-- MySQL: Powers most of the web, battle-tested
 - PostgreSQL: Bank-grade reliability, ACID compliant
 
 ---
@@ -651,12 +494,6 @@ All three are **extremely reliable** when properly configured. Choose based on y
 ### Can I use managed database services?
 
 **Yes!** Gassigeher works great with:
-
-**MySQL:**
-- AWS RDS for MySQL
-- Google Cloud SQL for MySQL
-- Azure Database for MySQL
-- DigitalOcean Managed MySQL
 
 **PostgreSQL:**
 - AWS RDS for PostgreSQL
@@ -673,19 +510,17 @@ Just set `DB_HOST`, `DB_USER`, `DB_PASSWORD` to your managed service credentials
 
 **For most users:** Start with **SQLite** (simple, free, fast)
 
-**When growing:** Migrate to **MySQL** (proven, widely supported)
+**When growing:** Migrate to **PostgreSQL** (advanced, scalable)
 
-**For enterprise:** Use **PostgreSQL** (advanced, scalable)
+**For SaaS-Mode:** Use **PostgreSQL** (required for Row-Level Security)
 
 **Switching databases:** Easy - just change environment variables and run migrations!
 
 ---
 
 **Related Documentation:**
-- [MySQL Setup Guide](MySQL_Setup_Guide.md) - Detailed MySQL configuration
 - [PostgreSQL Setup Guide](PostgreSQL_Setup_Guide.md) - Detailed PostgreSQL configuration
-- [Database Migration Guide](Database_Migration_Guide.md) - How to migrate between databases
-- [Multi-Database Testing Guide](MultiDatabase_Testing_Guide.md) - Testing with all databases
+- [Multi-Database Testing Guide](MultiDatabase_Testing_Guide.md) - Testing with both databases
 
 ---
 
@@ -693,6 +528,6 @@ Just set `DB_HOST`, `DB_USER`, `DB_PASSWORD` to your managed service credentials
 1. How many users do you expect?
 2. What's your technical expertise?
 3. What's your budget?
-4. Do you have existing database infrastructure?
+4. Do you need SaaS-Mode (multi-tenancy)?
 
 Still unsure? **Start with SQLite** - you can always migrate later!

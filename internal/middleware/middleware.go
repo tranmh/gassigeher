@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"net/http"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/logging"
 	"github.com/tranmh/gassigeher/internal/repository"
 	"github.com/tranmh/gassigeher/internal/services"
@@ -20,8 +20,8 @@ type contextKey string
 const UserIDKey contextKey = "userID"
 const EmailKey contextKey = "email"
 const IsAdminKey contextKey = "isAdmin"
-const IsSuperAdminKey contextKey = "isSuperAdmin"         // DONE: Phase 3
-const IsCentralAdminKey contextKey = "isCentralAdmin"     // SaaS: Platform-wide admin
+const IsSuperAdminKey contextKey = "isSuperAdmin"     // DONE: Phase 3
+const IsCentralAdminKey contextKey = "isCentralAdmin" // SaaS: Platform-wide admin
 const RequestIDKey contextKey = "requestID"
 const OriginalUserIDKey contextKey = "originalUserID"   // Impersonation: Super-admin's real ID
 const IsImpersonatingKey contextKey = "isImpersonating" // Impersonation: Boolean flag
@@ -85,6 +85,7 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 		log.Println(entry.Format())
 	})
 }
+
 // DONE: Enhanced logging with status code, request ID, client IP, etc.
 
 // CORSMiddleware adds CORS headers
@@ -306,7 +307,7 @@ var (
 
 // verifyAdminStatus checks the database to verify the user is still an admin and active
 // Results are cached for 1 minute to balance security and performance
-func verifyAdminStatus(db *sql.DB, userID int) (isAdmin, isActive bool, err error) {
+func verifyAdminStatus(db *database.DB, userID int) (isAdmin, isActive bool, err error) {
 	// Check cache first
 	adminVerificationMu.RLock()
 	entry, exists := adminVerificationCache[userID]
@@ -341,7 +342,7 @@ func verifyAdminStatus(db *sql.DB, userID int) (isAdmin, isActive bool, err erro
 // RequireAdminWithVerification is a more secure version of RequireAdmin that
 // verifies the user's admin status against the database (cached for 1 minute).
 // Use this for sensitive admin operations where immediate revocation is critical.
-func RequireAdminWithVerification(db *sql.DB) func(http.Handler) http.Handler {
+func RequireAdminWithVerification(db *database.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// First check JWT claims

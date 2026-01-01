@@ -25,7 +25,7 @@ function getTestConfig(mode = process.env.PLAYWRIGHT_TEST_MODE || TEST_MODES.SAA
       credentials: {
         admin: {
           email: 'admin@demo.gassigeher.org',
-          password: process.env.DEMO_ADMIN_PASSWORD || 'f2edd4c1b5bb'
+          password: process.env.DEMO_ADMIN_PASSWORD || 'demo1234'
         },
         // Demo users have fixed password
         greenUser: {
@@ -64,12 +64,11 @@ function getTestConfig(mode = process.env.PLAYWRIGHT_TEST_MODE || TEST_MODES.SAA
       // Main domain for landing/central admin
       mainDomainURL: process.env.SAAS_MAIN_URL || 'http://gassigeher.local:8080',
 
-      // Demo tenant credentials (from demo_tenant_state table)
+      // Demo tenant credentials (all demo users use same password)
       credentials: {
         admin: {
           email: 'admin@demo.gassigeher.org',
-          // This password may change - should be read from demo_tenant_state
-          password: process.env.DEMO_ADMIN_PASSWORD || 'f2edd4c1b5bb'
+          password: process.env.DEMO_ADMIN_PASSWORD || 'demo1234'
         },
         // Demo users have fixed password
         greenUser: {

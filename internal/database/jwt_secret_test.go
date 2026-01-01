@@ -159,18 +159,18 @@ func TestIsFreshInstall(t *testing.T) {
 
 	// Before migrations - should be fresh install
 	t.Run("before migrations", func(t *testing.T) {
-		if !IsFreshInstall(db) {
+		if !IsFreshInstall(db.SqlDB()) {
 			t.Error("IsFreshInstall() = false, want true (no schema_migrations table)")
 		}
 	})
 
 	// After migrations - should not be fresh install
 	t.Run("after migrations", func(t *testing.T) {
-		if err := RunMigrationsWithDialect(db, dialect); err != nil {
+		if err := RunMigrationsWithDialect(db.SqlDB(), dialect); err != nil {
 			t.Fatalf("Failed to run migrations: %v", err)
 		}
 
-		if IsFreshInstall(db) {
+		if IsFreshInstall(db.SqlDB()) {
 			t.Error("IsFreshInstall() = true, want false (schema_migrations exists with entries)")
 		}
 	})

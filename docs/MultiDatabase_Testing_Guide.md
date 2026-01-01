@@ -1,7 +1,8 @@
 # Multi-Database Testing Guide
 
 **Created:** 2025-01-22
-**Purpose:** Guide for testing Gassigeher with SQLite, MySQL, and PostgreSQL
+**Updated:** 2025-12-31
+**Purpose:** Guide for testing Gassigeher with SQLite and PostgreSQL
 **Audience:** Developers, QA, CI/CD Engineers
 
 ---
@@ -20,33 +21,7 @@ go test ./...
 # Result: Uses in-memory SQLite, fast, no setup needed
 ```
 
-**Expected:** 172/172 tests passing ✅
-
----
-
-### Test with MySQL (Requires Docker)
-
-```bash
-# 1. Start MySQL test database
-docker-compose -f docker-compose.test.yml up -d mysql-test
-
-# 2. Wait for it to be ready (automatic health checks)
-# Takes about 10-15 seconds
-
-# 3. Set connection string
-export DB_TEST_MYSQL="gassigeher_test:testpass@tcp(localhost:3307)/gassigeher_test?parseTime=true&charset=utf8mb4"
-
-# Windows PowerShell:
-$env:DB_TEST_MYSQL="gassigeher_test:testpass@tcp(localhost:3307)/gassigeher_test?parseTime=true&charset=utf8mb4"
-
-# 4. Run tests
-go test ./...
-
-# 5. Stop database when done
-docker-compose -f docker-compose.test.yml down
-```
-
-**Expected:** MySQL tests run instead of being skipped
+**Expected:** All tests passing
 
 ---
 
@@ -73,7 +48,7 @@ docker-compose -f docker-compose.test.yml down
 
 ---
 
-### Test All Three Databases (Automated)
+### Test Both Databases (Automated)
 
 ```bash
 # PowerShell (Windows):
@@ -86,13 +61,11 @@ chmod +x scripts/test_all_databases.sh
 
 **What It Does:**
 1. Runs tests with SQLite
-2. Starts MySQL via Docker
-3. Runs tests with MySQL
-4. Starts PostgreSQL via Docker
-5. Runs tests with PostgreSQL
-6. Reports summary
+2. Starts PostgreSQL via Docker
+3. Runs tests with PostgreSQL
+4. Reports summary
 
-**Duration:** ~2-3 minutes total
+**Duration:** ~1-2 minutes total
 
 ---
 
@@ -101,20 +74,18 @@ chmod +x scripts/test_all_databases.sh
 ### File: `docker-compose.test.yml`
 
 **Services:**
-- `mysql-test` - MySQL 8.0 on port 3307
 - `postgres-test` - PostgreSQL 15 on port 5433
 - `adminer` - Web UI for database management (port 8081)
 
 ### Commands
 
-**Start all test databases:**
+**Start test database:**
 ```bash
-docker-compose -f docker-compose.test.yml up -d
+docker-compose -f docker-compose.test.yml up -d postgres-test
 ```
 
 **View logs:**
 ```bash
-docker-compose -f docker-compose.test.yml logs -f mysql-test
 docker-compose -f docker-compose.test.yml logs -f postgres-test
 ```
 
@@ -123,7 +94,7 @@ docker-compose -f docker-compose.test.yml logs -f postgres-test
 docker-compose -f docker-compose.test.yml ps
 ```
 
-**Stop databases:**
+**Stop database:**
 ```bash
 docker-compose -f docker-compose.test.yml down
 ```
@@ -136,20 +107,6 @@ docker-compose -f docker-compose.test.yml down -v
 ---
 
 ## Test Database Credentials
-
-### MySQL
-
-- **Host:** localhost
-- **Port:** 3307 (mapped from 3306)
-- **Database:** gassigeher_test
-- **User:** gassigeher_test
-- **Password:** testpass
-- **Root Password:** testpass_root
-
-**Connection String:**
-```
-gassigeher_test:testpass@tcp(localhost:3307)/gassigeher_test?parseTime=true&charset=utf8mb4
-```
 
 ### PostgreSQL
 
@@ -169,13 +126,6 @@ postgres://gassigeher_test:testpass@localhost:5433/gassigeher_test?sslmode=disab
 ## Adminer Web UI
 
 **Access:** http://localhost:8081
-
-**MySQL Login:**
-- System: MySQL
-- Server: mysql-test
-- Username: gassigeher_test
-- Password: testpass
-- Database: gassigeher_test
 
 **PostgreSQL Login:**
 - System: PostgreSQL
@@ -199,14 +149,12 @@ postgres://gassigeher_test:testpass@localhost:5433/gassigeher_test?sslmode=disab
 **Run:** `go test ./internal/database -v`
 
 **Tests:**
-- Dialect implementations (16 tests)
-- Migration registry (5 tests)
-- Migration runner (9 tests)
-- Integration tests (6 tests)
+- Dialect implementations
+- Migration registry
+- Migration runner
+- Integration tests
 
-**Total:** 36 database tests
-
-**Databases:** Runs on SQLite by default, MySQL/PostgreSQL if env vars set
+**Databases:** Runs on SQLite by default, PostgreSQL if env var set
 
 ---
 
@@ -215,14 +163,12 @@ postgres://gassigeher_test:testpass@localhost:5433/gassigeher_test?sslmode=disab
 **Run:** `go test ./internal/repository -v`
 
 **Tests:**
-- Dog repository (4 tests)
-- Booking repository (4 tests)
-- User repository (tests)
+- Dog repository
+- Booking repository
+- User repository
 - Other repositories
 
-**Total:** Repository-specific tests
-
-**Databases:** Uses test helper - SQLite default, can use MySQL/PostgreSQL
+**Databases:** Uses test helper - SQLite default, can use PostgreSQL
 
 ---
 
@@ -231,12 +177,10 @@ postgres://gassigeher_test:testpass@localhost:5433/gassigeher_test?sslmode=disab
 **Run:** `go test ./internal/handlers -v`
 
 **Tests:**
-- Auth handler (40+ tests)
-- Dog handler (20+ tests)
-- Booking handler (30+ tests)
-- Other handlers (60+ tests)
-
-**Total:** 113 handler tests
+- Auth handler
+- Dog handler
+- Booking handler
+- Other handlers
 
 **Databases:** Uses test helper - SQLite default
 
@@ -249,8 +193,7 @@ postgres://gassigeher_test:testpass@localhost:5433/gassigeher_test?sslmode=disab
 # Start databases
 docker-compose -f docker-compose.test.yml up -d
 
-# Set env vars
-export DB_TEST_MYSQL="..."
+# Set env var
 export DB_TEST_POSTGRES="..."
 
 # Run tests
@@ -262,7 +205,6 @@ docker-compose -f docker-compose.test.yml down
 
 **Tests:**
 - SQLite initialization
-- MySQL initialization (if available)
 - PostgreSQL initialization (if available)
 - Connection pool configuration
 - DSN builders
@@ -286,7 +228,7 @@ go test ./...
 
 ---
 
-### Strategy 2: Full Test (All Databases)
+### Strategy 2: Full Test (Both Databases)
 
 **Use Case:** Pre-commit, comprehensive verification
 
@@ -296,12 +238,12 @@ go test ./...
 .\scripts\test_all_databases.ps1
 
 # Linux/Mac
-./scripts\test_all_databases.sh
+./scripts/test_all_databases.sh
 ```
 
-**Duration:** ~2-3 minutes (includes Docker startup)
-**Databases:** SQLite, MySQL, PostgreSQL
-**Coverage:** All tests × 3 databases
+**Duration:** ~1-2 minutes (includes Docker startup)
+**Databases:** SQLite and PostgreSQL
+**Coverage:** All tests x 2 databases
 
 ---
 
@@ -312,22 +254,35 @@ go test ./...
 **GitHub Actions Example:**
 ```yaml
 jobs:
-  test:
-    strategy:
-      matrix:
-        database: [sqlite, mysql, postgres]
+  test-sqlite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+      - run: go test ./... -v
+
+  test-postgres:
+    runs-on: ubuntu-latest
     services:
-      mysql:
-        image: mysql:8.0
-        # ... configuration
       postgres:
         image: postgres:15
-        # ... configuration
-    steps:
-      - run: go test ./...
         env:
-          DB_TEST_MYSQL: ${{ matrix.database == 'mysql' && '...' || '' }}
-          DB_TEST_POSTGRES: ${{ matrix.database == 'postgres' && '...' || '' }}
+          POSTGRES_DB: gassigeher_test
+          POSTGRES_USER: gassigeher_test
+          POSTGRES_PASSWORD: testpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U gassigeher_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+      - run: go test ./... -v
+        env:
+          DB_TEST_POSTGRES: postgres://gassigeher_test:testpass@localhost:5432/gassigeher_test?sslmode=disable
 ```
 
 **Duration:** ~1-2 minutes per database (parallel execution)
@@ -336,20 +291,6 @@ jobs:
 ---
 
 ## Troubleshooting
-
-### MySQL Container Won't Start
-
-**Symptom:** `Error response from daemon: port is already allocated`
-
-**Solution:**
-```bash
-# Check if MySQL is running on port 3306
-netstat -an | grep 3306
-
-# Stop local MySQL or use different port in docker-compose.test.yml
-```
-
----
 
 ### PostgreSQL Container Won't Start
 
@@ -373,7 +314,7 @@ netstat -an | grep 5432
 1. **Increase timeout** in test script
 2. **Check Docker resources** (increase memory/CPU)
 3. **Check health checks** in docker-compose.test.yml
-4. **View logs:** `docker-compose -f docker-compose.test.yml logs mysql-test`
+4. **View logs:** `docker-compose -f docker-compose.test.yml logs postgres-test`
 
 ---
 
@@ -400,7 +341,7 @@ netstat -an | grep 5432
 
 ---
 
-### Tests Fail on MySQL/PostgreSQL but Pass on SQLite
+### Tests Fail on PostgreSQL but Pass on SQLite
 
 **Possible Causes:**
 1. **Type differences** - Check boolean handling
@@ -414,7 +355,6 @@ netstat -an | grep 5432
 go test ./internal/repository -v -run TestSpecificTest
 
 # Check test result files
-cat test_results_mysql.txt | grep FAIL
 cat test_results_postgres.txt | grep FAIL
 ```
 
@@ -424,14 +364,14 @@ cat test_results_postgres.txt | grep FAIL
 
 ### Expected Performance Characteristics
 
-| Operation | SQLite | MySQL | PostgreSQL |
-|-----------|--------|-------|------------|
-| **INSERT** | Fast | Fast | Fast |
-| **SELECT** | Fast | Fast | Fast |
-| **UPDATE** | Fast | Moderate | Moderate |
-| **DELETE** | Fast | Moderate | Moderate |
-| **Concurrent Writes** | Limited | Good | Excellent |
-| **Concurrent Reads** | Excellent | Excellent | Excellent |
+| Operation | SQLite | PostgreSQL |
+|-----------|--------|------------|
+| **INSERT** | Fast | Fast |
+| **SELECT** | Fast | Fast |
+| **UPDATE** | Fast | Moderate |
+| **DELETE** | Fast | Moderate |
+| **Concurrent Writes** | Limited | Excellent |
+| **Concurrent Reads** | Excellent | Excellent |
 
 ### Running Benchmarks
 
@@ -440,7 +380,6 @@ cat test_results_postgres.txt | grep FAIL
 go test ./internal/repository -bench=. -benchmem
 
 # Compare across databases
-DB_TEST_MYSQL="..." go test ./internal/repository -bench=.
 DB_TEST_POSTGRES="..." go test ./internal/repository -bench=.
 ```
 
@@ -464,30 +403,6 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
       - run: go test ./... -v
-
-  test-mysql:
-    runs-on: ubuntu-latest
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: testpass
-          MYSQL_DATABASE: gassigeher_test
-          MYSQL_USER: gassigeher_test
-          MYSQL_PASSWORD: testpass
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
-      - run: go test ./... -v
-        env:
-          DB_TEST_MYSQL: gassigeher_test:testpass@tcp(localhost:3306)/gassigeher_test?parseTime=true
 
   test-postgres:
     runs-on: ubuntu-latest
@@ -525,16 +440,16 @@ jobs:
 
 ### Before Releasing
 
-- [ ] Start Docker test databases
+- [ ] Start Docker test database
 - [ ] Run `./scripts/test_all_databases.sh` (or .ps1)
-- [ ] Verify all 3 databases pass
+- [ ] Verify both databases pass
 - [ ] Check test result files
 - [ ] Review any skipped tests
 - [ ] Performance acceptable
 
 ### Before Production Deployment
 
-- [ ] Full test suite on all databases
+- [ ] Full test suite on both databases
 - [ ] Load testing on target database
 - [ ] Migration testing (if switching databases)
 - [ ] Backup/restore testing
@@ -550,13 +465,6 @@ jobs:
 **Persistence:** None (cleaned after each test)
 **Speed:** Fastest (no disk I/O)
 
-### MySQL
-
-**Storage:** Docker volume `mysql_test_data`
-**Persistence:** Persists between test runs
-**Cleanup:** `cleanMySQLTestDB()` drops all tables before each test
-**Speed:** Moderate (Docker overhead)
-
 ### PostgreSQL
 
 **Storage:** Docker volume `postgres_test_data`
@@ -571,23 +479,23 @@ jobs:
 ### Test Specific Repository with Specific Database
 
 ```go
-func TestDogRepository_MySQL(t *testing.T) {
-    db := testutil.SetupTestDBWithType(t, "mysql")
+func TestDogRepository_PostgreSQL(t *testing.T) {
+    db := testutil.SetupTestDBWithType(t, "postgres")
     if db == nil {
-        return // Skipped if MySQL not available
+        return // Skipped if PostgreSQL not available
     }
 
-    // Test runs on MySQL
+    // Test runs on PostgreSQL
     repo := repository.NewDogRepository(db)
     // ... test logic ...
 }
 ```
 
-### Test All Repositories with All Databases
+### Test All Repositories with Both Databases
 
 ```go
 func TestRepositories_AllDatabases(t *testing.T) {
-    databases := []string{"sqlite", "mysql", "postgres"}
+    databases := []string{"sqlite", "postgres"}
 
     for _, dbType := range databases {
         t.Run(dbType, func(t *testing.T) {
@@ -610,12 +518,6 @@ func TestRepositories_AllDatabases(t *testing.T) {
 
 ## Debugging Tips
 
-### View MySQL Logs
-
-```bash
-docker-compose -f docker-compose.test.yml logs -f mysql-test
-```
-
 ### View PostgreSQL Logs
 
 ```bash
@@ -623,11 +525,6 @@ docker-compose -f docker-compose.test.yml logs -f postgres-test
 ```
 
 ### Connect to Database Directly
-
-**MySQL:**
-```bash
-docker exec -it gassigeher-mysql-test mysql -u gassigeher_test -ptestpass gassigeher_test
-```
 
 **PostgreSQL:**
 ```bash
@@ -652,7 +549,6 @@ docker-compose -f docker-compose.test.yml restart
 ### Output Files
 
 - `test_results_sqlite.txt` - SQLite test output
-- `test_results_mysql.txt` - MySQL test output (if run)
 - `test_results_postgres.txt` - PostgreSQL test output (if run)
 
 ### Analyzing Results
@@ -681,9 +577,9 @@ grep -A 20 "TestDogRepository_Create" test_results_sqlite.txt
 
 SQLite tests are fast and don't require setup. Run these first to catch obvious issues.
 
-### 2. Use Docker for MySQL/PostgreSQL
+### 2. Use Docker for PostgreSQL
 
-Don't install MySQL/PostgreSQL locally for testing. Use Docker for:
+Don't install PostgreSQL locally for testing. Use Docker for:
 - Consistent environment
 - Easy cleanup
 - Version control
@@ -692,13 +588,6 @@ Don't install MySQL/PostgreSQL locally for testing. Use Docker for:
 ### 3. Clean Databases Between Tests
 
 Test helpers automatically clean databases, but for manual testing:
-
-**MySQL:**
-```sql
-SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS bookings, dogs, users, ... ;
-SET FOREIGN_KEY_CHECKS = 1;
-```
 
 **PostgreSQL:**
 ```sql
@@ -731,11 +620,10 @@ go test ./internal/repository -bench=. -benchmem
 
 # Save results for comparison
 go test ./... -bench=. > bench_sqlite.txt
-DB_TEST_MYSQL="..." go test ./... -bench=. > bench_mysql.txt
 DB_TEST_POSTGRES="..." go test ./... -bench=. > bench_postgres.txt
 
 # Compare results
-benchcmp bench_sqlite.txt bench_mysql.txt
+benchcmp bench_sqlite.txt bench_postgres.txt
 ```
 
 ### Expected Benchmarks
@@ -744,11 +632,6 @@ benchcmp bench_sqlite.txt bench_mysql.txt
 - INSERT: ~0.5ms
 - SELECT: ~0.1ms
 - UPDATE: ~0.5ms
-
-**MySQL:**
-- INSERT: ~1-2ms (includes network)
-- SELECT: ~0.5ms
-- UPDATE: ~1-2ms
 
 **PostgreSQL:**
 - INSERT: ~1-2ms
@@ -761,7 +644,7 @@ benchcmp bench_sqlite.txt bench_mysql.txt
 
 ## Conclusion
 
-Multi-database testing ensures Gassigeher works correctly with SQLite, MySQL, and PostgreSQL. Use the provided Docker Compose and test scripts for comprehensive testing before releases.
+Multi-database testing ensures Gassigeher works correctly with SQLite and PostgreSQL. Use the provided Docker Compose and test scripts for comprehensive testing before releases.
 
 **Quick Commands:**
 

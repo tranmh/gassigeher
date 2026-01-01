@@ -1416,8 +1416,8 @@ func TestMultiTenant_ImpersonateUser_CrossTenantBlocked(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", tenant2User.ID)})
 
 	// Context: Super Admin from tenant 0
-	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 0)            // Super Admin's tenant
-	ctx = context.WithValue(ctx, middleware.UserIDKey, superAdmin.ID)             // Super Admin user ID
+	ctx := context.WithValue(req.Context(), middleware.TenantIDKey, 0) // Super Admin's tenant
+	ctx = context.WithValue(ctx, middleware.UserIDKey, superAdmin.ID)  // Super Admin user ID
 	ctx = context.WithValue(ctx, middleware.EmailKey, "superadmin@tenant0.com")
 	ctx = context.WithValue(ctx, middleware.IsAdminKey, true)
 	ctx = context.WithValue(ctx, middleware.IsSuperAdminKey, true)

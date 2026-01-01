@@ -1,0 +1,20 @@
+# Docker build context exclusions
+data/
+uploads/
+*.db
+*.log
+.git/
+.github/
+.vscode/
+.idea/
+node_modules/
+e2e-tests/
+docs/
+*.md
+!README.md
+.env
+.env.*
+*.bak*
+coverage.out
+gassigeher
+gassigeher.exe

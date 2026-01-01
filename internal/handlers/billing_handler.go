@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"io"
 	"log"
@@ -13,6 +12,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stripe/stripe-go/v76"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -21,7 +21,7 @@ import (
 
 // BillingHandler handles billing-related HTTP requests
 type BillingHandler struct {
-	db               *sql.DB
+	db               *database.DB
 	cfg              *config.Config
 	stripeService    *services.StripeService
 	s3Service        *services.S3Service // For S3 pre-signed URL generation
@@ -33,7 +33,7 @@ type BillingHandler struct {
 }
 
 // NewBillingHandler creates a new billing handler
-func NewBillingHandler(db *sql.DB, cfg *config.Config, stripeService *services.StripeService) *BillingHandler {
+func NewBillingHandler(db *database.DB, cfg *config.Config, stripeService *services.StripeService) *BillingHandler {
 	// Initialize S3 service if configured
 	var s3Service *services.S3Service
 	if cfg != nil && cfg.UseS3 {

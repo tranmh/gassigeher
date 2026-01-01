@@ -1,12 +1,12 @@
 package repository
 
 import (
-	"database/sql"
 	"fmt"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/testutil"
 )
@@ -423,7 +423,7 @@ func TestMarketingRepository_RecordReferralUse_Idempotent(t *testing.T) {
 // Helper functions for test setup
 // =============================================================================
 
-func createTestSubscription(t *testing.T, db *sql.DB, tenantID int) int {
+func createTestSubscription(t *testing.T, db *database.DB, tenantID int) int {
 	t.Helper()
 	now := time.Now()
 	// First ensure a pricing plan exists
@@ -440,7 +440,7 @@ func createTestSubscription(t *testing.T, db *sql.DB, tenantID int) int {
 	return int(id)
 }
 
-func createTestPromoCode(t *testing.T, db *sql.DB, code string, maxUses int) int {
+func createTestPromoCode(t *testing.T, db *database.DB, code string, maxUses int) int {
 	t.Helper()
 	now := time.Now()
 	result, err := db.Exec(`INSERT INTO promo_codes
@@ -454,7 +454,7 @@ func createTestPromoCode(t *testing.T, db *sql.DB, code string, maxUses int) int
 	return int(id)
 }
 
-func createTestPromoCodeNoLimit(t *testing.T, db *sql.DB, code string) int {
+func createTestPromoCodeNoLimit(t *testing.T, db *database.DB, code string) int {
 	t.Helper()
 	now := time.Now()
 	result, err := db.Exec(`INSERT INTO promo_codes
@@ -468,7 +468,7 @@ func createTestPromoCodeNoLimit(t *testing.T, db *sql.DB, code string) int {
 	return int(id)
 }
 
-func createTestReferralCode(t *testing.T, db *sql.DB, code string, maxUses int) int {
+func createTestReferralCode(t *testing.T, db *database.DB, code string, maxUses int) int {
 	t.Helper()
 	now := time.Now()
 	result, err := db.Exec(`INSERT INTO referral_codes

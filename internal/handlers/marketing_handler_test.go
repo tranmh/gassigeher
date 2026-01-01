@@ -10,18 +10,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 )
 
-func setupMarketingTestDB(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite3", ":memory:")
+func setupMarketingTestDB(t *testing.T) *database.DB {
+	rawDB, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
 
 	// Create required tables
-	_, err = db.Exec(`
+	_, err = rawDB.Exec(`
 		CREATE TABLE referral_codes (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			code TEXT NOT NULL UNIQUE,
@@ -86,7 +88,9 @@ func setupMarketingTestDB(t *testing.T) *sql.DB {
 		t.Fatalf("Failed to create tables: %v", err)
 	}
 
-	return db
+	// Wrap in database.DB for auto-rebinding
+	sqlxDB := sqlx.NewDb(rawDB, "sqlite3")
+	return database.WrapSqlxDB(sqlxDB, database.NewSQLiteDialect())
 }
 
 // ========== BUG: Test that expires_at accepts RFC3339 format ==========
@@ -98,11 +102,12 @@ func TestCreateReferralCode_ExpiresAt_RFC3339Format(t *testing.T) {
 	handler := NewMarketingHandler(db)
 
 	// Test with RFC3339 format (ISO 8601 with time)
+	// Use a future date to avoid "date in past" validation error
 	reqBody := `{
 		"code": "RFC3339TEST",
 		"discount_months_referrer": 3,
 		"discount_months_referee": 1,
-		"expires_at": "2025-12-31T23:59:59Z"
+		"expires_at": "2027-12-31T23:59:59Z"
 	}`
 
 	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/referral-codes", bytes.NewBufferString(reqBody))
@@ -130,15 +135,14 @@ func TestCreateReferralCode_ExpiresAt_RFC3339Format(t *testing.T) {
 		t.Fatalf("expires_at not found in response")
 	}
 
-	// BUG: Currently this fails because RFC3339 format is not parsed correctly
-	// The date should be 2025-12-31, not 0001-01-01 (zero time)
+	// Verify RFC3339 format is parsed correctly
 	parsedTime, err := time.Parse(time.RFC3339, expiresAt)
 	if err != nil {
 		t.Fatalf("Failed to parse expires_at: %v", err)
 	}
 
-	if parsedTime.Year() != 2025 {
-		t.Errorf("Expected year 2025, got %d. expires_at was: %s", parsedTime.Year(), expiresAt)
+	if parsedTime.Year() != 2027 {
+		t.Errorf("Expected year 2027, got %d. expires_at was: %s", parsedTime.Year(), expiresAt)
 	}
 	if parsedTime.Month() != 12 {
 		t.Errorf("Expected month 12, got %d", parsedTime.Month())

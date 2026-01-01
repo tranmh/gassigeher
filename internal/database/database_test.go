@@ -29,7 +29,7 @@ func TestFreshDatabaseMigration(t *testing.T) {
 	defer db.Close()
 
 	// Run migrations
-	err = RunMigrationsWithDialect(db, dialect)
+	err = RunMigrationsWithDialect(db.SqlDB(), dialect)
 	if err != nil {
 		t.Fatalf("Migration failed: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestMigrationIdempotency(t *testing.T) {
 	defer db.Close()
 
 	// Run migrations first time
-	err = RunMigrationsWithDialect(db, dialect)
+	err = RunMigrationsWithDialect(db.SqlDB(), dialect)
 	if err != nil {
 		t.Fatalf("First migration failed: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestMigrationIdempotency(t *testing.T) {
 	}
 
 	// Run migrations second time
-	err = RunMigrationsWithDialect(db, dialect)
+	err = RunMigrationsWithDialect(db.SqlDB(), dialect)
 	if err != nil {
 		t.Fatalf("Second migration failed: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestMigrationIdempotency(t *testing.T) {
 	}
 
 	// Run migrations third time to be sure
-	err = RunMigrationsWithDialect(db, dialect)
+	err = RunMigrationsWithDialect(db.SqlDB(), dialect)
 	if err != nil {
 		t.Fatalf("Third migration failed: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestForeignKeyConstraints(t *testing.T) {
 	}
 
 	// Run migrations
-	err = RunMigrationsWithDialect(db, dialect)
+	err = RunMigrationsWithDialect(db.SqlDB(), dialect)
 	if err != nil {
 		t.Fatalf("Migration failed: %v", err)
 	}
@@ -246,7 +246,7 @@ func TestUniqueConstraints(t *testing.T) {
 	defer db.Close()
 
 	// Run migrations
-	err = RunMigrationsWithDialect(db, dialect)
+	err = RunMigrationsWithDialect(db.SqlDB(), dialect)
 	if err != nil {
 		t.Fatalf("Migration failed: %v", err)
 	}
@@ -362,7 +362,7 @@ func TestIndexEffectiveness(t *testing.T) {
 	defer db.Close()
 
 	// Run migrations
-	err = RunMigrationsWithDialect(db, dialect)
+	err = RunMigrationsWithDialect(db.SqlDB(), dialect)
 	if err != nil {
 		t.Fatalf("Migration failed: %v", err)
 	}

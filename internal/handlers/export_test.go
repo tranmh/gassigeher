@@ -11,20 +11,22 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/middleware"
 	"github.com/tranmh/gassigeher/internal/repository"
 )
 
-func setupExportTestDB(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite3", ":memory:")
+func setupExportTestDB(t *testing.T) *database.DB {
+	rawDB, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
 
 	// Create all required tables
-	_, err = db.Exec(`
+	_, err = rawDB.Exec(`
 		CREATE TABLE tenants (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			slug TEXT NOT NULL UNIQUE,
@@ -135,7 +137,9 @@ func setupExportTestDB(t *testing.T) *sql.DB {
 		t.Fatalf("Failed to create tables: %v", err)
 	}
 
-	return db
+	// Wrap in database.DB for auto-rebinding
+	sqlxDB := sqlx.NewDb(rawDB, "sqlite3")
+	return database.WrapSqlxDB(sqlxDB, database.NewSQLiteDialect())
 }
 
 // BUG #4: Test that tenant export includes dogs correctly

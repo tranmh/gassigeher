@@ -10,11 +10,11 @@ import (
 
 // InvoiceRepository handles invoice database operations
 type InvoiceRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
 // NewInvoiceRepository creates a new invoice repository
-func NewInvoiceRepository(db *sql.DB) *InvoiceRepository {
+func NewInvoiceRepository(db DBExecutor) *InvoiceRepository {
 	return &InvoiceRepository{db: db}
 }
 
@@ -29,7 +29,7 @@ func (r *InvoiceRepository) Create(invoice *models.TenantInvoice) error {
 	`
 
 	now := time.Now()
-	result, err := r.db.Exec(query,
+	id, err := r.db.InsertReturningID(query,
 		invoice.TenantID,
 		invoice.SubscriptionID,
 		invoice.StripeInvoiceID,
@@ -49,10 +49,6 @@ func (r *InvoiceRepository) Create(invoice *models.TenantInvoice) error {
 		return fmt.Errorf("failed to create invoice: %w", err)
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get invoice ID: %w", err)
-	}
 	invoice.ID = int(id)
 	invoice.CreatedAt = now
 

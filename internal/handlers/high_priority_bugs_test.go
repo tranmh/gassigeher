@@ -422,7 +422,7 @@ func TestBug4_RaceCondition_UploadDogPhoto(t *testing.T) {
 		}
 		// Add minimal data and EOF marker
 		part.Write(jpegHeader)
-		part.Write(make([]byte, 64)) // Quantization table placeholder
+		part.Write(make([]byte, 64))   // Quantization table placeholder
 		part.Write([]byte{0xFF, 0xD9}) // EOI marker
 		writer.Close()
 		return &buf, writer.FormDataContentType()

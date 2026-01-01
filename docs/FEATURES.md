@@ -38,7 +38,7 @@ Gassigeher supports two deployment modes:
 | Feature | Simple-Mode | SaaS-Mode |
 |---------|-------------|-----------|
 | Tenants | Single | Unlimited (subdomains) |
-| Database | SQLite/MySQL/PostgreSQL | PostgreSQL with RLS |
+| Database | SQLite or PostgreSQL | PostgreSQL with RLS |
 | Storage | Local filesystem | S3-compatible (Hetzner) |
 | Billing | N/A | Stripe integration |
 | Central Admin | N/A | Full platform management |
@@ -49,7 +49,7 @@ Gassigeher supports two deployment modes:
 - Ideal for individual animal shelters
 - Single-tenant deployment
 - All features except billing and central admin
-- Supports SQLite, MySQL, or PostgreSQL
+- Supports SQLite or PostgreSQL
 
 ### SaaS-Mode
 - Multi-tenant platform via subdomains (e.g., `shelter1.gassigeher.de`)
@@ -852,9 +852,9 @@ Strict-Transport-Security: max-age=31536000
 BASE_DOMAIN=                        # Empty = Simple-Mode, Set = SaaS-Mode
 
 # Database
-DB_TYPE=sqlite                      # sqlite, mysql, postgres
+DB_TYPE=sqlite                      # sqlite or postgres
 DATABASE_PATH=./gassigeher.db       # For SQLite
-DATABASE_URL=                       # For MySQL/PostgreSQL
+DATABASE_URL=                       # For PostgreSQL
 
 # Email
 EMAIL_PROVIDER=smtp                 # gmail or smtp

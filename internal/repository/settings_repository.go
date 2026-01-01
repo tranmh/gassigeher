@@ -10,11 +10,11 @@ import (
 
 // SettingsRepository handles system settings database operations
 type SettingsRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
 // NewSettingsRepository creates a new settings repository
-func NewSettingsRepository(db *sql.DB) *SettingsRepository {
+func NewSettingsRepository(db DBExecutor) *SettingsRepository {
 	return &SettingsRepository{db: db}
 }
 

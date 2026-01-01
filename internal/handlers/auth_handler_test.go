@@ -426,7 +426,7 @@ func TestAuthHandler_Login(t *testing.T) {
 			LastName:        "User",
 			Email:           &unverifiedEmail,
 			PasswordHash:    &hash,
-				IsVerified:      false,
+			IsVerified:      false,
 			IsActive:        true,
 			TermsAcceptedAt: time.Now(),
 			LastActivityAt:  time.Now(),
@@ -465,7 +465,7 @@ func TestAuthHandler_Login(t *testing.T) {
 			LastName:        "User",
 			Email:           &inactiveEmail,
 			PasswordHash:    &hash,
-				IsVerified:      true,
+			IsVerified:      true,
 			IsActive:        false,
 			TermsAcceptedAt: time.Now(),
 			LastActivityAt:  time.Now(),
@@ -520,7 +520,7 @@ func TestAuthHandler_Login(t *testing.T) {
 			LastName:        "Security Test",
 			Email:           &unverifiedEmail,
 			PasswordHash:    &hash,
-				IsVerified:      false, // UNVERIFIED
+			IsVerified:      false, // UNVERIFIED
 			IsActive:        true,
 			TermsAcceptedAt: time.Now(),
 			LastActivityAt:  time.Now(),
@@ -533,7 +533,7 @@ func TestAuthHandler_Login(t *testing.T) {
 			LastName:        "Security Test",
 			Email:           &deactivatedEmail,
 			PasswordHash:    &hash,
-				IsVerified:      true,
+			IsVerified:      true,
 			IsActive:        false, // DEACTIVATED
 			TermsAcceptedAt: time.Now(),
 			LastActivityAt:  time.Now(),

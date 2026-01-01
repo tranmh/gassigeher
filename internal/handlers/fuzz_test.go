@@ -229,8 +229,8 @@ func FuzzIsValidEmail(f *testing.F) {
 	f.Add("user@ example.com")
 	f.Add("<script>@example.com")
 	f.Add("user@<script>.com")
-	f.Add(strings.Repeat("a", 100)+"@example.com")
-	f.Add("user@"+strings.Repeat("a", 100)+".com")
+	f.Add(strings.Repeat("a", 100) + "@example.com")
+	f.Add("user@" + strings.Repeat("a", 100) + ".com")
 	// Header injection
 	f.Add("user\r\n@example.com")
 	f.Add("user@example.com\r\nBcc: evil@attacker.com")

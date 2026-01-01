@@ -294,7 +294,7 @@ func TestCacheService_GetStats(t *testing.T) {
 
 	cache.Set("key1", "value1")
 	cache.Set("key2", "value2")
-	cache.Get("key1") // hit
+	cache.Get("key1")        // hit
 	cache.Get("nonexistent") // miss
 	cache.Delete("key2")
 
@@ -327,8 +327,8 @@ func TestCacheService_GetHitRate(t *testing.T) {
 	}
 
 	cache.Set("key", "value")
-	cache.Get("key") // hit
-	cache.Get("key") // hit
+	cache.Get("key")  // hit
+	cache.Get("key")  // hit
 	cache.Get("miss") // miss
 
 	// 2 hits, 1 miss = 66.67%

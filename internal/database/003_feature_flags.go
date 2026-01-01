@@ -32,34 +32,6 @@ CREATE TABLE IF NOT EXISTS tenant_feature_flags (
 CREATE INDEX IF NOT EXISTS idx_tenant_feature_flags_tenant ON tenant_feature_flags(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_tenant_feature_flags_flag ON tenant_feature_flags(feature_flag_id);
 `,
-			"mysql": `
--- Feature flags table for global feature management
-CREATE TABLE IF NOT EXISTS feature_flags (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ` + "`key`" + ` VARCHAR(100) NOT NULL UNIQUE,
-  name VARCHAR(255) NOT NULL,
-  description TEXT,
-  is_global TINYINT(1) DEFAULT 0,
-  is_enabled TINYINT(1) DEFAULT 0,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-CREATE INDEX idx_feature_flags_key ON feature_flags(` + "`key`" + `);
-
--- Tenant-specific feature flag overrides
-CREATE TABLE IF NOT EXISTS tenant_feature_flags (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  tenant_id INT NOT NULL,
-  feature_flag_id INT NOT NULL,
-  is_enabled TINYINT(1) DEFAULT 0,
-  enabled_at DATETIME,
-  enabled_by INT,
-  UNIQUE KEY unique_tenant_flag (tenant_id, feature_flag_id),
-  FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
-  FOREIGN KEY (feature_flag_id) REFERENCES feature_flags(id) ON DELETE CASCADE,
-  FOREIGN KEY (enabled_by) REFERENCES users(id) ON DELETE SET NULL
-);
-`,
 			"postgres": `
 -- Feature flags table for global feature management
 CREATE TABLE IF NOT EXISTS feature_flags (

@@ -49,7 +49,7 @@ BASE_URL=https://gassigeher.yourshelter.com
 **Characteristics:**
 - Single organization deployment
 - Direct URL access (no subdomains)
-- SQLite, MySQL, or PostgreSQL database
+- SQLite or PostgreSQL database
 - Local filesystem storage for uploads
 - Global rate limiting
 
@@ -77,7 +77,7 @@ BASE_DOMAIN=gassigeher.org
 |---------|-------------|-----------|
 | Tenants | 1 | Unlimited |
 | URL | Single domain | Subdomains |
-| Database | SQLite/MySQL/PostgreSQL | PostgreSQL with RLS |
+| Database | SQLite or PostgreSQL | PostgreSQL with RLS |
 | Storage | Local filesystem | S3 (with fallback) |
 | Theming | Fixed | Per-tenant customizable |
 | Billing | None | Stripe integration |
@@ -196,7 +196,7 @@ BASE_DOMAIN=gassigeher.org
 
 **Backend:**
 - Go 1.24+
-- Multi-database support (SQLite, MySQL, PostgreSQL)
+- Multi-database support (SQLite and PostgreSQL)
 - gorilla/mux router
 - JWT authentication
 - bcrypt password hashing
@@ -247,8 +247,7 @@ gassigeher/
 ├── .env                      # Environment variables
 ├── .env.example              # Environment template
 ├── Dockerfile                # Docker build
-├── docker-compose.yml        # Development stack
-├── docker-compose.prod.yml   # Production stack
+├── docker-compose.yml        # Docker stack (--profile production for Caddy)
 ├── Caddyfile                 # SaaS: Wildcard SSL reverse proxy
 ├── go.mod                    # Go dependencies
 └── README.md                 # This file
@@ -259,7 +258,7 @@ gassigeher/
 ### 1. Prerequisites
 
 - Go 1.24 or higher
-- SQLite3 (default), MySQL, or PostgreSQL
+- SQLite3 (default) or PostgreSQL
 
 ### 2. Clone and Install
 
@@ -510,17 +509,16 @@ PORT=3000 ./gassigeher
 
 ## Database
 
-The application supports **three database backends** with automatic migrations and feature parity:
+The application supports **two database backends** with automatic migrations and feature parity:
 
 ### Supported Databases
 
 | Database | Best For | Max Users | Setup Time | Cost |
 |----------|----------|-----------|------------|------|
 | **SQLite** (default) | Development, small deployments (Simple-Mode) | <1,000 | 5 min | $0 |
-| **MySQL** | Web apps, medium deployments (Simple-Mode) | 10,000+ | 30 min | $ |
 | **PostgreSQL** | Enterprise, SaaS-Mode (required for RLS) | 100,000+ | 45 min | $$ |
 
-> **Note**: SaaS-Mode requires PostgreSQL for Row-Level Security (RLS) tenant isolation. Simple-Mode can use any of the three databases.
+> **Note**: SaaS-Mode requires PostgreSQL for Row-Level Security (RLS) tenant isolation. Simple-Mode can use either database.
 
 ### Quick Start - SQLite (Default)
 
@@ -532,22 +530,6 @@ No configuration needed! The database file is created automatically on first run
 ```
 
 Database file: `./gassigeher.db` (configurable via `DATABASE_PATH`)
-
-### MySQL Configuration
-
-```bash
-# In .env file
-DB_TYPE=mysql
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=gassigeher
-DB_USER=gassigeher_user
-DB_PASSWORD=your_secure_password
-DB_MAX_OPEN_CONNS=25
-DB_MAX_IDLE_CONNS=5
-```
-
-See **[MySQL_Setup_Guide.md](docs/MySQL_Setup_Guide.md)** for complete setup instructions.
 
 ### PostgreSQL Configuration
 
@@ -574,17 +556,12 @@ See **[PostgreSQL_Setup_Guide.md](docs/PostgreSQL_Setup_Guide.md)** for complete
 - Simple deployment (single server)
 - Zero setup time required
 
-**Choose MySQL if:**
-- Medium to large shelter (1,000-50,000 users)
-- Proven web-scale performance needed
-- Replication required
-- Familiar with MySQL administration
-
 **Choose PostgreSQL if:**
 - Enterprise deployment (10,000+ users)
 - Advanced features needed (JSON, full-text search)
 - Complex analytics queries
 - Strong ACID compliance required
+- SaaS-Mode deployment (required for RLS)
 
 See **[Database_Selection_Guide.md](docs/Database_Selection_Guide.md)** for detailed comparison.
 
@@ -840,9 +817,8 @@ See **[DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md)** for navigation gui
 | Document | Lines | Purpose | Audience |
 |----------|-------|---------|----------|
 | **[Database_Selection_Guide.md](docs/Database_Selection_Guide.md)** | 300+ | Choosing the right database | Decision Makers |
-| **[MySQL_Setup_Guide.md](docs/MySQL_Setup_Guide.md)** | 400+ | Complete MySQL setup and configuration | DevOps/System Admins |
 | **[PostgreSQL_Setup_Guide.md](docs/PostgreSQL_Setup_Guide.md)** | 500+ | Complete PostgreSQL setup and configuration | DevOps/System Admins |
-| **[MultiDatabase_Testing_Guide.md](docs/MultiDatabase_Testing_Guide.md)** | 300+ | Testing across all database backends | Developers/QA |
+| **[MultiDatabase_Testing_Guide.md](docs/MultiDatabase_Testing_Guide.md)** | 300+ | Testing across both database backends | Developers/QA |
 | **[DatabasesSupportPlan.md](docs/DatabasesSupportPlan.md)** | 2,300+ | Complete multi-database implementation plan | Technical Leads |
 
 ### Email Documentation

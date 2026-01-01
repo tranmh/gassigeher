@@ -460,7 +460,7 @@ func TestEncodeQuotedPrintable(t *testing.T) {
 			name:  "german_umlauts",
 			input: "Schöne Grüße",
 			contains: []string{
-				"Sch",  // Plain text part
+				"Sch", // Plain text part
 				"=C3", // UTF-8 encoded characters (ö, ü, ß start with C3)
 			},
 		},

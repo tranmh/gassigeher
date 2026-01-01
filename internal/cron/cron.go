@@ -1,7 +1,6 @@
 package cron
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"strconv"
@@ -9,6 +8,7 @@ import (
 	"time"
 
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/repository"
 	"github.com/tranmh/gassigeher/internal/services"
 )
@@ -26,7 +26,7 @@ func getBerlinLocation() *time.Location {
 
 // CronService handles scheduled tasks
 type CronService struct {
-	db                     *sql.DB
+	db                     *database.DB
 	bookingRepo            *repository.BookingRepository
 	userRepo               *repository.UserRepository
 	settingsRepo           *repository.SettingsRepository
@@ -40,7 +40,7 @@ type CronService struct {
 }
 
 // NewCronService creates a new cron service
-func NewCronService(db *sql.DB, cfg *config.Config) *CronService {
+func NewCronService(db *database.DB, cfg *config.Config) *CronService {
 	// Initialize email service for reminders (fail gracefully if not configured)
 	var emailService *services.EmailService
 	if cfg != nil {

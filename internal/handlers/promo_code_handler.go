@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"regexp"
@@ -11,19 +10,20 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tranmh/gassigeher/internal/config"
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
 )
 
 // PromoCodeHandler handles promo code related HTTP requests
 type PromoCodeHandler struct {
-	db            *sql.DB
+	db            *database.DB
 	cfg           *config.Config
 	promoCodeRepo *repository.PromoCodeRepository
 }
 
 // NewPromoCodeHandler creates a new promo code handler
-func NewPromoCodeHandler(db *sql.DB, cfg *config.Config) *PromoCodeHandler {
+func NewPromoCodeHandler(db *database.DB, cfg *config.Config) *PromoCodeHandler {
 	return &PromoCodeHandler{
 		db:            db,
 		cfg:           cfg,

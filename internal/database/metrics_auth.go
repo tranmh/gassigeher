@@ -129,10 +129,15 @@ func EnforceStrongMetricsPassword(isFreshInstall bool, currentPassword string, e
 		return "", false, fmt.Errorf("failed to generate secure metrics password: %w", err)
 	}
 
-	// Update .env file if path provided
+	// Update .env file if path provided and file exists
 	if envPath != "" {
-		if err := UpdateEnvFileMetricsPassword(envPath, newPassword); err != nil {
-			return "", false, fmt.Errorf("failed to update .env file: %w", err)
+		if _, err := os.Stat(envPath); err == nil {
+			if err := UpdateEnvFileMetricsPassword(envPath, newPassword); err != nil {
+				return "", false, fmt.Errorf("failed to update .env file: %w", err)
+			}
+		} else {
+			// .env file doesn't exist (e.g., Docker with env vars) - skip file update
+			log.Printf("Note: .env file not found at %s, skipping file update (env vars used directly)", envPath)
 		}
 	}
 

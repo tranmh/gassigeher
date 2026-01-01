@@ -25,7 +25,7 @@ type TestUser struct {
 // This tenant is used when not running in SaaS mode (no BASE_DOMAIN set)
 // All tenant_id columns default to 0, referencing this tenant
 // MUST be called before any other seed operations to satisfy foreign key constraints
-func EnsureDefaultTenant(db *sql.DB) error {
+func EnsureDefaultTenant(db *sql.DB, dbType string) error {
 	// Check if default tenant already exists
 	var count int
 	err := db.QueryRow("SELECT COUNT(*) FROM tenants WHERE id = 0").Scan(&count)
@@ -40,10 +40,17 @@ func EnsureDefaultTenant(db *sql.DB) error {
 	// Create default tenant with id=0
 	// We use a direct SQL insert with explicit id=0
 	now := time.Now()
-	_, err = db.Exec(`
-		INSERT INTO tenants (id, slug, name, contact_email, status, created_at, updated_at)
-		VALUES (0, 'default', 'Default Tenant', 'default@localhost', 'active', ?, ?)
-	`, now, now)
+
+	var query string
+	if dbType == "postgres" {
+		query = `INSERT INTO tenants (id, slug, name, contact_email, status, created_at, updated_at)
+			VALUES (0, 'default', 'Default Tenant', 'default@localhost', 'active', $1, $2)`
+	} else {
+		query = `INSERT INTO tenants (id, slug, name, contact_email, status, created_at, updated_at)
+			VALUES (0, 'default', 'Default Tenant', 'default@localhost', 'active', ?, ?)`
+	}
+
+	_, err = db.Exec(query, now, now)
 	if err != nil {
 		return fmt.Errorf("failed to create default tenant: %w", err)
 	}
@@ -56,7 +63,12 @@ func EnsureDefaultTenant(db *sql.DB) error {
 // Only runs if users table is empty
 // Set SKIP_SEED=true to skip (useful for E2E tests that manage their own data)
 // DONE
-func SeedDatabase(db *sql.DB, superAdminEmail string) error {
+func SeedDatabase(db *sql.DB, superAdminEmail string, dbType ...string) error {
+	// Determine database type (default to sqlite for backward compatibility)
+	dialect := "sqlite"
+	if len(dbType) > 0 && dbType[0] != "" {
+		dialect = dbType[0]
+	}
 	// 0. Check if seeding is disabled (for E2E tests)
 	if os.Getenv("SKIP_SEED") == "true" {
 		log.Println("SKIP_SEED=true, skipping seed data generation")
@@ -64,7 +76,7 @@ func SeedDatabase(db *sql.DB, superAdminEmail string) error {
 	}
 
 	// 0.5. Ensure default tenant exists (for foreign key constraints)
-	if err := EnsureDefaultTenant(db); err != nil {
+	if err := EnsureDefaultTenant(db, dialect); err != nil {
 		return fmt.Errorf("failed to ensure default tenant: %w", err)
 	}
 
@@ -97,17 +109,40 @@ func SeedDatabase(db *sql.DB, superAdminEmail string) error {
 	}
 
 	now := time.Now()
-	_, err = db.Exec(`
-		INSERT INTO users (
-			id, first_name, last_name, email, password_hash,
-			is_admin, is_super_admin, is_central_admin, is_verified, is_active,
-			terms_accepted_at, last_activity_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, 1, "Central", "Admin", superAdminEmail, string(hashedPassword),
+
+	// Use database-specific SQL syntax
+	var insertQuery string
+	if dialect == "postgres" {
+		insertQuery = `
+			INSERT INTO users (
+				id, tenant_id, first_name, last_name, email, password_hash,
+				is_admin, is_super_admin, is_central_admin, is_verified, is_active,
+				terms_accepted_at, last_activity_at, created_at, updated_at
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`
+	} else {
+		insertQuery = `
+			INSERT INTO users (
+				id, tenant_id, first_name, last_name, email, password_hash,
+				is_admin, is_super_admin, is_central_admin, is_verified, is_active,
+				terms_accepted_at, last_activity_at, created_at, updated_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	}
+
+	_, err = db.Exec(insertQuery,
+		1, 0, "Central", "Admin", superAdminEmail, string(hashedPassword),
 		true, true, true, true, true, now, now, now, now)
 
 	if err != nil {
 		return fmt.Errorf("failed to create Central Admin: %w", err)
+	}
+
+	// Reset PostgreSQL sequence after explicit ID insert
+	// Without this, the next auto-generated ID would conflict with ID=1
+	if dialect == "postgres" {
+		_, err = db.Exec("SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 1) FROM users))")
+		if err != nil {
+			log.Printf("Warning: failed to reset users_id_seq: %v", err)
+		}
 	}
 
 	superAdminPassword := centralAdminPassword // For backward compatibility in credentials file

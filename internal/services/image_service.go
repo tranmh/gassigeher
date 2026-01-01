@@ -26,12 +26,12 @@ type ImageService struct {
 
 // Image processing constants
 const (
-	MaxImageWidth   = 800  // Max width for full-size image
-	MaxImageHeight  = 800  // Max height for full-size image
-	ThumbnailSize   = 300  // Thumbnail dimensions (square max)
-	JPEGQuality     = 85   // JPEG compression quality (1-100)
-	LogoMaxWidth    = 1200 // Max width for site logo
-	LogoMaxHeight   = 200  // Max height for site logo (banner format)
+	MaxImageWidth  = 800  // Max width for full-size image
+	MaxImageHeight = 800  // Max height for full-size image
+	ThumbnailSize  = 300  // Thumbnail dimensions (square max)
+	JPEGQuality    = 85   // JPEG compression quality (1-100)
+	LogoMaxWidth   = 1200 // Max width for site logo
+	LogoMaxHeight  = 200  // Max height for site logo (banner format)
 )
 
 // NewImageService creates a new image service with local filesystem storage

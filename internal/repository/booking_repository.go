@@ -38,11 +38,11 @@ func normalizeDate(date string) string {
 
 // BookingRepository handles booking database operations
 type BookingRepository struct {
-	db *sql.DB
+	db DBExecutor
 }
 
 // NewBookingRepository creates a new booking repository
-func NewBookingRepository(db *sql.DB) *BookingRepository {
+func NewBookingRepository(db DBExecutor) *BookingRepository {
 	return &BookingRepository{db: db}
 }
 
@@ -69,14 +69,14 @@ func (r *BookingRepository) Create(booking *models.Booking) error {
 	}
 
 	// tenant_id=0 is valid for Simple-Mode (non-SaaS)
-	result, err := r.db.Exec(query,
+	id, err := r.db.InsertReturningID(query,
 		booking.TenantID,
 		booking.UserID,
 		booking.DogID,
 		booking.Date,
 		booking.ScheduledTime,
 		booking.Status,
-		booking.RequiresApproval,
+		r.db.BoolValue(booking.RequiresApproval),
 		booking.ApprovalStatus,
 		now,
 		now,
@@ -84,11 +84,6 @@ func (r *BookingRepository) Create(booking *models.Booking) error {
 
 	if err != nil {
 		return fmt.Errorf("failed to create booking: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get booking ID: %w", err)
 	}
 
 	booking.ID = int(id)

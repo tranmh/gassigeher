@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"database/sql"
 	"net/http"
 
+	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
 	"github.com/tranmh/gassigeher/internal/services"
@@ -11,13 +11,13 @@ import (
 
 // DemoHandler handles demo tenant API endpoints
 type DemoHandler struct {
-	db            *sql.DB
+	db            *database.DB
 	tenantRepo    *repository.TenantRepository
 	demoStateRepo *repository.DemoTenantRepository
 }
 
 // NewDemoHandler creates a new demo handler
-func NewDemoHandler(db *sql.DB) *DemoHandler {
+func NewDemoHandler(db *database.DB) *DemoHandler {
 	return &DemoHandler{
 		db:            db,
 		tenantRepo:    repository.NewTenantRepository(db),

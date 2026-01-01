@@ -103,8 +103,8 @@ func AddVersionHeader(next http.Handler) http.Handler {
 
 // VersionInfo returns information about the API version
 type VersionInfo struct {
-	Current   string   `json:"current"`
-	Supported []string `json:"supported"`
+	Current    string   `json:"current"`
+	Supported  []string `json:"supported"`
 	Deprecated []string `json:"deprecated,omitempty"`
 }
 
