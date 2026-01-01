@@ -152,7 +152,7 @@ func main() {
 	middleware.InitBusinessMetrics(db)
 
 	// Demo tenant: Ensure demo tenant exists with sample data
-	demoSeedService := services.NewDemoSeedService(db)
+	demoSeedService := services.NewDemoSeedService(db, cfg)
 	if err := demoSeedService.EnsureDemoTenant(); err != nil {
 		log.Printf("Warning: Failed to ensure demo tenant: %v", err)
 		// Don't exit - demo is optional
@@ -160,7 +160,7 @@ func main() {
 
 	// Local development: Handle tenant reset commands (only in local dev mode)
 	if cfg.IsLocalDevelopment() {
-		localDevService := services.NewLocalDevSeedService(db)
+		localDevService := services.NewLocalDevSeedService(db, cfg)
 
 		// Handle reset commands
 		if *resetTenant != "" {
@@ -249,7 +249,7 @@ func main() {
 	tenantHandler := handlers.NewTenantHandler(db, cfg)
 	centralAdminHandler := handlers.NewCentralAdminHandler(db, cfg)
 	contactHandler := handlers.NewContactHandler(cfg)
-	demoHandler := handlers.NewDemoHandler(db)
+	demoHandler := handlers.NewDemoHandler(db, cfg)
 	auditHandler := handlers.NewAuditHandler(db)
 	metricsHandler := handlers.NewMetricsHandler()
 	consentHandler := handlers.NewConsentHandler(db)

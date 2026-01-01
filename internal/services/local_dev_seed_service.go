@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tranmh/gassigeher/internal/config"
 	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -48,6 +49,7 @@ var LocalDevTenants = []LocalDevTenantConfig{
 // LocalDevSeedService handles local development tenant creation and reset
 type LocalDevSeedService struct {
 	db            *database.DB
+	cfg           *config.Config
 	tenantRepo    *repository.TenantRepository
 	userRepo      *repository.UserRepository
 	dogRepo       *repository.DogRepository
@@ -59,9 +61,10 @@ type LocalDevSeedService struct {
 }
 
 // NewLocalDevSeedService creates a new local dev seed service
-func NewLocalDevSeedService(db *database.DB) *LocalDevSeedService {
+func NewLocalDevSeedService(db *database.DB, cfg *config.Config) *LocalDevSeedService {
 	return &LocalDevSeedService{
 		db:            db,
+		cfg:           cfg,
 		tenantRepo:    repository.NewTenantRepository(db),
 		userRepo:      repository.NewUserRepository(db),
 		dogRepo:       repository.NewDogRepository(db),
@@ -102,8 +105,8 @@ func (s *LocalDevSeedService) ensureTenant(cfg LocalDevTenantConfig) error {
 
 	log.Printf("Creating local dev tenant '%s' with profile '%s'...", cfg.Slug, cfg.Profile)
 
-	// Create tenant
-	adminEmail := fmt.Sprintf("admin@%s.gassigeher.local", cfg.Slug)
+	// Create tenant using config for domain
+	adminEmail := fmt.Sprintf("admin@%s.%s", cfg.Slug, s.cfg.BaseDomain)
 	tenant = &models.Tenant{
 		Slug:         cfg.Slug,
 		Name:         cfg.Name,
@@ -759,8 +762,8 @@ func (s *LocalDevSeedService) ResetTenant(slug string) error {
 		return fmt.Errorf("failed to delete tenant data: %w", err)
 	}
 
-	// Re-seed data
-	adminEmail := fmt.Sprintf("admin@%s.gassigeher.local", slug)
+	// Re-seed data using config for domain
+	adminEmail := fmt.Sprintf("admin@%s.%s", slug, s.cfg.BaseDomain)
 	if err := s.seedProfile(tenant.ID, cfg.Profile, adminEmail); err != nil {
 		return fmt.Errorf("failed to re-seed data: %w", err)
 	}

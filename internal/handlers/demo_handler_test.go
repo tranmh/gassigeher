@@ -16,13 +16,14 @@ func TestDemoHandler_GetCredentials(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 
 	// Create demo tenant first
-	demoService := services.NewDemoSeedService(db)
+	cfg := testutil.TestConfig()
+	demoService := services.NewDemoSeedService(db, cfg)
 	err := demoService.EnsureDemoTenant()
 	if err != nil {
 		t.Fatalf("Failed to create demo tenant: %v", err)
 	}
 
-	handler := NewDemoHandler(db)
+	handler := NewDemoHandler(db, cfg)
 
 	t.Run("returns credentials when demo tenant exists", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/demo/credentials", nil)
@@ -139,7 +140,8 @@ func TestDemoHandler_GetCredentials(t *testing.T) {
 // TestDemoHandler_GetCredentials_NoDemoTenant tests when no demo tenant exists
 func TestDemoHandler_GetCredentials_NoDemoTenant(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	handler := NewDemoHandler(db)
+	cfg := testutil.TestConfig()
+	handler := NewDemoHandler(db, cfg)
 
 	t.Run("returns 404 when no demo tenant", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/demo/credentials", nil)
@@ -159,13 +161,14 @@ func TestDemoHandler_GetStatus(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 
 	// Create demo tenant first
-	demoService := services.NewDemoSeedService(db)
+	cfg := testutil.TestConfig()
+	demoService := services.NewDemoSeedService(db, cfg)
 	err := demoService.EnsureDemoTenant()
 	if err != nil {
 		t.Fatalf("Failed to create demo tenant: %v", err)
 	}
 
-	handler := NewDemoHandler(db)
+	handler := NewDemoHandler(db, cfg)
 
 	t.Run("returns status when demo tenant exists", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/demo/status", nil)
@@ -263,7 +266,8 @@ func TestDemoHandler_GetStatus(t *testing.T) {
 // TestDemoHandler_GetStatus_NoDemoTenant tests status when no demo tenant
 func TestDemoHandler_GetStatus_NoDemoTenant(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	handler := NewDemoHandler(db)
+	cfg := testutil.TestConfig()
+	handler := NewDemoHandler(db, cfg)
 
 	t.Run("returns is_demo false when no demo tenant", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/demo/status", nil)
@@ -291,7 +295,8 @@ func TestDemoHandler_GetStatus_NoDemoTenant(t *testing.T) {
 // TestDemoHandler_MethodNotAllowed tests wrong HTTP methods
 func TestDemoHandler_MethodNotAllowed(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	handler := NewDemoHandler(db)
+	cfg := testutil.TestConfig()
+	handler := NewDemoHandler(db, cfg)
 
 	methods := []string{http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch}
 
@@ -322,10 +327,11 @@ func TestDemoHandler_MethodNotAllowed(t *testing.T) {
 func TestDemoHandler_DogCategoriesMatchFrontend(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 
-	demoService := services.NewDemoSeedService(db)
+	cfg := testutil.TestConfig()
+	demoService := services.NewDemoSeedService(db, cfg)
 	demoService.EnsureDemoTenant()
 
-	handler := NewDemoHandler(db)
+	handler := NewDemoHandler(db, cfg)
 
 	t.Run("dog categories use CSS-compatible values", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/demo/credentials", nil)
@@ -449,10 +455,11 @@ func TestDemoHandler_SecurityConsiderations(t *testing.T) {
 func TestDemoHandler_ResponseContentType(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 
-	demoService := services.NewDemoSeedService(db)
+	cfg := testutil.TestConfig()
+	demoService := services.NewDemoSeedService(db, cfg)
 	demoService.EnsureDemoTenant()
 
-	handler := NewDemoHandler(db)
+	handler := NewDemoHandler(db, cfg)
 
 	t.Run("credentials returns json", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/demo/credentials", nil)

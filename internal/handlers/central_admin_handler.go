@@ -745,7 +745,7 @@ func (h *CentralAdminHandler) ResetLocalDevTenant(w http.ResponseWriter, r *http
 	}
 
 	// Reset the tenant
-	localDevService := services.NewLocalDevSeedService(h.db)
+	localDevService := services.NewLocalDevSeedService(h.db, h.cfg)
 	if err := localDevService.ResetTenant(tenant.Slug); err != nil {
 		log.Printf("Error resetting local dev tenant: %v", err)
 		respondError(w, http.StatusInternalServerError, "Fehler beim Zurücksetzen des Tierheims")

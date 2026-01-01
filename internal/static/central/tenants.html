@@ -96,6 +96,26 @@
         let currentTenantId = null;
         let currentTenantStatus = null;
 
+        // Get base domain from current hostname (e.g., central.gassigeher.org -> gassigeher.org)
+        function getBaseDomain() {
+            const hostname = window.location.hostname;
+            const parts = hostname.split('.');
+            // Remove 'central' subdomain if present, otherwise use full hostname
+            if (parts.length > 2 && parts[0] === 'central') {
+                return parts.slice(1).join('.');
+            }
+            // For local development (e.g., localhost:8080)
+            return parts.join('.');
+        }
+
+        // Construct tenant URL from slug
+        function getTenantUrl(slug) {
+            const baseDomain = getBaseDomain();
+            const protocol = window.location.protocol;
+            const port = window.location.port ? ':' + window.location.port : '';
+            return `${protocol}//${slug}.${baseDomain}${port}`;
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
             if (!isAuthenticated()) {
                 window.location.href = '/login.html';
@@ -187,7 +207,7 @@
                                     <td><strong>${escapeHtml(t.name)}</strong></td>
                                     <td>
                                         <code>${escapeHtml(t.slug)}</code>
-                                        <a href="https://${escapeHtml(t.slug)}.gassigeher.org" target="_blank" class="external-link" title="Besuchen">↗</a>
+                                        <a href="${getTenantUrl(t.slug)}" target="_blank" class="external-link" title="Besuchen">↗</a>
                                     </td>
                                     <td>${escapeHtml(t.contact_email || '-')}</td>
                                     <td><span class="badge badge-${getStatusBadge(t.status)}">${t.status}</span></td>

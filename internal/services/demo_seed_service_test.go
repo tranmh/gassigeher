@@ -5,13 +5,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tranmh/gassigeher/internal/config"
 	"github.com/tranmh/gassigeher/internal/testutil"
 )
+
+// testConfig returns a config suitable for testing
+func testConfig() *config.Config {
+	return testutil.TestConfig()
+}
 
 // TestDemoSeedService_GenerateRandomPassword tests password generation
 func TestDemoSeedService_GenerateRandomPassword(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	service := NewDemoSeedService(db)
+	service := NewDemoSeedService(db, testConfig())
 
 	t.Run("generates 12 character password", func(t *testing.T) {
 		password := service.generateRandomPassword()
@@ -45,7 +51,7 @@ func TestDemoSeedService_GenerateRandomPassword(t *testing.T) {
 // TestDemoSeedService_CalculateNextResetTime tests next reset calculation
 func TestDemoSeedService_CalculateNextResetTime(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	service := NewDemoSeedService(db)
+	service := NewDemoSeedService(db, testConfig())
 
 	t.Run("calculates next midnight", func(t *testing.T) {
 		nextReset := service.calculateNextResetTime()
@@ -74,7 +80,7 @@ func TestDemoSeedService_CalculateNextResetTime(t *testing.T) {
 // TestDemoSeedService_EnsureDemoTenant tests demo tenant creation
 func TestDemoSeedService_EnsureDemoTenant(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	service := NewDemoSeedService(db)
+	service := NewDemoSeedService(db, testConfig())
 
 	t.Run("creates demo tenant on first run", func(t *testing.T) {
 		err := service.EnsureDemoTenant()
@@ -84,7 +90,7 @@ func TestDemoSeedService_EnsureDemoTenant(t *testing.T) {
 
 		// Check tenant was created
 		var count int
-		err = db.QueryRow("SELECT COUNT(*) FROM tenants WHERE slug = ?", DemoTenantSlug).Scan(&count)
+		err = db.QueryRow("SELECT COUNT(*) FROM tenants WHERE slug = ?", "demo").Scan(&count)
 		if err != nil {
 			t.Fatalf("Failed to count tenants: %v", err)
 		}
@@ -94,7 +100,7 @@ func TestDemoSeedService_EnsureDemoTenant(t *testing.T) {
 
 		// Check is_demo flag
 		var isDemo bool
-		err = db.QueryRow("SELECT is_demo FROM tenants WHERE slug = ?", DemoTenantSlug).Scan(&isDemo)
+		err = db.QueryRow("SELECT is_demo FROM tenants WHERE slug = ?", "demo").Scan(&isDemo)
 		if err != nil {
 			t.Fatalf("Failed to check is_demo: %v", err)
 		}
@@ -112,7 +118,7 @@ func TestDemoSeedService_EnsureDemoTenant(t *testing.T) {
 
 		// Still should have only 1 tenant
 		var count int
-		db.QueryRow("SELECT COUNT(*) FROM tenants WHERE slug = ?", DemoTenantSlug).Scan(&count)
+		db.QueryRow("SELECT COUNT(*) FROM tenants WHERE slug = ?", "demo").Scan(&count)
 		if count != 1 {
 			t.Errorf("Expected 1 demo tenant after second run, got %d", count)
 		}
@@ -122,7 +128,7 @@ func TestDemoSeedService_EnsureDemoTenant(t *testing.T) {
 // TestDemoSeedService_SeedDemoData tests demo data seeding
 func TestDemoSeedService_SeedDemoData(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	service := NewDemoSeedService(db)
+	service := NewDemoSeedService(db, testConfig())
 
 	// First create demo tenant
 	err := service.EnsureDemoTenant()
@@ -132,7 +138,7 @@ func TestDemoSeedService_SeedDemoData(t *testing.T) {
 
 	// Get demo tenant ID
 	var tenantID int
-	err = db.QueryRow("SELECT id FROM tenants WHERE slug = ?", DemoTenantSlug).Scan(&tenantID)
+	err = db.QueryRow("SELECT id FROM tenants WHERE slug = ?", "demo").Scan(&tenantID)
 	if err != nil {
 		t.Fatalf("Failed to get demo tenant ID: %v", err)
 	}
@@ -207,7 +213,7 @@ func TestDemoSeedService_SeedDemoData(t *testing.T) {
 // TestDemoSeedService_ResetDemoTenant tests demo reset functionality
 func TestDemoSeedService_ResetDemoTenant(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	service := NewDemoSeedService(db)
+	service := NewDemoSeedService(db, testConfig())
 
 	// First create demo tenant
 	err := service.EnsureDemoTenant()
@@ -217,7 +223,7 @@ func TestDemoSeedService_ResetDemoTenant(t *testing.T) {
 
 	// Get demo tenant ID
 	var tenantID int
-	db.QueryRow("SELECT id FROM tenants WHERE slug = ?", DemoTenantSlug).Scan(&tenantID)
+	db.QueryRow("SELECT id FROM tenants WHERE slug = ?", "demo").Scan(&tenantID)
 
 	// Get original password
 	var originalPassword string
@@ -265,7 +271,7 @@ func TestDemoSeedService_ResetDemoTenant(t *testing.T) {
 // TestDemoSeedService_GetDemoTenantID tests getting demo tenant ID
 func TestDemoSeedService_GetDemoTenantID(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	service := NewDemoSeedService(db)
+	service := NewDemoSeedService(db, testConfig())
 
 	t.Run("returns 0 when no demo tenant", func(t *testing.T) {
 		id := service.GetDemoTenantID()
@@ -290,7 +296,7 @@ func TestDemoSeedService_GetDemoTenantID(t *testing.T) {
 // TestDemoSeedService_DeleteAllTenantData tests data deletion
 func TestDemoSeedService_DeleteAllTenantData(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	service := NewDemoSeedService(db)
+	service := NewDemoSeedService(db, testConfig())
 
 	// Create demo tenant with data
 	err := service.EnsureDemoTenant()
@@ -299,7 +305,7 @@ func TestDemoSeedService_DeleteAllTenantData(t *testing.T) {
 	}
 
 	var tenantID int
-	db.QueryRow("SELECT id FROM tenants WHERE slug = ?", DemoTenantSlug).Scan(&tenantID)
+	db.QueryRow("SELECT id FROM tenants WHERE slug = ?", "demo").Scan(&tenantID)
 
 	t.Run("deletes all tenant data", func(t *testing.T) {
 		// Verify data exists
@@ -341,25 +347,42 @@ func TestDemoUserPassword(t *testing.T) {
 	}
 }
 
-// TestDemoTenantSlug tests demo tenant slug constant
+// TestDemoTenantSlug tests demo tenant slug from config
 func TestDemoTenantSlug(t *testing.T) {
-	if DemoTenantSlug == "" {
-		t.Error("DemoTenantSlug should not be empty")
+	cfg := testConfig()
+
+	slug := cfg.DemoTenantSlug()
+	if slug == "" {
+		t.Error("DemoTenantSlug() should not return empty string")
 	}
 
-	if DemoTenantSlug != "demo" {
-		t.Errorf("Expected DemoTenantSlug to be 'demo', got %s", DemoTenantSlug)
+	// The demo tenant slug is always "demo"
+	if slug != "demo" {
+		t.Errorf("Expected DemoTenantSlug() to be 'demo', got %s", slug)
 	}
 }
 
-// TestDemoAdminEmail tests demo admin email constant
+// TestDemoAdminEmail tests demo admin email generated from config
 func TestDemoAdminEmail(t *testing.T) {
-	if DemoAdminEmail == "" {
-		t.Error("DemoAdminEmail should not be empty")
+	cfg := testConfig()
+
+	email := cfg.DemoAdminEmail()
+	if email == "" {
+		t.Error("DemoAdminEmail() should not return empty string")
 	}
 
-	if DemoAdminEmail != "admin@demo.gassigeher.org" {
-		t.Errorf("Expected DemoAdminEmail to be 'admin@demo.gassigeher.org', got %s", DemoAdminEmail)
+	// With test.local as BaseDomain, the email should be admin@demo.test.local
+	expected := "admin@demo.test.local"
+	if email != expected {
+		t.Errorf("Expected DemoAdminEmail() to be '%s', got %s", expected, email)
+	}
+
+	// Test with production-like domain
+	prodCfg := &config.Config{BaseDomain: "gassigeher.org"}
+	prodEmail := prodCfg.DemoAdminEmail()
+	expectedProd := "admin@demo.gassigeher.org"
+	if prodEmail != expectedProd {
+		t.Errorf("Expected DemoAdminEmail() with production domain to be '%s', got %s", expectedProd, prodEmail)
 	}
 }
 
@@ -374,7 +397,7 @@ func TestDemoAdminEmail(t *testing.T) {
 // TDD RED PHASE: This test should FAIL until we add booking time rules seeding
 func TestDemoSeedService_SeedDemoData_CreatesBookingTimeRules(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	service := NewDemoSeedService(db)
+	service := NewDemoSeedService(db, testConfig())
 
 	// Create demo tenant
 	err := service.EnsureDemoTenant()
@@ -384,7 +407,7 @@ func TestDemoSeedService_SeedDemoData_CreatesBookingTimeRules(t *testing.T) {
 
 	// Get demo tenant ID
 	var tenantID int
-	err = db.QueryRow("SELECT id FROM tenants WHERE slug = ?", DemoTenantSlug).Scan(&tenantID)
+	err = db.QueryRow("SELECT id FROM tenants WHERE slug = ?", "demo").Scan(&tenantID)
 	if err != nil {
 		t.Fatalf("Failed to get demo tenant ID: %v", err)
 	}
@@ -406,7 +429,7 @@ func TestDemoSeedService_SeedDemoData_CreatesBookingTimeRules(t *testing.T) {
 // TDD RED PHASE: This test should FAIL
 func TestDemoSeedService_ResetDemoTenant_PreservesBookingTimeRules(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	service := NewDemoSeedService(db)
+	service := NewDemoSeedService(db, testConfig())
 
 	// Create demo tenant
 	err := service.EnsureDemoTenant()
@@ -416,7 +439,7 @@ func TestDemoSeedService_ResetDemoTenant_PreservesBookingTimeRules(t *testing.T)
 
 	// Get demo tenant ID
 	var tenantID int
-	db.QueryRow("SELECT id FROM tenants WHERE slug = ?", DemoTenantSlug).Scan(&tenantID)
+	db.QueryRow("SELECT id FROM tenants WHERE slug = ?", "demo").Scan(&tenantID)
 
 	// Reset tenant
 	err = service.ResetDemoTenant()
@@ -439,7 +462,7 @@ func TestDemoSeedService_ResetDemoTenant_PreservesBookingTimeRules(t *testing.T)
 // TestDemoSeedService_SeedDemoColors_Idempotent tests that color seeding is idempotent
 func TestDemoSeedService_SeedDemoColors_Idempotent(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	service := NewDemoSeedService(db)
+	service := NewDemoSeedService(db, testConfig())
 
 	// First create demo tenant (without going through EnsureDemoTenant to control the flow)
 	now := testutil.Now()

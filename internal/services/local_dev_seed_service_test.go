@@ -6,8 +6,20 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/tranmh/gassigeher/internal/config"
 	"github.com/tranmh/gassigeher/internal/database"
 )
+
+// localDevTestConfig returns a config suitable for local dev testing
+// Named differently to avoid conflict with demo_seed_service_test.go
+func localDevTestConfig() *config.Config {
+	return &config.Config{
+		Port:       "8080",
+		BaseURL:    "http://localhost:8080",
+		BaseDomain: "test.local",
+		JWTSecret:  "test-secret-key-for-testing-only",
+	}
+}
 
 // setupTestDB creates an in-memory SQLite database with migrations
 func setupTestDB(t *testing.T) *database.DB {
@@ -97,7 +109,7 @@ func TestNewLocalDevSeedService(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	service := NewLocalDevSeedService(db)
+	service := NewLocalDevSeedService(db, localDevTestConfig())
 
 	if service == nil {
 		t.Fatal("NewLocalDevSeedService returned nil")
@@ -129,7 +141,7 @@ func TestEnsureLocalDevTenants(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	service := NewLocalDevSeedService(db)
+	service := NewLocalDevSeedService(db, localDevTestConfig())
 
 	// Test single tenant creation (demo1)
 	err := service.ensureTenant(LocalDevTenants[0])
@@ -170,7 +182,7 @@ func TestSeedProfileEmpty(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	service := NewLocalDevSeedService(db)
+	service := NewLocalDevSeedService(db, localDevTestConfig())
 
 	// Create demo1 tenant only
 	err := service.ensureTenant(LocalDevTenants[0]) // demo1 = ProfileEmpty
@@ -224,7 +236,7 @@ func TestSeedProfileSmall(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	service := NewLocalDevSeedService(db)
+	service := NewLocalDevSeedService(db, localDevTestConfig())
 
 	// Create demo2 tenant
 	err := service.ensureTenant(LocalDevTenants[1]) // demo2 = ProfileSmall
@@ -278,7 +290,7 @@ func TestSeedProfileMedium(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	service := NewLocalDevSeedService(db)
+	service := NewLocalDevSeedService(db, localDevTestConfig())
 
 	// Create demo3 tenant
 	err := service.ensureTenant(LocalDevTenants[2]) // demo3 = ProfileMedium
@@ -343,7 +355,7 @@ func TestSeedProfileStress(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	service := NewLocalDevSeedService(db)
+	service := NewLocalDevSeedService(db, localDevTestConfig())
 
 	// Create demo4 tenant
 	err := service.ensureTenant(LocalDevTenants[3]) // demo4 = ProfileStress
@@ -397,7 +409,7 @@ func TestResetTenant(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	service := NewLocalDevSeedService(db)
+	service := NewLocalDevSeedService(db, localDevTestConfig())
 
 	// Create demo2 tenant first
 	err := service.ensureTenant(LocalDevTenants[1]) // demo2 = ProfileSmall
@@ -434,7 +446,7 @@ func TestResetTenantUnknown(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	service := NewLocalDevSeedService(db)
+	service := NewLocalDevSeedService(db, localDevTestConfig())
 
 	err := service.ResetTenant("unknown-tenant")
 	if err == nil {
@@ -447,7 +459,7 @@ func TestAdminUserCreation(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	service := NewLocalDevSeedService(db)
+	service := NewLocalDevSeedService(db, localDevTestConfig())
 
 	err := service.ensureTenant(LocalDevTenants[0]) // demo1
 	if err != nil {
@@ -492,7 +504,7 @@ func TestColorCategoriesCreation(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	service := NewLocalDevSeedService(db)
+	service := NewLocalDevSeedService(db, localDevTestConfig())
 
 	err := service.ensureTenant(LocalDevTenants[0]) // demo1
 	if err != nil {
@@ -521,7 +533,7 @@ func TestLocalDevSeedService_SeedsBookingTimeRules(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	service := NewLocalDevSeedService(db)
+	service := NewLocalDevSeedService(db, localDevTestConfig())
 
 	// Ensure tenants exist
 	err := service.EnsureLocalDevTenants()

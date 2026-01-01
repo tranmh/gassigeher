@@ -70,6 +70,26 @@
         let currentQuery = '';
         const ITEMS_PER_PAGE = 25;
 
+        // Get base domain from current hostname (e.g., central.gassigeher.org -> gassigeher.org)
+        function getBaseDomain() {
+            const hostname = window.location.hostname;
+            const parts = hostname.split('.');
+            // Remove 'central' subdomain if present, otherwise use full hostname
+            if (parts.length > 2 && parts[0] === 'central') {
+                return parts.slice(1).join('.');
+            }
+            // For local development (e.g., localhost:8080)
+            return parts.join('.');
+        }
+
+        // Construct tenant URL from slug
+        function getTenantUrl(slug) {
+            const baseDomain = getBaseDomain();
+            const protocol = window.location.protocol;
+            const port = window.location.port ? ':' + window.location.port : '';
+            return `${protocol}//${slug}.${baseDomain}${port}`;
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
             if (!isAuthenticated()) {
                 window.location.href = '/login.html';
@@ -302,9 +322,7 @@
                 // Redirect to tenant dashboard
                 if (result.tenant?.slug) {
                     // In SaaS mode, redirect to tenant subdomain
-                    const baseUrl = window.location.hostname.includes('localhost') ?
-                        window.location.origin :
-                        `https://${result.tenant.slug}.gassigeher.org`;
+                    const baseUrl = getTenantUrl(result.tenant.slug);
                     setTimeout(() => {
                         window.location.href = baseUrl + '/dashboard.html';
                     }, 1000);

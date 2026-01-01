@@ -1,5 +1,12 @@
 // Landing Page JavaScript for Gassigeher SaaS
 
+// Get base domain from current hostname (for displaying tenant URLs)
+function getBaseDomain() {
+    const hostname = window.location.hostname;
+    // For local development, use the full hostname
+    return hostname;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize components
     initSlugChecker();
@@ -282,7 +289,7 @@ function initRegistrationForm() {
                     const loginLink = document.getElementById('login-link-free');
                     if (loginLink && result.login_url) {
                         loginLink.href = result.login_url;
-                        loginLink.textContent = `Anmelden bei ${result.slug}.gassigeher.org`;
+                        loginLink.textContent = `Anmelden bei ${result.slug}.${getBaseDomain()}`;
                     }
                 }
             }

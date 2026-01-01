@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/tranmh/gassigeher/internal/config"
 	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
@@ -12,14 +13,16 @@ import (
 // DemoHandler handles demo tenant API endpoints
 type DemoHandler struct {
 	db            *database.DB
+	cfg           *config.Config
 	tenantRepo    *repository.TenantRepository
 	demoStateRepo *repository.DemoTenantRepository
 }
 
 // NewDemoHandler creates a new demo handler
-func NewDemoHandler(db *database.DB) *DemoHandler {
+func NewDemoHandler(db *database.DB, cfg *config.Config) *DemoHandler {
 	return &DemoHandler{
 		db:            db,
+		cfg:           cfg,
 		tenantRepo:    repository.NewTenantRepository(db),
 		demoStateRepo: repository.NewDemoTenantRepository(db),
 	}
@@ -62,21 +65,21 @@ func (h *DemoHandler) GetCredentials(w http.ResponseWriter, r *http.Request) {
 		DemoUsers: []models.DemoUser{
 			{
 				Name:     "Anna Gruen",
-				Email:    "anna@demo.gassigeher.org",
+				Email:    h.cfg.DemoUserEmail("anna"),
 				Password: services.DemoUserPassword,
 				Level:    "green",
 				LevelDE:  "Anfaenger",
 			},
 			{
 				Name:     "Bernd Orange",
-				Email:    "bernd@demo.gassigeher.org",
+				Email:    h.cfg.DemoUserEmail("bernd"),
 				Password: services.DemoUserPassword,
 				Level:    "orange",
 				LevelDE:  "Fortgeschritten",
 			},
 			{
 				Name:     "Clara Blau",
-				Email:    "clara@demo.gassigeher.org",
+				Email:    h.cfg.DemoUserEmail("clara"),
 				Password: services.DemoUserPassword,
 				Level:    "blue",
 				LevelDE:  "Experte",

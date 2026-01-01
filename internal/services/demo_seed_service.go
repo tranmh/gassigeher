@@ -7,17 +7,16 @@ import (
 	"log"
 	"time"
 
+	"github.com/tranmh/gassigeher/internal/config"
 	"github.com/tranmh/gassigeher/internal/database"
 	"github.com/tranmh/gassigeher/internal/models"
 	"github.com/tranmh/gassigeher/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Constants for demo tenant
+// Constants for demo tenant (non-domain specific)
 const (
-	DemoTenantSlug      = "demo"
 	DemoTenantName      = "Demo Tierheim"
-	DemoAdminEmail      = "admin@demo.gassigeher.org"
 	DemoUserPassword    = "demo1234"
 	DemoAdminPassword   = "demo1234" // Same as users for easy testing
 	DefaultFederalState = "BW"
@@ -34,6 +33,7 @@ func formatDemoResetLogMessage(_ string, nextReset time.Time) string {
 // DemoSeedService handles demo tenant creation and reset
 type DemoSeedService struct {
 	db            *database.DB
+	cfg           *config.Config
 	tenantRepo    *repository.TenantRepository
 	demoStateRepo *repository.DemoTenantRepository
 	userRepo      *repository.UserRepository
@@ -45,9 +45,10 @@ type DemoSeedService struct {
 }
 
 // NewDemoSeedService creates a new demo seed service
-func NewDemoSeedService(db *database.DB) *DemoSeedService {
+func NewDemoSeedService(db *database.DB, cfg *config.Config) *DemoSeedService {
 	return &DemoSeedService{
 		db:            db,
+		cfg:           cfg,
 		tenantRepo:    repository.NewTenantRepository(db),
 		demoStateRepo: repository.NewDemoTenantRepository(db),
 		userRepo:      repository.NewUserRepository(db),
@@ -62,7 +63,8 @@ func NewDemoSeedService(db *database.DB) *DemoSeedService {
 // EnsureDemoTenant ensures the demo tenant exists and has data
 func (s *DemoSeedService) EnsureDemoTenant() error {
 	// Check if demo tenant already exists
-	tenant, err := s.tenantRepo.FindBySlug(DemoTenantSlug)
+	demoSlug := s.cfg.DemoTenantSlug()
+	tenant, err := s.tenantRepo.FindBySlug(demoSlug)
 	if err != nil {
 		return fmt.Errorf("failed to check demo tenant: %w", err)
 	}
@@ -79,10 +81,10 @@ func (s *DemoSeedService) EnsureDemoTenant() error {
 
 	// Create demo tenant
 	tenant = &models.Tenant{
-		Slug:         DemoTenantSlug,
+		Slug:         demoSlug,
 		Name:         DemoTenantName,
 		Status:       models.TenantStatusActive,
-		ContactEmail: DemoAdminEmail,
+		ContactEmail: s.cfg.DemoAdminEmail(),
 		FederalState: DefaultFederalState,
 		IsDemo:       true,
 	}
@@ -236,7 +238,7 @@ func (s *DemoSeedService) seedDemoUsers(tenantID int, adminPassword string) (map
 			Key:          "admin",
 			FirstName:    "Demo",
 			LastName:     "Admin",
-			Email:        DemoAdminEmail,
+			Email:        s.cfg.DemoAdminEmail(),
 			PasswordHash: string(adminHash),
 			IsSuperAdmin: true,
 			IsAdmin:      true,
@@ -247,7 +249,7 @@ func (s *DemoSeedService) seedDemoUsers(tenantID int, adminPassword string) (map
 			Key:          "green",
 			FirstName:    "Anna",
 			LastName:     "Mueller",
-			Email:        "anna@demo.gassigeher.org",
+			Email:        s.cfg.DemoUserEmail("anna"),
 			PasswordHash: string(demoHash),
 			IsSuperAdmin: false,
 			IsAdmin:      false,
@@ -258,7 +260,7 @@ func (s *DemoSeedService) seedDemoUsers(tenantID int, adminPassword string) (map
 			Key:          "orange",
 			FirstName:    "Bernd",
 			LastName:     "Schmidt",
-			Email:        "bernd@demo.gassigeher.org",
+			Email:        s.cfg.DemoUserEmail("bernd"),
 			PasswordHash: string(demoHash),
 			IsSuperAdmin: false,
 			IsAdmin:      false,
@@ -269,7 +271,7 @@ func (s *DemoSeedService) seedDemoUsers(tenantID int, adminPassword string) (map
 			Key:          "blue",
 			FirstName:    "Clara",
 			LastName:     "Weber",
-			Email:        "clara@demo.gassigeher.org",
+			Email:        s.cfg.DemoUserEmail("clara"),
 			PasswordHash: string(demoHash),
 			IsSuperAdmin: false,
 			IsAdmin:      false,
@@ -367,7 +369,7 @@ func (s *DemoSeedService) seedDemoDogs(tenantID int) ([]int, error) {
 	}
 
 	// External link for all demo dogs - points to main Gassigeher site
-	externalLink := "https://gassigeher.org"
+	externalLink := s.cfg.MainSiteURL()
 
 	dogs := []struct {
 		Name                string
@@ -688,7 +690,7 @@ func (s *DemoSeedService) ResetDemoTenant() error {
 	log.Println("Starting demo tenant reset...")
 
 	// Get demo tenant
-	tenant, err := s.tenantRepo.FindBySlug(DemoTenantSlug)
+	tenant, err := s.tenantRepo.FindBySlug(s.cfg.DemoTenantSlug())
 	if err != nil {
 		return fmt.Errorf("failed to find demo tenant: %w", err)
 	}
@@ -775,7 +777,7 @@ func (s *DemoSeedService) calculateNextResetTime() time.Time {
 
 // GetDemoTenantID returns the demo tenant ID, or 0 if not found
 func (s *DemoSeedService) GetDemoTenantID() int {
-	tenant, err := s.tenantRepo.FindBySlug(DemoTenantSlug)
+	tenant, err := s.tenantRepo.FindBySlug(s.cfg.DemoTenantSlug())
 	if err != nil || tenant == nil {
 		return 0
 	}

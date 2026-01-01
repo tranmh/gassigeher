@@ -24,9 +24,10 @@ set -o pipefail
 # CONFIGURATION - EDIT THESE VALUES
 # ============================================
 
-# Domain configuration
+# Domain configuration (override with --local for local testing)
 DOMAIN="gassigeher.org"
 BASE_DOMAIN="gassigeher.org"
+LOCAL_MODE=false
 
 # Installation directory
 INSTALL_DIR="/opt/gassigeher"
@@ -230,9 +231,17 @@ collect_configuration() {
 create_env_file() {
     log_info "Creating .env file..."
 
+    # Set BASE_URL based on mode
+    if [[ "$LOCAL_MODE" == "true" ]]; then
+        COMPUTED_BASE_URL="http://${DOMAIN}:8080"
+    else
+        COMPUTED_BASE_URL="https://${DOMAIN}"
+    fi
+
     cat > "$INSTALL_DIR/.env" << EOF
-# Gassigeher SaaS Production Configuration
+# Gassigeher SaaS Configuration
 # Generated: $(date)
+# Mode: $(if [[ "$LOCAL_MODE" == "true" ]]; then echo "LOCAL"; else echo "PRODUCTION"; fi)
 
 # ============================================
 # DATABASE
@@ -248,7 +257,7 @@ DB_PASSWORD=${DB_PASSWORD}
 # APPLICATION
 # ============================================
 PORT=8080
-BASE_URL=https://${DOMAIN}
+BASE_URL=${COMPUTED_BASE_URL}
 BASE_DOMAIN=${BASE_DOMAIN}
 
 # ============================================
@@ -651,12 +660,25 @@ print_summary() {
     echo -e "${GREEN}  INSTALLATION COMPLETE!${NC}"
     echo "============================================"
     echo ""
-    echo "Your Gassigeher SaaS is now running at:"
-    echo ""
-    echo -e "  ${BLUE}Landing Page:${NC}    https://${DOMAIN}"
-    echo -e "  ${BLUE}Central Admin:${NC}   https://admin.${DOMAIN}"
-    echo -e "  ${BLUE}Demo Tenant:${NC}     https://demo.${DOMAIN}"
-    echo -e "  ${BLUE}Health Check:${NC}    https://${DOMAIN}/api/health"
+
+    if [[ "$LOCAL_MODE" == "true" ]]; then
+        echo "Your Gassigeher SaaS is now running at (LOCAL MODE):"
+        echo ""
+        echo -e "  ${BLUE}Landing Page:${NC}    http://${DOMAIN}:8080/landing/"
+        echo -e "  ${BLUE}Central Admin:${NC}   http://${DOMAIN}:8080/central/"
+        echo -e "  ${BLUE}Demo Tenant:${NC}     http://demo.${DOMAIN}:8080"
+        echo -e "  ${BLUE}Health Check:${NC}    http://${DOMAIN}:8080/api/health"
+        echo ""
+        echo "Required /etc/hosts entries:"
+        echo "  127.0.0.1 ${DOMAIN} demo.${DOMAIN}"
+    else
+        echo "Your Gassigeher SaaS is now running at:"
+        echo ""
+        echo -e "  ${BLUE}Landing Page:${NC}    https://${DOMAIN}"
+        echo -e "  ${BLUE}Central Admin:${NC}   https://admin.${DOMAIN}"
+        echo -e "  ${BLUE}Demo Tenant:${NC}     https://demo.${DOMAIN}"
+        echo -e "  ${BLUE}Health Check:${NC}    https://${DOMAIN}/api/health"
+    fi
     echo ""
     echo "Management commands:"
     echo ""
@@ -677,16 +699,18 @@ print_summary() {
     echo "Super Admin credentials will be in:"
     echo "  $INSTALL_DIR/logs/ (check app logs)"
     echo ""
-    echo "Next steps:"
-    echo ""
-    echo "  1. Configure Stripe webhook:"
-    echo "     URL: https://${DOMAIN}/api/v1/billing/webhook"
-    echo ""
-    echo "  2. Configure Hetzner DNS:"
-    echo "     A record:     ${DOMAIN} -> $(curl -s ifconfig.me)"
-    echo "     A record:   *.${DOMAIN} -> $(curl -s ifconfig.me)"
-    echo ""
-    echo "  3. Test the installation:"
+    if [[ "$LOCAL_MODE" != "true" ]]; then
+        echo "Next steps:"
+        echo ""
+        echo "  1. Configure Stripe webhook:"
+        echo "     URL: https://${DOMAIN}/api/v1/billing/webhook"
+        echo ""
+        echo "  2. Configure Hetzner DNS:"
+        echo "     A record:     ${DOMAIN} -> $(curl -s ifconfig.me)"
+        echo "     A record:   *.${DOMAIN} -> $(curl -s ifconfig.me)"
+        echo ""
+    fi
+    echo "  Test the installation:"
     echo "     gassigeher health"
     echo ""
     echo "============================================"
@@ -703,7 +727,13 @@ show_help() {
     echo ""
     echo "Options:"
     echo "  --force       Force complete reinstall (stops containers, deletes target dir, rebuilds)"
+    echo "  --local       Use gassigeher.local domain for local testing (no SSL)"
     echo "  --help        Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  $0                    # Production install (gassigeher.org)"
+    echo "  $0 --local            # Local testing (gassigeher.local:8080)"
+    echo "  $0 --force --local    # Fresh local install"
     echo ""
     echo "The script is idempotent - safe to run multiple times."
     echo "Existing .env configuration is preserved unless --force is used."
@@ -772,6 +802,12 @@ main() {
         case $arg in
             --force)
                 FORCE_MODE=true
+                ;;
+            --local)
+                LOCAL_MODE=true
+                DOMAIN="gassigeher.local"
+                BASE_DOMAIN="gassigeher.local"
+                log_info "Local mode: Using domain gassigeher.local"
                 ;;
             --help|-h)
                 show_help

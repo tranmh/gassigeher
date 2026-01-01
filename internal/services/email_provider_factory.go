@@ -126,5 +126,6 @@ func ConfigToEmailConfig(cfg *config.Config) *EmailConfig {
 		SMTPUseSSL:        cfg.SMTPUseSSL,
 		BCCAdmin:          cfg.EmailBCCAdmin,
 		BaseURL:           cfg.BaseURL,
+		BaseDomain:        cfg.BaseDomain,
 	}
 }

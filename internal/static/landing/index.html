@@ -151,7 +151,7 @@
                     <div class="step">
                         <span class="step-number">1</span>
                         <h3>Registrieren</h3>
-                        <p>Wählen Sie Ihre Subdomain (z.B. tierheim-musterstadt.gassigeher.org) und erstellen Sie Ihr Admin-Konto.</p>
+                        <p>Wählen Sie Ihre Subdomain (z.B. tierheim-musterstadt.<span class="base-domain-placeholder">gassigeher.org</span>) und erstellen Sie Ihr Admin-Konto.</p>
                     </div>
                     <div class="step">
                         <span class="step-number">2</span>
@@ -230,5 +230,14 @@
     </footer>
 
     <script src="/landing/assets/js/landing.js"></script>
+    <script>
+        // Update domain placeholders dynamically
+        document.addEventListener('DOMContentLoaded', function() {
+            const placeholders = document.querySelectorAll('.base-domain-placeholder');
+            placeholders.forEach(function(el) {
+                el.textContent = window.location.hostname;
+            });
+        });
+    </script>
 </body>
 </html>

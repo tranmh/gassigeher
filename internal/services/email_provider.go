@@ -44,4 +44,7 @@ type EmailConfig struct {
 
 	// Base URL for email links (e.g., "https://gassigeher.com")
 	BaseURL string
+
+	// Base domain for multi-tenant (e.g., "gassigeher.org" or "gassigeher.local")
+	BaseDomain string
 }

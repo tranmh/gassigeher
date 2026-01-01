@@ -10,8 +10,9 @@ import (
 
 // EmailService handles sending emails via any email provider
 type EmailService struct {
-	provider EmailProvider
-	baseURL  string // Base URL for email links
+	provider   EmailProvider
+	baseURL    string // Base URL for email links
+	baseDomain string // Base domain for multi-tenant (e.g., "gassigeher.org")
 }
 
 // NewEmailService creates a new email service with the specified provider
@@ -48,8 +49,9 @@ func NewEmailService(config *EmailConfig) (*EmailService, error) {
 	}
 
 	return &EmailService{
-		provider: provider,
-		baseURL:  baseURL,
+		provider:   provider,
+		baseURL:    baseURL,
+		baseDomain: config.BaseDomain,
 	}, nil
 }
 
@@ -67,10 +69,10 @@ func NewEmailServiceLegacy(clientID, clientSecret, refreshToken, fromEmail strin
 }
 
 // SendEmail sends an email using the configured provider
-// Skips sending for demo tenant emails (ending with @demo.gassigeher.org)
+// Skips sending for demo tenant emails (ending with @demo.{baseDomain})
 func (s *EmailService) SendEmail(to, subject, body string) error {
 	// Skip emails for demo tenant users
-	if isDemoEmail(to) {
+	if s.isDemoEmail(to) {
 		log.Printf("Skipping email to demo tenant user: %s (subject: %s)", to, subject)
 		return nil
 	}
@@ -78,8 +80,27 @@ func (s *EmailService) SendEmail(to, subject, body string) error {
 }
 
 // isDemoEmail checks if an email address belongs to a demo tenant user
-func isDemoEmail(email string) bool {
-	return strings.HasSuffix(email, "@demo.gassigeher.org")
+func (s *EmailService) isDemoEmail(email string) bool {
+	if s.baseDomain == "" {
+		return strings.HasSuffix(email, "@demo.localhost")
+	}
+	return strings.HasSuffix(email, "@demo."+s.baseDomain)
+}
+
+// DemoTenantDomain returns the demo tenant domain (e.g., "demo.gassigeher.org")
+func (s *EmailService) DemoTenantDomain() string {
+	if s.baseDomain == "" {
+		return "demo.localhost"
+	}
+	return "demo." + s.baseDomain
+}
+
+// SupportEmail returns the support email address
+func (s *EmailService) SupportEmail() string {
+	if s.baseDomain == "" {
+		return "support@localhost"
+	}
+	return "support@" + s.baseDomain
 }
 
 // =============================================================================
@@ -1185,7 +1206,7 @@ func (s *EmailService) SendTenantWelcomeEmail(to, tenantName, adminName, tenantS
                 <h3 style="margin-top: 0; color: #82b965;">{{.TenantName}} ist bereit!</h3>
                 <p>Ihr Tierheim wurde erfolgreich eingerichtet und ist ab sofort unter folgender Adresse erreichbar:</p>
                 <p style="text-align: center; font-size: 1.2rem;">
-                    <strong><a href="{{.LoginURL}}" class="subdomain">{{.TenantSlug}}.gassigeher.org</a></strong>
+                    <strong><a href="{{.LoginURL}}" class="subdomain">{{.TenantDomain}}</a></strong>
                 </p>
             </div>
 
@@ -1205,7 +1226,7 @@ func (s *EmailService) SendTenantWelcomeEmail(to, tenantName, adminName, tenantS
             </div>
 
             <p style="font-size: 0.9rem; color: #666;">
-                Bei Fragen oder Problemen konnen Sie uns jederzeit unter <a href="mailto:support@gassigeher.org">support@gassigeher.org</a> erreichen.
+                Bei Fragen oder Problemen konnen Sie uns jederzeit unter <a href="mailto:{{.SupportEmail}}">{{.SupportEmail}}</a> erreichen.
             </p>
         </div>
         <div class="footer">
@@ -1217,16 +1238,26 @@ func (s *EmailService) SendTenantWelcomeEmail(to, tenantName, adminName, tenantS
 </html>
 `
 
+	// Build tenant domain from slug and base domain
+	tenantDomain := tenantSlug + "." + s.baseDomain
+	if s.baseDomain == "" {
+		tenantDomain = tenantSlug + ".localhost"
+	}
+
 	data := struct {
-		TenantName string
-		AdminName  string
-		TenantSlug string
-		LoginURL   string
+		TenantName   string
+		AdminName    string
+		TenantSlug   string
+		TenantDomain string
+		LoginURL     string
+		SupportEmail string
 	}{
-		TenantName: tenantName,
-		AdminName:  adminName,
-		TenantSlug: tenantSlug,
-		LoginURL:   loginURL,
+		TenantName:   tenantName,
+		AdminName:    adminName,
+		TenantSlug:   tenantSlug,
+		TenantDomain: tenantDomain,
+		LoginURL:     loginURL,
+		SupportEmail: s.SupportEmail(),
 	}
 
 	t, err := template.New("tenant_welcome").Parse(tmpl)

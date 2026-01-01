@@ -32,6 +32,7 @@ func main() {
 	federalState := flag.String("state", "BW", "Federal state code for holidays (default: BW)")
 	promoteCentralAdmin := flag.Bool("promote-central-admin", true, "Promote super admin to central admin")
 	dryRun := flag.Bool("dry-run", false, "Show what would be done without making changes")
+	baseDomain := flag.String("domain", "example.com", "Base domain for tenant URLs (e.g., 'gassigeher.org')")
 	dbType := flag.String("db-type", "sqlite", "Database type: sqlite, postgres, mysql")
 	dbPath := flag.String("db-path", "./gassigeher.db", "SQLite database path")
 	dbURL := flag.String("db-url", "", "Database connection URL (for postgres/mysql)")
@@ -153,7 +154,7 @@ func main() {
 		log.Printf("  Tenant Slug: %s", slug)
 		log.Printf("  Contact Email: %s", *contactEmail)
 		log.Printf("  Federal State: %s", *federalState)
-		log.Printf("  URL: https://%s.gassigeher.org", slug)
+		log.Printf("  URL: https://%s.%s", slug, *baseDomain)
 		return
 	}
 
@@ -221,12 +222,12 @@ func main() {
 	log.Printf("Tenant Name:  %s", *tenantName)
 	log.Printf("Tenant Slug:  %s", slug)
 	log.Printf("Tenant ID:    %d", tenantID)
-	log.Printf("Tenant URL:   https://%s.gassigeher.org", slug)
+	log.Printf("Tenant URL:   https://%s.%s", slug, *baseDomain)
 	log.Println("\nNext steps:")
-	log.Println("1. Update BASE_DOMAIN in .env to 'gassigeher.org'")
-	log.Println("2. Configure DNS wildcard record: *.gassigeher.org -> your server")
+	log.Printf("1. Update BASE_DOMAIN in .env to '%s'", *baseDomain)
+	log.Printf("2. Configure DNS wildcard record: *.%s -> your server", *baseDomain)
 	log.Println("3. Start the server with the new configuration")
-	log.Printf("4. Access your tenant at: https://%s.gassigeher.org", slug)
+	log.Printf("4. Access your tenant at: https://%s.%s", slug, *baseDomain)
 }
 
 // isValidSlug validates tenant slug format

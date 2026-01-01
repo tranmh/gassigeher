@@ -244,7 +244,7 @@ const FAQ_DATA = [
             '1. <strong>Spam-Ordner prüfen:</strong> E-Mails landen manchmal dort<br>' +
             '2. <strong>E-Mail-Adresse prüfen:</strong> Ist sie korrekt im Profil?<br>' +
             '3. <strong>Filter deaktivieren:</strong> Manche E-Mail-Programme filtern zu streng<br>' +
-            '4. <strong>Absender whitelisten:</strong> Fügen Sie noreply@gassigeher.org zu Ihren Kontakten hinzu<br><br>' +
+            '4. <strong>Absender whitelisten:</strong> Fügen Sie die Absenderadresse der Gassigeher-E-Mails zu Ihren Kontakten hinzu<br><br>' +
             'Bei weiterhin fehlenden E-Mails kontaktieren Sie bitte den Support.',
         keywords: ['email', 'nicht', 'erhalten', 'spam', 'posteingang', 'mail']
     },

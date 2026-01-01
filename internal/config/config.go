@@ -283,6 +283,77 @@ func (c *Config) IsLocalDevelopment() bool {
 		c.BaseDomain == "localhost"
 }
 
+// ===========================================
+// Domain-derived helper methods
+// All domain references should use these methods
+// to ensure consistency with BASE_DOMAIN config
+// ===========================================
+
+// DemoTenantSlug returns the slug for the demo tenant
+func (c *Config) DemoTenantSlug() string {
+	return "demo"
+}
+
+// DemoTenantDomain returns the full domain for demo tenant (e.g., "demo.gassigeher.org")
+func (c *Config) DemoTenantDomain() string {
+	if c.BaseDomain == "" {
+		return "demo.localhost"
+	}
+	return "demo." + c.BaseDomain
+}
+
+// DemoAdminEmail returns the admin email for demo tenant
+func (c *Config) DemoAdminEmail() string {
+	return "admin@" + c.DemoTenantDomain()
+}
+
+// DemoUserEmail returns a user email for demo tenant (e.g., "anna@demo.gassigeher.org")
+func (c *Config) DemoUserEmail(username string) string {
+	return username + "@" + c.DemoTenantDomain()
+}
+
+// IsDemoEmail checks if an email belongs to the demo tenant
+func (c *Config) IsDemoEmail(email string) bool {
+	return strings.HasSuffix(email, "@"+c.DemoTenantDomain())
+}
+
+// SupportEmail returns the support email address
+func (c *Config) SupportEmail() string {
+	if c.BaseDomain == "" {
+		return "support@localhost"
+	}
+	return "support@" + c.BaseDomain
+}
+
+// NoReplyEmail returns the noreply email address for whitelisting instructions
+func (c *Config) NoReplyEmail() string {
+	if c.BaseDomain == "" {
+		return "noreply@localhost"
+	}
+	return "noreply@" + c.BaseDomain
+}
+
+// TenantDomain returns the full domain for a tenant (e.g., "tierheim.gassigeher.org")
+func (c *Config) TenantDomain(slug string) string {
+	if c.BaseDomain == "" {
+		return slug + ".localhost"
+	}
+	return slug + "." + c.BaseDomain
+}
+
+// TenantURL returns the full URL for a tenant
+func (c *Config) TenantURL(slug string) string {
+	if c.IsLocalDevelopment() {
+		return "http://" + c.TenantDomain(slug) + ":" + c.Port
+	}
+	return "https://" + c.TenantDomain(slug)
+}
+
+// MainSiteURL returns the URL of the main marketing site
+func (c *Config) MainSiteURL() string {
+	return c.BaseURL
+}
+
 // IsBillingTestModeEnabled returns true if billing test mode is enabled
 // This allows testing subscription upgrades without Stripe
 // Auto-enabled for local development (.local, .localhost domains) or via BILLING_TEST_MODE=true

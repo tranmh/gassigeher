@@ -11,6 +11,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	_ "modernc.org/sqlite"
+	"github.com/tranmh/gassigeher/internal/config"
 	"github.com/tranmh/gassigeher/internal/database"
 )
 
@@ -828,4 +829,15 @@ func seedBenchmarkDB(b *testing.B, db *database.DB) {
 		(2, 0, 'dunkelblau', '#3b82f6', 'Fortgeschrittene Hunde', 2, 2, ?, ?),
 		(3, 0, 'orange', '#f97316', 'Erfahrene Gassigeher', 3, 3, ?, ?)
 	`, now, now, now, now, now, now)
+}
+
+// TestConfig returns a config suitable for testing
+// Uses test.local as BaseDomain for domain-related tests
+func TestConfig() *config.Config {
+	return &config.Config{
+		Port:       "8080",
+		BaseURL:    "http://localhost:8080",
+		BaseDomain: "test.local",
+		JWTSecret:  "test-secret-key-for-testing-only",
+	}
 }

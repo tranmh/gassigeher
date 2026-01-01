@@ -59,7 +59,7 @@ func NewCronService(db *database.DB, cfg *config.Config) *CronService {
 		tenantRepo:            repository.NewTenantRepository(db),
 		demoStateRepo:         repository.NewDemoTenantRepository(db),
 		emailService:          emailService,
-		demoSeedService:       services.NewDemoSeedService(db),
+		demoSeedService:       services.NewDemoSeedService(db, cfg),
 		tenantActivityChecker: NewTenantActivityChecker(db, 30), // Default 30 days inactivity
 		stopChan:              make(chan bool),
 	}

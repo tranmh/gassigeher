@@ -318,7 +318,7 @@
                                pattern="[a-z0-9-]+"
                                placeholder="tierheim-musterstadt"
                                autocomplete="off">
-                        <span>.gassigeher.org</span>
+                        <span id="domain-suffix">.gassigeher.org</span>
                     </div>
                     <span id="slug-status"></span>
                     <small>Nur Kleinbuchstaben, Zahlen und Bindestriche erlaubt. Mindestens 3 Zeichen.</small>
@@ -478,5 +478,14 @@
     </footer>
 
     <script src="/landing/assets/js/landing.js"></script>
+    <script>
+        // Set domain suffix dynamically based on current hostname
+        document.addEventListener('DOMContentLoaded', function() {
+            const domainSuffix = document.getElementById('domain-suffix');
+            if (domainSuffix) {
+                domainSuffix.textContent = '.' + window.location.hostname;
+            }
+        });
+    </script>
 </body>
 </html>

@@ -28,7 +28,8 @@
     function isDemoTenant() {
         // Check subdomain or cached value
         const hostname = window.location.hostname;
-        if (hostname.startsWith('demo.') || hostname === 'demo.gassigeher.org') {
+        // Demo tenant always uses "demo." subdomain regardless of base domain
+        if (hostname.startsWith('demo.')) {
             return true;
         }
         return localStorage.getItem(STORAGE_KEYS.isDemo) === 'true';
