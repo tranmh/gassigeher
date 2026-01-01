@@ -55,6 +55,9 @@ func (h *DemoHandler) GetCredentials(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Override admin email with config-based email (database may have old hardcoded value)
+	credentials.AdminEmail = h.cfg.DemoAdminEmail()
+
 	// Build response with demo users
 	response := struct {
 		AdminCredentials models.DemoCredentials `json:"admin"`
