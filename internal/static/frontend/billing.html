@@ -26,11 +26,11 @@
             box-shadow: 0 8px 24px rgba(0,0,0,0.12);
         }
         .pricing-card.current {
-            border-color: #82b965;
+            border-color: var(--color-primary, #82b965);
             background: linear-gradient(180deg, #f8fff5 0%, #fff 100%);
         }
         .pricing-card.recommended {
-            border-color: #82b965;
+            border-color: var(--color-primary, #82b965);
             position: relative;
         }
         .pricing-card.recommended::before {
@@ -39,7 +39,7 @@
             top: -12px;
             left: 50%;
             transform: translateX(-50%);
-            background: #82b965;
+            background: var(--color-primary, #82b965);
             color: white;
             padding: 4px 16px;
             border-radius: 20px;
@@ -55,7 +55,7 @@
         .plan-price {
             font-size: 2.5rem;
             font-weight: 700;
-            color: #82b965;
+            color: var(--color-primary, #82b965);
             margin: 16px 0;
         }
         .plan-price span {
@@ -78,7 +78,7 @@
         }
         .plan-features li::before {
             content: "✓";
-            color: #82b965;
+            color: var(--color-primary, #82b965);
             font-weight: bold;
         }
         .usage-bar {
@@ -89,7 +89,7 @@
             margin: 16px 0;
         }
         .usage-bar-fill {
-            background: linear-gradient(90deg, #82b965 0%, #6fa050 100%);
+            background: linear-gradient(90deg, var(--color-primary, #82b965) 0%, var(--color-secondary, #6fa050) 100%);
             height: 100%;
             border-radius: 8px;
             transition: width 0.5s ease;
@@ -173,11 +173,11 @@
             transition: background 0.2s, color 0.2s;
         }
         .billing-cycle-toggle button.active {
-            background: #82b965;
+            background: var(--color-primary, #82b965);
             color: white;
         }
         .savings-badge {
-            background: #82b965;
+            background: var(--color-primary, #82b965);
             color: white;
             padding: 2px 8px;
             border-radius: 4px;
@@ -269,7 +269,7 @@
             background: #f8f9fa;
         }
         .invoice-download {
-            color: #82b965;
+            color: var(--color-primary, #82b965);
             text-decoration: none;
             font-weight: 500;
         }
@@ -277,7 +277,7 @@
             text-decoration: underline;
         }
         .upgrade-cta {
-            background: linear-gradient(135deg, #82b965 0%, #6fa050 100%);
+            background: linear-gradient(135deg, var(--color-primary, #82b965) 0%, var(--color-secondary, #6fa050) 100%);
             color: white;
             border: none;
             padding: 14px 28px;
@@ -293,8 +293,8 @@
             box-shadow: 0 4px 12px rgba(130, 185, 101, 0.4);
         }
         .transparency-message {
-            background: linear-gradient(135deg, #f8fff5 0%, #e8f5e1 100%);
-            border: 1px solid #82b965;
+            background: color-mix(in srgb, var(--color-primary, #82b965) 8%, white);
+            border: 1px solid var(--color-primary, #82b965);
             border-radius: 12px;
             padding: 24px;
             margin: 30px 0;

@@ -11,7 +11,7 @@
     <style>
         .shepherd-element { z-index: 10000 !important; }
         .shepherd-modal-overlay-container { z-index: 9999 !important; }
-        .shepherd-button-primary { background: var(--primary-green, #82b965) !important; }
+        .shepherd-button-primary { background: var(--color-primary, #82b965) !important; }
         .shepherd-button-primary:hover { background: #6fa954 !important; }
     </style>
 </head>
@@ -65,7 +65,7 @@
 
             <!-- Statistics Grid -->
             <div id="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 30px 0;">
-                <div class="card" style="text-align: center; padding: 25px; background: linear-gradient(135deg, #82b965 0%, #6fa050 100%); color: white;">
+                <div class="card" style="text-align: center; padding: 25px; background: linear-gradient(135deg, var(--color-primary, #82b965) 0%, var(--color-secondary, #6fa050) 100%); color: white;">
                     <h2 style="margin: 0 0 10px 0; font-size: 2.5rem;" id="stat-total-walks">-</h2>
                     <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;" data-i18n="admin_dashboard.total_walks">Gesamt Spaziergänge</p>
                 </div>
@@ -86,7 +86,7 @@
                 </div>
 
                 <div class="card" style="text-align: center; padding: 25px;">
-                    <h2 style="margin: 0 0 10px 0; font-size: 2.5rem; color: #82b965;" id="stat-available-dogs">-</h2>
+                    <h2 style="margin: 0 0 10px 0; font-size: 2.5rem; color: var(--color-primary, #82b965);" id="stat-available-dogs">-</h2>
                     <p style="margin: 0; font-size: 0.9rem; color: #666;" data-i18n="admin_dashboard.available_dogs">Verfügbare Hunde</p>
                 </div>
 
@@ -118,7 +118,7 @@
                         <span id="usage-dogs-limit">- Limit</span>
                     </div>
                     <div style="background: #e0e0e0; border-radius: 8px; height: 12px; overflow: hidden;">
-                        <div id="usage-bar-fill" style="background: linear-gradient(90deg, #82b965 0%, #6fa050 100%); height: 100%; border-radius: 8px; transition: width 0.5s ease; width: 0%;"></div>
+                        <div id="usage-bar-fill" style="background: linear-gradient(90deg, var(--color-primary, #82b965) 0%, var(--color-secondary, #6fa050) 100%); height: 100%; border-radius: 8px; transition: width 0.5s ease; width: 0%;"></div>
                     </div>
                     <div id="usage-plan-info" style="margin-top: 12px; font-size: 0.9rem; color: #666;"></div>
                 </div>
@@ -303,7 +303,7 @@
                 // Show plan info
                 const planInfo = document.getElementById('usage-plan-info');
                 if (dogsLimit === -1) {
-                    planInfo.innerHTML = '<span style="color: #82b965; font-weight: 500;">Pro Plan - Unbegrenzte Hunde</span>';
+                    planInfo.innerHTML = '<span style="color: var(--color-primary, #82b965); font-weight: 500;">Pro Plan - Unbegrenzte Hunde</span>';
                 } else if (dogsUsed >= dogsLimit) {
                     planInfo.innerHTML = '<span style="color: #dc3545; font-weight: 500;">Limit erreicht! <a href="/billing.html">Upgrade auf Pro</a></span>';
                 } else if (dogsUsed >= dogsLimit * 0.9) {

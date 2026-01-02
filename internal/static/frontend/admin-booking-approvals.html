@@ -94,7 +94,7 @@
         }
         .empty-state h3 {
             margin-bottom: 10px;
-            color: #82b965;
+            color: var(--color-primary, #82b965);
         }
         .filter-tabs {
             display: flex;
@@ -111,9 +111,9 @@
             transition: all 0.3s;
         }
         .filter-tab.active {
-            background: var(--primary-green);
+            background: var(--color-primary, #82b965);
             color: white;
-            border-color: var(--primary-green);
+            border-color: var(--color-primary, #82b965);
         }
         .filter-tab .count {
             background: rgba(0,0,0,0.1);

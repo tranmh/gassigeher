@@ -180,7 +180,7 @@
 
             container.innerHTML = blockedDates.map(blocked => {
                 const dogDisplay = blocked.dog_id
-                    ? `<span style="color: var(--primary-green);">🐕 ${sanitizeHTML(blocked.dog_name || 'Unbekannter Hund')}</span>`
+                    ? `<span style="color: var(--color-primary, #82b965);">🐕 ${sanitizeHTML(blocked.dog_name || 'Unbekannter Hund')}</span>`
                     : '<span style="color: #888;">🌐 Alle Hunde</span>';
 
                 return `

@@ -266,7 +266,7 @@
 
                     // Get dog's color from embedded object or find in allColors
                     const dogColor = dog.color || allColors.find(c => c.id === dog.color_id);
-                    const borderColor = dogColor ? dogColor.hex_code : '#82b965';
+                    const borderColor = dogColor ? dogColor.hex_code : 'var(--color-primary, #82b965)';
 
                     const photoUrl = getPhotoUrl(dog.photo, '/assets/images/placeholders/dog-placeholder.svg');
 
@@ -284,7 +284,7 @@
                     }
 
                     const externalLinkHtml = safeExternalLink
-                        ? `<a href="${safeExternalLink}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 12px; color: var(--primary-green); text-decoration: none; font-weight: 500;">mehr über mich &rarr;</a>`
+                        ? `<a href="${safeExternalLink}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 12px; color: var(--color-primary, #82b965); text-decoration: none; font-weight: 500;">mehr über mich &rarr;</a>`
                         : '';
 
                     return `

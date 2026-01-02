@@ -11,7 +11,7 @@
     <style>
         .shepherd-element { z-index: 10000 !important; }
         .shepherd-modal-overlay-container { z-index: 9999 !important; }
-        .shepherd-button-primary { background: var(--primary-green, #82b965) !important; }
+        .shepherd-button-primary { background: var(--color-primary, #82b965) !important; }
         .shepherd-button-primary:hover { background: #6fa954 !important; }
     </style>
 </head>
@@ -375,7 +375,7 @@
                         const photoCount = report.photos ? report.photos.length : 0;
 
                         reportHtml = `
-                            <div style="margin-top: 10px; padding: 12px; background: linear-gradient(135deg, #f0f9f0 0%, #e8f5e8 100%); border-radius: 8px; border-left: 4px solid #82b965;">
+                            <div style="margin-top: 10px; padding: 12px; background: color-mix(in srgb, var(--color-primary, #82b965) 10%, white); border-radius: 8px; border-left: 4px solid var(--color-primary, #82b965);">
                                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                                     <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
                                         <span style="color: #ffc107; font-size: 16px;" title="Verhalten: ${report.behavior_rating}/5">${stars}</span>

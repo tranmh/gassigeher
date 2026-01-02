@@ -31,7 +31,7 @@
 
         /* Calendar Headers */
         .calendar-header {
-            background: linear-gradient(135deg, #82b965 0%, #6fa050 100%);
+            background: linear-gradient(135deg, var(--color-primary, #82b965) 0%, var(--color-secondary, #6fa050) 100%);
             color: white;
             padding: 16px 12px;
             text-align: center;
@@ -48,7 +48,7 @@
             position: sticky;
             left: 0;
             z-index: 11;
-            background: linear-gradient(135deg, #26272b 0%, #82b965 100%);
+            background: linear-gradient(135deg, var(--color-text, #26272b) 0%, var(--color-primary, #82b965) 100%);
         }
 
         /* Calendar Cells */
@@ -84,18 +84,18 @@
             width: 100%;
         }
 
-        /* Available Cells - Light green with good contrast */
+        /* Available Cells - Light primary color with good contrast */
         .calendar-cell.available {
-            background: linear-gradient(135deg, #e8f5e0 0%, #d4edda 100%);
+            background: color-mix(in srgb, var(--color-primary, #82b965) 15%, white);
             cursor: pointer;
             border: 2px solid transparent;
         }
 
         .calendar-cell.available:hover {
-            background: linear-gradient(135deg, #c3e6cb 0%, #b1dfbb 100%);
+            background: color-mix(in srgb, var(--color-primary, #82b965) 25%, white);
             transform: scale(1.05);
-            box-shadow: 0 4px 12px rgba(130, 185, 101, 0.3);
-            border-color: var(--primary-green);
+            box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary, #82b965) 30%, transparent);
+            border-color: var(--color-primary, #82b965);
             z-index: 2;
         }
 
@@ -125,8 +125,8 @@
         }
 
         .time-slot.available, .walk-type.available {
-            background: rgba(130, 185, 101, 0.2);
-            color: var(--secondary-green);
+            background: color-mix(in srgb, var(--color-primary, #82b965) 20%, white);
+            color: var(--color-secondary, #6fa050);
         }
 
         .time-slot.booked, .walk-type.booked {
@@ -206,9 +206,9 @@
         }
 
         .view-toggle button.active {
-            background: var(--primary-green);
+            background: var(--color-primary, #82b965);
             color: white;
-            border-color: var(--primary-green);
+            border-color: var(--color-primary, #82b965);
         }
 
         /* Mobile Responsive - Card View */
@@ -246,7 +246,7 @@
             .dog-card-mobile h3 {
                 margin-bottom: 15px;
                 color: var(--text-dark);
-                border-bottom: 2px solid var(--primary-green);
+                border-bottom: 2px solid var(--color-primary, #82b965);
                 padding-bottom: 10px;
             }
 
@@ -261,12 +261,12 @@
             }
 
             .day-slot.available {
-                background: linear-gradient(135deg, #e8f5e0 0%, #d4edda 100%);
+                background: color-mix(in srgb, var(--color-primary, #82b965) 15%, white);
                 cursor: pointer;
             }
 
             .day-slot.available:active {
-                background: linear-gradient(135deg, #c3e6cb 0%, #b1dfbb 100%);
+                background: color-mix(in srgb, var(--color-primary, #82b965) 25%, white);
             }
         }
 
@@ -318,7 +318,7 @@
                 <h1>📅 Kalender</h1>
                 <p style="color: var(--text-gray); font-size: 1.1rem; margin-bottom: 0;">
                     Übersicht über verfügbare Hunde und Buchungen für die nächsten 14 Tage.
-                    <strong style="color: var(--primary-green);">Klicke auf eine grüne Zelle</strong>, um schnell zu buchen!
+                    <strong style="color: var(--color-primary, #82b965);">Klicke auf eine farbige Zelle</strong>, um schnell zu buchen!
                 </p>
             </div>
 
@@ -343,7 +343,7 @@
             <!-- Legend -->
             <div class="legend">
                 <div class="legend-item">
-                    <div class="legend-color" style="background: linear-gradient(135deg, #e8f5e0 0%, #d4edda 100%); border: 2px solid var(--primary-green);"></div>
+                    <div class="legend-color" style="background: color-mix(in srgb, var(--color-primary, #82b965) 15%, white); border: 2px solid var(--color-primary, #82b965);"></div>
                     <span>✅ Verfügbar</span>
                 </div>
                 <div class="legend-item">
@@ -774,12 +774,12 @@
                             html += `<div class="day-slot available" data-action="quick-book" data-id="${dog.id}" data-value="${dateStr}">
                                 <div><strong>${dayName} ${dateDisplay}</strong></div>
                                 <div style="color: #856404;">Gebucht: ${bookedTimes.join(', ')}</div>
-                                <div style="color: var(--primary-green); font-size: 0.8rem;">+ Weitere Zeiten</div>
+                                <div style="color: var(--color-primary, #82b965); font-size: 0.8rem;">+ Weitere Zeiten</div>
                             </div>`;
                         } else {
                             html += `<div class="day-slot available" data-action="quick-book" data-id="${dog.id}" data-value="${dateStr}">
                                 <div><strong>${dayName} ${dateDisplay}</strong></div>
-                                <div style="color: var(--primary-green); font-weight: 600;">✅ Alle Zeiten verfügbar</div>
+                                <div style="color: var(--color-primary, #82b965); font-weight: 600;">✅ Alle Zeiten verfügbar</div>
                             </div>`;
                         }
                     }

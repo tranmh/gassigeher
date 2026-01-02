@@ -11,7 +11,7 @@
     <style>
         .shepherd-element { z-index: 10000 !important; }
         .shepherd-modal-overlay-container { z-index: 9999 !important; }
-        .shepherd-button-primary { background: var(--primary-green, #82b965) !important; }
+        .shepherd-button-primary { background: var(--color-primary, #82b965) !important; }
         .shepherd-button-primary:hover { background: #6fa954 !important; }
     </style>
 </head>
@@ -127,7 +127,7 @@
                     </small>
                 </div>
                 <!-- Time Rules Info Box -->
-                <div id="time-rules-info" class="alert alert-info" style="display: none; margin-top: 15px; padding: 15px; background: rgba(130, 185, 101, 0.1); border-left: 3px solid var(--primary-green); border-radius: 4px;">
+                <div id="time-rules-info" class="alert alert-info" style="display: none; margin-top: 15px; padding: 15px; background: color-mix(in srgb, var(--color-primary, #82b965) 10%, white); border-left: 3px solid var(--color-primary, #82b965); border-radius: 4px;">
                     <h6 style="margin: 0 0 10px 0; font-size: 0.9rem;">Erlaubte Buchungszeiten:</h6>
                     <ul id="time-rules-list" style="margin: 0; padding-left: 20px; font-size: 0.85rem;"></ul>
                 </div>
@@ -450,7 +450,7 @@
                 const dogColor = dog.color || allColors.find(c => c.id === dog.color_id);
                 const colorBadgeHtml = getColorBadgeHtml(dogColor);
                 const externalLinkHtml = dog.external_link
-                    ? `<a href="${sanitizeHTML(dog.external_link)}" target="_blank" rel="noopener noreferrer" class="dog-external-link" style="display: inline-block; margin-top: 10px; color: var(--primary-green); text-decoration: none; font-weight: 500; font-size: 0.9rem;">mehr über mich &rarr;</a>`
+                    ? `<a href="${sanitizeHTML(dog.external_link)}" target="_blank" rel="noopener noreferrer" class="dog-external-link" style="display: inline-block; margin-top: 10px; color: var(--color-primary, #82b965); text-decoration: none; font-weight: 500; font-size: 0.9rem;">mehr über mich &rarr;</a>`
                     : '';
 
                 return `
@@ -528,8 +528,8 @@
                 let careInfoHtml = '';
                 if (hasCareInfo) {
                     careInfoHtml = `
-                        <div style="margin-top: 20px; padding: 15px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 8px; border-left: 3px solid var(--primary-green);">
-                            <h4 style="margin: 0 0 12px 0; font-size: 0.95rem; color: var(--primary-green);">📋 Spaziergang-Informationen</h4>
+                        <div style="margin-top: 20px; padding: 15px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 8px; border-left: 3px solid var(--color-primary, #82b965);">
+                            <h4 style="margin: 0 0 12px 0; font-size: 0.95rem; color: var(--color-primary, #82b965);">📋 Spaziergang-Informationen</h4>
                             <div style="display: grid; gap: 8px; font-size: 0.9rem;">
                                 ${safePickupLocation ? `<div><strong>📍 Abholort:</strong> ${safePickupLocation}</div>` : ''}
                                 ${dog.walk_duration ? `<div><strong>⏱️ Dauer:</strong> ca. ${dog.walk_duration} Minuten</div>` : ''}
@@ -554,7 +554,7 @@
                             ${stats.total_walks > 0 ? `
                                 <div style="display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap;">
                                     <div style="background: linear-gradient(135deg, #f0f9f0 0%, #e8f5e8 100%); padding: 12px 20px; border-radius: 8px; flex: 1; min-width: 120px;">
-                                        <div style="font-size: 1.5rem; font-weight: bold; color: var(--primary-green);">${stats.total_walks}</div>
+                                        <div style="font-size: 1.5rem; font-weight: bold; color: var(--color-primary, #82b965);">${stats.total_walks}</div>
                                         <div style="font-size: 0.85rem; color: #666;">Spaziergänge</div>
                                     </div>
                                     <div style="background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%); padding: 12px 20px; border-radius: 8px; flex: 1; min-width: 120px;">
@@ -577,7 +577,7 @@
                                         const walkerName = report.user ? sanitizeHTML(report.user.first_name + ' ' + (report.user.last_name || '').charAt(0) + '.') : 'Unbekannt';
 
                                         return `
-                                            <div style="padding: 12px; background: #f9f9f9; border-radius: 8px; border-left: 3px solid var(--primary-green);">
+                                            <div style="padding: 12px; background: #f9f9f9; border-radius: 8px; border-left: 3px solid var(--color-primary, #82b965);">
                                                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                                                     <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                                                         <span style="color: #ffc107; font-size: 14px;">${stars}</span>
@@ -609,7 +609,7 @@
                             <h2 style="margin: 0 0 10px 0;">${safeDogName}</h2>
                             <p style="margin: 0 0 8px 0; color: #666;">${safeDogBreed} • ${getSizeLabel(dog.size)} • ${dog.age} Jahre</p>
                             ${safeSpecialNeeds ? `<p style="margin: 0 0 8px 0; color: var(--warning-orange); font-size: 0.9rem;">⚠️ ${safeSpecialNeeds}</p>` : ''}
-                            ${dog.external_link ? `<a href="${sanitizeHTML(dog.external_link)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 10px; color: var(--primary-green);">mehr über mich &rarr;</a>` : ''}
+                            ${dog.external_link ? `<a href="${sanitizeHTML(dog.external_link)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 10px; color: var(--color-primary, #82b965);">mehr über mich &rarr;</a>` : ''}
                         </div>
                     </div>
                     ${careInfoHtml}

@@ -38,7 +38,7 @@
             transition: all 0.2s;
         }
         .color-option:hover {
-            border-color: #82b965;
+            border-color: var(--color-primary, #82b965);
             background: #f9f9f9;
         }
         .color-option.owned {
@@ -183,8 +183,8 @@
             </div>
 
             <!-- Admin Account Management (SaaS mode only, admins/super-admins) -->
-            <div id="admin-account-section" class="card" style="display: none; border-left: 4px solid #82b965;">
-                <h3 style="color: #82b965;">💼 Kontoverwaltung</h3>
+            <div id="admin-account-section" class="card" style="display: none; border-left: 4px solid var(--color-primary, #82b965);">
+                <h3 style="color: var(--color-primary, #82b965);">💼 Kontoverwaltung</h3>
                 <p style="margin-bottom: 15px;">Verwalten Sie Ihren Account und Ihr Abonnement.</p>
                 <div style="display: flex; gap: 12px; flex-wrap: wrap;">
                     <a href="/account-status.html" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 8px;">

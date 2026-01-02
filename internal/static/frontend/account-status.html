@@ -50,7 +50,7 @@
             color: #2c3e34;
             margin: 0;
         }
-        .status-card-value.success { color: #82b965; }
+        .status-card-value.success { color: var(--color-primary, #82b965); }
         .status-card-value.warning { color: #f5a623; }
         .status-card-value.danger { color: #dc3545; }
         .status-card-detail {
@@ -162,7 +162,7 @@
             border-radius: 4px;
             transition: width 0.5s ease;
         }
-        .progress-bar-fill.success { background: #82b965; }
+        .progress-bar-fill.success { background: var(--color-primary, #82b965); }
         .progress-bar-fill.warning { background: #f5a623; }
         .progress-bar-fill.danger { background: #dc3545; }
 
@@ -170,7 +170,7 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            color: var(--primary-green, #82b965);
+            color: var(--color-primary, #82b965);
             text-decoration: none;
             font-size: 0.9rem;
             margin-top: 12px;
