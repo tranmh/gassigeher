@@ -414,6 +414,8 @@
 
     <script src="/js/api.js"></script>
     <script src="/js/i18n.js"></script>
+    <script src="/js/nav-menu.js"></script>
+    <script src="/js/impersonation-banner.js"></script>
     <script src="/js/event-handlers.js"></script>
     <script>
         // Register page-specific action handlers for CSP compliance (GASSI-2025-003)
@@ -433,6 +435,12 @@
 
         async function init() {
             await window.i18n.load();
+            window.i18n.updateElement(document.body);
+
+            // BUG FIX #6: Initialize impersonation banner
+            if (typeof ImpersonationBanner !== 'undefined') {
+                await ImpersonationBanner.init();
+            }
 
             // Check authentication
             const user = await api.getMe();
@@ -448,8 +456,13 @@
                 return;
             }
 
-            // Show admin link (super-admin always has admin access)
-            document.getElementById('admin-link').style.display = '';
+            // BUG FIX #7: Use nav-menu.js function for admin link
+            if (typeof showAdminLinkIfAdmin === 'function') {
+                showAdminLinkIfAdmin(user);
+            } else {
+                // Fallback if nav-menu.js not loaded
+                document.getElementById('admin-link').style.display = '';
+            }
 
             // Load data
             await Promise.all([
@@ -465,8 +478,7 @@
 
         async function loadUsage() {
             try {
-                const response = await api.fetch('/api/v1/billing/usage');
-                const data = await response.json();
+                const data = await api.getBillingUsage();
 
                 const dogsUsed = data.dogs_used || 0;
                 const dogsLimit = data.dogs_limit || 10;
@@ -502,8 +514,7 @@
 
         async function loadPlans() {
             try {
-                const response = await api.fetch('/api/v1/billing/plans');
-                const data = await response.json();
+                const data = await api.getBillingPlans();
 
                 plans = data.plans || [];
                 stripePublishableKey = data.publishable_key;
@@ -519,8 +530,7 @@
 
         async function loadSubscription() {
             try {
-                const response = await api.fetch('/api/v1/billing/subscription');
-                const data = await response.json();
+                const data = await api.getBillingSubscription();
 
                 subscriptionData = data;
                 currentSubscription = data.subscription;
@@ -573,8 +583,7 @@
 
         async function loadInvoices() {
             try {
-                const response = await api.fetch('/api/v1/billing/invoices');
-                const data = await response.json();
+                const data = await api.getBillingInvoices();
 
                 const invoices = data.invoices || [];
                 const section = document.getElementById('invoice-section');
@@ -644,18 +653,7 @@
             }
 
             try {
-                const response = await api.fetch(`/api/v1/promo-codes/validate/${encodeURIComponent(code)}`);
-
-                // Check for HTTP errors first
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    result.className = 'promo-result error';
-                    result.textContent = errorData.error || errorData.message || 'Ungültiger Code';
-                    validatedPromoCode = null;
-                    return;
-                }
-
-                const data = await response.json();
+                const data = await api.validatePromoCode(code);
 
                 if (data.valid) {
                     result.className = 'promo-result success';
@@ -669,7 +667,7 @@
             } catch (error) {
                 console.error('Promo code validation error:', error);
                 result.className = 'promo-result error';
-                result.textContent = 'Fehler beim Prüfen des Codes';
+                result.textContent = error.message || 'Fehler beim Prüfen des Codes';
                 validatedPromoCode = null;
             }
         }
@@ -793,26 +791,23 @@
             });
         }
 
+        // BUG FIX #9: Track loading state to prevent double-clicks
+        let isUpgrading = false;
+
         async function upgradeToPro() {
+            // BUG FIX #9: Prevent double-click
+            if (isUpgrading) return;
+            isUpgrading = true;
+
+            // Update button state
+            const upgradeBtn = document.querySelector('[data-action="upgrade-to-pro"]');
+            if (upgradeBtn) {
+                upgradeBtn.disabled = true;
+                upgradeBtn.textContent = 'Laden...';
+            }
+
             try {
-                // Build checkout request with optional promo code
-                const checkoutData = {
-                    plan_slug: 'pro',
-                    billing_cycle: currentBillingCycle
-                };
-
-                // Include promo code if validated
-                if (validatedPromoCode) {
-                    checkoutData.promo_code = validatedPromoCode;
-                }
-
-                const response = await api.fetch('/api/v1/billing/checkout', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(checkoutData)
-                });
-
-                const data = await response.json();
+                const data = await api.createBillingCheckout('pro', currentBillingCycle, validatedPromoCode);
 
                 if (data.checkout_url) {
                     // Show trial days info if applicable
@@ -826,20 +821,28 @@
                     }
                 } else if (data.error) {
                     showAlert(data.error, 'error');
+                    // Reset button
+                    if (upgradeBtn) {
+                        upgradeBtn.disabled = false;
+                        upgradeBtn.textContent = window.i18n.t('billing.upgrade_to_pro');
+                    }
+                    isUpgrading = false;
                 }
             } catch (error) {
                 console.error('Checkout error:', error);
-                showAlert(window.i18n.t('billing.checkout_error'), 'error');
+                showAlert(error.message || window.i18n.t('billing.checkout_error'), 'error');
+                // Reset button on error
+                if (upgradeBtn) {
+                    upgradeBtn.disabled = false;
+                    upgradeBtn.textContent = window.i18n.t('billing.upgrade_to_pro');
+                }
+                isUpgrading = false;
             }
         }
 
         async function openBillingPortal() {
             try {
-                const response = await api.fetch('/api/v1/billing/portal', {
-                    method: 'POST'
-                });
-
-                const data = await response.json();
+                const data = await api.createBillingPortal();
 
                 if (data.portal_url) {
                     window.location.href = data.portal_url;
@@ -848,7 +851,7 @@
                 }
             } catch (error) {
                 console.error('Portal error:', error);
-                showAlert(window.i18n.t('errors.unexpected_error'), 'error');
+                showAlert(error.message || window.i18n.t('errors.unexpected_error'), 'error');
             }
         }
 
@@ -858,24 +861,13 @@
             }
 
             try {
-                const response = await api.fetch('/api/v1/billing/cancel', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({})
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showAlert(window.i18n.t('billing.cancel_success'), 'success');
-                    await loadSubscription();
-                    renderPlans();
-                } else {
-                    showAlert(data.error || window.i18n.t('errors.unexpected_error'), 'error');
-                }
+                await api.cancelBillingSubscription();
+                showAlert(window.i18n.t('billing.cancel_success'), 'success');
+                await loadSubscription();
+                renderPlans();
             } catch (error) {
                 console.error('Cancel error:', error);
-                showAlert(window.i18n.t('errors.unexpected_error'), 'error');
+                showAlert(error.message || window.i18n.t('errors.unexpected_error'), 'error');
             }
         }
 

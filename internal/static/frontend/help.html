@@ -302,6 +302,7 @@
     <script src="/js/impersonation-banner.js"></script>
     <script src="/js/event-handlers.js"></script>
     <script src="/shared/js/faq-data.js"></script>
+    <script src="/shared/js/faq-sanitizer.js"></script>
     <script>
         // Category icons mapping
         const CATEGORY_ICONS = {
@@ -440,6 +441,7 @@
             }
 
             // Render FAQs
+            // BUG #15 FIX: Sanitize FAQ answers to prevent XSS attacks
             container.innerHTML = faqs.map(faq => `
                 <div class="faq-item" data-faq-id="${faq.id}">
                     <div class="faq-question" data-action="toggle-faq" data-id="${faq.id}">
@@ -448,7 +450,7 @@
                     </div>
                     <div class="faq-answer">
                         <div class="faq-answer-content">
-                            ${faq.answer}
+                            ${sanitizeFAQAnswer(faq.answer)}
                         </div>
                     </div>
                 </div>

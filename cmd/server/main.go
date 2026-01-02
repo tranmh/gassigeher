@@ -738,6 +738,14 @@ func main() {
 	// Serve landing pages at /landing/
 	router.PathPrefix("/landing/").Handler(http.StripPrefix("/landing/", http.FileServer(http.FS(landingFS))))
 
+	// Get embedded shared filesystem (for shared resources like FAQ data)
+	sharedFS, err := static.SharedFS()
+	if err != nil {
+		log.Fatalf("Failed to get embedded shared files: %v", err)
+	}
+	// Serve shared files at /shared/
+	router.PathPrefix("/shared/").Handler(http.StripPrefix("/shared/", http.FileServer(http.FS(sharedFS))))
+
 	// Get embedded central admin filesystem (for SaaS platform administration)
 	centralFS, err := static.CentralFS()
 	if err != nil {

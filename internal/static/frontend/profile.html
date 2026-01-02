@@ -182,6 +182,20 @@
                 </form>
             </div>
 
+            <!-- Admin Account Management (SaaS mode only, admins/super-admins) -->
+            <div id="admin-account-section" class="card" style="display: none; border-left: 4px solid #82b965;">
+                <h3 style="color: #82b965;">💼 Kontoverwaltung</h3>
+                <p style="margin-bottom: 15px;">Verwalten Sie Ihren Account und Ihr Abonnement.</p>
+                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                    <a href="/account-status.html" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 8px;">
+                        📊 Kontostatus
+                    </a>
+                    <a href="/billing.html" id="billing-link" class="btn btn-secondary" style="display: none; align-items: center; gap: 8px;">
+                        💳 Abrechnung
+                    </a>
+                </div>
+            </div>
+
             <!-- Guided Tour Replay -->
             <div class="card" style="border-left: 4px solid #17a2b8;">
                 <h3 style="color: #17a2b8;">🎓 Einführungstour</h3>
@@ -290,6 +304,11 @@
                 if (currentUser.is_super_admin) {
                     const deleteSection = document.getElementById('delete-account-section');
                     if (deleteSection) deleteSection.style.display = 'none';
+                }
+
+                // Show admin account section for admins/super-admins in SaaS mode
+                if (currentUser.is_admin || currentUser.is_super_admin) {
+                    showAdminAccountSection(currentUser);
                 }
 
                 renderProfile();
@@ -627,6 +646,40 @@
                 }
             } catch (error) {
                 console.error('Error loading WhatsApp settings:', error);
+            }
+        }
+
+        async function showAdminAccountSection(user) {
+            const section = document.getElementById('admin-account-section');
+            const billingLink = document.getElementById('billing-link');
+
+            // Check if we're in SaaS mode by trying to get branding (which includes tenant info)
+            try {
+                const branding = await api.getBranding();
+                // In SaaS mode, branding will have tenant-specific fields
+                const isSaaSMode = branding && (branding.tenant_name || branding.tenant_slug);
+
+                if (isSaaSMode) {
+                    section.style.display = 'block';
+
+                    // Only super-admins can see billing page
+                    if (user.is_super_admin) {
+                        billingLink.style.display = 'inline-flex';
+                    }
+                }
+            } catch (error) {
+                // If branding fails, we might be in Simple mode - check billing plans as fallback
+                try {
+                    await api.getBillingPlans();
+                    // If billing plans work, we're in SaaS mode
+                    section.style.display = 'block';
+                    if (user.is_super_admin) {
+                        billingLink.style.display = 'inline-flex';
+                    }
+                } catch (e) {
+                    // Billing not available - Simple mode, don't show section
+                    console.log('Billing not available (Simple mode)');
+                }
             }
         }
     </script>

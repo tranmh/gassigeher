@@ -710,6 +710,57 @@ class API {
     getImportTemplateUrl() {
         return `${this.baseURL}/admin/import/dogs/template`;
     }
+
+    // BILLING ENDPOINTS (SaaS-Mode only)
+
+    async getBillingUsage() {
+        return this.request('GET', '/billing/usage');
+    }
+
+    async getBillingPlans() {
+        return this.request('GET', '/billing/plans');
+    }
+
+    async getBillingSubscription() {
+        return this.request('GET', '/billing/subscription');
+    }
+
+    async getBillingInvoices() {
+        return this.request('GET', '/billing/invoices');
+    }
+
+    async createBillingCheckout(planSlug, billingCycle, promoCode = null) {
+        const body = { plan_slug: planSlug, billing_cycle: billingCycle };
+        if (promoCode) {
+            body.promo_code = promoCode;
+        }
+        return this.request('POST', '/billing/checkout', body);
+    }
+
+    async createBillingPortal() {
+        return this.request('POST', '/billing/portal');
+    }
+
+    async cancelBillingSubscription(reason = null) {
+        return this.request('POST', '/billing/cancel', reason ? { reason } : {});
+    }
+
+    async validatePromoCode(code) {
+        return this.request('GET', `/promo-codes/validate/${encodeURIComponent(code)}`);
+    }
+
+    // COLOR CATEGORY ALIAS (for backwards compatibility)
+
+    async getColorCategories() {
+        return this.getColors();
+    }
+
+    // MY COLOR REQUESTS (user's own pending requests)
+    // Note: For non-admins, /color-requests returns only user's own requests
+
+    async getMyColorRequests() {
+        return this.request('GET', '/color-requests');
+    }
 }
 
 // Global instance
