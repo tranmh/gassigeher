@@ -102,7 +102,7 @@ services:
       - '--storage.tsdb.retention.time=30d'
       - '--web.enable-lifecycle'
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"
@@ -125,7 +125,7 @@ services:
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
     ports:
       - "3000:3000"
     networks:

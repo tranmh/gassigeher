@@ -641,7 +641,7 @@ copy_source_code() {
     SOURCE_DIR="$(dirname "$SCRIPT_DIR")"
 
     if [[ -f "$SOURCE_DIR/go.mod" ]]; then
-        cp -r "$SOURCE_DIR"/{cmd,internal,go.mod,go.sum,docker-compose.yml,.dockerignore} "$INSTALL_DIR/"
+        cp -r "$SOURCE_DIR"/{cmd,internal,go.mod,go.sum,docker-compose.yml,.dockerignore,deploy} "$INSTALL_DIR/"
         log_success "Source code copied from $SOURCE_DIR"
     else
         log_warn "Source code not found. You'll need to copy it manually."
