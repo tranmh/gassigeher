@@ -1,19 +1,22 @@
 #!/bin/bash
 #
-# Gassigeher - Production Deployment Script
+# Gassigeher SaaS - Production Deployment Script
 # Target: Ubuntu 24.04 LTS with Docker Compose
 #
-# Supports both Simple-Mode and SaaS-Mode deployments.
+# Deploys Gassigeher in SaaS mode (multi-tenant platform).
 #
 # Usage:
-#   ./install-ubuntu-24.sh                    # Install/update (preserves existing config)
+#   ./install-ubuntu-24.sh                    # Install SaaS platform
 #   ./install-ubuntu-24.sh --force            # Fresh install (regenerates secrets)
 #   ./install-ubuntu-24.sh --local            # Local testing mode (no SSL)
 #   ./install-ubuntu-24.sh --env /path/.env   # Custom config file location
 #
+# Note: This script is for SaaS mode (Docker Compose) deployments only.
+#       For Simple mode, just run the binary directly with .env file.
+#
 # Configuration:
 #   The script reads configuration from:
-#     - .env         -> Application settings (from .env.example if not present)
+#     - .env         -> Application settings (from .env.example.saas)
 #     - .env.secrets -> Auto-generated passwords and API keys
 #
 #   Manual configuration required in .env.secrets:
@@ -214,23 +217,23 @@ load_configuration() {
     # Determine source config file
     local source_config=""
 
+    # Get source directory for .env.example files
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    SOURCE_DIR="$(dirname "$SCRIPT_DIR")"
+
     if [[ -n "$CONFIG_FILE" && -f "$CONFIG_FILE" ]]; then
         source_config="$CONFIG_FILE"
         log_info "Using config file: $CONFIG_FILE"
-    elif [[ -f "$INSTALL_DIR/.env" ]]; then
+    elif [[ -f "$INSTALL_DIR/.env" && "$FORCE_MODE" != "true" ]]; then
         source_config="$INSTALL_DIR/.env"
         log_info "Using existing config: $INSTALL_DIR/.env"
     else
-        # Find .env.example in the source directory
-        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-        SOURCE_DIR="$(dirname "$SCRIPT_DIR")"
-
-        if [[ -f "$SOURCE_DIR/.env.example" ]]; then
-            source_config="$SOURCE_DIR/.env.example"
-            log_info "Using default config: $source_config"
+        # Docker Compose deployment = SaaS mode, use .env.example.saas
+        if [[ -f "$SOURCE_DIR/.env.example.saas" ]]; then
+            source_config="$SOURCE_DIR/.env.example.saas"
+            log_info "Using SaaS config: $source_config"
         else
-            log_error "No configuration file found!"
-            log_error "Please provide .env file or copy .env.example to .env"
+            log_error "SaaS config not found: $SOURCE_DIR/.env.example.saas"
             exit 1
         fi
     fi
@@ -265,6 +268,32 @@ generate_secrets() {
     if [[ -f "$secrets_file" && "$FORCE_MODE" != "true" ]]; then
         log_success "Using existing secrets from $secrets_file"
         parse_env_file "$secrets_file"
+
+        # Check if mode-appropriate admin password exists
+        # This handles the case where mode changed after initial install
+        local is_saas_mode=false
+        if [[ -n "$BASE_DOMAIN" ]]; then
+            is_saas_mode=true
+        fi
+
+        if [[ "$is_saas_mode" == "true" && -z "$CENTRAL_ADMIN_PASSWORD" ]]; then
+            log_warn "SaaS Mode detected but CENTRAL_ADMIN_PASSWORD not found in secrets"
+            local central_admin_password=$(generate_password)
+            echo "" >> "$secrets_file"
+            echo "# SaaS Mode: Central Admin password (added after mode change)" >> "$secrets_file"
+            echo "CENTRAL_ADMIN_PASSWORD=${central_admin_password}" >> "$secrets_file"
+            export CENTRAL_ADMIN_PASSWORD="$central_admin_password"
+            log_success "Generated CENTRAL_ADMIN_PASSWORD and added to $secrets_file"
+        elif [[ "$is_saas_mode" != "true" && -z "$SUPER_ADMIN_PASSWORD" ]]; then
+            log_warn "Simple Mode detected but SUPER_ADMIN_PASSWORD not found in secrets"
+            local super_admin_password=$(generate_password)
+            echo "" >> "$secrets_file"
+            echo "# Simple Mode: Super Admin password (added after mode change)" >> "$secrets_file"
+            echo "SUPER_ADMIN_PASSWORD=${super_admin_password}" >> "$secrets_file"
+            export SUPER_ADMIN_PASSWORD="$super_admin_password"
+            log_success "Generated SUPER_ADMIN_PASSWORD and added to $secrets_file"
+        fi
+
         return 0
     fi
 
@@ -881,30 +910,33 @@ print_summary() {
 }
 
 show_help() {
-    echo "Gassigeher Installer"
+    echo "Gassigeher SaaS Installer (Docker Compose)"
     echo ""
     echo "Usage: $0 [OPTIONS]"
     echo ""
+    echo "This script deploys Gassigeher in SaaS mode (multi-tenant) using Docker Compose."
+    echo "For Simple mode (single shelter), just run the binary directly with .env file."
+    echo ""
     echo "Options:"
     echo "  --force       Force complete reinstall (regenerates secrets, deletes data)"
-    echo "  --local       Use local testing mode (no SSL, uses gassigeher.local)"
-    echo "  --env FILE    Use specified config file instead of .env.example"
+    echo "  --local       Local testing mode (no SSL, uses gassigeher.local)"
+    echo "  --env FILE    Use custom config file instead of .env.example.saas"
     echo "  --dry-run     Show what would be done without making changes"
     echo "  --help        Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $0                         # Install using .env.example defaults"
+    echo "  $0                         # Install SaaS platform"
     echo "  $0 --local                 # Local testing (gassigeher.local:8080)"
-    echo "  $0 --env /path/to/.env     # Use custom config file"
     echo "  $0 --force                 # Fresh install (WARNING: deletes all data!)"
+    echo "  $0 --env /path/to/.env     # Use custom config file"
     echo ""
     echo "Configuration:"
-    echo "  The script reads configuration from two files:"
-    echo "    .env         - Application settings"
-    echo "    .env.secrets - Passwords and API keys (auto-generated)"
+    echo "  Config template: .env.example.saas"
+    echo "  Installed to:    /opt/gassigeher/.env"
+    echo "  Secrets:         /opt/gassigeher/.env.secrets (auto-generated)"
     echo ""
     echo "  On first install, secrets are auto-generated."
-    echo "  On subsequent runs, existing secrets are preserved."
+    echo "  On subsequent runs, existing config is preserved."
     echo "  Use --force to regenerate all secrets."
 }
 
