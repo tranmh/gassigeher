@@ -72,31 +72,71 @@ func (h *MarketingHandler) GetCampaign(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, campaign)
 }
 
+// CreateCampaignRequest is the request to create a campaign
+type CreateCampaignRequest struct {
+	Type        string  `json:"type"`
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
+	Config      *string `json:"config,omitempty"`
+	IsActive    bool    `json:"is_active"`
+	StartDate   *string `json:"start_date,omitempty"`
+	EndDate     *string `json:"end_date,omitempty"`
+}
+
 // CreateCampaign creates a new campaign (Central Admin only)
 // POST /api/v1/central-admin/marketing/campaigns
 func (h *MarketingHandler) CreateCampaign(w http.ResponseWriter, r *http.Request) {
-	var campaign models.MarketingCampaign
-	if err := json.NewDecoder(r.Body).Decode(&campaign); err != nil {
+	var req CreateCampaignRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondError(w, http.StatusBadRequest, "Ungültige Anfrage")
 		return
 	}
 
 	// Validate name
-	campaign.Name = strings.TrimSpace(campaign.Name)
-	if campaign.Name == "" {
+	req.Name = strings.TrimSpace(req.Name)
+	if req.Name == "" {
 		respondError(w, http.StatusBadRequest, "Name ist erforderlich")
 		return
 	}
-	if len(campaign.Name) > 255 {
+	if len(req.Name) > 255 {
 		respondError(w, http.StatusBadRequest, "Name darf maximal 255 Zeichen lang sein")
 		return
 	}
 
 	// Validate type
 	validTypes := map[string]bool{"fomo_countdown": true, "referral": true, "reference_page": true, "custom": true}
-	if !validTypes[campaign.Type] {
+	if !validTypes[req.Type] {
 		respondError(w, http.StatusBadRequest, "Ungültiger Kampagnentyp")
 		return
+	}
+
+	// Build campaign
+	campaign := models.MarketingCampaign{
+		Type:        req.Type,
+		Name:        req.Name,
+		Description: req.Description,
+		Config:      req.Config,
+		IsActive:    req.IsActive,
+	}
+
+	// Parse start date
+	if req.StartDate != nil && *req.StartDate != "" {
+		t, err := time.Parse("2006-01-02", *req.StartDate)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "Ungültiges Startdatum (Format: YYYY-MM-DD)")
+			return
+		}
+		campaign.StartDate = &t
+	}
+
+	// Parse end date
+	if req.EndDate != nil && *req.EndDate != "" {
+		t, err := time.Parse("2006-01-02", *req.EndDate)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "Ungültiges Enddatum (Format: YYYY-MM-DD)")
+			return
+		}
+		campaign.EndDate = &t
 	}
 
 	// Validate date range if both are provided

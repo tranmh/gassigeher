@@ -959,3 +959,298 @@ func TestCreateReferenceEntry_CentralAdminAutoApproved(t *testing.T) {
 		t.Errorf("Expected is_approved true for admin-created entry, got %v", response["is_approved"])
 	}
 }
+
+// ========== Campaign Handler Tests ==========
+
+func TestCreateCampaign_DateOnlyFormat_Success(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// Test with date-only format (YYYY-MM-DD) - the format sent by HTML date inputs
+	reqBody := `{
+		"type": "fomo_countdown",
+		"name": "Test FOMO Campaign",
+		"description": "A test campaign",
+		"start_date": "2026-01-01",
+		"end_date": "2026-12-31",
+		"is_active": true
+	}`
+
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/campaigns", bytes.NewBufferString(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateCampaign(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+
+	var response map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to parse response: %v", err)
+	}
+
+	// Verify start_date was parsed correctly
+	startDate, ok := response["start_date"].(string)
+	if !ok {
+		t.Fatalf("start_date not found in response")
+	}
+
+	parsedStart, err := time.Parse(time.RFC3339, startDate)
+	if err != nil {
+		t.Fatalf("Failed to parse start_date: %v", err)
+	}
+
+	if parsedStart.Year() != 2026 || parsedStart.Month() != 1 || parsedStart.Day() != 1 {
+		t.Errorf("Expected start_date 2026-01-01, got %s", startDate)
+	}
+
+	// Verify end_date was parsed correctly
+	endDate, ok := response["end_date"].(string)
+	if !ok {
+		t.Fatalf("end_date not found in response")
+	}
+
+	parsedEnd, err := time.Parse(time.RFC3339, endDate)
+	if err != nil {
+		t.Fatalf("Failed to parse end_date: %v", err)
+	}
+
+	if parsedEnd.Year() != 2026 || parsedEnd.Month() != 12 || parsedEnd.Day() != 31 {
+		t.Errorf("Expected end_date 2026-12-31, got %s", endDate)
+	}
+}
+
+func TestCreateCampaign_NoDates_Success(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// Test without dates (both optional)
+	reqBody := `{
+		"type": "referral",
+		"name": "Referral Campaign",
+		"is_active": false
+	}`
+
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/campaigns", bytes.NewBufferString(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateCampaign(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+
+	var response map[string]interface{}
+	json.Unmarshal(rec.Body.Bytes(), &response)
+
+	if response["name"] != "Referral Campaign" {
+		t.Errorf("Expected name 'Referral Campaign', got '%v'", response["name"])
+	}
+}
+
+func TestCreateCampaign_InvalidStartDateFormat_ReturnsError(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// Test with invalid date format
+	reqBody := `{
+		"type": "fomo_countdown",
+		"name": "Invalid Date Campaign",
+		"start_date": "31-12-2026"
+	}`
+
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/campaigns", bytes.NewBufferString(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateCampaign(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for invalid date format, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCreateCampaign_InvalidEndDateFormat_ReturnsError(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// Test with invalid end date format
+	reqBody := `{
+		"type": "fomo_countdown",
+		"name": "Invalid End Date Campaign",
+		"start_date": "2026-01-01",
+		"end_date": "December 31, 2026"
+	}`
+
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/campaigns", bytes.NewBufferString(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateCampaign(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for invalid end date format, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCreateCampaign_EndDateBeforeStartDate_ReturnsError(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// Test with end date before start date
+	reqBody := `{
+		"type": "fomo_countdown",
+		"name": "Invalid Date Range Campaign",
+		"start_date": "2026-12-31",
+		"end_date": "2026-01-01"
+	}`
+
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/campaigns", bytes.NewBufferString(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateCampaign(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for end date before start date, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCreateCampaign_MissingName_ReturnsError(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	reqBody := `{
+		"type": "fomo_countdown"
+	}`
+
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/campaigns", bytes.NewBufferString(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateCampaign(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for missing name, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCreateCampaign_InvalidType_ReturnsError(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	reqBody := `{
+		"type": "invalid_type",
+		"name": "Invalid Type Campaign"
+	}`
+
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/campaigns", bytes.NewBufferString(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateCampaign(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for invalid type, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCreateCampaign_WithConfig_Success(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// Test with valid JSON config
+	reqBody := `{
+		"type": "fomo_countdown",
+		"name": "FOMO with Config",
+		"config": "{\"total_slots\": 30, \"remaining_slots\": 30, \"message\": \"Nur noch X Plätze!\"}",
+		"is_active": true
+	}`
+
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/campaigns", bytes.NewBufferString(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateCampaign(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+
+	var response map[string]interface{}
+	json.Unmarshal(rec.Body.Bytes(), &response)
+
+	if response["config"] == nil {
+		t.Error("Expected config to be present in response")
+	}
+}
+
+func TestCreateCampaign_InvalidConfigJSON_ReturnsError(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// Test with invalid JSON in config
+	reqBody := `{
+		"type": "fomo_countdown",
+		"name": "Invalid Config Campaign",
+		"config": "not valid json {"
+	}`
+
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/campaigns", bytes.NewBufferString(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateCampaign(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for invalid config JSON, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+}
