@@ -2,6 +2,10 @@
 class API {
     constructor() {
         this.baseURL = '/api/v1';
+
+        // Check for impersonation token in URL hash (cross-subdomain impersonation from central admin)
+        this.handleImpersonationFromURL();
+
         // Validate token format to prevent localStorage XSS
         // JWT has 3 base64url segments separated by dots
         const storedToken = localStorage.getItem('gassigeher_token');
@@ -13,6 +17,42 @@ class API {
             if (storedToken) {
                 localStorage.removeItem('gassigeher_token');
             }
+        }
+    }
+
+    // Handle impersonation token passed via URL hash from central admin
+    // This is necessary because localStorage is per-origin, and central admin
+    // is on a different subdomain than tenant applications
+    handleImpersonationFromURL() {
+        const hash = window.location.hash;
+        if (!hash || !hash.startsWith('#impersonate=')) {
+            return;
+        }
+
+        try {
+            const encoded = hash.substring('#impersonate='.length);
+            const data = JSON.parse(decodeURIComponent(encoded));
+
+            // Validate token format
+            if (!data.token || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(data.token)) {
+                console.error('Invalid impersonation token format');
+                return;
+            }
+
+            // Store the token
+            localStorage.setItem('gassigeher_token', data.token);
+
+            // Store impersonation info for banner display
+            if (data.impersonation) {
+                localStorage.setItem('gassigeher_impersonating', JSON.stringify(data.impersonation));
+            }
+
+            // Clean up URL (remove hash) without triggering a page reload
+            history.replaceState(null, '', window.location.pathname + window.location.search);
+
+            console.log('Impersonation token received from central admin');
+        } catch (e) {
+            console.error('Failed to parse impersonation data from URL:', e);
         }
     }
 

@@ -307,27 +307,33 @@
             try {
                 const result = await centralAPI.impersonateUser(userId);
 
-                // Store the new token
-                localStorage.setItem('gassigeher_token', result.token);
-
-                // Store info that we're impersonating (for banner display)
-                localStorage.setItem('gassigeher_impersonating', JSON.stringify({
+                // Store impersonation info for the banner on return
+                // Note: The token must be passed via URL because different subdomains have different localStorage
+                const impersonationInfo = {
                     userName: userName,
                     tenantName: tenantName || 'Unbekannt',
-                    tenantSlug: result.tenant?.slug || ''
-                }));
+                    tenantSlug: result.tenant?.slug || '',
+                    centralAdminOrigin: window.location.origin
+                };
 
                 showAlert(`Sie sind jetzt als ${userName} angemeldet. Weiterleitung...`, 'success');
 
-                // Redirect to tenant dashboard
+                // Redirect to tenant dashboard with token in URL hash
+                // We use hash fragment (#) instead of query string (?) for security - hash is not sent to server
                 if (result.tenant?.slug) {
                     // In SaaS mode, redirect to tenant subdomain
                     const baseUrl = getTenantUrl(result.tenant.slug);
+                    const tokenData = encodeURIComponent(JSON.stringify({
+                        token: result.token,
+                        impersonation: impersonationInfo
+                    }));
                     setTimeout(() => {
-                        window.location.href = baseUrl + '/dashboard.html';
+                        window.location.href = baseUrl + '/dashboard.html#impersonate=' + tokenData;
                     }, 1000);
                 } else {
-                    // Fallback to main domain dashboard
+                    // Fallback to main domain dashboard (simple mode)
+                    localStorage.setItem('gassigeher_token', result.token);
+                    localStorage.setItem('gassigeher_impersonating', JSON.stringify(impersonationInfo));
                     setTimeout(() => {
                         window.location.href = '/dashboard.html';
                     }, 1000);

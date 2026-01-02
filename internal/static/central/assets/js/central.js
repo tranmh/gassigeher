@@ -2,6 +2,35 @@
 
 const TOKEN_KEY = 'gassigeher_token';
 
+// Handle token returned from impersonation end (cross-origin redirect)
+(function handleReturnToken() {
+    const hash = window.location.hash;
+    if (!hash || !hash.startsWith('#token=')) {
+        return;
+    }
+
+    try {
+        const encoded = hash.substring('#token='.length);
+        const token = decodeURIComponent(encoded);
+
+        // Validate token format (JWT has 3 base64url segments)
+        if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) {
+            console.error('Invalid token format');
+            return;
+        }
+
+        // Store the token
+        localStorage.setItem(TOKEN_KEY, token);
+
+        // Clean up URL (remove hash) without triggering page reload
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+
+        console.log('Token received from impersonation end');
+    } catch (e) {
+        console.error('Failed to parse return token:', e);
+    }
+})();
+
 // Authentication
 function getToken() {
     return localStorage.getItem(TOKEN_KEY);
@@ -16,6 +45,12 @@ function logout() {
     window.location.href = '/login.html';
 }
 
+// Get CSRF token from cookie
+function getCSRFToken() {
+    const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
+    return match ? decodeURIComponent(match[1]) : null;
+}
+
 // API Base
 async function apiRequest(endpoint, options = {}) {
     const token = getToken();
@@ -24,13 +59,21 @@ async function apiRequest(endpoint, options = {}) {
         throw new Error('Not authenticated');
     }
 
+    const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        ...options.headers
+    };
+
+    // Include CSRF token for state-changing requests
+    const csrfToken = getCSRFToken();
+    if (csrfToken && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method)) {
+        headers['X-CSRF-Token'] = csrfToken;
+    }
+
     const config = {
         ...options,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-            ...options.headers
-        }
+        headers
     };
 
     const response = await fetch(`/api/v1${endpoint}`, config);

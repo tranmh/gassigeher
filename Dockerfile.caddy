@@ -1,0 +1,37 @@
+# Dockerfile for Caddy with Hetzner DNS plugin
+# Used for wildcard SSL certificates in SaaS mode
+
+FROM golang:1.23-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache git
+
+# Install xcaddy
+RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
+
+# Build Caddy with Hetzner DNS module
+# GOTOOLCHAIN=auto allows Go to download required toolchain version
+WORKDIR /build
+ENV GOTOOLCHAIN=auto
+RUN xcaddy build \
+    --with github.com/caddy-dns/hetzner
+
+FROM alpine:3.19
+
+# Install ca-certificates for HTTPS and tzdata for timezones
+RUN apk add --no-cache ca-certificates tzdata
+
+# Copy custom-built Caddy binary
+COPY --from=builder /build/caddy /usr/bin/caddy
+
+# Create caddy user and directories
+RUN adduser -D -H -h /var/lib/caddy caddy && \
+    mkdir -p /var/log/caddy /etc/caddy /var/lib/caddy && \
+    chown -R caddy:caddy /var/log/caddy /var/lib/caddy
+
+# Copy Caddyfile
+COPY Caddyfile /etc/caddy/Caddyfile
+
+EXPOSE 80 443
+
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]

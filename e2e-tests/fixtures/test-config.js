@@ -85,8 +85,8 @@ function getTestConfig(mode = process.env.PLAYWRIGHT_TEST_MODE || TEST_MODES.SAA
         },
         // Central admin (platform-level)
         centralAdmin: {
-          email: process.env.CENTRAL_ADMIN_EMAIL || 'admin@gassigeher.local',
-          password: process.env.CENTRAL_ADMIN_PASSWORD || 'changeme'
+          email: process.env.CENTRAL_ADMIN_EMAIL || 'admin@gassigeher.org',
+          password: process.env.CENTRAL_ADMIN_PASSWORD || 'QKJPRpttNZ51cb92SEXxHCPwrwhDoBjB'
         }
       },
 
