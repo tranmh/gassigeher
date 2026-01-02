@@ -642,6 +642,11 @@ func main() {
 	admin.HandleFunc("/admin/tenant/branding", tenantHandler.UpdateBranding).Methods("PUT")
 	admin.HandleFunc("/admin/tenant/export", tenantHandler.ExportTenantData).Methods("GET")
 
+	// Reference page self-service (tenant admin)
+	admin.HandleFunc("/admin/reference-entry", tenantHandler.GetTenantReferenceEntry).Methods("GET")
+	admin.HandleFunc("/admin/reference-entry", tenantHandler.SubmitReferenceEntry).Methods("POST")
+	admin.HandleFunc("/admin/reference-entry", tenantHandler.DeleteTenantReferenceEntry).Methods("DELETE")
+
 	// Import management (admin only)
 	admin.HandleFunc("/admin/import/dogs/preview", importHandler.PreviewImport).Methods("POST")
 	admin.HandleFunc("/admin/import/dogs", importHandler.ExecuteImport).Methods("POST")
@@ -715,7 +720,9 @@ func main() {
 	centralAdmin.HandleFunc("/marketing/referral-codes/{id}/toggle", marketingHandler.ToggleReferralCode).Methods("PUT")
 	centralAdmin.HandleFunc("/marketing/referral-codes/{id}", marketingHandler.DeleteReferralCode).Methods("DELETE")
 	centralAdmin.HandleFunc("/marketing/references", marketingHandler.ListReferenceEntries).Methods("GET")
+	centralAdmin.HandleFunc("/marketing/references", marketingHandler.CreateReferenceEntry).Methods("POST")
 	centralAdmin.HandleFunc("/marketing/references/{id}", marketingHandler.GetReferenceEntry).Methods("GET")
+	centralAdmin.HandleFunc("/marketing/references/{id}", marketingHandler.UpdateReferenceEntry).Methods("PUT")
 	centralAdmin.HandleFunc("/marketing/references/{id}/approve", marketingHandler.ApproveReferenceEntry).Methods("PUT")
 	centralAdmin.HandleFunc("/marketing/references/{id}", marketingHandler.DeleteReferenceEntry).Methods("DELETE")
 

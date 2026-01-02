@@ -89,6 +89,7 @@
                 <div class="card">
                     <div class="card-header">
                         <h2>Referenzseite</h2>
+                        <button onclick="showReferenceModal()" class="btn btn-primary">+ Neue Referenz</button>
                     </div>
                     <div id="references-container">
                         <p class="loading">Laden...</p>
@@ -197,6 +198,63 @@
             <div class="modal-footer">
                 <button onclick="closeReferralModal()" class="btn btn-secondary">Abbrechen</button>
                 <button onclick="saveReferralCode()" class="btn btn-primary">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reference Entry Modal -->
+    <div id="reference-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="reference-modal-title">Neue Referenz</h2>
+                <button class="modal-close" onclick="closeReferenceModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="reference-form">
+                    <input type="hidden" id="reference-id">
+                    <div class="form-group">
+                        <label>Anzeigename *</label>
+                        <input type="text" id="reference-name" class="form-input" required placeholder="z.B. Tierheim Göppingen">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Stadt</label>
+                            <input type="text" id="reference-city" class="form-input" placeholder="z.B. Göppingen">
+                        </div>
+                        <div class="form-group">
+                            <label>Bundesland</label>
+                            <input type="text" id="reference-state" class="form-input" placeholder="z.B. Baden-Württemberg">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Website-URL</label>
+                        <input type="url" id="reference-website" class="form-input" placeholder="https://www.example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Testimonial / Beschreibung</label>
+                        <textarea id="reference-testimonial" class="form-textarea" rows="3" placeholder="Optional: Kurze Beschreibung oder Zitat"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Logo-URL</label>
+                        <input type="url" id="reference-logo" class="form-input" placeholder="https://www.example.com/logo.png">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Anzeigereihenfolge</label>
+                            <input type="number" id="reference-order" class="form-input" value="0" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label" style="margin-top: 28px;">
+                                <input type="checkbox" id="reference-approved" checked>
+                                Genehmigt
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeReferenceModal()" class="btn btn-secondary">Abbrechen</button>
+                <button onclick="saveReference()" class="btn btn-primary">Speichern</button>
             </div>
         </div>
     </div>
@@ -507,6 +565,7 @@
                                 <td>${r.website_url ? `<a href="${escapeHtml(r.website_url)}" target="_blank">Link</a>` : '-'}</td>
                                 <td>${r.is_approved ? '<span class="badge badge-success">Genehmigt</span>' : '<span class="badge badge-warning">Ausstehend</span>'}</td>
                                 <td>
+                                    <button onclick="editReference(${r.id})" class="btn btn-sm btn-secondary">Bearbeiten</button>
                                     ${!r.is_approved ? `<button onclick="approveReference(${r.id})" class="btn btn-sm btn-primary">Genehmigen</button>` : ''}
                                     <button onclick="deleteReferenceConfirm(${r.id})" class="btn btn-sm btn-danger">Löschen</button>
                                 </td>
@@ -515,6 +574,56 @@
                     </tbody>
                 </table>
             `;
+        }
+
+        function showReferenceModal(ref = null) {
+            document.getElementById('reference-modal-title').textContent = ref ? 'Referenz bearbeiten' : 'Neue Referenz';
+            document.getElementById('reference-id').value = ref?.id || '';
+            document.getElementById('reference-name').value = ref?.display_name || '';
+            document.getElementById('reference-city').value = ref?.city || '';
+            document.getElementById('reference-state').value = ref?.federal_state || '';
+            document.getElementById('reference-website').value = ref?.website_url || '';
+            document.getElementById('reference-testimonial').value = ref?.testimonial || '';
+            document.getElementById('reference-logo').value = ref?.logo_url || '';
+            document.getElementById('reference-order').value = ref?.display_order || 0;
+            document.getElementById('reference-approved').checked = ref?.is_approved ?? true;
+            document.getElementById('reference-modal').style.display = 'flex';
+        }
+
+        function closeReferenceModal() {
+            document.getElementById('reference-modal').style.display = 'none';
+        }
+
+        function editReference(id) {
+            const ref = references.find(r => r.id === id);
+            if (ref) showReferenceModal(ref);
+        }
+
+        async function saveReference() {
+            const id = document.getElementById('reference-id').value;
+            const data = {
+                display_name: document.getElementById('reference-name').value,
+                city: document.getElementById('reference-city').value || null,
+                federal_state: document.getElementById('reference-state').value || null,
+                website_url: document.getElementById('reference-website').value || null,
+                testimonial: document.getElementById('reference-testimonial').value || null,
+                logo_url: document.getElementById('reference-logo').value || null,
+                display_order: parseInt(document.getElementById('reference-order').value) || 0,
+                is_approved: document.getElementById('reference-approved').checked
+            };
+
+            try {
+                if (id) {
+                    await updateReferenceEntry(id, data);
+                } else {
+                    await createReferenceEntry(data);
+                }
+                closeReferenceModal();
+                showAlert('Referenzeintrag gespeichert');
+                await loadAll();
+            } catch (err) {
+                showAlert('Fehler: ' + err.message, 'error');
+            }
         }
 
         async function approveReference(id) {

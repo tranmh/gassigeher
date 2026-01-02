@@ -414,6 +414,20 @@ class API {
         return this.request('GET', '/admin/tenant/export');
     }
 
+    // REFERENCE PAGE SELF-SERVICE
+
+    async getReferenceEntry() {
+        return this.request('GET', '/admin/reference-entry');
+    }
+
+    async submitReferenceEntry(data) {
+        return this.request('POST', '/admin/reference-entry', data);
+    }
+
+    async deleteReferenceEntry() {
+        return this.request('DELETE', '/admin/reference-entry');
+    }
+
     // LOGO ENDPOINTS
 
     async getLogo() {

@@ -563,6 +563,213 @@ func (h *MarketingHandler) GetReferenceEntry(w http.ResponseWriter, r *http.Requ
 	respondJSON(w, http.StatusOK, entry)
 }
 
+// CreateReferenceEntry creates a new reference entry (Central Admin only)
+// POST /api/v1/central-admin/marketing/references
+func (h *MarketingHandler) CreateReferenceEntry(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		TenantID     *int    `json:"tenant_id,omitempty"`
+		DisplayName  string  `json:"display_name"`
+		City         *string `json:"city,omitempty"`
+		FederalState *string `json:"federal_state,omitempty"`
+		WebsiteURL   *string `json:"website_url,omitempty"`
+		Testimonial  *string `json:"testimonial,omitempty"`
+		LogoURL      *string `json:"logo_url,omitempty"`
+		IsApproved   *bool   `json:"is_approved,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "Ungültige Anfrage")
+		return
+	}
+
+	// Validate display_name
+	req.DisplayName = strings.TrimSpace(req.DisplayName)
+	if req.DisplayName == "" {
+		respondError(w, http.StatusBadRequest, "Name ist erforderlich")
+		return
+	}
+	if len(req.DisplayName) > 255 {
+		respondError(w, http.StatusBadRequest, "Name darf maximal 255 Zeichen lang sein")
+		return
+	}
+
+	// Validate optional fields
+	if req.City != nil && len(*req.City) > 100 {
+		respondError(w, http.StatusBadRequest, "Stadt darf maximal 100 Zeichen lang sein")
+		return
+	}
+	if req.FederalState != nil && len(*req.FederalState) > 50 {
+		respondError(w, http.StatusBadRequest, "Bundesland darf maximal 50 Zeichen lang sein")
+		return
+	}
+	if req.WebsiteURL != nil && *req.WebsiteURL != "" {
+		if len(*req.WebsiteURL) > 500 {
+			respondError(w, http.StatusBadRequest, "Website-URL darf maximal 500 Zeichen lang sein")
+			return
+		}
+		if !strings.HasPrefix(*req.WebsiteURL, "http://") && !strings.HasPrefix(*req.WebsiteURL, "https://") {
+			respondError(w, http.StatusBadRequest, "Website-URL muss mit http:// oder https:// beginnen")
+			return
+		}
+	}
+	if req.Testimonial != nil && len(*req.Testimonial) > 2000 {
+		respondError(w, http.StatusBadRequest, "Testimonial darf maximal 2000 Zeichen lang sein")
+		return
+	}
+	if req.LogoURL != nil && *req.LogoURL != "" {
+		if len(*req.LogoURL) > 500 {
+			respondError(w, http.StatusBadRequest, "Logo-URL darf maximal 500 Zeichen lang sein")
+			return
+		}
+		if !strings.HasPrefix(*req.LogoURL, "http://") && !strings.HasPrefix(*req.LogoURL, "https://") {
+			respondError(w, http.StatusBadRequest, "Logo-URL muss mit http:// oder https:// beginnen")
+			return
+		}
+	}
+
+	// If tenant_id is provided, check for existing entry
+	if req.TenantID != nil && *req.TenantID > 0 {
+		existing, _ := h.marketingRepo.GetReferenceEntryByTenant(*req.TenantID)
+		if existing != nil {
+			respondError(w, http.StatusConflict, "Dieser Tenant hat bereits einen Referenzeintrag")
+			return
+		}
+	}
+
+	// Central admin created entries are auto-approved by default
+	isApproved := true
+	if req.IsApproved != nil {
+		isApproved = *req.IsApproved
+	}
+
+	entry := &models.ReferenceEntry{
+		DisplayName:  req.DisplayName,
+		City:         req.City,
+		FederalState: req.FederalState,
+		WebsiteURL:   req.WebsiteURL,
+		Testimonial:  req.Testimonial,
+		LogoURL:      req.LogoURL,
+		IsApproved:   isApproved,
+		DisplayOrder: 0,
+	}
+	if req.TenantID != nil {
+		entry.TenantID = *req.TenantID
+	}
+
+	if err := h.marketingRepo.CreateReferenceEntry(entry); err != nil {
+		respondError(w, http.StatusInternalServerError, "Fehler beim Erstellen des Referenzeintrags")
+		return
+	}
+	respondJSON(w, http.StatusCreated, entry)
+}
+
+// UpdateReferenceEntry updates a reference entry (Central Admin only)
+// PUT /api/v1/central-admin/marketing/references/:id
+func (h *MarketingHandler) UpdateReferenceEntry(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Ungültige Referenz-ID")
+		return
+	}
+
+	entry, err := h.marketingRepo.GetReferenceEntry(id)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Fehler beim Laden des Referenzeintrags")
+		return
+	}
+	if entry == nil {
+		respondError(w, http.StatusNotFound, "Referenzeintrag nicht gefunden")
+		return
+	}
+
+	var req struct {
+		DisplayName  *string `json:"display_name,omitempty"`
+		City         *string `json:"city,omitempty"`
+		FederalState *string `json:"federal_state,omitempty"`
+		WebsiteURL   *string `json:"website_url,omitempty"`
+		Testimonial  *string `json:"testimonial,omitempty"`
+		LogoURL      *string `json:"logo_url,omitempty"`
+		IsApproved   *bool   `json:"is_approved,omitempty"`
+		DisplayOrder *int    `json:"display_order,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "Ungültige Anfrage")
+		return
+	}
+
+	// Apply updates conditionally
+	if req.DisplayName != nil {
+		name := strings.TrimSpace(*req.DisplayName)
+		if name == "" {
+			respondError(w, http.StatusBadRequest, "Name darf nicht leer sein")
+			return
+		}
+		if len(name) > 255 {
+			respondError(w, http.StatusBadRequest, "Name darf maximal 255 Zeichen lang sein")
+			return
+		}
+		entry.DisplayName = name
+	}
+	if req.City != nil {
+		if len(*req.City) > 100 {
+			respondError(w, http.StatusBadRequest, "Stadt darf maximal 100 Zeichen lang sein")
+			return
+		}
+		entry.City = req.City
+	}
+	if req.FederalState != nil {
+		if len(*req.FederalState) > 50 {
+			respondError(w, http.StatusBadRequest, "Bundesland darf maximal 50 Zeichen lang sein")
+			return
+		}
+		entry.FederalState = req.FederalState
+	}
+	if req.WebsiteURL != nil {
+		if *req.WebsiteURL != "" {
+			if len(*req.WebsiteURL) > 500 {
+				respondError(w, http.StatusBadRequest, "Website-URL darf maximal 500 Zeichen lang sein")
+				return
+			}
+			if !strings.HasPrefix(*req.WebsiteURL, "http://") && !strings.HasPrefix(*req.WebsiteURL, "https://") {
+				respondError(w, http.StatusBadRequest, "Website-URL muss mit http:// oder https:// beginnen")
+				return
+			}
+		}
+		entry.WebsiteURL = req.WebsiteURL
+	}
+	if req.Testimonial != nil {
+		if len(*req.Testimonial) > 2000 {
+			respondError(w, http.StatusBadRequest, "Testimonial darf maximal 2000 Zeichen lang sein")
+			return
+		}
+		entry.Testimonial = req.Testimonial
+	}
+	if req.LogoURL != nil {
+		if *req.LogoURL != "" {
+			if len(*req.LogoURL) > 500 {
+				respondError(w, http.StatusBadRequest, "Logo-URL darf maximal 500 Zeichen lang sein")
+				return
+			}
+			if !strings.HasPrefix(*req.LogoURL, "http://") && !strings.HasPrefix(*req.LogoURL, "https://") {
+				respondError(w, http.StatusBadRequest, "Logo-URL muss mit http:// oder https:// beginnen")
+				return
+			}
+		}
+		entry.LogoURL = req.LogoURL
+	}
+	if req.IsApproved != nil {
+		entry.IsApproved = *req.IsApproved
+	}
+	if req.DisplayOrder != nil {
+		entry.DisplayOrder = *req.DisplayOrder
+	}
+
+	if err := h.marketingRepo.UpdateReferenceEntry(entry); err != nil {
+		respondError(w, http.StatusInternalServerError, "Fehler beim Aktualisieren des Referenzeintrags")
+		return
+	}
+	respondJSON(w, http.StatusOK, entry)
+}
+
 // ApproveReferenceEntry approves a reference entry (Central Admin only)
 // PUT /api/v1/central-admin/marketing/references/:id/approve
 func (h *MarketingHandler) ApproveReferenceEntry(w http.ResponseWriter, r *http.Request) {

@@ -1136,3 +1136,159 @@ func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request)
 		tenant.Slug, time.Now().Format("2006-01-02")))
 	respondJSON(w, http.StatusOK, export)
 }
+
+// ========== Reference Page Self-Service ==========
+
+// GetTenantReferenceEntry returns the current tenant's reference entry
+// GET /api/v1/admin/reference-entry
+func (h *TenantHandler) GetTenantReferenceEntry(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+	if !ok {
+		respondError(w, http.StatusInternalServerError, "Tenant context nicht gefunden")
+		return
+	}
+
+	entry, err := h.marketingRepo.GetReferenceEntryByTenant(tenantID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Fehler beim Laden des Referenzeintrags")
+		return
+	}
+
+	// Return null if no entry exists (not an error)
+	if entry == nil {
+		respondJSON(w, http.StatusOK, map[string]interface{}{"entry": nil})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{"entry": entry})
+}
+
+// SubmitReferenceEntry creates or updates the tenant's reference entry
+// POST /api/v1/admin/reference-entry
+func (h *TenantHandler) SubmitReferenceEntry(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+	if !ok {
+		respondError(w, http.StatusInternalServerError, "Tenant context nicht gefunden")
+		return
+	}
+
+	var req models.CreateReferenceEntryRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "Ungültige Anfrage")
+		return
+	}
+
+	// Validate display_name
+	req.DisplayName = strings.TrimSpace(req.DisplayName)
+	if req.DisplayName == "" {
+		respondError(w, http.StatusBadRequest, "Name ist erforderlich")
+		return
+	}
+	if len(req.DisplayName) > 255 {
+		respondError(w, http.StatusBadRequest, "Name darf maximal 255 Zeichen lang sein")
+		return
+	}
+
+	// Validate optional fields
+	if req.City != nil && len(*req.City) > 100 {
+		respondError(w, http.StatusBadRequest, "Stadt darf maximal 100 Zeichen lang sein")
+		return
+	}
+	if req.FederalState != nil && len(*req.FederalState) > 50 {
+		respondError(w, http.StatusBadRequest, "Bundesland darf maximal 50 Zeichen lang sein")
+		return
+	}
+	if req.WebsiteURL != nil && *req.WebsiteURL != "" {
+		if len(*req.WebsiteURL) > 500 {
+			respondError(w, http.StatusBadRequest, "Website-URL darf maximal 500 Zeichen lang sein")
+			return
+		}
+		if !strings.HasPrefix(*req.WebsiteURL, "http://") && !strings.HasPrefix(*req.WebsiteURL, "https://") {
+			respondError(w, http.StatusBadRequest, "Website-URL muss mit http:// oder https:// beginnen")
+			return
+		}
+	}
+	if req.Testimonial != nil && len(*req.Testimonial) > 2000 {
+		respondError(w, http.StatusBadRequest, "Testimonial darf maximal 2000 Zeichen lang sein")
+		return
+	}
+
+	// Check for existing entry
+	existing, err := h.marketingRepo.GetReferenceEntryByTenant(tenantID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Fehler beim Prüfen des bestehenden Eintrags")
+		return
+	}
+
+	if existing != nil {
+		// Update existing entry
+		existing.DisplayName = req.DisplayName
+		existing.City = req.City
+		existing.FederalState = req.FederalState
+		existing.WebsiteURL = req.WebsiteURL
+		existing.Testimonial = req.Testimonial
+		// Reset approval status when content changes (tenant must wait for re-approval)
+		existing.IsApproved = false
+
+		if err := h.marketingRepo.UpdateReferenceEntry(existing); err != nil {
+			respondError(w, http.StatusInternalServerError, "Fehler beim Aktualisieren des Referenzeintrags")
+			return
+		}
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"message": "Referenzeintrag aktualisiert. Wartet auf Genehmigung.",
+			"entry":   existing,
+		})
+		return
+	}
+
+	// Create new entry
+	entry := &models.ReferenceEntry{
+		TenantID:     tenantID,
+		DisplayName:  req.DisplayName,
+		City:         req.City,
+		FederalState: req.FederalState,
+		WebsiteURL:   req.WebsiteURL,
+		Testimonial:  req.Testimonial,
+		IsApproved:   false, // Tenant submissions require approval
+		DisplayOrder: 0,
+	}
+
+	if err := h.marketingRepo.CreateReferenceEntry(entry); err != nil {
+		respondError(w, http.StatusInternalServerError, "Fehler beim Erstellen des Referenzeintrags")
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, map[string]interface{}{
+		"message": "Referenzeintrag eingereicht. Wartet auf Genehmigung.",
+		"entry":   entry,
+	})
+}
+
+// DeleteTenantReferenceEntry deletes the tenant's reference entry
+// DELETE /api/v1/admin/reference-entry
+func (h *TenantHandler) DeleteTenantReferenceEntry(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+	if !ok {
+		respondError(w, http.StatusInternalServerError, "Tenant context nicht gefunden")
+		return
+	}
+
+	// Find the tenant's entry
+	entry, err := h.marketingRepo.GetReferenceEntryByTenant(tenantID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Fehler beim Laden des Referenzeintrags")
+		return
+	}
+	if entry == nil {
+		respondError(w, http.StatusNotFound, "Kein Referenzeintrag vorhanden")
+		return
+	}
+
+	// Delete the entry
+	if err := h.marketingRepo.DeleteReferenceEntry(entry.ID); err != nil {
+		respondError(w, http.StatusInternalServerError, "Fehler beim Löschen des Referenzeintrags")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"message": "Referenzeintrag gelöscht"})
+}

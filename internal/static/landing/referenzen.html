@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Referenzen - Gassigeher</title>
+    <meta name="description" content="Tierheime, die Gassigeher erfolgreich einsetzen. Lesen Sie Erfahrungsberichte unserer Partner.">
+    <link rel="stylesheet" href="/landing/assets/css/landing.css">
+    <link rel="icon" href="/assets/images/favicon.ico">
+    <style>
+        .references-hero {
+            background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
+            color: white;
+            padding: 80px 0;
+            text-align: center;
+        }
+        .references-hero h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+        .references-hero p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .references-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 30px;
+            padding: 60px 0;
+        }
+        .reference-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .reference-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+        }
+        .reference-card-header {
+            padding: 25px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .reference-logo {
+            width: 60px;
+            height: 60px;
+            border-radius: 10px;
+            object-fit: cover;
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: var(--primary-green);
+        }
+        .reference-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 10px;
+        }
+        .reference-info h3 {
+            margin: 0 0 5px 0;
+            font-size: 1.2rem;
+        }
+        .reference-location {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        .reference-card-body {
+            padding: 25px;
+        }
+        .reference-testimonial {
+            font-style: italic;
+            color: #555;
+            line-height: 1.7;
+            position: relative;
+            padding-left: 20px;
+        }
+        .reference-testimonial::before {
+            content: '"';
+            position: absolute;
+            left: 0;
+            top: -10px;
+            font-size: 3rem;
+            color: var(--primary-green);
+            opacity: 0.3;
+            font-family: Georgia, serif;
+        }
+        .reference-card-footer {
+            padding: 15px 25px;
+            background: #f9f9f9;
+            border-top: 1px solid #eee;
+        }
+        .reference-link {
+            color: var(--primary-green);
+            text-decoration: none;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .reference-link:hover {
+            text-decoration: underline;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: #666;
+        }
+        .empty-state h2 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .cta-section {
+            background: #f5f5f5;
+            padding: 60px 0;
+            text-align: center;
+        }
+        .cta-section h2 {
+            margin-bottom: 15px;
+        }
+        .cta-section p {
+            color: #666;
+            margin-bottom: 25px;
+        }
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <a href="/landing/" class="logo">
+                <span>Gassigeher</span>
+            </a>
+            <nav class="nav">
+                <a href="/landing/">Startseite</a>
+                <a href="/landing/pricing.html">Preise</a>
+                <a href="/landing/faq.html">FAQ</a>
+                <a href="/landing/referenzen.html" class="active">Referenzen</a>
+                <a href="/landing/demo.html" class="nav-demo">Demo testen</a>
+                <a href="/landing/register.html" class="btn btn-primary">Jetzt starten</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="references-hero">
+            <div class="container">
+                <h1>Unsere Referenzen</h1>
+                <p>Entdecken Sie Tierheime, die Gassigeher erfolgreich einsetzen und von unserer Plattform begeistert sind.</p>
+            </div>
+        </section>
+
+        <section class="container">
+            <div id="references-container" class="references-grid">
+                <div class="loading">Referenzen werden geladen...</div>
+            </div>
+        </section>
+
+        <section class="cta-section">
+            <div class="container">
+                <h2>Auch Ihr Tierheim auf unserer Referenzseite?</h2>
+                <p>Registrieren Sie sich kostenlos und werden Sie Teil unserer wachsenden Community.</p>
+                <a href="/landing/register.html" class="btn btn-primary btn-large">Jetzt kostenlos starten</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-col">
+                    <h4>Gassigeher</h4>
+                    <p>Das Buchungssystem für Tierheime. Kostenlos und einfach zu bedienen.</p>
+                </div>
+                <div class="footer-col">
+                    <h4>Links</h4>
+                    <a href="/landing/">Startseite</a>
+                    <a href="/landing/pricing.html">Preise</a>
+                    <a href="/landing/faq.html">FAQ</a>
+                    <a href="/landing/referenzen.html">Referenzen</a>
+                </div>
+                <div class="footer-col">
+                    <h4>Rechtliches</h4>
+                    <a href="/landing/impressum.html">Impressum</a>
+                    <a href="/landing/datenschutz.html">Datenschutz</a>
+                    <a href="/landing/agb.html">AGB</a>
+                </div>
+                <div class="footer-col">
+                    <h4>Kontakt</h4>
+                    <a href="mailto:info@gassigeher.org">info@gassigeher.org</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Gassigeher. Alle Rechte vorbehalten.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadReferences();
+        });
+
+        async function loadReferences() {
+            const container = document.getElementById('references-container');
+
+            try {
+                const response = await fetch('/api/v1/marketing/references');
+                if (!response.ok) throw new Error('Failed to load');
+
+                const references = await response.json();
+
+                if (!references || references.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state" style="grid-column: 1 / -1;">
+                            <h2>Bald hier: Unsere Referenzen</h2>
+                            <p>Wir arbeiten daran, Erfahrungsberichte von Tierheimen zu sammeln, die Gassigeher nutzen.</p>
+                            <p style="margin-top: 20px;">
+                                <a href="/landing/register.html" class="btn btn-primary">Jetzt registrieren und dabei sein</a>
+                            </p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = references.map(ref => `
+                    <div class="reference-card">
+                        <div class="reference-card-header">
+                            <div class="reference-logo">
+                                ${ref.logo_url
+                                    ? `<img src="${escapeHtml(ref.logo_url)}" alt="${escapeHtml(ref.display_name)} Logo" onerror="this.parentElement.innerHTML='🏠'">`
+                                    : '🏠'
+                                }
+                            </div>
+                            <div class="reference-info">
+                                <h3>${escapeHtml(ref.display_name)}</h3>
+                                ${ref.city || ref.federal_state
+                                    ? `<div class="reference-location">📍 ${[ref.city, ref.federal_state].filter(Boolean).map(escapeHtml).join(', ')}</div>`
+                                    : ''
+                                }
+                            </div>
+                        </div>
+                        ${ref.testimonial ? `
+                            <div class="reference-card-body">
+                                <p class="reference-testimonial">${escapeHtml(ref.testimonial)}</p>
+                            </div>
+                        ` : ''}
+                        ${ref.website_url ? `
+                            <div class="reference-card-footer">
+                                <a href="${escapeHtml(ref.website_url)}" target="_blank" rel="noopener" class="reference-link">
+                                    Website besuchen →
+                                </a>
+                            </div>
+                        ` : ''}
+                    </div>
+                `).join('');
+
+            } catch (err) {
+                console.error('Error loading references:', err);
+                container.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                        <h2>Referenzen konnten nicht geladen werden</h2>
+                        <p>Bitte versuchen Sie es später erneut.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

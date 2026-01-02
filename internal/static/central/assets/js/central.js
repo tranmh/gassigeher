@@ -322,3 +322,17 @@ async function deleteReferenceEntry(id) {
         method: 'DELETE'
     });
 }
+
+async function createReferenceEntry(entry) {
+    return apiRequest('/central-admin/marketing/references', {
+        method: 'POST',
+        body: JSON.stringify(entry)
+    });
+}
+
+async function updateReferenceEntry(id, entry) {
+    return apiRequest(`/central-admin/marketing/references/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(entry)
+    });
+}

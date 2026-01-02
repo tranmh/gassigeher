@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Referenzseite - Gassigeher Admin</title>
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <script src="/js/theme-loader.js"></script>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <button class="menu-toggle" data-action="toggle-menu" aria-label="Menu">☰</button>
+            <a href="/" class="logo">🐕 Gassigeher Admin</a>
+            <nav id="main-nav">
+                <ul>
+                    <li><a href="/admin-dashboard.html" data-i18n="admin_dashboard.title">Dashboard</a></li>
+                    <li><a href="/admin-dogs.html" data-i18n="dogs.manage_dogs">Hunde</a></li>
+                    <li class="nav-dropdown">
+                        <a href="#">Buchungen</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-bookings.html">📅 Alle Buchungen</a>
+                            <a href="/admin-booking-approvals.html">✓ Genehmigungen</a>
+                            <a href="/admin-booking-times.html">⏰ Buchungszeiten</a>
+                            <a href="/admin-blocked-dates.html">🚫 Gesperrte Tage</a>
+                        </div>
+                    </li>
+                    <li class="nav-dropdown">
+                        <a href="#">Benutzer</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-users.html">👥 Alle Benutzer</a>
+                            <a href="/admin-color-requests.html">🎨 Farb-Anfragen</a>
+                            <a href="/admin-reactivation-requests.html">🔄 Reaktivierungen</a>
+                        </div>
+                    </li>
+                    <li class="nav-dropdown">
+                        <a href="#">Einstellungen</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-settings.html">⚙️ System</a>
+                            <a href="/admin-branding.html">🎨 Branding</a>
+                            <a href="/admin-reference-page.html">📋 Referenzseite</a>
+                        </div>
+                    </li>
+                    <li id="super-admin-colors-link" style="display:none;"><a href="/admin-colors.html">🎨 Farben</a></li>
+                    <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
+                    <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <div class="nav-overlay" id="nav-overlay" data-action="toggle-menu"></div>
+
+    <main style="padding: 40px 0;">
+        <div class="container-narrow">
+            <h1>Referenzseite</h1>
+            <p style="color: var(--text-gray); margin-bottom: 30px;">
+                Tragen Sie Ihr Tierheim auf unserer öffentlichen Referenzseite ein, um andere Tierheime zu inspirieren.
+            </p>
+
+            <div id="alert-container"></div>
+
+            <!-- Status Card -->
+            <div id="status-card" class="card" style="margin-bottom: 30px; display: none;">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <span id="status-icon" style="font-size: 2rem;"></span>
+                    <div>
+                        <strong id="status-title"></strong>
+                        <p id="status-message" style="margin: 5px 0 0 0; color: var(--text-gray);"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reference Entry Form -->
+            <div class="card">
+                <h2>Eintrag für die Referenzseite</h2>
+                <p style="font-size: 0.85rem; color: #666; margin-bottom: 20px;">
+                    Füllen Sie die Felder aus und senden Sie Ihren Eintrag zur Genehmigung ein.
+                </p>
+
+                <form id="reference-form">
+                    <div class="form-group">
+                        <label for="display-name">Anzeigename *</label>
+                        <input type="text" id="display-name" required maxlength="255"
+                               placeholder="z.B. Tierheim Göppingen">
+                        <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                            Der Name, der öffentlich angezeigt wird
+                        </p>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div class="form-group">
+                            <label for="city">Stadt</label>
+                            <input type="text" id="city" maxlength="100"
+                                   placeholder="z.B. Göppingen">
+                        </div>
+                        <div class="form-group">
+                            <label for="federal-state">Bundesland</label>
+                            <input type="text" id="federal-state" maxlength="50"
+                                   placeholder="z.B. Baden-Württemberg">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="website-url">Website</label>
+                        <input type="url" id="website-url" maxlength="500"
+                               placeholder="https://www.ihr-tierheim.de">
+                        <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                            Optional: Link zu Ihrer Website
+                        </p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="testimonial">Kurzbeschreibung / Testimonial</label>
+                        <textarea id="testimonial" rows="4" maxlength="2000"
+                                  placeholder="z.B. Gassigeher hat unsere Freiwilligenkoordination revolutioniert..."></textarea>
+                        <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                            Optional: Eine kurze Beschreibung oder ein Erfahrungsbericht (max. 2000 Zeichen)
+                        </p>
+                    </div>
+
+                    <div style="display: flex; gap: 15px; margin-top: 30px;">
+                        <button type="submit" class="btn btn-primary" id="submit-btn">
+                            Eintrag einreichen
+                        </button>
+                        <button type="button" class="btn btn-danger" id="delete-btn" style="display: none;"
+                                data-action="delete-entry">
+                            Eintrag löschen
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Info Box -->
+            <div class="card" style="margin-top: 30px; background: var(--bg-light);">
+                <h3 style="margin-bottom: 10px;">ℹ️ Wie funktioniert es?</h3>
+                <ol style="margin: 0; padding-left: 20px; line-height: 1.8;">
+                    <li>Füllen Sie das Formular aus und klicken Sie auf "Eintrag einreichen"</li>
+                    <li>Unser Team prüft Ihren Eintrag (meist innerhalb von 24 Stunden)</li>
+                    <li>Nach Genehmigung erscheint Ihr Tierheim auf der öffentlichen Referenzseite</li>
+                    <li>Sie können Ihren Eintrag jederzeit aktualisieren oder löschen</li>
+                </ol>
+            </div>
+        </div>
+    </main>
+
+    <script src="/js/logo-banner.js"></script>
+    <script src="/js/nav-menu.js"></script>
+    <script src="/js/i18n.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/sanitize.js"></script>
+    <script src="/js/impersonation-banner.js"></script>
+    <script src="/js/demo-banner.js"></script>
+    <script src="/js/event-handlers.js"></script>
+    <script>
+        let currentEntry = null;
+
+        // Register page-specific action handlers
+        registerActions({
+            'delete-entry': function(e) { e.preventDefault(); deleteEntry(); }
+        });
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check authentication
+            if (!window.api.isAuthenticated()) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // Check if user is admin
+            try {
+                const userData = await window.api.getMe();
+                if (!userData.is_admin) {
+                    alert('Zugriff verweigert: Diese Seite ist nur für Administratoren zugänglich.');
+                    window.location.href = '/dashboard.html';
+                    return;
+                }
+                // Show colors link for super-admins
+                if (userData.is_super_admin) {
+                    const colorsLink = document.getElementById('super-admin-colors-link');
+                    if (colorsLink) colorsLink.style.display = '';
+                }
+            } catch (error) {
+                console.error('Failed to verify admin status:', error);
+                window.location.href = '/dashboard.html';
+                return;
+            }
+
+            await window.i18n.load();
+            window.i18n.updateElement(document.body);
+
+            // Initialize impersonation banner (shows if impersonating)
+            await ImpersonationBanner.init();
+
+            await loadReferenceEntry();
+
+            // Form submission
+            document.getElementById('reference-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await submitEntry();
+            });
+        });
+
+        async function loadReferenceEntry() {
+            try {
+                const response = await window.api.getReferenceEntry();
+                currentEntry = response.entry;
+
+                if (currentEntry) {
+                    // Populate form
+                    document.getElementById('display-name').value = currentEntry.display_name || '';
+                    document.getElementById('city').value = currentEntry.city || '';
+                    document.getElementById('federal-state').value = currentEntry.federal_state || '';
+                    document.getElementById('website-url').value = currentEntry.website_url || '';
+                    document.getElementById('testimonial').value = currentEntry.testimonial || '';
+
+                    // Update button text
+                    document.getElementById('submit-btn').textContent = 'Eintrag aktualisieren';
+                    document.getElementById('delete-btn').style.display = 'inline-block';
+
+                    // Show status
+                    showStatus(currentEntry.is_approved);
+                }
+            } catch (err) {
+                console.error('Failed to load reference entry:', err);
+            }
+        }
+
+        function showStatus(isApproved) {
+            const card = document.getElementById('status-card');
+            const icon = document.getElementById('status-icon');
+            const title = document.getElementById('status-title');
+            const message = document.getElementById('status-message');
+
+            card.style.display = 'block';
+
+            if (isApproved) {
+                icon.textContent = '✅';
+                title.textContent = 'Ihr Eintrag ist genehmigt';
+                message.textContent = 'Ihr Tierheim wird auf der öffentlichen Referenzseite angezeigt.';
+                card.style.borderLeft = '4px solid var(--success-green)';
+            } else {
+                icon.textContent = '⏳';
+                title.textContent = 'Genehmigung ausstehend';
+                message.textContent = 'Ihr Eintrag wird geprüft. Dies dauert in der Regel 24 Stunden.';
+                card.style.borderLeft = '4px solid var(--warning-orange)';
+            }
+        }
+
+        async function submitEntry() {
+            const data = {
+                display_name: document.getElementById('display-name').value.trim(),
+                city: document.getElementById('city').value.trim() || null,
+                federal_state: document.getElementById('federal-state').value.trim() || null,
+                website_url: document.getElementById('website-url').value.trim() || null,
+                testimonial: document.getElementById('testimonial').value.trim() || null
+            };
+
+            if (!data.display_name) {
+                showAlert('Bitte geben Sie einen Anzeigenamen ein.', 'error');
+                return;
+            }
+
+            try {
+                const response = await window.api.submitReferenceEntry(data);
+                currentEntry = response.entry;
+
+                showAlert(response.message || 'Eintrag gespeichert!', 'success');
+                document.getElementById('submit-btn').textContent = 'Eintrag aktualisieren';
+                document.getElementById('delete-btn').style.display = 'inline-block';
+                showStatus(currentEntry.is_approved);
+            } catch (err) {
+                showAlert('Fehler: ' + err.message, 'error');
+            }
+        }
+
+        async function deleteEntry() {
+            if (!confirm('Möchten Sie Ihren Eintrag wirklich löschen? Ihr Tierheim wird dann nicht mehr auf der Referenzseite angezeigt.')) {
+                return;
+            }
+
+            try {
+                await window.api.deleteReferenceEntry();
+                currentEntry = null;
+
+                // Reset form
+                document.getElementById('reference-form').reset();
+                document.getElementById('submit-btn').textContent = 'Eintrag einreichen';
+                document.getElementById('delete-btn').style.display = 'none';
+                document.getElementById('status-card').style.display = 'none';
+
+                showAlert('Eintrag gelöscht.', 'success');
+            } catch (err) {
+                showAlert('Fehler: ' + err.message, 'error');
+            }
+        }
+
+        function showAlert(message, type = 'success') {
+            const container = document.getElementById('alert-container');
+            // Sanitize message to prevent XSS
+            const safeMessage = typeof sanitizeHTML === 'function' ? sanitizeHTML(message) : message.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+            container.innerHTML = `<div class="alert alert-${type}">${safeMessage}</div>`;
+            setTimeout(() => container.innerHTML = '', 5000);
+        }
+    </script>
+</body>
+</html>

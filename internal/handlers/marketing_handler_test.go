@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/tranmh/gassigeher/internal/database"
@@ -427,5 +428,534 @@ func TestCreateReferralCode_InvalidCharacters_ReturnsError(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// ========== Reference Entry Handler Tests ==========
+
+func TestCreateReferenceEntry_Success(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	reqBody := `{
+		"display_name": "Tierheim Göppingen",
+		"city": "Göppingen",
+		"federal_state": "Baden-Württemberg",
+		"website_url": "https://www.tierheim-goeppingen.de",
+		"testimonial": "Gassigeher hat unsere Freiwilligenkoordination revolutioniert!",
+		"is_approved": true
+	}`
+
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/references", bytes.NewBufferString(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateReferenceEntry(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+
+	var response map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to parse response: %v", err)
+	}
+
+	if response["display_name"] != "Tierheim Göppingen" {
+		t.Errorf("Expected display_name 'Tierheim Göppingen', got '%v'", response["display_name"])
+	}
+	if response["is_approved"] != true {
+		t.Errorf("Expected is_approved true, got %v", response["is_approved"])
+	}
+}
+
+func TestCreateReferenceEntry_MissingDisplayName_ReturnsError(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	reqBody := `{
+		"city": "Göppingen",
+		"federal_state": "Baden-Württemberg"
+	}`
+
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/references", bytes.NewBufferString(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateReferenceEntry(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for missing display_name, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCreateReferenceEntry_DisplayNameTooLong_ReturnsError(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// Create a name longer than 255 characters
+	longName := ""
+	for i := 0; i < 300; i++ {
+		longName += "A"
+	}
+
+	reqBody := `{"display_name": "` + longName + `"}`
+
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/references", bytes.NewBufferString(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateReferenceEntry(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for display_name too long, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCreateReferenceEntry_InvalidWebsiteURL_ReturnsError(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	testCases := []struct {
+		name string
+		url  string
+	}{
+		{"Missing protocol", "www.example.com"},
+		{"Invalid protocol", "ftp://www.example.com"},
+		{"JavaScript protocol", "javascript:alert(1)"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			reqBody := `{"display_name": "Test Shelter", "website_url": "` + tc.url + `"}`
+
+			req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/references", bytes.NewBufferString(reqBody))
+			req.Header.Set("Content-Type", "application/json")
+			ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+			ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+			req = req.WithContext(ctx)
+
+			rec := httptest.NewRecorder()
+			handler.CreateReferenceEntry(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("Expected status 400 for invalid URL '%s', got %d. Body: %s", tc.url, rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestCreateReferenceEntry_TestimonialTooLong_ReturnsError(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// Create testimonial longer than 2000 characters
+	longTestimonial := ""
+	for i := 0; i < 2500; i++ {
+		longTestimonial += "A"
+	}
+
+	reqBody := `{"display_name": "Test Shelter", "testimonial": "` + longTestimonial + `"}`
+
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/references", bytes.NewBufferString(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateReferenceEntry(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for testimonial too long, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCreateReferenceEntry_DuplicateTenant_ReturnsConflict(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// First, create an entry with tenant_id
+	firstReqBody := `{
+		"display_name": "First Entry",
+		"tenant_id": 1
+	}`
+
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/references", bytes.NewBufferString(firstReqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateReferenceEntry(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("First entry creation failed: %d. Body: %s", rec.Code, rec.Body.String())
+	}
+
+	// Try to create another entry for the same tenant
+	secondReqBody := `{
+		"display_name": "Second Entry",
+		"tenant_id": 1
+	}`
+
+	req = httptest.NewRequest("POST", "/api/v1/central-admin/marketing/references", bytes.NewBufferString(secondReqBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx = context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec = httptest.NewRecorder()
+	handler.CreateReferenceEntry(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("Expected status 409 for duplicate tenant entry, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestUpdateReferenceEntry_Success(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// First create an entry
+	createBody := `{"display_name": "Original Name"}`
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/references", bytes.NewBufferString(createBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateReferenceEntry(rec, req)
+
+	var createResp map[string]interface{}
+	json.Unmarshal(rec.Body.Bytes(), &createResp)
+	entryID := int(createResp["id"].(float64))
+
+	// Update the entry
+	updateBody := `{
+		"display_name": "Updated Name",
+		"city": "New City",
+		"is_approved": false
+	}`
+
+	req = httptest.NewRequest("PUT", "/api/v1/central-admin/marketing/references/1", bytes.NewBufferString(updateBody))
+	req.Header.Set("Content-Type", "application/json")
+	req = mux.SetURLVars(req, map[string]string{"id": "1"})
+	ctx = context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec = httptest.NewRecorder()
+	handler.UpdateReferenceEntry(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d. Body: %s (entry ID: %d)", rec.Code, rec.Body.String(), entryID)
+	}
+
+	var updateResp map[string]interface{}
+	json.Unmarshal(rec.Body.Bytes(), &updateResp)
+
+	if updateResp["display_name"] != "Updated Name" {
+		t.Errorf("Expected display_name 'Updated Name', got '%v'", updateResp["display_name"])
+	}
+	if updateResp["city"] != "New City" {
+		t.Errorf("Expected city 'New City', got '%v'", updateResp["city"])
+	}
+	if updateResp["is_approved"] != false {
+		t.Errorf("Expected is_approved false, got %v", updateResp["is_approved"])
+	}
+}
+
+func TestUpdateReferenceEntry_NotFound_ReturnsError(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	updateBody := `{"display_name": "Updated Name"}`
+
+	req := httptest.NewRequest("PUT", "/api/v1/central-admin/marketing/references/999", bytes.NewBufferString(updateBody))
+	req.Header.Set("Content-Type", "application/json")
+	req = mux.SetURLVars(req, map[string]string{"id": "999"})
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.UpdateReferenceEntry(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("Expected status 404 for non-existent entry, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestUpdateReferenceEntry_EmptyDisplayName_ReturnsError(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// First create an entry
+	createBody := `{"display_name": "Original Name"}`
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/references", bytes.NewBufferString(createBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.CreateReferenceEntry(rec, req)
+
+	// Try to update with empty display_name
+	updateBody := `{"display_name": "   "}`
+
+	req = httptest.NewRequest("PUT", "/api/v1/central-admin/marketing/references/1", bytes.NewBufferString(updateBody))
+	req.Header.Set("Content-Type", "application/json")
+	req = mux.SetURLVars(req, map[string]string{"id": "1"})
+	ctx = context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+
+	rec = httptest.NewRecorder()
+	handler.UpdateReferenceEntry(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400 for empty display_name, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestListReferenceEntries_PublicEndpoint_ReturnsApprovedOnly(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// Create approved entry with tenant_id 1
+	approvedBody := `{"display_name": "Approved Shelter", "is_approved": true, "tenant_id": 1}`
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/references", bytes.NewBufferString(approvedBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+	handler.CreateReferenceEntry(rec, req)
+
+	// Create pending entry with tenant_id 2
+	pendingBody := `{"display_name": "Pending Shelter", "is_approved": false, "tenant_id": 2}`
+	req = httptest.NewRequest("POST", "/api/v1/central-admin/marketing/references", bytes.NewBufferString(pendingBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx = context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+	rec = httptest.NewRecorder()
+	handler.CreateReferenceEntry(rec, req)
+
+	// List from public endpoint (should only return approved)
+	req = httptest.NewRequest("GET", "/api/v1/marketing/references", nil)
+	rec = httptest.NewRecorder()
+	handler.ListReferenceEntries(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+
+	var entries []map[string]interface{}
+	json.Unmarshal(rec.Body.Bytes(), &entries)
+
+	if len(entries) != 1 {
+		t.Errorf("Expected 1 approved entry, got %d entries", len(entries))
+	}
+
+	if len(entries) > 0 && entries[0]["display_name"] != "Approved Shelter" {
+		t.Errorf("Expected 'Approved Shelter', got '%v'", entries[0]["display_name"])
+	}
+}
+
+func TestListReferenceEntries_AdminEndpoint_ReturnsAll(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// Create approved entry with tenant_id 1
+	approvedBody := `{"display_name": "Approved Shelter", "is_approved": true, "tenant_id": 1}`
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/references", bytes.NewBufferString(approvedBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+	handler.CreateReferenceEntry(rec, req)
+
+	// Create pending entry with tenant_id 2
+	pendingBody := `{"display_name": "Pending Shelter", "is_approved": false, "tenant_id": 2}`
+	req = httptest.NewRequest("POST", "/api/v1/central-admin/marketing/references", bytes.NewBufferString(pendingBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx = context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+	rec = httptest.NewRecorder()
+	handler.CreateReferenceEntry(rec, req)
+
+	// List from central-admin endpoint (should return all)
+	req = httptest.NewRequest("GET", "/api/v1/central-admin/marketing/references", nil)
+	ctx = context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+	rec = httptest.NewRecorder()
+	handler.ListReferenceEntries(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+
+	var entries []map[string]interface{}
+	json.Unmarshal(rec.Body.Bytes(), &entries)
+
+	if len(entries) != 2 {
+		t.Errorf("Expected 2 entries (approved + pending), got %d entries", len(entries))
+	}
+}
+
+func TestApproveReferenceEntry_Success(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// Create pending entry
+	createBody := `{"display_name": "Pending Shelter", "is_approved": false}`
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/references", bytes.NewBufferString(createBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+	handler.CreateReferenceEntry(rec, req)
+
+	// Approve the entry
+	req = httptest.NewRequest("PUT", "/api/v1/central-admin/marketing/references/1/approve", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": "1"})
+	ctx = context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+	rec = httptest.NewRecorder()
+	handler.ApproveReferenceEntry(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+
+	// Verify approval by getting the entry
+	req = httptest.NewRequest("GET", "/api/v1/central-admin/marketing/references/1", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": "1"})
+	ctx = context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+	rec = httptest.NewRecorder()
+	handler.GetReferenceEntry(rec, req)
+
+	var entry map[string]interface{}
+	json.Unmarshal(rec.Body.Bytes(), &entry)
+
+	if entry["is_approved"] != true {
+		t.Errorf("Expected is_approved true after approval, got %v", entry["is_approved"])
+	}
+}
+
+func TestDeleteReferenceEntry_Success(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// Create entry
+	createBody := `{"display_name": "To Be Deleted"}`
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/references", bytes.NewBufferString(createBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+	handler.CreateReferenceEntry(rec, req)
+
+	// Delete the entry
+	req = httptest.NewRequest("DELETE", "/api/v1/central-admin/marketing/references/1", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": "1"})
+	ctx = context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+	rec = httptest.NewRecorder()
+	handler.DeleteReferenceEntry(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+
+	// Verify deletion by trying to get the entry
+	req = httptest.NewRequest("GET", "/api/v1/central-admin/marketing/references/1", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": "1"})
+	ctx = context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+	rec = httptest.NewRecorder()
+	handler.GetReferenceEntry(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("Expected status 404 after deletion, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCreateReferenceEntry_CentralAdminAutoApproved(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	defer db.Close()
+
+	handler := NewMarketingHandler(db)
+
+	// Create entry without specifying is_approved (should default to true for admin)
+	createBody := `{"display_name": "Admin Created Shelter"}`
+	req := httptest.NewRequest("POST", "/api/v1/central-admin/marketing/references", bytes.NewBufferString(createBody))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.IsCentralAdminKey, true)
+	ctx = context.WithValue(ctx, middleware.UserIDKey, 1)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+	handler.CreateReferenceEntry(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("Expected status 201, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+
+	var response map[string]interface{}
+	json.Unmarshal(rec.Body.Bytes(), &response)
+
+	// Central admin created entries should be auto-approved
+	if response["is_approved"] != true {
+		t.Errorf("Expected is_approved true for admin-created entry, got %v", response["is_approved"])
 	}
 }
