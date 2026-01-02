@@ -336,39 +336,37 @@ CREATE TABLE IF NOT EXISTS pricing_plans (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tenant subscriptions
-CREATE TABLE IF NOT EXISTS tenant_subscriptions (
+-- Promotional codes (separate from referral codes)
+CREATE TABLE IF NOT EXISTS promo_codes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  plan_id INTEGER NOT NULL REFERENCES pricing_plans(id),
-  status TEXT DEFAULT 'active' CHECK(status IN ('active', 'cancelled', 'past_due', 'trialing')),
-  billing_cycle TEXT DEFAULT 'monthly' CHECK(billing_cycle IN ('monthly', 'yearly')),
-  current_period_start TIMESTAMP,
-  current_period_end TIMESTAMP,
-  stripe_customer_id TEXT,
-  stripe_subscription_id TEXT,
-  cancelled_at TIMESTAMP,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_tenant_subscriptions_tenant ON tenant_subscriptions(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_tenant_subscriptions_status ON tenant_subscriptions(status);
-
--- Marketing campaigns (FOMO countdown, referral promotions, etc.)
-CREATE TABLE IF NOT EXISTS marketing_campaigns (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  type TEXT NOT NULL CHECK(type IN ('fomo_countdown', 'referral', 'reference_page', 'custom')),
-  name TEXT NOT NULL,
+  code TEXT NOT NULL UNIQUE,
   description TEXT,
-  config TEXT,
-  is_active INTEGER DEFAULT 0,
-  start_date TIMESTAMP,
-  end_date TIMESTAMP,
+  discount_type TEXT NOT NULL CHECK(discount_type IN ('percentage', 'fixed', 'free_months')),
+  discount_value INTEGER NOT NULL,
+  max_uses INTEGER,
+  uses_count INTEGER DEFAULT 0,
+  valid_for_plans TEXT,
+  is_active INTEGER DEFAULT 1,
+  stripe_coupon_id TEXT,
+  expires_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_promo_codes_code ON promo_codes(code);
+CREATE INDEX IF NOT EXISTS idx_promo_codes_active ON promo_codes(is_active);
 
--- Referral codes for tenant referrals
+-- Promo code usage tracking
+CREATE TABLE IF NOT EXISTS promo_code_uses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  promo_code_id INTEGER NOT NULL REFERENCES promo_codes(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(promo_code_id, tenant_id)
+);
+CREATE INDEX IF NOT EXISTS idx_promo_code_uses_code ON promo_code_uses(promo_code_id);
+CREATE INDEX IF NOT EXISTS idx_promo_code_uses_tenant ON promo_code_uses(tenant_id);
+
+-- Referral codes for tenant referrals (must be before tenant_subscriptions)
 CREATE TABLE IF NOT EXISTS referral_codes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   code TEXT NOT NULL UNIQUE,
@@ -396,6 +394,44 @@ CREATE TABLE IF NOT EXISTS referral_uses (
 CREATE INDEX IF NOT EXISTS idx_referral_uses_code ON referral_uses(code_id);
 CREATE INDEX IF NOT EXISTS idx_referral_uses_referee ON referral_uses(referee_tenant_id);
 
+-- Tenant subscriptions
+CREATE TABLE IF NOT EXISTS tenant_subscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  plan_id INTEGER NOT NULL REFERENCES pricing_plans(id),
+  status TEXT DEFAULT 'active' CHECK(status IN ('active', 'cancelled', 'past_due', 'trialing')),
+  billing_cycle TEXT DEFAULT 'monthly' CHECK(billing_cycle IN ('monthly', 'yearly')),
+  current_period_start TIMESTAMP,
+  current_period_end TIMESTAMP,
+  stripe_customer_id TEXT,
+  stripe_subscription_id TEXT,
+  cancelled_at TIMESTAMP,
+  free_months_remaining INTEGER DEFAULT 0,
+  free_months_granted INTEGER DEFAULT 0,
+  free_months_source TEXT,
+  applied_promo_code_id INTEGER REFERENCES promo_codes(id) ON DELETE SET NULL,
+  applied_referral_code_id INTEGER REFERENCES referral_codes(id) ON DELETE SET NULL,
+  trial_ends_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_tenant_subscriptions_tenant ON tenant_subscriptions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_subscriptions_status ON tenant_subscriptions(status);
+
+-- Marketing campaigns (FOMO countdown, referral promotions, etc.)
+CREATE TABLE IF NOT EXISTS marketing_campaigns (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  type TEXT NOT NULL CHECK(type IN ('fomo_countdown', 'referral', 'reference_page', 'custom')),
+  name TEXT NOT NULL,
+  description TEXT,
+  config TEXT,
+  is_active INTEGER DEFAULT 0,
+  start_date TIMESTAMP,
+  end_date TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Reference page entries (shelters displayed publicly)
 CREATE TABLE IF NOT EXISTS reference_entries (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -412,6 +448,91 @@ CREATE TABLE IF NOT EXISTS reference_entries (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_reference_entries_approved ON reference_entries(is_approved, display_order);
+
+-- Tenant invoices for billing history
+CREATE TABLE IF NOT EXISTS tenant_invoices (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  subscription_id INTEGER REFERENCES tenant_subscriptions(id) ON DELETE SET NULL,
+  stripe_invoice_id TEXT UNIQUE,
+  invoice_number TEXT NOT NULL,
+  status TEXT DEFAULT 'paid' CHECK(status IN ('draft', 'open', 'paid', 'void', 'uncollectible')),
+  amount_cents INTEGER NOT NULL,
+  currency TEXT DEFAULT 'EUR',
+  period_start DATE,
+  period_end DATE,
+  pdf_path TEXT,
+  pdf_url TEXT,
+  description TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  paid_at TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_tenant_invoices_tenant ON tenant_invoices(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_invoices_stripe ON tenant_invoices(stripe_invoice_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_invoices_status ON tenant_invoices(status);
+
+-- Feature flags table for global feature management
+CREATE TABLE IF NOT EXISTS feature_flags (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  key TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  description TEXT,
+  is_global INTEGER DEFAULT 0,
+  is_enabled INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_feature_flags_key ON feature_flags(key);
+
+-- Tenant-specific feature flag overrides
+CREATE TABLE IF NOT EXISTS tenant_feature_flags (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  feature_flag_id INTEGER NOT NULL REFERENCES feature_flags(id) ON DELETE CASCADE,
+  is_enabled INTEGER DEFAULT 0,
+  enabled_at TIMESTAMP,
+  enabled_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  UNIQUE(tenant_id, feature_flag_id)
+);
+CREATE INDEX IF NOT EXISTS idx_tenant_feature_flags_tenant ON tenant_feature_flags(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_feature_flags_flag ON tenant_feature_flags(feature_flag_id);
+
+-- Consents table for GDPR compliance
+CREATE TABLE IF NOT EXISTS consents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0,
+  consent_type TEXT NOT NULL,
+  version TEXT NOT NULL,
+  ip_address TEXT,
+  user_agent TEXT,
+  accepted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_consents_user ON consents(user_id);
+CREATE INDEX IF NOT EXISTS idx_consents_tenant ON consents(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_consents_type ON consents(consent_type);
+CREATE INDEX IF NOT EXISTS idx_consents_user_tenant_type ON consents(user_id, tenant_id, consent_type);
+
+-- Audit logs table for security audit trail
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id INTEGER NOT NULL DEFAULT 0,
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  action TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  entity_id INTEGER,
+  old_value TEXT,
+  new_value TEXT,
+  ip_address TEXT,
+  user_agent TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant ON audit_logs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant_created ON audit_logs(tenant_id, created_at);
 
 -- Insert default pricing plans
 INSERT INTO pricing_plans (name, slug, max_dogs, price_monthly, price_yearly, is_active) VALUES
@@ -489,8 +610,8 @@ CREATE TABLE IF NOT EXISTS demo_tenant_state (
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   tenant_id INTEGER NOT NULL DEFAULT 0 REFERENCES tenants(id) ON DELETE CASCADE,
-  first_name VARCHAR(100),
-  last_name VARCHAR(100),
+  first_name VARCHAR(255),
+  last_name VARCHAR(255),
   email VARCHAR(255),
   phone VARCHAR(50),
   password_hash VARCHAR(255),
@@ -761,6 +882,64 @@ CREATE TABLE IF NOT EXISTS pricing_plans (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Promotional codes (separate from referral codes)
+CREATE TABLE IF NOT EXISTS promo_codes (
+  id SERIAL PRIMARY KEY,
+  code VARCHAR(50) NOT NULL UNIQUE,
+  description TEXT,
+  discount_type VARCHAR(20) NOT NULL CHECK(discount_type IN ('percentage', 'fixed', 'free_months')),
+  discount_value INTEGER NOT NULL,
+  max_uses INTEGER,
+  uses_count INTEGER DEFAULT 0,
+  valid_for_plans JSONB,
+  is_active BOOLEAN DEFAULT TRUE,
+  stripe_coupon_id VARCHAR(255),
+  expires_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_promo_codes_code ON promo_codes(code);
+CREATE INDEX IF NOT EXISTS idx_promo_codes_active ON promo_codes(is_active);
+
+-- Promo code usage tracking
+CREATE TABLE IF NOT EXISTS promo_code_uses (
+  id SERIAL PRIMARY KEY,
+  promo_code_id INTEGER NOT NULL REFERENCES promo_codes(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(promo_code_id, tenant_id)
+);
+CREATE INDEX IF NOT EXISTS idx_promo_code_uses_code ON promo_code_uses(promo_code_id);
+CREATE INDEX IF NOT EXISTS idx_promo_code_uses_tenant ON promo_code_uses(tenant_id);
+
+-- Referral codes for tenant referrals (must be before tenant_subscriptions)
+CREATE TABLE IF NOT EXISTS referral_codes (
+  id SERIAL PRIMARY KEY,
+  code VARCHAR(50) NOT NULL UNIQUE,
+  referrer_tenant_id INTEGER REFERENCES tenants(id) ON DELETE SET NULL,
+  referrer_email VARCHAR(255),
+  discount_months_referrer INTEGER DEFAULT 3,
+  discount_months_referee INTEGER DEFAULT 1,
+  uses_count INTEGER DEFAULT 0,
+  max_uses INTEGER,
+  is_active BOOLEAN DEFAULT TRUE,
+  expires_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_referral_codes_code ON referral_codes(code);
+CREATE INDEX IF NOT EXISTS idx_referral_codes_referrer ON referral_codes(referrer_tenant_id);
+
+-- Referral code usage tracking
+CREATE TABLE IF NOT EXISTS referral_uses (
+  id SERIAL PRIMARY KEY,
+  code_id INTEGER NOT NULL REFERENCES referral_codes(id) ON DELETE CASCADE,
+  referee_tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_referral_uses_code ON referral_uses(code_id);
+CREATE INDEX IF NOT EXISTS idx_referral_uses_referee ON referral_uses(referee_tenant_id);
+
 -- Tenant subscriptions
 CREATE TABLE IF NOT EXISTS tenant_subscriptions (
   id SERIAL PRIMARY KEY,
@@ -773,6 +952,12 @@ CREATE TABLE IF NOT EXISTS tenant_subscriptions (
   stripe_customer_id VARCHAR(255),
   stripe_subscription_id VARCHAR(255),
   cancelled_at TIMESTAMP,
+  free_months_remaining INTEGER DEFAULT 0,
+  free_months_granted INTEGER DEFAULT 0,
+  free_months_source VARCHAR(50),
+  applied_promo_code_id INTEGER REFERENCES promo_codes(id) ON DELETE SET NULL,
+  applied_referral_code_id INTEGER REFERENCES referral_codes(id) ON DELETE SET NULL,
+  trial_ends_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -793,34 +978,6 @@ CREATE TABLE IF NOT EXISTS marketing_campaigns (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Referral codes
-CREATE TABLE IF NOT EXISTS referral_codes (
-  id SERIAL PRIMARY KEY,
-  code VARCHAR(50) NOT NULL UNIQUE,
-  referrer_tenant_id INTEGER REFERENCES tenants(id) ON DELETE SET NULL,
-  referrer_email VARCHAR(255),
-  discount_months_referrer INTEGER DEFAULT 3,
-  discount_months_referee INTEGER DEFAULT 1,
-  uses_count INTEGER DEFAULT 0,
-  max_uses INTEGER,
-  is_active BOOLEAN DEFAULT TRUE,
-  expires_at TIMESTAMP,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_referral_codes_code ON referral_codes(code);
-CREATE INDEX IF NOT EXISTS idx_referral_codes_referrer ON referral_codes(referrer_tenant_id);
-
--- Referral uses
-CREATE TABLE IF NOT EXISTS referral_uses (
-  id SERIAL PRIMARY KEY,
-  code_id INTEGER NOT NULL REFERENCES referral_codes(id) ON DELETE CASCADE,
-  referee_tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_referral_uses_code ON referral_uses(code_id);
-CREATE INDEX IF NOT EXISTS idx_referral_uses_referee ON referral_uses(referee_tenant_id);
-
 -- Reference entries
 CREATE TABLE IF NOT EXISTS reference_entries (
   id SERIAL PRIMARY KEY,
@@ -837,6 +994,91 @@ CREATE TABLE IF NOT EXISTS reference_entries (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_reference_entries_approved ON reference_entries(is_approved, display_order);
+
+-- Tenant invoices for billing history
+CREATE TABLE IF NOT EXISTS tenant_invoices (
+  id SERIAL PRIMARY KEY,
+  tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  subscription_id INTEGER REFERENCES tenant_subscriptions(id) ON DELETE SET NULL,
+  stripe_invoice_id VARCHAR(255) UNIQUE,
+  invoice_number VARCHAR(100) NOT NULL,
+  status VARCHAR(20) DEFAULT 'paid' CHECK(status IN ('draft', 'open', 'paid', 'void', 'uncollectible')),
+  amount_cents INTEGER NOT NULL,
+  currency VARCHAR(3) DEFAULT 'EUR',
+  period_start DATE,
+  period_end DATE,
+  pdf_path VARCHAR(500),
+  pdf_url VARCHAR(500),
+  description TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  paid_at TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_tenant_invoices_tenant ON tenant_invoices(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_invoices_stripe ON tenant_invoices(stripe_invoice_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_invoices_status ON tenant_invoices(status);
+
+-- Feature flags table for global feature management
+CREATE TABLE IF NOT EXISTS feature_flags (
+  id SERIAL PRIMARY KEY,
+  key VARCHAR(100) NOT NULL UNIQUE,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  is_global BOOLEAN DEFAULT FALSE,
+  is_enabled BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_feature_flags_key ON feature_flags(key);
+
+-- Tenant-specific feature flag overrides
+CREATE TABLE IF NOT EXISTS tenant_feature_flags (
+  id SERIAL PRIMARY KEY,
+  tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  feature_flag_id INTEGER NOT NULL REFERENCES feature_flags(id) ON DELETE CASCADE,
+  is_enabled BOOLEAN DEFAULT FALSE,
+  enabled_at TIMESTAMP,
+  enabled_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  UNIQUE(tenant_id, feature_flag_id)
+);
+CREATE INDEX IF NOT EXISTS idx_tenant_feature_flags_tenant ON tenant_feature_flags(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_feature_flags_flag ON tenant_feature_flags(feature_flag_id);
+
+-- Consents table for GDPR compliance
+CREATE TABLE IF NOT EXISTS consents (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL DEFAULT 0,
+  consent_type VARCHAR(50) NOT NULL,
+  version VARCHAR(20) NOT NULL,
+  ip_address VARCHAR(45),
+  user_agent TEXT,
+  accepted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_consents_user ON consents(user_id);
+CREATE INDEX IF NOT EXISTS idx_consents_tenant ON consents(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_consents_type ON consents(consent_type);
+CREATE INDEX IF NOT EXISTS idx_consents_user_tenant_type ON consents(user_id, tenant_id, consent_type);
+
+-- Audit logs table for security audit trail
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id SERIAL PRIMARY KEY,
+  tenant_id INTEGER NOT NULL DEFAULT 0,
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  action VARCHAR(100) NOT NULL,
+  entity_type VARCHAR(50) NOT NULL,
+  entity_id INTEGER,
+  old_value JSONB,
+  new_value JSONB,
+  ip_address VARCHAR(45),
+  user_agent TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant ON audit_logs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant_created ON audit_logs(tenant_id, created_at);
 
 -- Insert default pricing plans
 INSERT INTO pricing_plans (name, slug, max_dogs, price_monthly, price_yearly, is_active) VALUES
