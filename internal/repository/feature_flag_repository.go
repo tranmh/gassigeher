@@ -29,7 +29,7 @@ func (r *FeatureFlagRepository) GetAll() ([]*models.FeatureFlag, error) {
 	}
 	defer rows.Close()
 
-	var flags []*models.FeatureFlag
+	flags := []*models.FeatureFlag{}
 	for rows.Next() {
 		f := &models.FeatureFlag{}
 		var description sql.NullString
@@ -149,7 +149,7 @@ func (r *FeatureFlagRepository) GetAllWithTenantStatus(tenantID int) ([]*models.
 	}
 	defer rows.Close()
 
-	var flags []*models.FeatureFlagWithStatus
+	flags := []*models.FeatureFlagWithStatus{}
 	for rows.Next() {
 		f := &models.FeatureFlagWithStatus{}
 		var description sql.NullString

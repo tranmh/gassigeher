@@ -234,6 +234,8 @@ var dataTables = []string{
 	"blocked_dates",
 	"experience_requests",
 	"reactivation_requests",
+	"consents",
+	"audit_logs",
 	"dogs",
 	"demo_tenant_state",
 	"tenant_subscriptions",
@@ -706,6 +708,12 @@ func Now() string {
 // NowTime returns the current time as a time.Time for SQL queries
 func NowTime() time.Time {
 	return time.Now()
+}
+
+// WaitForAsync waits for goroutines to complete
+// Used when testing code that uses goroutines (like audit logging)
+func WaitForAsync() {
+	time.Sleep(100 * time.Millisecond)
 }
 
 // InsertAndGetID executes an INSERT statement and returns the last inserted ID
