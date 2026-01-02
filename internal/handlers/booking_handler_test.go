@@ -294,7 +294,8 @@ func TestBookingHandler_CreateBooking(t *testing.T) {
 		dogID := testutil.SeedTestDog(t, db, "SettingDog", "Poodle", "green")
 
 		// Set INVALID setting value (non-numeric)
-		db.Exec("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)", "booking_advance_days", "invalid_value")
+		// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
+		db.Exec(`INSERT OR REPLACE INTO system_settings ("key", value) VALUES (?, ?)`, "booking_advance_days", "invalid_value")
 
 		futureDate := time.Now().AddDate(0, 0, 5).Format("2006-01-02")
 

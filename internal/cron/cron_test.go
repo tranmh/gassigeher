@@ -499,8 +499,9 @@ func TestCronService_AutoDeactivateUsersForTenant_RespectsTenantSettings(t *test
 		// Set tenant-specific setting to 30 days (shorter than default 365)
 		// Note: system_settings has columns (tenant_id, key, value, updated_at)
 		// Use INSERT OR REPLACE for SQLite compatibility
+		// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 		_, err := db.Exec(`
-			INSERT OR REPLACE INTO system_settings (tenant_id, key, value, updated_at)
+			INSERT OR REPLACE INTO system_settings (tenant_id, "key", value, updated_at)
 			VALUES (1, 'auto_deactivation_days', '30', ?)
 		`, time.Now())
 		if err != nil {
@@ -533,7 +534,7 @@ func TestCronService_AutoDeactivateUsersForTenant_RespectsTenantSettings(t *test
 
 	t.Run("uses default 365 days when setting not configured", func(t *testing.T) {
 		// Remove the setting
-		db.Exec("DELETE FROM system_settings WHERE tenant_id = 1 AND key = 'auto_deactivation_days'")
+		db.Exec(`DELETE FROM system_settings WHERE tenant_id = 1 AND "key" = 'auto_deactivation_days'`)
 
 		// Create user inactive for 100 days (should NOT be deactivated with default 365)
 		oldActivity := time.Now().AddDate(0, 0, -100)

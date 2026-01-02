@@ -20,10 +20,11 @@ func NewSettingsRepository(db DBExecutor) *SettingsRepository {
 
 // Get retrieves a setting by key within a tenant
 func (r *SettingsRepository) Get(tenantID int, key string) (*models.SystemSetting, error) {
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 	query := `
-		SELECT tenant_id, key, value, updated_at
+		SELECT tenant_id, "key", value, updated_at
 		FROM system_settings
-		WHERE key = ? AND tenant_id = ?
+		WHERE "key" = ? AND tenant_id = ?
 	`
 
 	setting := &models.SystemSetting{}
@@ -47,11 +48,12 @@ func (r *SettingsRepository) Get(tenantID int, key string) (*models.SystemSettin
 
 // GetAll retrieves all settings for a tenant
 func (r *SettingsRepository) GetAll(tenantID int) ([]*models.SystemSetting, error) {
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 	query := `
-		SELECT tenant_id, key, value, updated_at
+		SELECT tenant_id, "key", value, updated_at
 		FROM system_settings
 		WHERE tenant_id = ?
-		ORDER BY key ASC
+		ORDER BY "key" ASC
 	`
 
 	rows, err := r.db.Query(query, tenantID)
@@ -85,10 +87,11 @@ func (r *SettingsRepository) GetAll(tenantID int) ([]*models.SystemSetting, erro
 
 // Update updates a setting value within a tenant
 func (r *SettingsRepository) Update(tenantID int, key, value string) error {
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 	query := `
 		UPDATE system_settings
 		SET value = ?, updated_at = ?
-		WHERE key = ? AND tenant_id = ?
+		WHERE "key" = ? AND tenant_id = ?
 	`
 
 	result, err := r.db.Exec(query, value, time.Now(), key, tenantID)
@@ -110,8 +113,9 @@ func (r *SettingsRepository) Update(tenantID int, key, value string) error {
 
 // Create creates a new setting for a tenant
 func (r *SettingsRepository) Create(tenantID int, key, value string) error {
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 	query := `
-		INSERT INTO system_settings (tenant_id, key, value, updated_at)
+		INSERT INTO system_settings (tenant_id, "key", value, updated_at)
 		VALUES (?, ?, ?, ?)
 	`
 

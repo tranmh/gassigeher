@@ -72,6 +72,8 @@ func (r *UserRepository) CreateTx(tx *sql.Tx, user *models.User) error {
 	// PostgreSQL requires RETURNING clause instead of LastInsertId
 	if r.db.GetDialectName() == "postgres" {
 		query = query + " RETURNING id"
+		// Rebind query for PostgreSQL (? -> $1, $2, ...)
+		query = r.db.RebindQuery(query)
 		var id int64
 		err := tx.QueryRow(
 			query,

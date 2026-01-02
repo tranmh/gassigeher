@@ -127,8 +127,12 @@ func (r *UserColorRepository) SetUserColors(tenantID int, userID int, colorIDs [
 	}
 	defer tx.Rollback()
 
+	// Rebind queries for PostgreSQL (? -> $1, $2, ...)
+	deleteQuery := r.db.RebindQuery("DELETE FROM user_colors WHERE user_id = ? AND tenant_id = ?")
+	insertQuery := r.db.RebindQuery("INSERT INTO user_colors (tenant_id, user_id, color_id, granted_at, granted_by) VALUES (?, ?, ?, ?, ?)")
+
 	// Remove all existing colors for this user in this tenant
-	_, err = tx.Exec("DELETE FROM user_colors WHERE user_id = ? AND tenant_id = ?", userID, tenantID)
+	_, err = tx.Exec(deleteQuery, userID, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to remove existing colors: %w", err)
 	}
@@ -136,10 +140,7 @@ func (r *UserColorRepository) SetUserColors(tenantID int, userID int, colorIDs [
 	// Add new colors
 	now := time.Now()
 	for _, colorID := range colorIDs {
-		_, err = tx.Exec(
-			"INSERT INTO user_colors (tenant_id, user_id, color_id, granted_at, granted_by) VALUES (?, ?, ?, ?, ?)",
-			tenantID, userID, colorID, now, grantedBy,
-		)
+		_, err = tx.Exec(insertQuery, tenantID, userID, colorID, now, grantedBy)
 		if err != nil {
 			return fmt.Errorf("failed to add color %d: %w", colorID, err)
 		}

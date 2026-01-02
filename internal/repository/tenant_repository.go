@@ -62,6 +62,8 @@ func (r *TenantRepository) CreateTx(tx *sql.Tx, tenant *models.Tenant) (int, err
 	// PostgreSQL requires RETURNING clause instead of LastInsertId
 	if r.db.GetDialectName() == "postgres" {
 		query = query + " RETURNING id"
+		// Rebind query for PostgreSQL (? -> $1, $2, ...)
+		query = r.db.RebindQuery(query)
 		var id int64
 		err := tx.QueryRow(
 			query,
@@ -453,6 +455,9 @@ func (r *TenantRepository) CreateSettingsTx(tx *sql.Tx, settings *models.TenantS
 			website_url, donation_url
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
+
+	// Rebind query for PostgreSQL (? -> $1, $2, ...)
+	query = r.db.RebindQuery(query)
 
 	_, err := tx.Exec(
 		query,

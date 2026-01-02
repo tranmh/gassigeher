@@ -47,6 +47,8 @@ func (r *DogRepository) CreateTx(tx *sql.Tx, dog *models.Dog) error {
 	// PostgreSQL requires RETURNING clause instead of LastInsertId
 	if r.db.GetDialectName() == "postgres" {
 		query = query + " RETURNING id"
+		// Rebind query for PostgreSQL (? -> $1, $2, ...)
+		query = r.db.RebindQuery(query)
 		var id int64
 		err := tx.QueryRow(
 			query,
@@ -515,8 +517,10 @@ func (r *DogRepository) CreateWithLimitCheck(dog *models.Dog, limit int) error {
 	defer tx.Rollback() // Will be no-op after commit
 
 	// Count dogs within transaction
+	// Rebind query for PostgreSQL (? -> $1, $2, ...)
+	countQuery := r.db.RebindQuery(`SELECT COUNT(*) FROM dogs WHERE tenant_id = ?`)
 	var count int
-	err = tx.QueryRow(`SELECT COUNT(*) FROM dogs WHERE tenant_id = ?`, dog.TenantID).Scan(&count)
+	err = tx.QueryRow(countQuery, dog.TenantID).Scan(&count)
 	if err != nil {
 		return fmt.Errorf("failed to count dogs: %w", err)
 	}
@@ -540,6 +544,8 @@ func (r *DogRepository) CreateWithLimitCheck(dog *models.Dog, limit int) error {
 	// PostgreSQL requires RETURNING clause instead of LastInsertId
 	if r.db.GetDialectName() == "postgres" {
 		query = query + " RETURNING id"
+		// Rebind query for PostgreSQL (? -> $1, $2, ...)
+		query = r.db.RebindQuery(query)
 		err = tx.QueryRow(
 			query,
 			dog.TenantID,

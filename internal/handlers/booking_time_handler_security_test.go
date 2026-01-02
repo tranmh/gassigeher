@@ -46,7 +46,8 @@ func setupSecurityTest(t *testing.T) (*database.DB, *BookingTimeHandler, *Holida
 	db.Exec(`UPDATE color_categories SET tenant_id = 0 WHERE tenant_id IS NULL`)
 
 	// Insert system settings for tenant 1
-	_, err = db.Exec(`INSERT INTO system_settings (tenant_id, key, value, updated_at) VALUES
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
+	_, err = db.Exec(`INSERT INTO system_settings (tenant_id, "key", value, updated_at) VALUES
 		(1, 'booking_advance_days', '14', ?),
 		(1, 'cancellation_notice_hours', '12', ?),
 		(1, 'auto_deactivation_days', '365', ?),

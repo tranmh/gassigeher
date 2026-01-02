@@ -28,8 +28,9 @@ func TestAuthHandler_Register(t *testing.T) {
 	handler := NewAuthHandler(db, cfg)
 
 	// Set up a known registration password for testing
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 	const testRegPassword = "TEST1234"
-	db.Exec(`UPDATE system_settings SET value = ? WHERE key = 'registration_password' AND tenant_id = 0`, testRegPassword)
+	db.Exec(`UPDATE system_settings SET value = ? WHERE "key" = 'registration_password' AND tenant_id = 0`, testRegPassword)
 
 	t.Run("successful registration", func(t *testing.T) {
 		reqBody := map[string]interface{}{
@@ -265,8 +266,9 @@ func TestAuthHandler_Register_AssignsDefaultColor(t *testing.T) {
 	handler := NewAuthHandler(db, cfg)
 
 	// Set up a known registration password for testing
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 	const testRegPassword = "TEST1234"
-	db.Exec(`UPDATE system_settings SET value = ? WHERE key = 'registration_password' AND tenant_id = 0`, testRegPassword)
+	db.Exec(`UPDATE system_settings SET value = ? WHERE "key" = 'registration_password' AND tenant_id = 0`, testRegPassword)
 
 	// Color categories are already seeded by migration 024 with IDs 1-7:
 	// 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau, 6=helllila, 7=dunkellila
@@ -1251,8 +1253,9 @@ func TestAuthHandler_Security_NoUserEnumeration(t *testing.T) {
 	}
 
 	// Set up registration password
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 	const testRegPassword = "TEST1234"
-	db.Exec(`INSERT OR REPLACE INTO system_settings (tenant_id, key, value) VALUES (0, 'registration_password', ?)`, testRegPassword)
+	db.Exec(`INSERT OR REPLACE INTO system_settings (tenant_id, "key", value) VALUES (0, 'registration_password', ?)`, testRegPassword)
 
 	t.Run("registration with existing email returns success message not error", func(t *testing.T) {
 		reqBody := map[string]interface{}{

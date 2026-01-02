@@ -33,6 +33,10 @@ type DBExecutor interface {
 	// BoolValue returns the appropriate boolean representation for the database
 	// PostgreSQL: true/false, SQLite/MySQL: 1/0
 	BoolValue(b bool) interface{}
+
+	// RebindQuery converts ? placeholders to the database-specific format ($1, $2 for postgres)
+	// Use this when executing queries within raw *sql.Tx transactions
+	RebindQuery(query string) string
 }
 
 // DBRebinder interface for components that need to rebind queries

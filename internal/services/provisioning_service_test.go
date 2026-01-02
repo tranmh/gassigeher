@@ -144,11 +144,11 @@ func TestProvisioningService_CreateDefaultSettings(t *testing.T) {
 
 	// Verify settings were created
 	var bookingDays, cancellationHours, deactivationDays, feiertagState, useFeiertagAPI string
-	db.QueryRow("SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'booking_advance_days'", tenantID).Scan(&bookingDays)
-	db.QueryRow("SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'cancellation_notice_hours'", tenantID).Scan(&cancellationHours)
-	db.QueryRow("SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'auto_deactivation_days'", tenantID).Scan(&deactivationDays)
-	db.QueryRow("SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'feiertage_state'", tenantID).Scan(&feiertagState)
-	db.QueryRow("SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'use_feiertage_api'", tenantID).Scan(&useFeiertagAPI)
+	db.QueryRow(`SELECT value FROM system_settings WHERE tenant_id = ? AND "key" = 'booking_advance_days'`, tenantID).Scan(&bookingDays)
+	db.QueryRow(`SELECT value FROM system_settings WHERE tenant_id = ? AND "key" = 'cancellation_notice_hours'`, tenantID).Scan(&cancellationHours)
+	db.QueryRow(`SELECT value FROM system_settings WHERE tenant_id = ? AND "key" = 'auto_deactivation_days'`, tenantID).Scan(&deactivationDays)
+	db.QueryRow(`SELECT value FROM system_settings WHERE tenant_id = ? AND "key" = 'feiertage_state'`, tenantID).Scan(&feiertagState)
+	db.QueryRow(`SELECT value FROM system_settings WHERE tenant_id = ? AND "key" = 'use_feiertage_api'`, tenantID).Scan(&useFeiertagAPI)
 
 	if bookingDays != "14" {
 		t.Errorf("Expected booking_advance_days = '14', got '%s'", bookingDays)
@@ -219,7 +219,7 @@ func TestProvisioningService_ProvisionTenant(t *testing.T) {
 
 	// Verify feiertage_state was set correctly
 	var feiertagState string
-	db.QueryRow("SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'feiertage_state'", tenantID).Scan(&feiertagState)
+	db.QueryRow(`SELECT value FROM system_settings WHERE tenant_id = ? AND "key" = 'feiertage_state'`, tenantID).Scan(&feiertagState)
 	if feiertagState != "NW" {
 		t.Errorf("Expected feiertage_state = 'NW', got '%s'", feiertagState)
 	}
@@ -258,7 +258,7 @@ func TestProvisioningService_CreateDefaultSettings_IncludesRegistrationPassword(
 
 	// Verify registration_password was created
 	var registrationPassword string
-	err = db.QueryRow("SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'registration_password'", tenantID).Scan(&registrationPassword)
+	err = db.QueryRow(`SELECT value FROM system_settings WHERE tenant_id = ? AND "key" = 'registration_password'`, tenantID).Scan(&registrationPassword)
 	if err != nil {
 		t.Fatalf("registration_password setting not found: %v", err)
 	}
@@ -393,7 +393,7 @@ func TestProvisioningService_CreateDefaultSettings_FederalStateForHolidays(t *te
 			// Verify feiertage_state matches the tenant's federal state
 			var storedState string
 			err = db.QueryRow(
-				"SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'feiertage_state'",
+				`SELECT value FROM system_settings WHERE tenant_id = ? AND "key" = 'feiertage_state'`,
 				tenantID,
 			).Scan(&storedState)
 			if err != nil {
@@ -407,7 +407,7 @@ func TestProvisioningService_CreateDefaultSettings_FederalStateForHolidays(t *te
 			// Verify use_feiertage_api is enabled
 			var apiEnabled string
 			err = db.QueryRow(
-				"SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'use_feiertage_api'",
+				`SELECT value FROM system_settings WHERE tenant_id = ? AND "key" = 'use_feiertage_api'`,
 				tenantID,
 			).Scan(&apiEnabled)
 			if err != nil {
@@ -462,7 +462,7 @@ func TestProvisioningService_CreateDefaultSettings_EmptyFederalStateDefaultsToBW
 	// Verify it defaulted to BW
 	var storedState string
 	err = db.QueryRow(
-		"SELECT value FROM system_settings WHERE tenant_id = ? AND `key` = 'feiertage_state'",
+		`SELECT value FROM system_settings WHERE tenant_id = ? AND "key" = 'feiertage_state'`,
 		tenantID,
 	).Scan(&storedState)
 	if err != nil {

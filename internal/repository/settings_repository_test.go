@@ -12,7 +12,8 @@ func TestSettingsRepository_Get(t *testing.T) {
 	repo := NewSettingsRepository(db)
 
 	// Insert test setting
-	db.Exec(`INSERT INTO system_settings (tenant_id, key, value) VALUES (0, ?, ?)`, "test_setting", "test_value")
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
+	db.Exec(`INSERT INTO system_settings (tenant_id, "key", value) VALUES (0, ?, ?)`, "test_setting", "test_value")
 
 	t.Run("setting exists", func(t *testing.T) {
 		setting, err := repo.Get(0, "test_setting") // tenantID = 0
@@ -56,9 +57,10 @@ func TestSettingsRepository_GetAll(t *testing.T) {
 	repo := NewSettingsRepository(db)
 
 	// Insert test settings
-	db.Exec(`INSERT INTO system_settings (tenant_id, key, value) VALUES (0, ?, ?)`, "booking_advance_days", "14")
-	db.Exec(`INSERT INTO system_settings (tenant_id, key, value) VALUES (0, ?, ?)`, "cancellation_notice_hours", "12")
-	db.Exec(`INSERT INTO system_settings (tenant_id, key, value) VALUES (0, ?, ?)`, "auto_deactivation_days", "365")
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
+	db.Exec(`INSERT INTO system_settings (tenant_id, "key", value) VALUES (0, ?, ?)`, "booking_advance_days", "14")
+	db.Exec(`INSERT INTO system_settings (tenant_id, "key", value) VALUES (0, ?, ?)`, "cancellation_notice_hours", "12")
+	db.Exec(`INSERT INTO system_settings (tenant_id, "key", value) VALUES (0, ?, ?)`, "auto_deactivation_days", "365")
 
 	t.Run("get all settings", func(t *testing.T) {
 		settings, err := repo.GetAll(0) // tenantID = 0
@@ -115,7 +117,8 @@ func TestSettingsRepository_Update(t *testing.T) {
 	repo := NewSettingsRepository(db)
 
 	// Insert initial setting
-	db.Exec(`INSERT INTO system_settings (tenant_id, key, value) VALUES (0, ?, ?)`, "booking_advance_days", "14")
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
+	db.Exec(`INSERT INTO system_settings (tenant_id, "key", value) VALUES (0, ?, ?)`, "booking_advance_days", "14")
 
 	t.Run("update existing setting", func(t *testing.T) {
 		err := repo.Update(0, "booking_advance_days", "21") // tenantID = 0
@@ -140,7 +143,7 @@ func TestSettingsRepository_Update(t *testing.T) {
 
 	t.Run("update with empty value", func(t *testing.T) {
 		// First create the setting
-		db.Exec(`INSERT INTO system_settings (tenant_id, key, value) VALUES (0, ?, ?)`, "test_key", "initial")
+		db.Exec(`INSERT INTO system_settings (tenant_id, "key", value) VALUES (0, ?, ?)`, "test_key", "initial")
 
 		err := repo.Update(0, "test_key", "") // tenantID = 0
 		if err != nil {

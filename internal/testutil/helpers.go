@@ -135,7 +135,8 @@ func SetupTestDBWithType(t *testing.T, dbType string) *database.DB {
 	// No need to insert them here
 
 	// Insert system settings for tenant 0 (default)
-	_, _ = rawDB.Exec(`INSERT INTO system_settings (tenant_id, key, value, updated_at) VALUES
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
+	_, _ = rawDB.Exec(`INSERT INTO system_settings (tenant_id, "key", value, updated_at) VALUES
 		(0, 'booking_advance_days', '14', ?),
 		(0, 'cancellation_notice_hours', '12', ?),
 		(0, 'auto_deactivation_days', '365', ?),
@@ -364,7 +365,8 @@ func truncateAndResetData(t *testing.T, db *sql.DB, dialect database.Dialect) {
 	// No need to insert them here
 
 	// 4. Default system settings (all 13 settings expected by tests) - use tenant_id=0
-	_, _ = db.Exec(`INSERT INTO system_settings (tenant_id, `+"`key`"+`, value, updated_at) VALUES
+	// Note: "key" is a reserved word, use double quotes for SQLite/PostgreSQL compatibility
+	_, _ = db.Exec(`INSERT INTO system_settings (tenant_id, "key", value, updated_at) VALUES
 		(0, 'booking_advance_days', '14', ?),
 		(0, 'cancellation_notice_hours', '12', ?),
 		(0, 'auto_deactivation_days', '365', ?),

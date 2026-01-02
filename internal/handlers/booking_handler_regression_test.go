@@ -105,7 +105,8 @@ func setupRegressionTest(t *testing.T) (*database.DB, func()) {
 	}
 
 	// Update registration_password for test purposes
-	_, err = db.Exec(`UPDATE system_settings SET value = ? WHERE tenant_id = 0 AND key = 'registration_password'`, "TEST1234")
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
+	_, err = db.Exec(`UPDATE system_settings SET value = ? WHERE tenant_id = 0 AND "key" = 'registration_password'`, "TEST1234")
 	if err != nil {
 		t.Fatalf("Failed to update registration password: %v", err)
 	}

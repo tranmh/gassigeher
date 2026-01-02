@@ -19,8 +19,9 @@ func NewFeatureFlagRepository(db DBExecutor) *FeatureFlagRepository {
 
 // GetAll returns all feature flags
 func (r *FeatureFlagRepository) GetAll() ([]*models.FeatureFlag, error) {
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 	rows, err := r.db.Query(`
-		SELECT id, key, name, description, is_global, is_enabled, created_at, updated_at
+		SELECT id, "key", name, description, is_global, is_enabled, created_at, updated_at
 		FROM feature_flags
 		ORDER BY name ASC
 	`)
@@ -47,12 +48,13 @@ func (r *FeatureFlagRepository) GetAll() ([]*models.FeatureFlag, error) {
 
 // GetByKey returns a feature flag by its key
 func (r *FeatureFlagRepository) GetByKey(key string) (*models.FeatureFlag, error) {
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 	f := &models.FeatureFlag{}
 	var description sql.NullString
 	err := r.db.QueryRow(`
-		SELECT id, key, name, description, is_global, is_enabled, created_at, updated_at
+		SELECT id, "key", name, description, is_global, is_enabled, created_at, updated_at
 		FROM feature_flags
-		WHERE key = ?
+		WHERE "key" = ?
 	`, key).Scan(&f.ID, &f.Key, &f.Name, &description, &f.IsGlobal, &f.IsEnabled, &f.CreatedAt, &f.UpdatedAt)
 
 	if err == sql.ErrNoRows {
@@ -69,10 +71,11 @@ func (r *FeatureFlagRepository) GetByKey(key string) (*models.FeatureFlag, error
 
 // GetByID returns a feature flag by its ID
 func (r *FeatureFlagRepository) GetByID(id int) (*models.FeatureFlag, error) {
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 	f := &models.FeatureFlag{}
 	var description sql.NullString
 	err := r.db.QueryRow(`
-		SELECT id, key, name, description, is_global, is_enabled, created_at, updated_at
+		SELECT id, "key", name, description, is_global, is_enabled, created_at, updated_at
 		FROM feature_flags
 		WHERE id = ?
 	`, id).Scan(&f.ID, &f.Key, &f.Name, &description, &f.IsGlobal, &f.IsEnabled, &f.CreatedAt, &f.UpdatedAt)
@@ -91,9 +94,10 @@ func (r *FeatureFlagRepository) GetByID(id int) (*models.FeatureFlag, error) {
 
 // Create creates a new feature flag
 func (r *FeatureFlagRepository) Create(f *models.FeatureFlag) error {
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 	now := time.Now()
 	query := `
-		INSERT INTO feature_flags (key, name, description, is_global, is_enabled, created_at, updated_at)
+		INSERT INTO feature_flags ("key", name, description, is_global, is_enabled, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
 	id, err := r.db.InsertReturningID(query, f.Key, f.Name, f.Description, r.db.BoolValue(f.IsGlobal), r.db.BoolValue(f.IsEnabled), now, now)
@@ -136,9 +140,10 @@ func (r *FeatureFlagRepository) Delete(id int) error {
 
 // GetAllWithTenantStatus returns all flags with their status for a specific tenant
 func (r *FeatureFlagRepository) GetAllWithTenantStatus(tenantID int) ([]*models.FeatureFlagWithStatus, error) {
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 	rows, err := r.db.Query(`
 		SELECT
-			f.id, f.key, f.name, f.description, f.is_global, f.is_enabled, f.created_at, f.updated_at,
+			f.id, f."key", f.name, f.description, f.is_global, f.is_enabled, f.created_at, f.updated_at,
 			tf.is_enabled, tf.enabled_at
 		FROM feature_flags f
 		LEFT JOIN tenant_feature_flags tf ON f.id = tf.feature_flag_id AND tf.tenant_id = ?
@@ -186,6 +191,7 @@ func (r *FeatureFlagRepository) GetAllWithTenantStatus(tenantID int) ([]*models.
 
 // IsEnabled checks if a feature is enabled for a tenant
 func (r *FeatureFlagRepository) IsEnabled(key string, tenantID int) (bool, error) {
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 	var isGlobal, globalEnabled bool
 	var tenantEnabled sql.NullBool
 
@@ -193,7 +199,7 @@ func (r *FeatureFlagRepository) IsEnabled(key string, tenantID int) (bool, error
 		SELECT f.is_global, f.is_enabled, tf.is_enabled
 		FROM feature_flags f
 		LEFT JOIN tenant_feature_flags tf ON f.id = tf.feature_flag_id AND tf.tenant_id = ?
-		WHERE f.key = ?
+		WHERE f."key" = ?
 	`, tenantID, key).Scan(&isGlobal, &globalEnabled, &tenantEnabled)
 
 	if err == sql.ErrNoRows {

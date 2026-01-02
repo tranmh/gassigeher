@@ -113,14 +113,46 @@ func (db *DB) PrepareContext(ctx context.Context, query string) (*sql.Stmt, erro
 	return db.DB.PrepareContext(ctx, db.DB.Rebind(query))
 }
 
-// Begin starts a transaction
+// Tx wraps sql.Tx to provide automatic placeholder rebinding for PostgreSQL
+type Tx struct {
+	*sql.Tx
+	db *DB
+}
+
+// Exec executes a query with automatic placeholder rebinding
+func (tx *Tx) Exec(query string, args ...interface{}) (sql.Result, error) {
+	return tx.Tx.Exec(tx.db.DB.Rebind(query), args...)
+}
+
+// Query executes a query that returns rows with automatic placeholder rebinding
+func (tx *Tx) Query(query string, args ...interface{}) (*sql.Rows, error) {
+	return tx.Tx.Query(tx.db.DB.Rebind(query), args...)
+}
+
+// QueryRow executes a query that returns at most one row with automatic placeholder rebinding
+func (tx *Tx) QueryRow(query string, args ...interface{}) *sql.Row {
+	return tx.Tx.QueryRow(tx.db.DB.Rebind(query), args...)
+}
+
+// Begin starts a transaction and returns *sql.Tx for DBExecutor interface compatibility
+// Use BeginRebinding() if you want a wrapped Tx with automatic rebinding support
 func (db *DB) Begin() (*sql.Tx, error) {
 	return db.DB.Begin()
 }
 
-// BeginTx starts a transaction with options
+// BeginTx starts a transaction with options and returns *sql.Tx for DBExecutor interface compatibility
 func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
 	return db.DB.BeginTx(ctx, opts)
+}
+
+// BeginRebinding starts a transaction and returns a wrapped Tx with automatic rebinding support
+// Use this when you want queries to be automatically rebound for PostgreSQL compatibility
+func (db *DB) BeginRebinding() (*Tx, error) {
+	tx, err := db.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	return &Tx{Tx: tx, db: db}, nil
 }
 
 // RebindQuery returns the rebound query for use in transactions
@@ -524,8 +556,11 @@ CREATE TABLE IF NOT EXISTS reactivation_requests (
 CREATE INDEX IF NOT EXISTS idx_reactivation_pending ON reactivation_requests(status, created_at);
 `
 
+// Note: This is legacy code - default settings are now created by ProvisioningService
+// "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
+// INSERT OR IGNORE is SQLite-specific; PostgreSQL uses ON CONFLICT DO NOTHING
 const insertDefaultSettings = `
-INSERT OR IGNORE INTO system_settings (key, value) VALUES
+INSERT OR IGNORE INTO system_settings ("key", value) VALUES
   ('booking_advance_days', '14'),
   ('cancellation_notice_hours', '12'),
   ('auto_deactivation_days', '365');

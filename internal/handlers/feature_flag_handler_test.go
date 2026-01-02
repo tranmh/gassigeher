@@ -36,8 +36,9 @@ func TestFeatureFlagHandler_ListFlags(t *testing.T) {
 
 	t.Run("returns flags after creation", func(t *testing.T) {
 		// Insert a test flag
+		// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 		now := testutil.Now()
-		db.Exec("INSERT INTO feature_flags (key, name, is_global, is_enabled, created_at, updated_at) VALUES ('test_flag', 'Test Flag', 1, 1, ?, ?)", now, now)
+		db.Exec(`INSERT INTO feature_flags ("key", name, is_global, is_enabled, created_at, updated_at) VALUES ('test_flag', 'Test Flag', 1, 1, ?, ?)`, now, now)
 
 		req := httptest.NewRequest("GET", "/api/v1/central-admin/feature-flags", nil)
 
@@ -121,8 +122,9 @@ func TestFeatureFlagHandler_GetFlag(t *testing.T) {
 	handler := NewFeatureFlagHandler(db)
 
 	// Insert a test flag
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 	now := testutil.Now()
-	result, _ := db.Exec("INSERT INTO feature_flags (key, name, is_global, is_enabled, created_at, updated_at) VALUES ('get_test', 'Get Test', 1, 1, ?, ?)", now, now)
+	result, _ := db.Exec(`INSERT INTO feature_flags ("key", name, is_global, is_enabled, created_at, updated_at) VALUES ('get_test', 'Get Test', 1, 1, ?, ?)`, now, now)
 	flagID, _ := result.LastInsertId()
 
 	t.Run("returns flag by ID", func(t *testing.T) {
@@ -171,9 +173,10 @@ func TestFeatureFlagHandler_CheckFlag(t *testing.T) {
 	handler := NewFeatureFlagHandler(db)
 
 	// Insert a test flag
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 	now := testutil.Now()
-	db.Exec("INSERT INTO feature_flags (key, name, is_global, is_enabled, created_at, updated_at) VALUES ('enabled_feature', 'Enabled', 1, 1, ?, ?)", now, now)
-	db.Exec("INSERT INTO feature_flags (key, name, is_global, is_enabled, created_at, updated_at) VALUES ('disabled_feature', 'Disabled', 1, 0, ?, ?)", now, now)
+	db.Exec(`INSERT INTO feature_flags ("key", name, is_global, is_enabled, created_at, updated_at) VALUES ('enabled_feature', 'Enabled', 1, 1, ?, ?)`, now, now)
+	db.Exec(`INSERT INTO feature_flags ("key", name, is_global, is_enabled, created_at, updated_at) VALUES ('disabled_feature', 'Disabled', 1, 0, ?, ?)`, now, now)
 
 	t.Run("returns enabled for enabled flag", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/v1/feature-flags/enabled_feature/check", nil)
@@ -239,9 +242,10 @@ func TestFeatureFlagHandler_CheckMultipleFlags(t *testing.T) {
 	handler := NewFeatureFlagHandler(db)
 
 	// Insert test flags
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 	now := testutil.Now()
-	db.Exec("INSERT INTO feature_flags (key, name, is_global, is_enabled, created_at, updated_at) VALUES ('multi_enabled', 'Multi Enabled', 1, 1, ?, ?)", now, now)
-	db.Exec("INSERT INTO feature_flags (key, name, is_global, is_enabled, created_at, updated_at) VALUES ('multi_disabled', 'Multi Disabled', 1, 0, ?, ?)", now, now)
+	db.Exec(`INSERT INTO feature_flags ("key", name, is_global, is_enabled, created_at, updated_at) VALUES ('multi_enabled', 'Multi Enabled', 1, 1, ?, ?)`, now, now)
+	db.Exec(`INSERT INTO feature_flags ("key", name, is_global, is_enabled, created_at, updated_at) VALUES ('multi_disabled', 'Multi Disabled', 1, 0, ?, ?)`, now, now)
 
 	t.Run("returns status for multiple flags", func(t *testing.T) {
 		reqBody := map[string]interface{}{

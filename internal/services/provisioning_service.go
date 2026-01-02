@@ -32,9 +32,12 @@ func (s *ProvisioningService) CreateDefaultColors(tx *sql.Tx, tenantID int) erro
 		{"Blau", "#3b82f6", 5},
 	}
 
+	// Rebind query for PostgreSQL (? -> $1, $2, ...)
+	query := s.db.RebindQuery(`INSERT INTO color_categories (tenant_id, name, hex_code, sort_order) VALUES (?, ?, ?, ?)`)
+
 	for _, c := range colors {
 		_, err := tx.Exec(
-			`INSERT INTO color_categories (tenant_id, name, hex_code, sort_order) VALUES (?, ?, ?, ?)`,
+			query,
 			tenantID, c.Name, c.HexCode, c.SortOrder,
 		)
 		if err != nil {
@@ -62,10 +65,13 @@ func (s *ProvisioningService) CreateDefaultBookingRules(tx *sql.Tx, tenantID int
 		{"holiday", "afternoon", "14:00", "16:00", false},
 	}
 
+	// Rebind query for PostgreSQL (? -> $1, $2, ...)
+	query := s.db.RebindQuery(`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked) VALUES (?, ?, ?, ?, ?, ?)`)
+
 	for _, r := range rules {
 		_, err := tx.Exec(
-			`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked) VALUES (?, ?, ?, ?, ?, ?)`,
-			tenantID, r.DayType, r.RuleName, r.StartTime, r.EndTime, r.IsBlocked,
+			query,
+			tenantID, r.DayType, r.RuleName, r.StartTime, r.EndTime, s.db.BoolValue(r.IsBlocked),
 		)
 		if err != nil {
 			return err
@@ -129,23 +135,22 @@ func (s *ProvisioningService) CreateDefaultSettings(tx *sql.Tx, tenantID int, fe
 		"use_feiertage_api":         "true",       // Enable holiday API by default
 	}
 
+	// Rebind queries for PostgreSQL (? -> $1, $2, ...)
+	// Note: "key" is a reserved word, use double quotes for SQLite/PostgreSQL compatibility
+	updateQuery := s.db.RebindQuery(`UPDATE system_settings SET value = ? WHERE tenant_id = ? AND "key" = ?`)
+	insertQuery := s.db.RebindQuery(`INSERT INTO system_settings (tenant_id, "key", value) VALUES (?, ?, ?)`)
+
 	for key, value := range settings {
 		// Use UPDATE-then-INSERT pattern for cross-database compatibility
 		// (INSERT OR REPLACE is SQLite-specific, ON CONFLICT is PostgreSQL-specific)
-		result, err := tx.Exec(
-			"UPDATE system_settings SET value = ? WHERE tenant_id = ? AND `key` = ?",
-			value, tenantID, key,
-		)
+		result, err := tx.Exec(updateQuery, value, tenantID, key)
 		if err != nil {
 			return err
 		}
 		rowsAffected, _ := result.RowsAffected()
 		if rowsAffected == 0 {
 			// Row doesn't exist, insert it
-			_, err = tx.Exec(
-				"INSERT INTO system_settings (tenant_id, `key`, value) VALUES (?, ?, ?)",
-				tenantID, key, value,
-			)
+			_, err = tx.Exec(insertQuery, tenantID, key, value)
 			if err != nil {
 				return err
 			}
@@ -156,10 +161,9 @@ func (s *ProvisioningService) CreateDefaultSettings(tx *sql.Tx, tenantID int, fe
 
 // CreateDefaultSubscription creates a Free plan subscription for a new tenant
 func (s *ProvisioningService) CreateDefaultSubscription(tx *sql.Tx, tenantID int) error {
-	_, err := tx.Exec(
-		`INSERT INTO tenant_subscriptions (tenant_id, plan_id, status, created_at, updated_at) VALUES (?, 1, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-		tenantID,
-	)
+	// Rebind query for PostgreSQL (? -> $1, $2, ...)
+	query := s.db.RebindQuery(`INSERT INTO tenant_subscriptions (tenant_id, plan_id, status, created_at, updated_at) VALUES (?, 1, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
+	_, err := tx.Exec(query, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to create subscription: %w", err)
 	}

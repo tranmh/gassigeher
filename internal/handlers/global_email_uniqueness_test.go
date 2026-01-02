@@ -40,9 +40,10 @@ func TestAuthHandler_Register_RejectsDuplicateEmailAcrossTenants(t *testing.T) {
 	handler := NewAuthHandler(db, cfg)
 
 	// Set up registration password for both tenants
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 	const testRegPassword = "TEST1234"
-	db.Exec(`INSERT OR REPLACE INTO system_settings (tenant_id, key, value) VALUES (0, 'registration_password', ?)`, testRegPassword)
-	db.Exec(`INSERT OR REPLACE INTO system_settings (tenant_id, key, value) VALUES (1, 'registration_password', ?)`, testRegPassword)
+	db.Exec(`INSERT OR REPLACE INTO system_settings (tenant_id, "key", value) VALUES (0, 'registration_password', ?)`, testRegPassword)
+	db.Exec(`INSERT OR REPLACE INTO system_settings (tenant_id, "key", value) VALUES (1, 'registration_password', ?)`, testRegPassword)
 
 	// First registration in tenant 0 - should succeed
 	reqBody1 := map[string]interface{}{
@@ -135,9 +136,10 @@ func TestAuthHandler_Register_DifferentEmailsDifferentTenants(t *testing.T) {
 	handler := NewAuthHandler(db, cfg)
 
 	// Set up registration password for both tenants
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 	const testRegPassword = "TEST1234"
-	db.Exec(`INSERT OR REPLACE INTO system_settings (tenant_id, key, value) VALUES (0, 'registration_password', ?)`, testRegPassword)
-	db.Exec(`INSERT OR REPLACE INTO system_settings (tenant_id, key, value) VALUES (1, 'registration_password', ?)`, testRegPassword)
+	db.Exec(`INSERT OR REPLACE INTO system_settings (tenant_id, "key", value) VALUES (0, 'registration_password', ?)`, testRegPassword)
+	db.Exec(`INSERT OR REPLACE INTO system_settings (tenant_id, "key", value) VALUES (1, 'registration_password', ?)`, testRegPassword)
 
 	// First registration in tenant 0
 	reqBody1 := map[string]interface{}{
@@ -204,9 +206,10 @@ func TestAuthHandler_Register_EmailExistsInDifferentTenant_SecurityResponse(t *t
 	handler := NewAuthHandler(db, cfg)
 
 	// Set up registration password
+	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
 	const testRegPassword = "TEST1234"
-	db.Exec(`INSERT OR REPLACE INTO system_settings (tenant_id, key, value) VALUES (0, 'registration_password', ?)`, testRegPassword)
-	db.Exec(`INSERT OR REPLACE INTO system_settings (tenant_id, key, value) VALUES (1, 'registration_password', ?)`, testRegPassword)
+	db.Exec(`INSERT OR REPLACE INTO system_settings (tenant_id, "key", value) VALUES (0, 'registration_password', ?)`, testRegPassword)
+	db.Exec(`INSERT OR REPLACE INTO system_settings (tenant_id, "key", value) VALUES (1, 'registration_password', ?)`, testRegPassword)
 
 	// First registration in tenant 0
 	email := "security-test@crosstenanttest.com"
