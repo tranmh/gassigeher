@@ -741,6 +741,95 @@ func TestCentralAdminHandler_SearchUsers(t *testing.T) {
 	})
 }
 
+// TestCentralAdminHandler_ImpersonateTenantUser_SuperAdmin tests that Central Admin CAN impersonate Super Admins
+// This is important because Central Admin needs to test the Super Admin experience of tenants
+func TestCentralAdminHandler_ImpersonateTenantUser_SuperAdmin(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewCentralAdminHandler(db, cfg)
+
+	// Create tenant
+	result, err := db.Exec(`INSERT INTO tenants (slug, name, contact_email, status, created_at) VALUES ('impersonate-tenant', 'Impersonate Test', 'test@tenant.com', 'active', ?)`, time.Now())
+	if err != nil {
+		t.Fatalf("Failed to create tenant: %v", err)
+	}
+	tenantID, _ := result.LastInsertId()
+
+	// Create central admin (no tenant)
+	centralAdminID := testutil.SeedTestUser(t, db, "central@admin.com", "Central Admin", "green")
+	db.Exec("UPDATE users SET is_central_admin = 1, tenant_id = 0 WHERE id = ?", centralAdminID)
+
+	// Create Super Admin in the tenant
+	superAdminID := testutil.SeedTestUser(t, db, "super@tenant.com", "Super Admin", "green")
+	db.Exec("UPDATE users SET is_admin = 1, is_super_admin = 1, is_central_admin = 0, tenant_id = ? WHERE id = ?", tenantID, superAdminID)
+
+	// Create another Central Admin (should NOT be impersonatable)
+	otherCentralAdminID := testutil.SeedTestUser(t, db, "other-central@admin.com", "Other Central", "green")
+	db.Exec("UPDATE users SET is_central_admin = 1, tenant_id = 0 WHERE id = ?", otherCentralAdminID)
+
+	// Create regular user in tenant
+	regularUserID := testutil.SeedTestUser(t, db, "user@tenant.com", "Regular User", "green")
+	db.Exec("UPDATE users SET tenant_id = ? WHERE id = ?", tenantID, regularUserID)
+
+	t.Run("Central Admin CAN impersonate Super Admin of a tenant", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/api/central-admin/impersonate/"+strconv.Itoa(superAdminID), nil)
+		req = mux.SetURLVars(req, map[string]string{"userId": strconv.Itoa(superAdminID)})
+		ctx := contextWithCentralAdmin(req.Context(), centralAdminID, "central@admin.com")
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ImpersonateTenantUser(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Central Admin SHOULD be able to impersonate Super Admin: got %d - %s", rec.Code, rec.Body.String())
+		}
+
+		// Verify response contains token and user info
+		var response map[string]interface{}
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
+
+		if response["token"] == nil {
+			t.Error("Expected token in response")
+		}
+		if response["user"] == nil {
+			t.Error("Expected user in response")
+		}
+	})
+
+	t.Run("Central Admin CANNOT impersonate other Central Admins", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/api/central-admin/impersonate/"+strconv.Itoa(otherCentralAdminID), nil)
+		req = mux.SetURLVars(req, map[string]string{"userId": strconv.Itoa(otherCentralAdminID)})
+		ctx := contextWithCentralAdmin(req.Context(), centralAdminID, "central@admin.com")
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ImpersonateTenantUser(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("Central Admin should NOT be able to impersonate other Central Admins: got %d", rec.Code)
+		}
+	})
+
+	t.Run("Central Admin CAN impersonate regular users", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/api/central-admin/impersonate/"+strconv.Itoa(regularUserID), nil)
+		req = mux.SetURLVars(req, map[string]string{"userId": strconv.Itoa(regularUserID)})
+		ctx := contextWithCentralAdmin(req.Context(), centralAdminID, "central@admin.com")
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ImpersonateTenantUser(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Central Admin SHOULD be able to impersonate regular users: got %d - %s", rec.Code, rec.Body.String())
+		}
+	})
+}
+
 // TestCentralAdminHandler_ExportTenantData tests GDPR-compliant data export
 func TestCentralAdminHandler_ExportTenantData(t *testing.T) {
 	db := testutil.SetupTestDB(t)

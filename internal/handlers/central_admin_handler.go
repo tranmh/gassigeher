@@ -877,9 +877,9 @@ func (h *CentralAdminHandler) ImpersonateTenantUser(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// Cannot impersonate central admins or super admins
-	if targetUser.IsCentralAdmin || targetUser.IsSuperAdmin {
-		respondError(w, http.StatusForbidden, "Central Admin und Super Admin können nicht imitiert werden")
+	// Cannot impersonate central admins (but CAN impersonate super admins to test tenant admin experience)
+	if targetUser.IsCentralAdmin {
+		respondError(w, http.StatusForbidden, "Central Admin können nicht imitiert werden")
 		return
 	}
 

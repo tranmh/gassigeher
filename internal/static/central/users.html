@@ -167,10 +167,10 @@
                                     <td><span class="badge badge-${u.is_active ? 'success' : 'warning'}">${u.is_active ? 'Aktiv' : 'Inaktiv'}</span></td>
                                     <td>${formatDate(u.created_at)}</td>
                                     <td>
-                                        ${!u.is_super_admin && !u.is_central_admin && u.is_active ?
+                                        ${!u.is_central_admin && u.is_active ?
                                             `<button class="btn btn-sm btn-primary" onclick="impersonateUser(${u.id}, '${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)}', '${escapeHtml(u.tenant_name || '')}')">Imitieren</button>` : ''
                                         }
-                                        ${!u.is_central_admin && !u.is_super_admin ?
+                                        ${!u.is_central_admin ?
                                             `<button class="btn btn-sm btn-secondary" onclick="promoteToAdmin(${u.id}, '${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)}')">Zum Central Admin</button>` :
                                             '<span class="text-muted">Bereits Central Admin</span>'
                                         }

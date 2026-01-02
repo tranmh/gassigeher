@@ -575,6 +575,193 @@ describe('Utility Functions', () => {
   });
 });
 
+/**
+ * Helper function to determine if a user should show "Bereits Central Admin"
+ * This replicates the logic from central/users.html for testing
+ *
+ * BUG: The original logic was:
+ *   !u.is_central_admin && !u.is_super_admin ? "Zum Central Admin" : "Bereits Central Admin"
+ *
+ * This incorrectly treats is_super_admin as equivalent to Central Admin.
+ * A Super Admin is the top admin within a TENANT, not a platform-wide Central Admin.
+ *
+ * CORRECT: Only is_central_admin should determine Central Admin status
+ */
+function shouldShowAlreadyCentralAdmin(user) {
+  // BUG FIX: Only check is_central_admin, NOT is_super_admin
+  // is_super_admin means tenant-level admin, NOT platform Central Admin
+  return user.is_central_admin;
+}
+
+/**
+ * Original buggy logic (for comparison in tests)
+ */
+function shouldShowAlreadyCentralAdmin_BUGGY(user) {
+  // BUG: This incorrectly treats is_super_admin as Central Admin
+  return user.is_central_admin || user.is_super_admin;
+}
+
+/**
+ * Helper function to determine if user can be impersonated
+ *
+ * BUG FIX: The original logic was:
+ *   !u.is_super_admin && !u.is_central_admin && u.is_active
+ *
+ * This incorrectly blocked impersonating Super Admins.
+ * Central Admin should be able to impersonate Super Admins to test tenant admin experience.
+ *
+ * CORRECT: Only Central Admins cannot be impersonated
+ */
+function canImpersonateUser(user) {
+  // Only Central Admins cannot be impersonated
+  // Super Admins CAN be impersonated so Central Admin can test tenant admin experience
+  return !user.is_central_admin && user.is_active;
+}
+
+/**
+ * Original buggy impersonation logic (for comparison)
+ */
+function canImpersonateUser_BUGGY(user) {
+  // BUG: This incorrectly blocks impersonating Super Admins
+  return !user.is_super_admin && !user.is_central_admin && user.is_active;
+}
+
+describe('Central Admin User List UI Logic - SECURITY BUG FIX', () => {
+  describe('shouldShowAlreadyCentralAdmin', () => {
+    test('should return true ONLY for users with is_central_admin=true', () => {
+      const centralAdmin = {
+        id: 1,
+        is_admin: true,
+        is_super_admin: true,
+        is_central_admin: true,
+      };
+
+      expect(shouldShowAlreadyCentralAdmin(centralAdmin)).toBe(true);
+    });
+
+    test('should return false for Super Admin who is NOT Central Admin', () => {
+      // This is the key security test case!
+      // A tenant Super Admin should NOT be treated as Central Admin
+      const tenantSuperAdmin = {
+        id: 2,
+        is_admin: true,
+        is_super_admin: true,      // Super Admin of their tenant
+        is_central_admin: false,   // NOT a Central Admin of the platform
+      };
+
+      expect(shouldShowAlreadyCentralAdmin(tenantSuperAdmin)).toBe(false);
+    });
+
+    test('should return false for regular admin', () => {
+      const regularAdmin = {
+        id: 3,
+        is_admin: true,
+        is_super_admin: false,
+        is_central_admin: false,
+      };
+
+      expect(shouldShowAlreadyCentralAdmin(regularAdmin)).toBe(false);
+    });
+
+    test('should return false for regular user', () => {
+      const regularUser = {
+        id: 4,
+        is_admin: false,
+        is_super_admin: false,
+        is_central_admin: false,
+      };
+
+      expect(shouldShowAlreadyCentralAdmin(regularUser)).toBe(false);
+    });
+  });
+
+  describe('Verify buggy behavior (to document the bug)', () => {
+    test('BUGGY: incorrectly treats Super Admin as Central Admin', () => {
+      const tenantSuperAdmin = {
+        id: 2,
+        is_admin: true,
+        is_super_admin: true,      // Super Admin of their tenant
+        is_central_admin: false,   // NOT a Central Admin
+      };
+
+      // The buggy logic would incorrectly return true
+      expect(shouldShowAlreadyCentralAdmin_BUGGY(tenantSuperAdmin)).toBe(true);
+
+      // But the correct logic returns false
+      expect(shouldShowAlreadyCentralAdmin(tenantSuperAdmin)).toBe(false);
+    });
+  });
+
+  describe('canImpersonateUser (Impersonate button visibility)', () => {
+    test('should allow impersonating Super Admin of a tenant', () => {
+      const tenantSuperAdmin = {
+        id: 2,
+        is_admin: true,
+        is_super_admin: true,      // Super Admin of their tenant
+        is_central_admin: false,   // NOT a Central Admin
+        is_active: true,
+      };
+
+      // Super Admins CAN be impersonated to test tenant admin experience
+      expect(canImpersonateUser(tenantSuperAdmin)).toBe(true);
+    });
+
+    test('should NOT allow impersonating Central Admin', () => {
+      const centralAdmin = {
+        id: 1,
+        is_admin: true,
+        is_super_admin: true,
+        is_central_admin: true,    // Central Admin
+        is_active: true,
+      };
+
+      expect(canImpersonateUser(centralAdmin)).toBe(false);
+    });
+
+    test('should allow impersonating regular users', () => {
+      const regularUser = {
+        id: 4,
+        is_admin: false,
+        is_super_admin: false,
+        is_central_admin: false,
+        is_active: true,
+      };
+
+      expect(canImpersonateUser(regularUser)).toBe(true);
+    });
+
+    test('should NOT allow impersonating inactive users', () => {
+      const inactiveUser = {
+        id: 5,
+        is_admin: false,
+        is_super_admin: false,
+        is_central_admin: false,
+        is_active: false,
+      };
+
+      expect(canImpersonateUser(inactiveUser)).toBe(false);
+    });
+  });
+
+  describe('Verify buggy impersonation behavior (to document the bug)', () => {
+    test('BUGGY: incorrectly blocks impersonating Super Admin', () => {
+      const tenantSuperAdmin = {
+        id: 2,
+        is_admin: true,
+        is_super_admin: true,
+        is_central_admin: false,
+        is_active: true,
+      };
+
+      // The buggy logic would incorrectly return false (blocking impersonation)
+      expect(canImpersonateUser_BUGGY(tenantSuperAdmin)).toBe(false);
+
+      // But the correct logic returns true (allowing impersonation)
+      expect(canImpersonateUser(tenantSuperAdmin)).toBe(true);
+    });
+  });
+});
+
 describe('Global Function Availability', () => {
   test('getToken should be defined', () => {
     expect(typeof getToken).toBe('function');
