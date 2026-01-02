@@ -164,17 +164,19 @@ func (s *DemoSeedService) SeedDemoData(tenantID int, adminPassword string) error
 
 // seedDemoColors creates the default color categories for the demo tenant
 // This function is idempotent - it skips colors that already exist
+// Each color includes a unique pattern_icon for color-blind accessibility
 func (s *DemoSeedService) seedDemoColors(tenantID int) error {
 	colors := []struct {
-		Name      string
-		HexCode   string
-		SortOrder int
+		Name        string
+		HexCode     string
+		PatternIcon string
+		SortOrder   int
 	}{
-		{"Gruen", "#22c55e", 1},
-		{"Gelb", "#eab308", 2},
-		{"Orange", "#f97316", 3},
-		{"Hellblau", "#38bdf8", 4},
-		{"Dunkelblau", "#3b82f6", 5},
+		{"Gruen", "#22c55e", "circle", 1},
+		{"Gelb", "#eab308", "star", 2},
+		{"Orange", "#f97316", "triangle", 3},
+		{"Hellblau", "#38bdf8", "hexagon", 4},
+		{"Dunkelblau", "#3b82f6", "diamond", 5},
 	}
 
 	createdCount := 0
@@ -189,11 +191,13 @@ func (s *DemoSeedService) seedDemoColors(tenantID int) error {
 			continue
 		}
 
+		patternIcon := c.PatternIcon
 		color := &models.ColorCategory{
-			TenantID:  tenantID,
-			Name:      c.Name,
-			HexCode:   c.HexCode,
-			SortOrder: c.SortOrder,
+			TenantID:    tenantID,
+			Name:        c.Name,
+			HexCode:     c.HexCode,
+			PatternIcon: &patternIcon,
+			SortOrder:   c.SortOrder,
 		}
 		if err := s.colorRepo.Create(tenantID, color); err != nil {
 			return fmt.Errorf("failed to create color %s: %w", c.Name, err)

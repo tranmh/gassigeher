@@ -19,26 +19,28 @@ func NewProvisioningService(db *database.DB) *ProvisioningService {
 }
 
 // CreateDefaultColors creates default color categories for a tenant
+// Each color includes a unique pattern_icon for color-blind accessibility
 func (s *ProvisioningService) CreateDefaultColors(tx *sql.Tx, tenantID int) error {
 	colors := []struct {
-		Name      string
-		HexCode   string
-		SortOrder int
+		Name        string
+		HexCode     string
+		PatternIcon string
+		SortOrder   int
 	}{
-		{"Grün", "#22c55e", 1},
-		{"Gelb", "#eab308", 2},
-		{"Orange", "#f97316", 3},
-		{"Rot", "#ef4444", 4},
-		{"Blau", "#3b82f6", 5},
+		{"Grün", "#22c55e", "circle", 1},
+		{"Gelb", "#eab308", "star", 2},
+		{"Orange", "#f97316", "triangle", 3},
+		{"Rot", "#ef4444", "square", 4},
+		{"Blau", "#3b82f6", "diamond", 5},
 	}
 
 	// Rebind query for PostgreSQL (? -> $1, $2, ...)
-	query := s.db.RebindQuery(`INSERT INTO color_categories (tenant_id, name, hex_code, sort_order) VALUES (?, ?, ?, ?)`)
+	query := s.db.RebindQuery(`INSERT INTO color_categories (tenant_id, name, hex_code, pattern_icon, sort_order) VALUES (?, ?, ?, ?, ?)`)
 
 	for _, c := range colors {
 		_, err := tx.Exec(
 			query,
-			tenantID, c.Name, c.HexCode, c.SortOrder,
+			tenantID, c.Name, c.HexCode, c.PatternIcon, c.SortOrder,
 		)
 		if err != nil {
 			return err
