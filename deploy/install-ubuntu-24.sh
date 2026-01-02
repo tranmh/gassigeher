@@ -1,36 +1,48 @@
 #!/bin/bash
 #
-# Gassigeher SaaS - Production Deployment Script
+# Gassigeher - Production Deployment Script
 # Target: Ubuntu 24.04 LTS with Docker Compose
-# Domain: gassigeher.org (wildcard SSL via Hetzner DNS)
+#
+# Supports both Simple-Mode and SaaS-Mode deployments.
 #
 # Usage:
-#   chmod +x install-ubuntu-24.sh
-#   ./install-ubuntu-24.sh          # Runs without root (Docker must be pre-installed)
-#   sudo ./install-ubuntu-24.sh     # Full install including Docker
+#   ./install-ubuntu-24.sh                    # Install/update (preserves existing config)
+#   ./install-ubuntu-24.sh --force            # Fresh install (regenerates secrets)
+#   ./install-ubuntu-24.sh --local            # Local testing mode (no SSL)
+#   ./install-ubuntu-24.sh --env /path/.env   # Custom config file location
+#
+# Configuration:
+#   The script reads configuration from:
+#     - .env         -> Application settings (from .env.example if not present)
+#     - .env.secrets -> Auto-generated passwords and API keys
+#
+#   Manual configuration required in .env.secrets:
+#     - HETZNER_DNS_TOKEN (for wildcard SSL)
+#     - STRIPE_* keys (for SaaS billing)
+#     - SMTP_PASSWORD (for email)
 #
 # Prerequisites:
-#   - Fresh Ubuntu 24.04 LTS server (Hetzner Cloud recommended)
-#   - Domain gassigeher.org pointing to server IP
-#   - Hetzner DNS API token (for wildcard SSL)
-#   - Stripe API keys (for billing)
-#   - SMTP credentials (for email)
+#   - Fresh Ubuntu 24.04 LTS server
+#   - Domain pointing to server IP (for production)
 #
 
-set -e  # Exit on error
+set -e
 set -o pipefail
 
 # ============================================
-# CONFIGURATION - EDIT THESE VALUES
+# CONFIGURATION
 # ============================================
 
-# Domain configuration (override with --local for local testing)
-DOMAIN="gassigeher.org"
-BASE_DOMAIN="gassigeher.org"
-LOCAL_MODE=false
-
-# Installation directory
+# Default installation directory
 INSTALL_DIR="/opt/gassigeher"
+
+# Default config file (can be overridden with --env)
+CONFIG_FILE=""
+
+# Flags
+FORCE_MODE=false
+LOCAL_MODE=false
+DRY_RUN=false
 
 # Colors for output
 RED='\033[0;31m'
@@ -60,7 +72,6 @@ log_error() {
 }
 
 check_sudo() {
-    # Check if we can use sudo (needed for some operations)
     if [[ $EUID -eq 0 ]]; then
         SUDO=""
         CAN_SUDO=true
@@ -76,15 +87,69 @@ check_sudo() {
 }
 
 check_ubuntu() {
-    if ! grep -q "Ubuntu" /etc/os-release; then
-        log_error "This script is designed for Ubuntu 24.04"
-        exit 1
+    if [[ -f /etc/os-release ]]; then
+        if ! grep -q "Ubuntu" /etc/os-release; then
+            log_warn "This script is designed for Ubuntu 24.04"
+        fi
     fi
-    log_success "Ubuntu detected"
+    log_success "OS check passed"
 }
 
 generate_password() {
     openssl rand -base64 32 | tr -d '/+=' | cut -c1-32
+}
+
+# Parse a simple .env file and export variables
+# Usage: parse_env_file /path/to/.env
+parse_env_file() {
+    local file="$1"
+    if [[ ! -f "$file" ]]; then
+        return 1
+    fi
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Skip empty lines and comments
+        [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+
+        # Extract key=value, handling quotes
+        if [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+            local key="${BASH_REMATCH[1]}"
+            local value="${BASH_REMATCH[2]}"
+
+            # Remove surrounding quotes if present
+            value="${value%\"}"
+            value="${value#\"}"
+            value="${value%\'}"
+            value="${value#\'}"
+
+            # Remove inline comments (but not in quoted values)
+            if [[ ! "$value" =~ ^[\"\'] ]]; then
+                value="${value%%#*}"
+                value="${value%"${value##*[![:space:]]}"}"  # Trim trailing whitespace
+            fi
+
+            # Export the variable
+            export "$key=$value"
+        fi
+    done < "$file"
+}
+
+# Get value from env file without exporting
+get_env_value() {
+    local file="$1"
+    local key="$2"
+    local value=""
+
+    if [[ -f "$file" ]]; then
+        value=$(grep -E "^${key}=" "$file" 2>/dev/null | head -1 | cut -d'=' -f2-)
+        # Remove quotes
+        value="${value%\"}"
+        value="${value#\"}"
+        value="${value%\'}"
+        value="${value#\'}"
+    fi
+
+    echo "$value"
 }
 
 # ============================================
@@ -130,350 +195,342 @@ create_directories() {
     log_info "Creating directories..."
 
     if [[ "$CAN_SUDO" == "true" ]]; then
-        $SUDO mkdir -p "$INSTALL_DIR"/{data/app,logs,backups,uploads}
+        $SUDO mkdir -p "$INSTALL_DIR"/{data/app,data/postgres,data/minio,data/caddy,data/caddy-config,logs,logs/caddy,backups,uploads}
         $SUDO chmod 750 "$INSTALL_DIR"
-        # Make current user the owner if using sudo
         if [[ -n "$SUDO" ]]; then
             $SUDO chown -R "$(id -u):$(id -g)" "$INSTALL_DIR"
         fi
     else
-        mkdir -p "$INSTALL_DIR"/{data/app,logs,backups,uploads}
+        mkdir -p "$INSTALL_DIR"/{data/app,data/postgres,data/minio,data/caddy,data/caddy-config,logs,logs/caddy,backups,uploads}
         chmod 750 "$INSTALL_DIR"
     fi
 
     log_success "Directories created at $INSTALL_DIR"
 }
 
-collect_configuration() {
-    log_info "Collecting configuration..."
-    echo ""
-    echo "============================================"
-    echo "  GASSIGEHER SAAS CONFIGURATION"
-    echo "============================================"
-    echo ""
+load_configuration() {
+    log_info "Loading configuration..."
 
-    # Generate secrets
-    JWT_SECRET=$(generate_password)
-    DB_PASSWORD=$(generate_password)
+    # Determine source config file
+    local source_config=""
 
-    # Hetzner DNS Token (required for wildcard SSL)
-    echo -e "${YELLOW}Hetzner DNS API Token${NC}"
-    echo "Get it from: https://dns.hetzner.com/settings/api-token"
-    read -p "Enter Hetzner DNS API Token: " HETZNER_DNS_TOKEN
-    if [[ -z "$HETZNER_DNS_TOKEN" ]]; then
-        log_error "Hetzner DNS token is required for wildcard SSL"
-        exit 1
-    fi
-    echo ""
-
-    # Stripe Configuration
-    echo -e "${YELLOW}Stripe Configuration${NC}"
-    echo "Get keys from: https://dashboard.stripe.com/apikeys"
-    read -p "Stripe Secret Key (sk_live_...): " STRIPE_SECRET_KEY
-    read -p "Stripe Publishable Key (pk_live_...): " STRIPE_PUBLISHABLE_KEY
-    read -p "Stripe Webhook Secret (whsec_...): " STRIPE_WEBHOOK_SECRET
-    read -p "Stripe Price ID - Monthly (price_...): " STRIPE_PRICE_MONTHLY
-    read -p "Stripe Price ID - Yearly (price_...): " STRIPE_PRICE_YEARLY
-    echo ""
-
-    # S3 Configuration (MinIO default, or external Hetzner)
-    echo -e "${YELLOW}S3 Object Storage Configuration${NC}"
-    echo "MinIO is included in Docker Compose (default). For production, you can use Hetzner Object Storage."
-    read -p "Use external S3 instead of MinIO? (y/N): " USE_EXTERNAL_S3
-    if [[ "$USE_EXTERNAL_S3" =~ ^[Yy]$ ]]; then
-        USE_S3="true"
-        echo "Create bucket at: https://console.hetzner.cloud/"
-        read -p "S3 Endpoint (e.g., fsn1.your-objectstorage.com): " S3_ENDPOINT
-        read -p "S3 Access Key: " S3_ACCESS_KEY
-        read -p "S3 Secret Key: " S3_SECRET_KEY
-        read -p "S3 Bucket Name [gassigeher-uploads]: " S3_BUCKET_NAME
-        S3_BUCKET_NAME=${S3_BUCKET_NAME:-gassigeher-uploads}
-        read -p "S3 Region (e.g., fsn1): " S3_REGION
-        read -p "S3 Public URL (e.g., https://bucket.fsn1.your-objectstorage.com): " S3_PUBLIC_URL
-        S3_USE_SSL="true"
+    if [[ -n "$CONFIG_FILE" && -f "$CONFIG_FILE" ]]; then
+        source_config="$CONFIG_FILE"
+        log_info "Using config file: $CONFIG_FILE"
+    elif [[ -f "$INSTALL_DIR/.env" ]]; then
+        source_config="$INSTALL_DIR/.env"
+        log_info "Using existing config: $INSTALL_DIR/.env"
     else
-        # Default: Use MinIO from Docker Compose
-        USE_S3="true"
-        S3_ENDPOINT="minio:9000"
-        S3_ACCESS_KEY="minioadmin"
-        S3_SECRET_KEY="minioadmin123"
-        S3_BUCKET_NAME="gassigeher-uploads"
-        S3_REGION="us-east-1"
-        S3_PUBLIC_URL="http://localhost:9000/gassigeher-uploads"
-        S3_USE_SSL="false"
-        echo -e "${GREEN}Using MinIO (included in Docker Compose)${NC}"
-    fi
-    echo ""
+        # Find .env.example in the source directory
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        SOURCE_DIR="$(dirname "$SCRIPT_DIR")"
 
-    # SMTP Configuration
-    echo -e "${YELLOW}SMTP Email Configuration${NC}"
-    echo "Examples: smtp.strato.de (port 465), smtp.office365.com (port 587)"
-    read -p "SMTP Host: " SMTP_HOST
-    read -p "SMTP Port [465]: " SMTP_PORT
-    SMTP_PORT=${SMTP_PORT:-465}
-    read -p "SMTP Username: " SMTP_USERNAME
-    read -p "SMTP Password: " SMTP_PASSWORD
-    read -p "SMTP From Email: " SMTP_FROM_EMAIL
-    read -p "Use SSL? (Y/n): " SMTP_SSL_INPUT
-    if [[ "$SMTP_SSL_INPUT" =~ ^[Nn]$ ]]; then
-        SMTP_USE_SSL="false"
-    else
-        SMTP_USE_SSL="true"
-    fi
-    read -p "BCC Admin Email (optional): " EMAIL_BCC_ADMIN
-    echo ""
-
-    # Contact Email
-    read -p "Contact form email [kontakt@$DOMAIN]: " CONTACT_EMAIL
-    CONTACT_EMAIL=${CONTACT_EMAIL:-kontakt@$DOMAIN}
-
-    # Super Admin Email (with validation)
-    while true; do
-        read -p "Super Admin email: " SUPER_ADMIN_EMAIL
-        if [[ "$SUPER_ADMIN_EMAIL" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
-            break
+        if [[ -f "$SOURCE_DIR/.env.example" ]]; then
+            source_config="$SOURCE_DIR/.env.example"
+            log_info "Using default config: $source_config"
         else
-            log_error "Invalid email format. Please enter a valid email address."
+            log_error "No configuration file found!"
+            log_error "Please provide .env file or copy .env.example to .env"
+            exit 1
         fi
-    done
-    echo ""
+    fi
 
-    log_success "Configuration collected"
+    # Parse the config file
+    parse_env_file "$source_config"
+
+    # Override for local mode
+    if [[ "$LOCAL_MODE" == "true" ]]; then
+        export BASE_DOMAIN="gassigeher.local"
+        export BASE_URL="http://gassigeher.local:8080"
+        log_info "Local mode: Using domain gassigeher.local"
+    fi
+
+    # Set defaults for required variables
+    export PORT="${PORT:-8080}"
+    export DB_TYPE="${DB_TYPE:-postgres}"
+    export DB_HOST="${DB_HOST:-db}"
+    export DB_PORT="${DB_PORT:-5432}"
+    export DB_NAME="${DB_NAME:-gassigeher}"
+    export DB_USER="${DB_USER:-gassigeher}"
+
+    log_success "Configuration loaded"
+}
+
+generate_secrets() {
+    log_info "Generating secrets..."
+
+    local secrets_file="$INSTALL_DIR/.env.secrets"
+
+    # Check if secrets file exists and we're not in force mode
+    if [[ -f "$secrets_file" && "$FORCE_MODE" != "true" ]]; then
+        log_success "Using existing secrets from $secrets_file"
+        parse_env_file "$secrets_file"
+        return 0
+    fi
+
+    # Generate new secrets
+    local db_password=$(generate_password)
+    local jwt_secret=$(generate_password)
+    local s3_access_key="gassigeher$(openssl rand -hex 4)"
+    local s3_secret_key=$(generate_password)
+    local metrics_password=$(generate_password)
+    local grafana_password=$(generate_password)
+
+    # Determine mode and generate appropriate admin password
+    local is_saas_mode=false
+    if [[ -n "$BASE_DOMAIN" ]]; then
+        is_saas_mode=true
+    fi
+
+    local super_admin_password=""
+    local central_admin_password=""
+
+    if [[ "$is_saas_mode" == "true" ]]; then
+        # SaaS Mode: Generate Central Admin password
+        central_admin_password=$(generate_password)
+        log_info "SaaS Mode detected - generating Central Admin password"
+    else
+        # Simple Mode: Generate Super Admin password
+        super_admin_password=$(generate_password)
+        log_info "Simple Mode detected - generating Super Admin password"
+    fi
+
+    # Create secrets file
+    cat > "$secrets_file" << EOF
+# ==================================================
+# Gassigeher Secrets
+# Generated: $(date)
+# Mode: $(if [[ "$is_saas_mode" == "true" ]]; then echo "SaaS"; else echo "Simple"; fi)
+# ==================================================
+# WARNING: Keep this file secure! Never commit to version control.
+# To change admin password: edit this file and restart server.
+
+# ==================================================
+# Database
+# ==================================================
+DB_PASSWORD=${db_password}
+
+# ==================================================
+# Authentication
+# ==================================================
+JWT_SECRET=${jwt_secret}
+
+# ==================================================
+# Admin Password
+# ==================================================
+EOF
+
+    if [[ "$is_saas_mode" == "true" ]]; then
+        cat >> "$secrets_file" << EOF
+# SaaS Mode: Central Admin is the platform administrator
+# Central Admin can impersonate any tenant's Super Admin
+# Each tenant has their own Super Admin (created during registration)
+CENTRAL_ADMIN_PASSWORD=${central_admin_password}
+EOF
+    else
+        cat >> "$secrets_file" << EOF
+# Simple Mode: Super Admin is the local shelter administrator
+SUPER_ADMIN_PASSWORD=${super_admin_password}
+EOF
+    fi
+
+    cat >> "$secrets_file" << EOF
+
+# ==================================================
+# S3/MinIO
+# ==================================================
+S3_ACCESS_KEY=${s3_access_key}
+S3_SECRET_KEY=${s3_secret_key}
+
+# ==================================================
+# Monitoring
+# ==================================================
+METRICS_PASSWORD=${metrics_password}
+GRAFANA_ADMIN_PASSWORD=${grafana_password}
+
+# ==================================================
+# External Services (Manual Configuration Required)
+# ==================================================
+# Fill these in before starting services:
+
+# Hetzner DNS (for wildcard SSL in production)
+HETZNER_DNS_TOKEN=
+
+# Stripe (for SaaS billing - only needed in SaaS Mode)
+STRIPE_SECRET_KEY=
+STRIPE_PUBLISHABLE_KEY=
+STRIPE_WEBHOOK_SECRET=
+
+# SMTP (for email)
+SMTP_PASSWORD=
+
+# Gmail API (alternative to SMTP)
+# GMAIL_CLIENT_ID=
+# GMAIL_CLIENT_SECRET=
+# GMAIL_REFRESH_TOKEN=
+
+# Sentry (optional error tracking)
+SENTRY_DSN=
+EOF
+
+    chmod 600 "$secrets_file"
+
+    # Export for current session
+    export DB_PASSWORD="$db_password"
+    export JWT_SECRET="$jwt_secret"
+    export SUPER_ADMIN_PASSWORD="$super_admin_password"
+    export CENTRAL_ADMIN_PASSWORD="$central_admin_password"
+    export S3_ACCESS_KEY="$s3_access_key"
+    export S3_SECRET_KEY="$s3_secret_key"
+    export METRICS_PASSWORD="$metrics_password"
+    export GRAFANA_ADMIN_PASSWORD="$grafana_password"
+
+    log_success "Secrets generated and saved to $secrets_file"
+    log_warn "Please configure external service credentials in $secrets_file"
 }
 
 create_env_file() {
     log_info "Creating .env file..."
 
-    # Set BASE_URL based on mode
+    # Determine BASE_URL
+    local computed_base_url
     if [[ "$LOCAL_MODE" == "true" ]]; then
-        COMPUTED_BASE_URL="http://${DOMAIN}:8080"
+        computed_base_url="http://${BASE_DOMAIN:-gassigeher.local}:8080"
     else
-        COMPUTED_BASE_URL="https://${DOMAIN}"
+        computed_base_url="${BASE_URL:-https://${BASE_DOMAIN:-gassigeher.org}}"
     fi
 
     cat > "$INSTALL_DIR/.env" << EOF
-# Gassigeher SaaS Configuration
+# Gassigeher Configuration
 # Generated: $(date)
 # Mode: $(if [[ "$LOCAL_MODE" == "true" ]]; then echo "LOCAL"; else echo "PRODUCTION"; fi)
 
-# ============================================
-# DATABASE
-# ============================================
+# ==================================================
+# Server
+# ==================================================
+PORT=${PORT:-8080}
+BASE_URL=${computed_base_url}
+BASE_DOMAIN=${BASE_DOMAIN:-}
+
+# ==================================================
+# Database
+# ==================================================
 DB_TYPE=postgres
 DB_HOST=db
 DB_PORT=5432
-DB_NAME=gassigeher
-DB_USER=gassigeher
-DB_PASSWORD=${DB_PASSWORD}
+DB_NAME=${DB_NAME:-gassigeher}
+DB_USER=${DB_USER:-gassigeher}
+DB_MAX_OPEN_CONNS=${DB_MAX_OPEN_CONNS:-25}
+DB_MAX_IDLE_CONNS=${DB_MAX_IDLE_CONNS:-5}
+DB_CONN_MAX_LIFETIME=${DB_CONN_MAX_LIFETIME:-5}
 
-# ============================================
-# APPLICATION
-# ============================================
-PORT=8080
-BASE_URL=${COMPUTED_BASE_URL}
-BASE_DOMAIN=${BASE_DOMAIN}
+# ==================================================
+# Authentication
+# ==================================================
+JWT_EXPIRATION_HOURS=${JWT_EXPIRATION_HOURS:-24}
 
-# ============================================
-# AUTHENTICATION
-# ============================================
-JWT_SECRET=${JWT_SECRET}
-JWT_EXPIRATION_HOURS=24
-SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL}
+# ==================================================
+# Admin
+# ==================================================
+SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL:-admin@yourshelter.com}
+CENTRAL_ADMIN_EMAIL=${CENTRAL_ADMIN_EMAIL:-admin@gassigeher.org}
 
-# ============================================
-# HETZNER DNS (for wildcard SSL)
-# ============================================
-HETZNER_DNS_TOKEN=${HETZNER_DNS_TOKEN}
+# ==================================================
+# Email
+# ==================================================
+EMAIL_PROVIDER=${EMAIL_PROVIDER:-smtp}
+EMAIL_BCC_ADMIN=${EMAIL_BCC_ADMIN:-}
+SMTP_HOST=${SMTP_HOST:-}
+SMTP_PORT=${SMTP_PORT:-587}
+SMTP_USERNAME=${SMTP_USERNAME:-}
+SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
+SMTP_USE_TLS=${SMTP_USE_TLS:-false}
+SMTP_USE_SSL=${SMTP_USE_SSL:-false}
+GMAIL_FROM_EMAIL=${GMAIL_FROM_EMAIL:-}
 
-# ============================================
-# STRIPE BILLING
-# ============================================
-STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
-STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
-STRIPE_PRICE_MONTHLY=${STRIPE_PRICE_MONTHLY}
-STRIPE_PRICE_YEARLY=${STRIPE_PRICE_YEARLY}
+# ==================================================
+# S3 Storage
+# ==================================================
+USE_S3=${USE_S3:-true}
+S3_ENDPOINT=${S3_ENDPOINT:-minio:9000}
+S3_BUCKET_NAME=${S3_BUCKET_NAME:-gassigeher-uploads}
+S3_REGION=${S3_REGION:-us-east-1}
+S3_PUBLIC_URL=${S3_PUBLIC_URL:-http://localhost:9000/gassigeher-uploads}
+S3_USE_SSL=${S3_USE_SSL:-false}
 
-# ============================================
-# S3 STORAGE (MinIO default / Hetzner for production)
-# ============================================
-USE_S3=${USE_S3}
-S3_ENDPOINT=${S3_ENDPOINT}
-S3_ACCESS_KEY=${S3_ACCESS_KEY}
-S3_SECRET_KEY=${S3_SECRET_KEY}
-S3_BUCKET_NAME=${S3_BUCKET_NAME}
-S3_REGION=${S3_REGION}
-S3_PUBLIC_URL=${S3_PUBLIC_URL}
-S3_USE_SSL=${S3_USE_SSL}
+# ==================================================
+# Stripe (SaaS-Mode)
+# ==================================================
+STRIPE_PRICE_MONTHLY=${STRIPE_PRICE_MONTHLY:-}
+STRIPE_PRICE_YEARLY=${STRIPE_PRICE_YEARLY:-}
 
-# ============================================
-# EMAIL (SMTP)
-# ============================================
-EMAIL_PROVIDER=smtp
-SMTP_HOST=${SMTP_HOST}
-SMTP_PORT=${SMTP_PORT}
-SMTP_USERNAME=${SMTP_USERNAME}
-SMTP_PASSWORD=${SMTP_PASSWORD}
-SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL}
-SMTP_USE_SSL=${SMTP_USE_SSL}
-EMAIL_BCC_ADMIN=${EMAIL_BCC_ADMIN}
-CONTACT_EMAIL=${CONTACT_EMAIL}
+# ==================================================
+# Rate Limiting
+# ==================================================
+RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED:-true}
+RATE_LIMIT_RPS=${RATE_LIMIT_RPS:-10}
+RATE_LIMIT_BURST=${RATE_LIMIT_BURST:-20}
+BRUTE_FORCE_MAX_ATTEMPTS=${BRUTE_FORCE_MAX_ATTEMPTS:-3}
+BRUTE_FORCE_LOCKOUT_BASE=${BRUTE_FORCE_LOCKOUT_BASE:-30}
+BRUTE_FORCE_LOCKOUT_MAX=${BRUTE_FORCE_LOCKOUT_MAX:-1800}
 
-# ============================================
-# LOGGING
-# ============================================
+# ==================================================
+# Tenant Settings (SaaS-Mode)
+# ==================================================
+TENANT_REGISTRATION_OPEN=${TENANT_REGISTRATION_OPEN:-true}
+TENANT_REGISTRATION_PASSWORD=${TENANT_REGISTRATION_PASSWORD:-}
+DEMO_ENABLED=${DEMO_ENABLED:-true}
+DEMO_RESET_INTERVAL_HOURS=${DEMO_RESET_INTERVAL_HOURS:-24}
+
+# ==================================================
+# Logging
+# ==================================================
 LOG_DIR=/app/logs
-LOG_MAX_AGE_DAYS=30
-LOG_COMPRESS_SIZE_MB=10
-LOG_CONSOLE_OUTPUT=true
+LOG_MAX_AGE_DAYS=${LOG_MAX_AGE_DAYS:-30}
+LOG_COMPRESS_SIZE_MB=${LOG_COMPRESS_SIZE_MB:-10}
+LOG_CONSOLE_OUTPUT=${LOG_CONSOLE_OUTPUT:-true}
 
-# ============================================
-# SYSTEM SETTINGS
-# ============================================
-BOOKING_ADVANCE_DAYS=14
-CANCELLATION_NOTICE_HOURS=12
-AUTO_DEACTIVATION_DAYS=365
+# ==================================================
+# System Settings
+# ==================================================
+BOOKING_ADVANCE_DAYS=${BOOKING_ADVANCE_DAYS:-14}
+CANCELLATION_NOTICE_HOURS=${CANCELLATION_NOTICE_HOURS:-12}
+AUTO_DEACTIVATION_DAYS=${AUTO_DEACTIVATION_DAYS:-365}
+
+# ==================================================
+# Monitoring
+# ==================================================
+METRICS_USERNAME=${METRICS_USERNAME:-prometheus}
+GRAFANA_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
+SENTRY_RELEASE=${SENTRY_RELEASE:-}
 EOF
 
     chmod 600 "$INSTALL_DIR/.env"
     log_success ".env file created"
 }
 
-create_dockerfile() {
-    log_info "Creating Dockerfile..."
+copy_source_code() {
+    log_info "Copying source code..."
 
-    cat > "$INSTALL_DIR/Dockerfile" << 'EOF'
-# Build stage
-FROM golang:1.24-alpine AS builder
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    SOURCE_DIR="$(dirname "$SCRIPT_DIR")"
 
-RUN apk add --no-cache git
+    if [[ -f "$SOURCE_DIR/go.mod" ]]; then
+        # Copy essential files
+        cp -r "$SOURCE_DIR"/{cmd,internal,go.mod,go.sum,.dockerignore} "$INSTALL_DIR/" 2>/dev/null || true
+        cp "$SOURCE_DIR/docker-compose.yml" "$INSTALL_DIR/"
+        cp "$SOURCE_DIR/Dockerfile" "$INSTALL_DIR/" 2>/dev/null || true
+        cp "$SOURCE_DIR/Dockerfile.caddy" "$INSTALL_DIR/" 2>/dev/null || true
+        cp "$SOURCE_DIR/Caddyfile" "$INSTALL_DIR/" 2>/dev/null || true
+        cp -r "$SOURCE_DIR/deploy" "$INSTALL_DIR/" 2>/dev/null || true
 
-WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
-
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o gassigeher ./cmd/server
-
-# Production stage
-FROM alpine:3.19
-
-RUN apk add --no-cache ca-certificates tzdata wget
-
-WORKDIR /app
-
-COPY --from=builder /app/gassigeher .
-
-RUN mkdir -p /app/uploads /app/logs
-
-EXPOSE 8080
-
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1
-
-CMD ["./gassigeher"]
-EOF
-
-    log_success "Dockerfile created"
-}
-
-create_caddy_dockerfile() {
-    log_info "Creating Caddy Dockerfile with Hetzner DNS module..."
-
-    cat > "$INSTALL_DIR/Dockerfile.caddy" << 'EOF'
-# Custom Caddy with Hetzner DNS module for wildcard SSL
-FROM caddy:2-builder AS builder
-
-RUN xcaddy build \
-    --with github.com/caddy-dns/hetzner
-
-FROM caddy:2-alpine
-
-COPY --from=builder /usr/bin/caddy /usr/bin/caddy
-EOF
-
-    log_success "Caddy Dockerfile created"
-}
-
-create_caddyfile() {
-    log_info "Creating Caddyfile..."
-
-    cat > "$INSTALL_DIR/Caddyfile" << 'EOF'
-# Caddyfile for Gassigeher SaaS
-# Wildcard SSL for *.gassigeher.org using Hetzner DNS challenge
-
-# Main domain - Landing page
-gassigeher.org {
-    tls {
-        dns hetzner {env.HETZNER_DNS_TOKEN}
-    }
-    reverse_proxy app:8080
-    header {
-        X-Frame-Options "DENY"
-        X-Content-Type-Options "nosniff"
-        X-XSS-Protection "1; mode=block"
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
-        Referrer-Policy "strict-origin-when-cross-origin"
-    }
-    encode gzip zstd
-    log {
-        output file /var/log/caddy/gassigeher.log
-        format json
-    }
-}
-
-# WWW redirect
-www.gassigeher.org {
-    redir https://gassigeher.org{uri} permanent
-}
-
-# Central admin dashboard
-admin.gassigeher.org {
-    tls {
-        dns hetzner {env.HETZNER_DNS_TOKEN}
-    }
-    reverse_proxy app:8080
-    header {
-        X-Frame-Options "DENY"
-        X-Content-Type-Options "nosniff"
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
-    }
-    encode gzip zstd
-    log {
-        output file /var/log/caddy/admin.log
-        format json
-    }
-}
-
-# Wildcard for all tenant subdomains
-*.gassigeher.org {
-    tls {
-        dns hetzner {env.HETZNER_DNS_TOKEN}
-    }
-    reverse_proxy app:8080
-    header {
-        X-Frame-Options "DENY"
-        X-Content-Type-Options "nosniff"
-        X-XSS-Protection "1; mode=block"
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
-        Referrer-Policy "strict-origin-when-cross-origin"
-    }
-    encode gzip zstd
-    log {
-        output file /var/log/caddy/tenants.log
-        format json
-    }
-}
-EOF
-
-    log_success "Caddyfile created"
-}
-
-create_docker_compose() {
-    log_info "Copying docker-compose.yml..."
-    cp "$INSTALL_DIR/docker-compose.yml" "$INSTALL_DIR/docker-compose.yml.bak" 2>/dev/null || true
-    # docker-compose.yml is already in the repo, no need to generate
-    log_success "docker-compose.yml ready"
+        log_success "Source code copied from $SOURCE_DIR"
+    else
+        log_error "Source code not found at $SOURCE_DIR"
+        log_error "Please run this script from the deploy/ directory of the source code"
+        exit 1
+    fi
 }
 
 create_backup_script() {
@@ -490,7 +547,13 @@ BACKUP_DIR="/opt/gassigeher/backups"
 DATE=$(date +%Y%m%d_%H%M%S)
 RETENTION_DAYS=30
 
-source /opt/gassigeher/.env
+# Load environment
+if [[ -f /opt/gassigeher/.env ]]; then
+    source /opt/gassigeher/.env
+fi
+if [[ -f /opt/gassigeher/.env.secrets ]]; then
+    source /opt/gassigeher/.env.secrets
+fi
 
 mkdir -p "$BACKUP_DIR"
 
@@ -498,7 +561,7 @@ echo "[$(date)] Starting PostgreSQL backup..."
 
 # Backup database
 docker compose -f /opt/gassigeher/docker-compose.yml exec -T db \
-    pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$BACKUP_DIR/gassigeher_${DATE}.sql.gz"
+    pg_dump -U "${DB_USER:-gassigeher}" "${DB_NAME:-gassigeher}" | gzip > "$BACKUP_DIR/gassigeher_${DATE}.sql.gz"
 
 echo "[$(date)] Backup completed: gassigeher_${DATE}.sql.gz"
 
@@ -525,23 +588,47 @@ create_management_script() {
 INSTALL_DIR="/opt/gassigeher"
 cd "$INSTALL_DIR"
 
+# Load environment for commands that need it
+load_env() {
+    if [[ -f "$INSTALL_DIR/.env" ]]; then
+        set -a
+        source "$INSTALL_DIR/.env"
+        set +a
+    fi
+    if [[ -f "$INSTALL_DIR/.env.secrets" ]]; then
+        set -a
+        source "$INSTALL_DIR/.env.secrets"
+        set +a
+    fi
+}
+
 case "$1" in
     start)
         echo "Starting Gassigeher..."
+        load_env
         docker compose --profile production up -d
+        ;;
+    start-dev)
+        echo "Starting Gassigeher (development mode, no Caddy)..."
+        load_env
+        docker compose up -d
         ;;
     stop)
         echo "Stopping Gassigeher..."
+        load_env
         docker compose --profile production down
         ;;
     restart)
         echo "Restarting Gassigeher..."
+        load_env
         docker compose --profile production restart
         ;;
     logs)
+        load_env
         docker compose --profile production logs -f ${2:-}
         ;;
     status)
+        load_env
         docker compose --profile production ps
         ;;
     backup)
@@ -550,19 +637,27 @@ case "$1" in
     update)
         echo "Updating Gassigeher..."
         git pull 2>/dev/null || echo "Not a git repo, skipping git pull"
+        load_env
         docker compose --profile production build --no-cache app
         docker compose --profile production up -d
         echo "Update complete!"
         ;;
     shell)
-        docker compose --profile production exec app sh
+        load_env
+        docker compose exec app sh
         ;;
     db)
-        docker compose --profile production exec db psql -U gassigeher gassigeher
+        load_env
+        docker compose exec db psql -U "${DB_USER:-gassigeher}" "${DB_NAME:-gassigeher}"
         ;;
     health)
-        curl -s http://localhost:8080/api/health | jq .
-        curl -s http://localhost:8080/api/ready | jq .
+        curl -s http://localhost:8080/api/health | jq . 2>/dev/null || curl -s http://localhost:8080/api/health
+        echo ""
+        curl -s http://localhost:8080/api/ready | jq . 2>/dev/null || curl -s http://localhost:8080/api/ready
+        ;;
+    secrets)
+        echo "Editing secrets file..."
+        ${EDITOR:-nano} "$INSTALL_DIR/.env.secrets"
         ;;
     *)
         echo "Gassigeher Management Script"
@@ -570,26 +665,27 @@ case "$1" in
         echo "Usage: gassigeher [command]"
         echo ""
         echo "Commands:"
-        echo "  start     Start all services"
-        echo "  stop      Stop all services"
-        echo "  restart   Restart all services"
-        echo "  logs      View logs (optional: app, db, caddy)"
-        echo "  status    Show service status"
-        echo "  backup    Run database backup"
-        echo "  update    Pull latest code and rebuild"
-        echo "  shell     Open shell in app container"
-        echo "  db        Open PostgreSQL shell"
-        echo "  health    Check application health"
+        echo "  start       Start all services (production with Caddy)"
+        echo "  start-dev   Start services (development, no Caddy)"
+        echo "  stop        Stop all services"
+        echo "  restart     Restart all services"
+        echo "  logs        View logs (optional: app, db, caddy, minio)"
+        echo "  status      Show service status"
+        echo "  backup      Run database backup"
+        echo "  update      Pull latest code and rebuild"
+        echo "  shell       Open shell in app container"
+        echo "  db          Open PostgreSQL shell"
+        echo "  health      Check application health"
+        echo "  secrets     Edit secrets file"
         ;;
 esac
 EOF
 
     chmod +x "$INSTALL_DIR/gassigeher"
 
-    # Create symlink in /usr/local/bin if we have sudo access
     if [[ "$CAN_SUDO" == "true" ]]; then
         $SUDO ln -sf "$INSTALL_DIR/gassigeher" /usr/local/bin/gassigeher
-        log_success "Management script created (use: gassigeher [command])"
+        log_success "Management script installed (use: gassigeher [command])"
     else
         log_success "Management script created (use: $INSTALL_DIR/gassigeher [command])"
         log_info "Add to PATH: export PATH=\"$INSTALL_DIR:\$PATH\""
@@ -599,10 +695,8 @@ EOF
 setup_cron_backup() {
     log_info "Setting up daily backup cron job..."
 
-    # Add cron job for daily backup at 3 AM
     CRON_JOB="0 3 * * * $INSTALL_DIR/backup.sh >> $INSTALL_DIR/logs/backup.log 2>&1"
 
-    # Get existing crontab (without our job), add our job, then install
     {
         crontab -l 2>/dev/null | grep -v "gassigeher/backup.sh" || true
         echo "$CRON_JOB"
@@ -619,34 +713,15 @@ setup_firewall() {
 
     log_info "Configuring firewall..."
 
-    # Install ufw if not present
     $SUDO apt-get install -y ufw
 
-    # Allow SSH, HTTP, HTTPS
     $SUDO ufw allow ssh
     $SUDO ufw allow http
     $SUDO ufw allow https
 
-    # Enable firewall
     $SUDO ufw --force enable
 
     log_success "Firewall configured (SSH, HTTP, HTTPS allowed)"
-}
-
-copy_source_code() {
-    log_info "Copying source code..."
-
-    # Get the directory where this script is located
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    SOURCE_DIR="$(dirname "$SCRIPT_DIR")"
-
-    if [[ -f "$SOURCE_DIR/go.mod" ]]; then
-        cp -r "$SOURCE_DIR"/{cmd,internal,go.mod,go.sum,docker-compose.yml,.dockerignore,deploy} "$INSTALL_DIR/"
-        log_success "Source code copied from $SOURCE_DIR"
-    else
-        log_warn "Source code not found. You'll need to copy it manually."
-        echo "  cp -r /path/to/gassigeher/{cmd,internal,go.mod,go.sum,docker-compose.yml} $INSTALL_DIR/"
-    fi
 }
 
 start_services() {
@@ -654,105 +729,27 @@ start_services() {
 
     cd "$INSTALL_DIR"
 
-    # Build and start with production profile (includes Caddy for SSL)
-    log_info "Running: docker compose --profile production up --build -d"
-    docker compose --profile production up --build -d
+    # Check if secrets are configured
+    if [[ -z "$DB_PASSWORD" ]]; then
+        log_error "Secrets not loaded. Please check .env.secrets"
+        exit 1
+    fi
 
-    # Wait for services to be healthy
+    # Determine profile
+    local profile=""
+    if [[ "$LOCAL_MODE" != "true" ]]; then
+        profile="--profile production"
+    fi
+
+    log_info "Running: docker compose $profile up --build -d"
+    docker compose $profile up --build -d
+
     log_info "Waiting for services to start..."
     sleep 10
 
-    # Check status
-    docker compose ps
+    docker compose $profile ps
 
     log_success "Services started!"
-}
-
-print_summary() {
-    echo ""
-    echo "============================================"
-    echo -e "${GREEN}  INSTALLATION COMPLETE!${NC}"
-    echo "============================================"
-    echo ""
-
-    if [[ "$LOCAL_MODE" == "true" ]]; then
-        echo "Your Gassigeher SaaS is now running at (LOCAL MODE):"
-        echo ""
-        echo -e "  ${BLUE}Landing Page:${NC}    http://${DOMAIN}:8080/landing/"
-        echo -e "  ${BLUE}Central Admin:${NC}   http://${DOMAIN}:8080/central/"
-        echo -e "  ${BLUE}Demo Tenant:${NC}     http://demo.${DOMAIN}:8080"
-        echo -e "  ${BLUE}Health Check:${NC}    http://${DOMAIN}:8080/api/health"
-        echo ""
-        echo "Required /etc/hosts entries:"
-        echo "  127.0.0.1 ${DOMAIN} demo.${DOMAIN}"
-    else
-        echo "Your Gassigeher SaaS is now running at:"
-        echo ""
-        echo -e "  ${BLUE}Landing Page:${NC}    https://${DOMAIN}"
-        echo -e "  ${BLUE}Central Admin:${NC}   https://admin.${DOMAIN}"
-        echo -e "  ${BLUE}Demo Tenant:${NC}     https://demo.${DOMAIN}"
-        echo -e "  ${BLUE}Health Check:${NC}    https://${DOMAIN}/api/health"
-    fi
-    echo ""
-    echo "Management commands:"
-    echo ""
-    echo "  gassigeher start    - Start services"
-    echo "  gassigeher stop     - Stop services"
-    echo "  gassigeher logs     - View logs"
-    echo "  gassigeher backup   - Run backup"
-    echo "  gassigeher update   - Update application"
-    echo "  gassigeher status   - Check status"
-    echo ""
-    echo "Important files:"
-    echo ""
-    echo "  Config:   $INSTALL_DIR/.env"
-    echo "  Logs:     $INSTALL_DIR/logs/"
-    echo "  Backups:  $INSTALL_DIR/backups/"
-    echo "  Data:     $INSTALL_DIR/data/"
-    echo ""
-    echo "Super Admin credentials will be in:"
-    echo "  $INSTALL_DIR/logs/ (check app logs)"
-    echo ""
-    if [[ "$LOCAL_MODE" != "true" ]]; then
-        echo "Next steps:"
-        echo ""
-        echo "  1. Configure Stripe webhook:"
-        echo "     URL: https://${DOMAIN}/api/v1/billing/webhook"
-        echo ""
-        echo "  2. Configure Hetzner DNS:"
-        echo "     A record:     ${DOMAIN} -> $(curl -s ifconfig.me)"
-        echo "     A record:   *.${DOMAIN} -> $(curl -s ifconfig.me)"
-        echo ""
-    fi
-    echo "  Test the installation:"
-    echo "     gassigeher health"
-    echo ""
-    echo "============================================"
-}
-
-# ============================================
-# MAIN INSTALLATION
-# ============================================
-
-show_help() {
-    echo "Gassigeher SaaS Installer"
-    echo ""
-    echo "Usage: $0 [OPTIONS]"
-    echo ""
-    echo "Options:"
-    echo "  --force       Force complete reinstall (stops containers, deletes target dir, rebuilds)"
-    echo "  --local       Use gassigeher.local domain for local testing (no SSL)"
-    echo "  --help        Show this help message"
-    echo ""
-    echo "Examples:"
-    echo "  $0                    # Production install (gassigeher.org)"
-    echo "  $0 --local            # Local testing (gassigeher.local:8080)"
-    echo "  $0 --force --local    # Fresh local install"
-    echo ""
-    echo "The script is idempotent - safe to run multiple times."
-    echo "Existing .env configuration is preserved unless --force is used."
-    echo ""
-    echo "WARNING: --force will DELETE all data including database, uploads, and backups!"
 }
 
 force_cleanup() {
@@ -763,7 +760,7 @@ force_cleanup() {
     log_warn "This will:"
     log_warn "  1. Stop all running containers"
     log_warn "  2. DELETE the entire directory: $INSTALL_DIR"
-    log_warn "  3. This includes: database, uploads, backups, logs, .env"
+    log_warn "  3. This includes: database, uploads, backups, logs, secrets"
     echo ""
     log_error "ALL DATA WILL BE PERMANENTLY LOST!"
     echo ""
@@ -777,22 +774,16 @@ force_cleanup() {
     echo ""
     log_info "Proceeding with force cleanup..."
 
-    # Stop containers and remove volumes if docker-compose.yml exists
     if [[ -f "$INSTALL_DIR/docker-compose.yml" ]]; then
         log_info "Stopping containers and removing volumes..."
         cd "$INSTALL_DIR"
-        docker compose --profile production down -v --remove-orphans || true
+        docker compose --profile production down -v --remove-orphans 2>/dev/null || true
         cd - > /dev/null
         log_success "Containers and volumes removed"
-    else
-        log_info "No docker-compose.yml found, skipping container stop"
     fi
 
-    # Also prune any orphaned volumes with gassigeher in the name
-    log_info "Cleaning up orphaned Docker volumes..."
     docker volume ls -q | grep -i gassi | xargs -r docker volume rm 2>/dev/null || true
 
-    # Delete the entire target directory
     if [[ -d "$INSTALL_DIR" ]]; then
         log_info "Deleting $INSTALL_DIR..."
         if [[ "$CAN_SUDO" == "true" ]]; then
@@ -801,38 +792,161 @@ force_cleanup() {
             rm -rf "$INSTALL_DIR"
         fi
         log_success "Directory deleted"
-    else
-        log_info "Directory does not exist, nothing to delete"
     fi
 
     log_success "Force cleanup completed"
     echo ""
 }
 
+print_summary() {
+    local domain="${BASE_DOMAIN:-gassigeher.org}"
+
+    echo ""
+    echo "============================================"
+    echo -e "${GREEN}  INSTALLATION COMPLETE!${NC}"
+    echo "============================================"
+    echo ""
+
+    if [[ "$LOCAL_MODE" == "true" ]]; then
+        echo "Your Gassigeher is now running at (LOCAL MODE):"
+        echo ""
+        echo -e "  ${BLUE}Application:${NC}     http://${domain}:8080"
+        echo -e "  ${BLUE}Health Check:${NC}    http://${domain}:8080/api/health"
+        echo -e "  ${BLUE}MinIO Console:${NC}   http://localhost:9001"
+        echo -e "  ${BLUE}Grafana:${NC}         http://localhost:3000"
+        echo ""
+        echo "Required /etc/hosts entry:"
+        echo "  127.0.0.1 ${domain}"
+        if [[ -n "$BASE_DOMAIN" ]]; then
+            echo "  127.0.0.1 demo.${domain}"
+        fi
+    else
+        echo "Your Gassigeher is now running at:"
+        echo ""
+        echo -e "  ${BLUE}Application:${NC}     https://${domain}"
+        if [[ -n "$BASE_DOMAIN" ]]; then
+            echo -e "  ${BLUE}Central Admin:${NC}   https://admin.${domain}"
+            echo -e "  ${BLUE}Demo Tenant:${NC}     https://demo.${domain}"
+        fi
+        echo -e "  ${BLUE}Health Check:${NC}    https://${domain}/api/health"
+    fi
+
+    echo ""
+    echo "Management commands:"
+    echo ""
+    echo "  gassigeher start    - Start services (production)"
+    echo "  gassigeher start-dev- Start services (development)"
+    echo "  gassigeher stop     - Stop services"
+    echo "  gassigeher logs     - View logs"
+    echo "  gassigeher backup   - Run backup"
+    echo "  gassigeher status   - Check status"
+    echo "  gassigeher secrets  - Edit secrets"
+    echo ""
+    echo "Important files:"
+    echo ""
+    echo "  Config:      $INSTALL_DIR/.env"
+    echo "  Secrets:     $INSTALL_DIR/.env.secrets (admin password here)"
+    echo "  Logs:        $INSTALL_DIR/logs/"
+    echo "  Backups:     $INSTALL_DIR/backups/"
+    echo ""
+
+    # Check if external services need configuration
+    local needs_config=false
+    if [[ -z "$HETZNER_DNS_TOKEN" && "$LOCAL_MODE" != "true" ]]; then
+        needs_config=true
+    fi
+    if [[ -z "$SMTP_PASSWORD" && -z "$GMAIL_CLIENT_ID" ]]; then
+        needs_config=true
+    fi
+
+    if [[ "$needs_config" == "true" ]]; then
+        echo -e "${YELLOW}Action Required:${NC}"
+        echo ""
+        echo "  Edit $INSTALL_DIR/.env.secrets to configure:"
+        if [[ -z "$HETZNER_DNS_TOKEN" && "$LOCAL_MODE" != "true" ]]; then
+            echo "    - HETZNER_DNS_TOKEN (for wildcard SSL)"
+        fi
+        if [[ -z "$SMTP_PASSWORD" && -z "$GMAIL_CLIENT_ID" ]]; then
+            echo "    - SMTP_PASSWORD or Gmail API credentials (for email)"
+        fi
+        if [[ -n "$BASE_DOMAIN" ]]; then
+            echo "    - STRIPE_* keys (for billing, if using SaaS-Mode)"
+        fi
+        echo ""
+        echo "  Then restart: gassigeher restart"
+        echo ""
+    fi
+
+    echo "============================================"
+}
+
+show_help() {
+    echo "Gassigeher Installer"
+    echo ""
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --force       Force complete reinstall (regenerates secrets, deletes data)"
+    echo "  --local       Use local testing mode (no SSL, uses gassigeher.local)"
+    echo "  --env FILE    Use specified config file instead of .env.example"
+    echo "  --dry-run     Show what would be done without making changes"
+    echo "  --help        Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  $0                         # Install using .env.example defaults"
+    echo "  $0 --local                 # Local testing (gassigeher.local:8080)"
+    echo "  $0 --env /path/to/.env     # Use custom config file"
+    echo "  $0 --force                 # Fresh install (WARNING: deletes all data!)"
+    echo ""
+    echo "Configuration:"
+    echo "  The script reads configuration from two files:"
+    echo "    .env         - Application settings"
+    echo "    .env.secrets - Passwords and API keys (auto-generated)"
+    echo ""
+    echo "  On first install, secrets are auto-generated."
+    echo "  On subsequent runs, existing secrets are preserved."
+    echo "  Use --force to regenerate all secrets."
+}
+
+# ============================================
+# MAIN
+# ============================================
+
 main() {
     # Parse arguments
-    FORCE_MODE=false
-    for arg in "$@"; do
-        case $arg in
+    while [[ $# -gt 0 ]]; do
+        case $1 in
             --force)
                 FORCE_MODE=true
+                shift
                 ;;
             --local)
                 LOCAL_MODE=true
-                DOMAIN="gassigeher.local"
-                BASE_DOMAIN="gassigeher.local"
-                log_info "Local mode: Using domain gassigeher.local"
+                shift
+                ;;
+            --env)
+                CONFIG_FILE="$2"
+                shift 2
+                ;;
+            --dry-run)
+                DRY_RUN=true
+                shift
                 ;;
             --help|-h)
                 show_help
                 exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                show_help
+                exit 1
                 ;;
         esac
     done
 
     echo ""
     echo "============================================"
-    echo "  GASSIGEHER SAAS INSTALLER"
+    echo "  GASSIGEHER INSTALLER"
     echo "  Ubuntu 24.04 + Docker Compose"
     echo "============================================"
     echo ""
@@ -840,12 +954,12 @@ main() {
     check_sudo
     check_ubuntu
 
-    # Force mode: cleanup before installation
+    # Force mode cleanup
     if [[ "$FORCE_MODE" == "true" ]]; then
         force_cleanup
     fi
 
-    # Install Docker
+    # Install Docker if needed
     if ! command -v docker &> /dev/null; then
         install_docker
     else
@@ -855,31 +969,27 @@ main() {
     # Create directories
     create_directories
 
-    # Configuration handling (idempotent)
-    if [[ -f "$INSTALL_DIR/.env" ]]; then
-        log_success "Existing .env found - preserving configuration"
-        log_info "Use --force to do a complete reinstall"
-        # Source existing env to get variables for summary
-        source "$INSTALL_DIR/.env"
-    else
-        # Collect configuration (fresh install or after --force cleanup)
-        collect_configuration
-        # Create .env file
+    # Load configuration
+    load_configuration
+
+    # Generate or load secrets
+    generate_secrets
+
+    # Create .env file
+    if [[ ! -f "$INSTALL_DIR/.env" || "$FORCE_MODE" == "true" ]]; then
         create_env_file
+    else
+        log_success "Using existing .env file"
     fi
 
-    # Create/update configuration files (always safe to overwrite)
-    create_dockerfile
-    create_caddy_dockerfile
-    create_caddyfile
-    create_docker_compose
+    # Copy source code
+    copy_source_code
+
+    # Create helper scripts
     create_backup_script
     create_management_script
 
-    # Copy source code (overwrites are safe)
-    copy_source_code
-
-    # Setup cron and firewall (idempotent)
+    # Setup cron and firewall
     setup_cron_backup
     setup_firewall
 
@@ -890,5 +1000,4 @@ main() {
     print_summary
 }
 
-# Run main function
 main "$@"

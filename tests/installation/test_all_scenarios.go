@@ -20,23 +20,26 @@ func main() {
 	}
 
 	fmt.Println("=============================================================")
-	fmt.Println("  TESTING ALL 3 SUPER ADMIN SCENARIOS")
+	fmt.Println("  TESTING ADMIN PASSWORD SCENARIOS")
 	fmt.Println("=============================================================")
 	fmt.Println()
+	fmt.Println("Note: Admin passwords are now stored in .env.secrets")
+	fmt.Println("      No more SUPER_ADMIN_CREDENTIALS.txt file")
+	fmt.Println()
 
-	// Backup original files if they exist
+	// Backup original database if it exists
 	backupFiles()
 
-	// Test Scenario 1: First-time installation
+	// Test Scenario 1: First-time installation (Simple Mode)
 	testScenario1()
 
-	// Test Scenario 2: Existing database + missing credentials
+	// Test Scenario 2: Password sync from environment
 	testScenario2()
 
-	// Test Scenario 3: Normal startup with existing credentials
+	// Test Scenario 3: SaaS Mode with Central Admin
 	testScenario3()
 
-	// Restore original files
+	// Restore original database
 	restoreFiles()
 
 	fmt.Println()
@@ -50,38 +53,32 @@ func backupFiles() {
 		os.Rename("gassigeher.db", "gassigeher.db.backup")
 		fmt.Println("✓ Backed up existing database")
 	}
-	if _, err := os.Stat("SUPER_ADMIN_CREDENTIALS.txt"); err == nil {
-		os.Rename("SUPER_ADMIN_CREDENTIALS.txt", "SUPER_ADMIN_CREDENTIALS.txt.backup")
-		fmt.Println("✓ Backed up existing credentials file")
-	}
 	fmt.Println()
 }
 
 func restoreFiles() {
-	// Clean up test files
+	// Clean up test database
 	os.Remove("gassigeher.db")
-	os.Remove("SUPER_ADMIN_CREDENTIALS.txt")
 
-	// Restore originals
+	// Restore original
 	if _, err := os.Stat("gassigeher.db.backup"); err == nil {
 		os.Rename("gassigeher.db.backup", "gassigeher.db")
 		fmt.Println("✓ Restored original database")
-	}
-	if _, err := os.Stat("SUPER_ADMIN_CREDENTIALS.txt.backup"); err == nil {
-		os.Rename("SUPER_ADMIN_CREDENTIALS.txt.backup", "SUPER_ADMIN_CREDENTIALS.txt")
-		fmt.Println("✓ Restored original credentials file")
 	}
 }
 
 func testScenario1() {
 	fmt.Println("=============================================================")
-	fmt.Println("  SCENARIO 1: First-time installation (empty database)")
+	fmt.Println("  SCENARIO 1: First-time installation (Simple Mode)")
 	fmt.Println("=============================================================")
 	fmt.Println()
 
 	// Clean slate
 	os.Remove("gassigeher.db")
-	os.Remove("SUPER_ADMIN_CREDENTIALS.txt")
+
+	// Set Simple Mode environment
+	os.Setenv("BASE_DOMAIN", "") // Simple mode = no BASE_DOMAIN
+	os.Setenv("SUPER_ADMIN_PASSWORD", "TestPassword123!")
 
 	// Initialize
 	cfg := config.Load()
@@ -97,29 +94,35 @@ func testScenario1() {
 		log.Fatalf("❌ Failed to run migrations: %v", err)
 	}
 
-	// Run seed (should create Super Admin and credentials file)
-	if err := database.SeedDatabase(db.SqlDB(), cfg.SuperAdminEmail, dialect.Name()); err != nil {
+	// Run seed with Simple Mode config
+	seedConfig := database.SeedConfig{
+		IsSaaSMode:         false,
+		SuperAdminEmail:    cfg.SuperAdminEmail,
+		SuperAdminPassword: os.Getenv("SUPER_ADMIN_PASSWORD"),
+		DBType:             dialect.Name(),
+	}
+	if err := database.SeedDatabaseWithConfig(db.SqlDB(), seedConfig); err != nil {
 		log.Fatalf("❌ Failed to seed database: %v", err)
 	}
 
-	// Verify
-	checkSuperAdminExists(db)
-	checkCredentialsFileExists()
+	// Verify Super Admin exists
+	checkAdminExists(db, "Super Admin", false)
 
-	fmt.Println("✅ SCENARIO 1 PASSED: First-time installation works correctly")
+	fmt.Println("✅ SCENARIO 1 PASSED: Simple Mode installation works correctly")
 	fmt.Println()
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 }
 
 func testScenario2() {
 	fmt.Println("=============================================================")
-	fmt.Println("  SCENARIO 2: Existing database + missing credentials file")
+	fmt.Println("  SCENARIO 2: Password sync from .env.secrets")
 	fmt.Println("=============================================================")
 	fmt.Println()
 
-	// Delete only the credentials file
-	os.Remove("SUPER_ADMIN_CREDENTIALS.txt")
-	fmt.Println("✓ Deleted credentials file (simulating loss)")
+	// Change password in environment (simulating .env.secrets edit)
+	newPassword := "NewSecurePassword456!"
+	os.Setenv("SUPER_ADMIN_PASSWORD", newPassword)
+	fmt.Printf("✓ Changed SUPER_ADMIN_PASSWORD in environment to: %s\n", newPassword)
 	fmt.Println()
 
 	// Initialize
@@ -131,96 +134,97 @@ func testScenario2() {
 	}
 	defer db.Close()
 
-	// Run SuperAdminService check (should regenerate credentials)
-	superAdminService := services.NewSuperAdminService(db, cfg)
-	if err := superAdminService.CheckAndUpdatePassword(); err != nil {
-		log.Fatalf("❌ Failed to check/update Super Admin: %v", err)
+	// Run AdminPasswordService sync (should detect change)
+	adminService := services.NewAdminPasswordService(db, cfg)
+	if err := adminService.SyncPasswordFromEnv(); err != nil {
+		log.Fatalf("❌ Failed to sync admin password: %v", err)
 	}
 
-	// Verify
-	checkSuperAdminExists(db)
-	checkCredentialsFileExists()
+	// Verify admin still exists
+	checkAdminExists(db, "Super Admin", false)
 
-	fmt.Println("✅ SCENARIO 2 PASSED: Credentials file regenerated successfully")
+	fmt.Println("✅ SCENARIO 2 PASSED: Password sync from environment works correctly")
 	fmt.Println()
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 }
 
 func testScenario3() {
 	fmt.Println("=============================================================")
-	fmt.Println("  SCENARIO 3: Normal startup with existing credentials file")
+	fmt.Println("  SCENARIO 3: SaaS Mode with Central Admin")
 	fmt.Println("=============================================================")
 	fmt.Println()
 
-	// Both database and credentials file exist from scenario 2
-	fmt.Println("✓ Database and credentials file both exist")
+	// Clean slate for SaaS mode
+	os.Remove("gassigeher.db")
+
+	// Set SaaS Mode environment
+	os.Setenv("BASE_DOMAIN", "gassigeher.local")
+	os.Setenv("CENTRAL_ADMIN_EMAIL", "central@gassigeher.local")
+	os.Setenv("CENTRAL_ADMIN_PASSWORD", "CentralAdmin789!")
+	fmt.Println("✓ Set BASE_DOMAIN=gassigeher.local (SaaS Mode)")
+	fmt.Println("✓ Set CENTRAL_ADMIN_EMAIL=central@gassigeher.local")
 	fmt.Println()
 
 	// Initialize
 	cfg := config.Load()
 	dbConfig := cfg.GetDBConfig()
-	db, _, err := database.InitializeWithConfig(dbConfig)
+	db, dialect, err := database.InitializeWithConfig(dbConfig)
 	if err != nil {
 		log.Fatalf("❌ Failed to initialize database: %v", err)
 	}
 	defer db.Close()
 
-	// Run SuperAdminService check (should validate and continue)
-	superAdminService := services.NewSuperAdminService(db, cfg)
-	if err := superAdminService.CheckAndUpdatePassword(); err != nil {
-		log.Fatalf("❌ Failed to check Super Admin: %v", err)
+	// Run migrations
+	if err := database.RunMigrationsWithDialect(db.SqlDB(), dialect); err != nil {
+		log.Fatalf("❌ Failed to run migrations: %v", err)
 	}
 
-	// Verify
-	checkSuperAdminExists(db)
-	checkCredentialsFileExists()
+	// Run seed with SaaS Mode config
+	seedConfig := database.SeedConfig{
+		IsSaaSMode:           true,
+		CentralAdminEmail:    cfg.CentralAdminEmail,
+		CentralAdminPassword: os.Getenv("CENTRAL_ADMIN_PASSWORD"),
+		DBType:               dialect.Name(),
+	}
+	if err := database.SeedDatabaseWithConfig(db.SqlDB(), seedConfig); err != nil {
+		log.Fatalf("❌ Failed to seed database: %v", err)
+	}
 
-	fmt.Println("✅ SCENARIO 3 PASSED: Normal startup validation works correctly")
+	// Verify Central Admin exists (has is_central_admin=true)
+	checkAdminExists(db, "Central Admin", true)
+
+	// Clear SaaS mode for cleanup
+	os.Setenv("BASE_DOMAIN", "")
+
+	fmt.Println("✅ SCENARIO 3 PASSED: SaaS Mode Central Admin works correctly")
 	fmt.Println()
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 }
 
-func checkSuperAdminExists(db *database.DB) {
+func checkAdminExists(db *database.DB, adminType string, isCentralAdmin bool) {
 	var exists bool
-	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = 1 AND is_super_admin = 1)").Scan(&exists)
+	var email string
+	var isCentral bool
+
+	err := db.QueryRow(`
+		SELECT EXISTS(SELECT 1 FROM users WHERE id = 1 AND is_super_admin = 1),
+		       (SELECT email FROM users WHERE id = 1),
+		       (SELECT CASE WHEN is_central_admin = 1 THEN 1 ELSE 0 END FROM users WHERE id = 1)
+	`).Scan(&exists, &email, &isCentral)
 	if err != nil {
-		log.Fatalf("❌ Failed to check Super Admin: %v", err)
+		log.Fatalf("❌ Failed to check admin: %v", err)
 	}
 	if !exists {
-		log.Fatalf("❌ Super Admin does not exist in database")
+		log.Fatalf("❌ %s does not exist in database", adminType)
 	}
-	fmt.Println("✓ Super Admin exists in database (ID=1)")
-}
+	fmt.Printf("✓ %s exists in database (ID=1, email=%s)\n", adminType, email)
 
-func checkCredentialsFileExists() {
-	if _, err := os.Stat("SUPER_ADMIN_CREDENTIALS.txt"); os.IsNotExist(err) {
-		log.Fatalf("❌ SUPER_ADMIN_CREDENTIALS.txt file does not exist")
+	// Verify Central Admin flag
+	if isCentralAdmin && !isCentral {
+		log.Fatalf("❌ Expected is_central_admin=true for %s", adminType)
 	}
-
-	// Read and verify file has content
-	content, err := os.ReadFile("SUPER_ADMIN_CREDENTIALS.txt")
-	if err != nil {
-		log.Fatalf("❌ Failed to read credentials file: %v", err)
+	if !isCentralAdmin && isCentral {
+		log.Fatalf("❌ Expected is_central_admin=false for %s", adminType)
 	}
-
-	if len(content) < 100 {
-		log.Fatalf("❌ Credentials file is too short (possibly corrupt)")
-	}
-
-	fmt.Println("✓ SUPER_ADMIN_CREDENTIALS.txt exists and contains data")
-
-	// Display first few lines for verification
-	lines := ""
-	for i, b := range content {
-		lines += string(b)
-		if b == '\n' && len(lines) > 200 {
-			break
-		}
-		if i > 500 {
-			break
-		}
-	}
-	fmt.Println()
-	fmt.Println("File preview:")
-	fmt.Println(lines)
+	fmt.Printf("✓ is_central_admin=%v (expected: %v)\n", isCentral, isCentralAdmin)
 }

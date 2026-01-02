@@ -12,7 +12,9 @@ gassigeher.db
 gassigeher.db.backup
 *.db.backup
 
-# Super Admin credentials (NEVER commit!)
+# Secrets and credentials (NEVER commit!)
+.env.secrets
+.env.local
 SUPER_ADMIN_CREDENTIALS.txt
 SUPER_ADMIN_CREDENTIALS.txt.backup
 

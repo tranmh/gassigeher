@@ -37,8 +37,15 @@ type Config struct {
 	JWTSecret          string
 	JWTExpirationHours int
 
-	// Super Admin (DONE: replaces ADMIN_EMAILS)
-	SuperAdminEmail string
+	// Admin Configuration
+	// Simple Mode: SuperAdminEmail is the local shelter admin
+	// SaaS Mode: CentralAdminEmail is the platform admin (can impersonate tenant super admins)
+	SuperAdminEmail  string // Simple Mode: local shelter admin email
+	CentralAdminEmail string // SaaS Mode: platform admin email
+
+	// Passwords are read from .env.secrets (not stored in config for security)
+	// Simple Mode: SUPER_ADMIN_PASSWORD
+	// SaaS Mode: CENTRAL_ADMIN_PASSWORD
 
 	// Email Provider Selection
 	EmailProvider string // "gmail" or "smtp"
@@ -143,8 +150,11 @@ func Load() *Config {
 		JWTSecret:          getEnvRequired("JWT_SECRET", "change-this-in-production-INSECURE"),
 		JWTExpirationHours: getEnvAsInt("JWT_EXPIRATION_HOURS", 24),
 
-		// Super Admin (DONE: replaces ADMIN_EMAILS)
-		SuperAdminEmail: getEnv("SUPER_ADMIN_EMAIL", ""),
+		// Admin Configuration
+		// Simple Mode: SUPER_ADMIN_EMAIL is the local shelter admin
+		// SaaS Mode: CENTRAL_ADMIN_EMAIL is the platform admin
+		SuperAdminEmail:   getEnv("SUPER_ADMIN_EMAIL", ""),
+		CentralAdminEmail: getEnv("CENTRAL_ADMIN_EMAIL", ""),
 
 		// Email Provider (default: gmail for backward compatibility)
 		EmailProvider: getEnv("EMAIL_PROVIDER", "gmail"),
@@ -491,6 +501,22 @@ func (c *Config) GetEffectiveDBPort() int {
 		return c.DBPort
 	}
 	return c.GetDefaultDBPort()
+}
+
+// IsSaaSMode returns true if running in SaaS multi-tenant mode
+// SaaS mode is enabled when BASE_DOMAIN is set
+func (c *Config) IsSaaSMode() bool {
+	return c.BaseDomain != ""
+}
+
+// GetAdminEmail returns the appropriate admin email based on mode
+// Simple Mode: returns SuperAdminEmail
+// SaaS Mode: returns CentralAdminEmail
+func (c *Config) GetAdminEmail() string {
+	if c.IsSaaSMode() {
+		return c.CentralAdminEmail
+	}
+	return c.SuperAdminEmail
 }
 
 // DONE

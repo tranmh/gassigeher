@@ -12,6 +12,23 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// SeedConfig holds configuration for database seeding
+type SeedConfig struct {
+	// Mode detection
+	IsSaaSMode bool // true = SaaS multi-tenant, false = Simple single-tenant
+
+	// Simple Mode settings
+	SuperAdminEmail    string // Email for Super Admin (Simple Mode)
+	SuperAdminPassword string // Password from SUPER_ADMIN_PASSWORD env var
+
+	// SaaS Mode settings
+	CentralAdminEmail    string // Email for Central Admin (SaaS Mode)
+	CentralAdminPassword string // Password from CENTRAL_ADMIN_PASSWORD env var
+
+	// Database dialect
+	DBType string // "sqlite" or "postgres"
+}
+
 // TestUser holds test user credentials for display
 type TestUser struct {
 	FirstName string
@@ -38,7 +55,6 @@ func EnsureDefaultTenant(db *sql.DB, dbType string) error {
 	}
 
 	// Create default tenant with id=0
-	// We use a direct SQL insert with explicit id=0
 	now := time.Now()
 
 	var query string
@@ -62,25 +78,53 @@ func EnsureDefaultTenant(db *sql.DB, dbType string) error {
 // SeedDatabase generates initial seed data for first-time installations
 // Only runs if users table is empty
 // Set SKIP_SEED=true to skip (useful for E2E tests that manage their own data)
-// DONE
+//
+// Deprecated: Use SeedDatabaseWithConfig for new code
 func SeedDatabase(db *sql.DB, superAdminEmail string, dbType ...string) error {
 	// Determine database type (default to sqlite for backward compatibility)
 	dialect := "sqlite"
 	if len(dbType) > 0 && dbType[0] != "" {
 		dialect = dbType[0]
 	}
-	// 0. Check if seeding is disabled (for E2E tests)
+
+	// Get password from environment (new approach)
+	// Try SUPER_ADMIN_PASSWORD first, fall back to generating one
+	password := os.Getenv("SUPER_ADMIN_PASSWORD")
+	if password == "" {
+		password = generateSecurePassword(20)
+		log.Println("Warning: SUPER_ADMIN_PASSWORD not set in .env.secrets, generated random password")
+	}
+
+	// Detect SaaS mode from environment
+	isSaaSMode := os.Getenv("BASE_DOMAIN") != ""
+
+	config := SeedConfig{
+		IsSaaSMode:           isSaaSMode,
+		SuperAdminEmail:      superAdminEmail,
+		SuperAdminPassword:   password,
+		CentralAdminEmail:    os.Getenv("CENTRAL_ADMIN_EMAIL"),
+		CentralAdminPassword: os.Getenv("CENTRAL_ADMIN_PASSWORD"),
+		DBType:               dialect,
+	}
+
+	return SeedDatabaseWithConfig(db, config)
+}
+
+// SeedDatabaseWithConfig generates initial seed data with explicit configuration
+// This is the preferred method for new code
+func SeedDatabaseWithConfig(db *sql.DB, cfg SeedConfig) error {
+	// Check if seeding is disabled (for E2E tests)
 	if os.Getenv("SKIP_SEED") == "true" {
 		log.Println("SKIP_SEED=true, skipping seed data generation")
 		return nil
 	}
 
-	// 0.5. Ensure default tenant exists (for foreign key constraints)
-	if err := EnsureDefaultTenant(db, dialect); err != nil {
+	// Ensure default tenant exists (for foreign key constraints)
+	if err := EnsureDefaultTenant(db, cfg.DBType); err != nil {
 		return fmt.Errorf("failed to ensure default tenant: %w", err)
 	}
 
-	// 1. Check if users table is empty
+	// Check if users table is empty
 	var count int
 	err := db.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
 	if err != nil {
@@ -94,25 +138,37 @@ func SeedDatabase(db *sql.DB, superAdminEmail string, dbType ...string) error {
 
 	log.Println("Empty database detected, generating seed data...")
 
-	// 2. Validate Super Admin email
-	if superAdminEmail == "" {
-		return fmt.Errorf("SUPER_ADMIN_EMAIL not set in .env - cannot create Super Admin")
+	if cfg.IsSaaSMode {
+		return seedSaaSMode(db, cfg)
+	}
+	return seedSimpleMode(db, cfg)
+}
+
+// seedSimpleMode creates the Super Admin for a single-tenant deployment
+func seedSimpleMode(db *sql.DB, cfg SeedConfig) error {
+	// Validate Super Admin email
+	if cfg.SuperAdminEmail == "" {
+		return fmt.Errorf("SUPER_ADMIN_EMAIL not set - cannot create Super Admin for Simple Mode")
 	}
 
-	// 3. Generate Central Admin (platform-level admin for SaaS)
-	// In SaaS mode, this is the platform administrator who can manage all tenants
-	// They access the system via /central/ on the main domain
-	centralAdminPassword := generateSecurePassword(20)
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(centralAdminPassword), bcrypt.DefaultCost)
+	// Get or generate password
+	password := cfg.SuperAdminPassword
+	if password == "" {
+		password = generateSecurePassword(20)
+		log.Println("Warning: SUPER_ADMIN_PASSWORD not set, generated random password")
+	}
+
+	// Hash password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return fmt.Errorf("failed to hash central admin password: %w", err)
+		return fmt.Errorf("failed to hash Super Admin password: %w", err)
 	}
 
 	now := time.Now()
 
-	// Use database-specific SQL syntax
+	// Insert Super Admin
 	var insertQuery string
-	if dialect == "postgres" {
+	if cfg.DBType == "postgres" {
 		insertQuery = `
 			INSERT INTO users (
 				id, tenant_id, first_name, last_name, email, password_hash,
@@ -128,53 +184,102 @@ func SeedDatabase(db *sql.DB, superAdminEmail string, dbType ...string) error {
 			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	}
 
+	// Super Admin for Simple Mode: is_super_admin=true, is_central_admin=false
 	_, err = db.Exec(insertQuery,
-		1, 0, "Central", "Admin", superAdminEmail, string(hashedPassword),
-		true, true, true, true, true, now, now, now, now)
-
+		1, 0, "Super", "Admin", cfg.SuperAdminEmail, string(hashedPassword),
+		true, true, false, true, true, now, now, now, now)
 	if err != nil {
-		return fmt.Errorf("failed to create Central Admin: %w", err)
+		return fmt.Errorf("failed to create Super Admin: %w", err)
 	}
 
 	// Reset PostgreSQL sequence after explicit ID insert
-	// Without this, the next auto-generated ID would conflict with ID=1
-	if dialect == "postgres" {
+	if cfg.DBType == "postgres" {
 		_, err = db.Exec("SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 1) FROM users))")
 		if err != nil {
 			log.Printf("Warning: failed to reset users_id_seq: %v", err)
 		}
 	}
 
-	superAdminPassword := centralAdminPassword // For backward compatibility in credentials file
-	log.Println("✓ Central Admin created (ID: 1) - Platform administrator for SaaS")
+	log.Println("✓ Super Admin created (ID: 1) - Local shelter administrator")
 
-	// In SaaS mode, we skip test users/dogs/bookings since they don't belong to any tenant
-	// Each tenant will create their own data during registration
-	// Test data can be created per-tenant via admin UI or API
-	var testUsers []TestUser
-	log.Println("✓ Skipped test data (SaaS mode - each tenant creates own data)")
+	// Print setup complete message
+	printSimpleModeSetup(cfg.SuperAdminEmail, password)
 
-	// Note: Demo tenant is created by DemoSeedService.EnsureDemoTenant() in main.go
-	// after the service is initialized. This avoids circular import issues.
-	log.Println("✓ Demo tenant will be created by DemoSeedService on startup")
+	log.Println("✓ Seed data generation completed successfully (Simple Mode)")
+	return nil
+}
 
-	// 9. Write credentials to file
-	err = writeCredentialsFile(superAdminEmail, superAdminPassword)
-	if err != nil {
-		log.Printf("Warning: Failed to write credentials file: %v", err)
+// seedSaaSMode creates the Central Admin for a multi-tenant deployment
+func seedSaaSMode(db *sql.DB, cfg SeedConfig) error {
+	// Validate Central Admin email
+	if cfg.CentralAdminEmail == "" {
+		return fmt.Errorf("CENTRAL_ADMIN_EMAIL not set - cannot create Central Admin for SaaS Mode")
 	}
 
-	// 10. Print setup complete message
-	printSetupComplete(superAdminEmail, superAdminPassword, testUsers)
+	// Get or generate password
+	password := cfg.CentralAdminPassword
+	if password == "" {
+		password = generateSecurePassword(20)
+		log.Println("Warning: CENTRAL_ADMIN_PASSWORD not set, generated random password")
+	}
 
-	log.Println("✓ Seed data generation completed successfully")
+	// Hash password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash Central Admin password: %w", err)
+	}
+
+	now := time.Now()
+
+	// Insert Central Admin
+	var insertQuery string
+	if cfg.DBType == "postgres" {
+		insertQuery = `
+			INSERT INTO users (
+				id, tenant_id, first_name, last_name, email, password_hash,
+				is_admin, is_super_admin, is_central_admin, is_verified, is_active,
+				terms_accepted_at, last_activity_at, created_at, updated_at
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`
+	} else {
+		insertQuery = `
+			INSERT INTO users (
+				id, tenant_id, first_name, last_name, email, password_hash,
+				is_admin, is_super_admin, is_central_admin, is_verified, is_active,
+				terms_accepted_at, last_activity_at, created_at, updated_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	}
+
+	// Central Admin for SaaS Mode: is_super_admin=true, is_central_admin=true
+	_, err = db.Exec(insertQuery,
+		1, 0, "Central", "Admin", cfg.CentralAdminEmail, string(hashedPassword),
+		true, true, true, true, true, now, now, now, now)
+	if err != nil {
+		return fmt.Errorf("failed to create Central Admin: %w", err)
+	}
+
+	// Reset PostgreSQL sequence after explicit ID insert
+	if cfg.DBType == "postgres" {
+		_, err = db.Exec("SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 1) FROM users))")
+		if err != nil {
+			log.Printf("Warning: failed to reset users_id_seq: %v", err)
+		}
+	}
+
+	log.Println("✓ Central Admin created (ID: 1) - Platform administrator for SaaS")
+
+	// Note: Demo tenant is created by DemoSeedService.EnsureDemoTenant() in main.go
+	log.Println("✓ Demo tenant will be created by DemoSeedService on startup")
+
+	// Print setup complete message
+	printSaaSModeSetup(cfg.CentralAdminEmail, password)
+
+	log.Println("✓ Seed data generation completed successfully (SaaS Mode)")
 	return nil
 }
 
 // generateSecurePassword generates a cryptographically secure random password
 // Uses crypto/rand for unpredictable random bytes
 func generateSecurePassword(length int) string {
-	// Character sets for password generation
 	lowercase := "abcdefghijklmnopqrstuvwxyz"
 	uppercase := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	numbers := "0123456789"
@@ -183,12 +288,9 @@ func generateSecurePassword(length int) string {
 
 	password := make([]byte, length)
 
-	// Helper function for cryptographically secure random index
 	secureRandomIndex := func(max int) int {
 		n, err := rand.Int(rand.Reader, big.NewInt(int64(max)))
 		if err != nil {
-			// This should never happen - if crypto/rand fails, the system is compromised
-			// Log the error for operators before terminating
 			log.Printf("CRITICAL: crypto/rand failed during password generation: %v", err)
 			panic("crypto/rand failed: " + err.Error())
 		}
@@ -215,149 +317,57 @@ func generateSecurePassword(length int) string {
 	return string(password)
 }
 
-// generateTestUsers creates 3 test users with different color levels
-// Level field is used for assigning colors after creation
-// DONE
-func generateTestUsers(db *sql.DB) ([]TestUser, error) {
-	users := []TestUser{
-		{FirstName: "Test", LastName: "Walker (Green)", Email: "green-walker@test.com", Level: "green"},
-		{FirstName: "Test", LastName: "Walker (Blue)", Email: "blue-walker@test.com", Level: "blue"},
-		{FirstName: "Test", LastName: "Walker (Orange)", Email: "orange-walker@test.com", Level: "orange"},
-	}
-
-	now := time.Now()
-	for i := range users {
-		users[i].Password = generateSecurePassword(12)
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(users[i].Password), bcrypt.DefaultCost)
-		if err != nil {
-			return nil, fmt.Errorf("failed to hash test user password: %w", err)
-		}
-
-		_, err = db.Exec(`
-			INSERT INTO users (first_name, last_name, email, password_hash,
-				is_admin, is_super_admin, is_verified, is_active,
-				terms_accepted_at, last_activity_at, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, users[i].FirstName, users[i].LastName, users[i].Email, string(hashedPassword),
-			false, false, true, true, now, now, now, now)
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to create test user %s: %w", users[i].Email, err)
-		}
-	}
-
-	log.Printf("✓ Created %d test users", len(users))
-	return users, nil
+// printSimpleModeSetup prints setup info for Simple Mode
+func printSimpleModeSetup(email, password string) {
+	fmt.Println()
+	fmt.Println("=============================================================")
+	fmt.Println("  GASSIGEHER - INSTALLATION COMPLETE (Simple Mode)")
+	fmt.Println("=============================================================")
+	fmt.Println()
+	fmt.Println("SUPER ADMIN CREDENTIALS:")
+	fmt.Printf("  Email:    %s\n", email)
+	fmt.Printf("  Password: %s\n", password)
+	fmt.Println()
+	fmt.Println("ACCESS:")
+	fmt.Println("  Application: http://localhost:8080")
+	fmt.Println("  Admin Panel: http://localhost:8080/admin-dashboard.html")
+	fmt.Println()
+	fmt.Println("IMPORTANT:")
+	fmt.Println("- Password is stored in .env.secrets as SUPER_ADMIN_PASSWORD")
+	fmt.Println("- To change password: edit .env.secrets and restart server")
+	fmt.Println("- Keep .env.secrets secure and never commit to git")
+	fmt.Println()
+	fmt.Println("=============================================================")
+	fmt.Println()
 }
 
-// generateDogs creates 5 sample dogs with different colors and care info
-// Color IDs: 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau
-func generateDogs(db *sql.DB) error {
-	dogs := []struct {
-		Name                string
-		ColorID             int // Color category ID
-		Breed               string
-		Size                string
-		Age                 int
-		SpecialNeeds        *string
-		PickupLocation      *string
-		WalkRoute           *string
-		WalkDuration        *int
-		SpecialInstructions *string
-		DefaultMorningTime  *string
-		DefaultEveningTime  *string
-	}{
-		{
-			Name:                "Bella",
-			ColorID:             1, // gruen
-			Breed:               "Labrador Retriever",
-			Size:                "large",
-			Age:                 3,
-			SpecialNeeds:        strPtr("Keine besonderen Bedürfnisse"),
-			PickupLocation:      strPtr("Zwinger 1, Gebäude A"),
-			WalkRoute:           strPtr("Waldweg hinter dem Tierheim, geradeaus bis zur Bank, dann links zurück"),
-			WalkDuration:        intPtr(45),
-			SpecialInstructions: strPtr("Bella ist sehr freundlich und verträgt sich gut mit anderen Hunden. Liebt es, Stöckchen zu holen!"),
-			DefaultMorningTime:  strPtr("09:00"),
-			DefaultEveningTime:  strPtr("17:00"),
-		},
-		{
-			Name:                "Max",
-			ColorID:             2, // gelb
-			Breed:               "Golden Retriever",
-			Size:                "large",
-			Age:                 5,
-			SpecialNeeds:        strPtr("Leichte Arthrose - bitte keine langen Spaziergänge"),
-			PickupLocation:      strPtr("Zwinger 3, Gebäude A"),
-			WalkRoute:           strPtr("Kurze Runde um den Teich, ebener Untergrund bevorzugt"),
-			WalkDuration:        intPtr(30),
-			SpecialInstructions: strPtr("Max braucht häufige Pausen. Bei Anzeichen von Müdigkeit bitte umkehren. Nach dem Spaziergang Leckerli als Belohnung."),
-			DefaultMorningTime:  strPtr("10:00"),
-			DefaultEveningTime:  strPtr("16:00"),
-		},
-		{
-			Name:                "Luna",
-			ColorID:             3, // orange
-			Breed:               "Deutscher Schäferhund",
-			Size:                "large",
-			Age:                 4,
-			SpecialNeeds:        strPtr("Reaktiv gegenüber anderen Hunden - Abstand halten!"),
-			PickupLocation:      strPtr("Zwinger 7, Gebäude B (separater Eingang)"),
-			WalkRoute:           strPtr("Feldweg Richtung Süden, weg von den Hauptwegen. Karte am Zwinger."),
-			WalkDuration:        intPtr(60),
-			SpecialInstructions: strPtr("WICHTIG: Mindestens 10m Abstand zu anderen Hunden. Bei Begegnung: Luna ablenken mit Leckerli. Niemals an der kurzen Leine führen bei Hundebegegnungen."),
-			DefaultMorningTime:  strPtr("08:00"),
-			DefaultEveningTime:  strPtr("18:00"),
-		},
-		{
-			Name:                "Charlie",
-			ColorID:             4, // hellblau
-			Breed:               "Border Collie",
-			Size:                "medium",
-			Age:                 2,
-			SpecialNeeds:        strPtr("Sehr energiegeladen - braucht viel Beschäftigung"),
-			PickupLocation:      strPtr("Zwinger 2, Gebäude A"),
-			WalkRoute:           strPtr("Große Runde durch den Wald, gerne mit Apportier-Spielen"),
-			WalkDuration:        intPtr(60),
-			SpecialInstructions: strPtr("Charlie liebt Kopfarbeit! Bitte Ball oder Frisbee mitnehmen (liegt am Zwinger). Kommandos: Sitz, Platz, Bleib funktionieren gut."),
-			DefaultMorningTime:  strPtr("08:30"),
-			DefaultEveningTime:  strPtr("17:30"),
-		},
-		{
-			Name:                "Rocky",
-			ColorID:             5, // dunkelblau
-			Breed:               "Belgischer Malinois",
-			Size:                "large",
-			Age:                 6,
-			SpecialNeeds:        strPtr("Nur für erfahrene Hundeführer - stark und eigenwillig"),
-			PickupLocation:      strPtr("Zwinger 10, Gebäude C (Schlüssel beim Pfleger holen)"),
-			WalkRoute:           strPtr("Trainingsgelände hinter Gebäude C, dann Waldweg Nord"),
-			WalkDuration:        intPtr(45),
-			SpecialInstructions: strPtr("Rocky braucht klare Führung. Immer Leckerlis dabei haben. Bei Unsicherheit: Spaziergang abbrechen und zurückkehren. Notfall-Nummer Pfleger: Am Zwinger ausgehängt."),
-			DefaultMorningTime:  strPtr("07:30"),
-			DefaultEveningTime:  strPtr("16:30"),
-		},
-	}
-
-	now := time.Now()
-	for _, dog := range dogs {
-		_, err := db.Exec(`
-			INSERT INTO dogs (name, color_id, breed, size, age,
-				special_needs, pickup_location, walk_route, walk_duration,
-				special_instructions, default_morning_time, default_evening_time,
-				is_available, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, dog.Name, dog.ColorID, dog.Breed, dog.Size, dog.Age,
-			dog.SpecialNeeds, dog.PickupLocation, dog.WalkRoute, dog.WalkDuration,
-			dog.SpecialInstructions, dog.DefaultMorningTime, dog.DefaultEveningTime,
-			true, now, now)
-		if err != nil {
-			return fmt.Errorf("failed to create dog %s: %w", dog.Name, err)
-		}
-	}
-
-	log.Printf("✓ Created %d dogs with care info", len(dogs))
-	return nil
+// printSaaSModeSetup prints setup info for SaaS Mode
+func printSaaSModeSetup(email, password string) {
+	fmt.Println()
+	fmt.Println("=============================================================")
+	fmt.Println("  GASSIGEHER SaaS - INSTALLATION COMPLETE (SaaS Mode)")
+	fmt.Println("=============================================================")
+	fmt.Println()
+	fmt.Println("CENTRAL ADMIN CREDENTIALS (Platform Administrator):")
+	fmt.Printf("  Email:    %s\n", email)
+	fmt.Printf("  Password: %s\n", password)
+	fmt.Println()
+	fmt.Println("ACCESS POINTS:")
+	fmt.Println("  Landing Page:    http://gassigeher.local:8080/landing/")
+	fmt.Println("  Central Admin:   http://gassigeher.local:8080/central/")
+	fmt.Println()
+	fmt.Println("NEXT STEPS:")
+	fmt.Println("  1. Login at /central/ with Central Admin credentials")
+	fmt.Println("  2. Create tenants (animal shelters)")
+	fmt.Println("  3. Each tenant gets their own Super Admin on registration")
+	fmt.Println()
+	fmt.Println("IMPORTANT:")
+	fmt.Println("- Password is stored in .env.secrets as CENTRAL_ADMIN_PASSWORD")
+	fmt.Println("- To change password: edit .env.secrets and restart server")
+	fmt.Println("- Keep .env.secrets secure and never commit to git")
+	fmt.Println()
+	fmt.Println("=============================================================")
+	fmt.Println()
 }
 
 // Helper functions for creating pointers to values
@@ -367,247 +377,4 @@ func strPtr(s string) *string {
 
 func intPtr(i int) *int {
 	return &i
-}
-
-// assignUserColors assigns colors to users based on their level
-// Color IDs: 1=gruen, 2=gelb, 3=orange, 4=hellblau, 5=dunkelblau, 6=helllila, 7=dunkellila
-// - green users: only gruen (1)
-// - orange users: gruen (1), gelb (2), orange (3)
-// - blue users: all colors (1-5)
-func assignUserColors(db *sql.DB, testUsers []TestUser) error {
-	// Define which colors each level gets
-	colorsByLevel := map[string][]int{
-		"green":  {1},             // only gruen
-		"orange": {1, 2, 3},       // gruen, gelb, orange
-		"blue":   {1, 2, 3, 4, 5}, // all main colors
-	}
-
-	// Build a map of email to level from test users
-	levelByEmail := make(map[string]string)
-	for _, u := range testUsers {
-		levelByEmail[u.Email] = u.Level
-	}
-
-	// Get all users with their emails
-	rows, err := db.Query("SELECT id, email FROM users")
-	if err != nil {
-		return fmt.Errorf("failed to query users: %w", err)
-	}
-	defer rows.Close()
-
-	type userInfo struct {
-		id    int
-		email string
-	}
-	var users []userInfo
-
-	for rows.Next() {
-		var u userInfo
-		if err := rows.Scan(&u.id, &u.email); err != nil {
-			return fmt.Errorf("failed to scan user: %w", err)
-		}
-		users = append(users, u)
-	}
-
-	totalAssignments := 0
-	for _, user := range users {
-		// Determine level: Super Admin (ID=1) gets orange, test users get their level
-		var level string
-		if user.id == 1 {
-			level = "orange" // Super Admin gets orange-level colors
-		} else if l, ok := levelByEmail[user.email]; ok {
-			level = l
-		} else {
-			level = "green" // Default to green
-		}
-
-		colors, ok := colorsByLevel[level]
-		if !ok {
-			colors = colorsByLevel["green"]
-		}
-
-		for _, colorID := range colors {
-			_, err := db.Exec(`
-				INSERT INTO user_colors (user_id, color_id)
-				VALUES (?, ?)
-			`, user.id, colorID)
-			if err != nil {
-				return fmt.Errorf("failed to assign color %d to user %d: %w", colorID, user.id, err)
-			}
-			totalAssignments++
-		}
-	}
-
-	log.Printf("✓ Assigned %d colors to %d users based on levels", totalAssignments, len(users))
-	return nil
-}
-
-// generateBookings creates 3 sample bookings (past, present, future)
-// DONE
-func generateBookings(db *sql.DB) error {
-	today := time.Now()
-	yesterday := today.AddDate(0, 0, -1)
-	tomorrow := today.AddDate(0, 0, 1)
-
-	bookings := []struct {
-		UserID int
-		DogID  int
-		Date   time.Time
-		Time   string
-		Status string
-	}{
-		{2, 1, yesterday, "09:00", "completed"},
-		{3, 2, today, "14:00", "scheduled"},
-		{4, 3, tomorrow, "10:30", "scheduled"},
-	}
-
-	now := time.Now()
-	for _, booking := range bookings {
-		_, err := db.Exec(`
-			INSERT INTO bookings (user_id, dog_id, date, scheduled_time,
-				status, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
-		`, booking.UserID, booking.DogID,
-			booking.Date.Format("2006-01-02"), booking.Time,
-			booking.Status, now, now)
-		if err != nil {
-			return fmt.Errorf("failed to create booking: %w", err)
-		}
-	}
-
-	log.Printf("✓ Created %d bookings", len(bookings))
-	return nil
-}
-
-// initializeSystemSettings creates default system settings if not exists
-// DONE
-func initializeSystemSettings(db *sql.DB) error {
-	settings := []struct {
-		Key   string
-		Value string
-	}{
-		{"booking_advance_days", "14"},
-		{"cancellation_notice_hours", "12"},
-		{"auto_deactivation_days", "365"},
-	}
-
-	now := time.Now()
-	for _, setting := range settings {
-		// Check if setting exists
-		var count int
-		err := db.QueryRow("SELECT COUNT(*) FROM system_settings WHERE key = ?", setting.Key).Scan(&count)
-		if err != nil {
-			return fmt.Errorf("failed to check setting %s: %w", setting.Key, err)
-		}
-
-		if count == 0 {
-			_, err = db.Exec(`
-				INSERT INTO system_settings (key, value, updated_at)
-				VALUES (?, ?, ?)
-			`, setting.Key, setting.Value, now)
-			if err != nil {
-				return fmt.Errorf("failed to create setting %s: %w", setting.Key, err)
-			}
-		}
-	}
-
-	log.Printf("✓ Initialized system settings")
-	return nil
-}
-
-// writeCredentialsFile writes Central Admin credentials to a file
-// In Docker, writes to logs/ directory (mounted volume) for persistence
-// In non-Docker, writes to current directory
-func writeCredentialsFile(email, password string) error {
-	now := time.Now().Format("2006-01-02 15:04:05")
-	content := fmt.Sprintf(`=============================================================
-GASSIGEHER SAAS - CENTRAL ADMIN CREDENTIALS
-=============================================================
-
-EMAIL: %s
-PASSWORD: %s
-
-CREATED: %s
-LAST UPDATED: %s
-
-=============================================================
-WHAT IS CENTRAL ADMIN?
-=============================================================
-
-Central Admin is the PLATFORM-LEVEL administrator who can:
-- Access /central/ dashboard on the main domain
-- Create and manage all tenants (animal shelters)
-- View platform-wide statistics
-- Promote/demote other Central Admins
-
-This is DIFFERENT from tenant-level Super Admin who manages
-a single shelter.
-
-=============================================================
-HOW TO CHANGE PASSWORD:
-=============================================================
-
-1. Edit the PASSWORD line above with your new password
-2. Save this file
-3. Restart the Gassigeher server
-4. Server will hash and save the new password
-5. This file will be updated with confirmation
-
-IMPORTANT:
-- Keep this file secure (never commit to git)
-- This is the ONLY way to change Central Admin password
-- Central Admin email cannot be changed (defined in .env)
-
-=============================================================
-`, email, password, now, now)
-
-	// Determine file path - use data/ if it exists (Docker volume mount)
-	filePath := "SUPER_ADMIN_CREDENTIALS.txt"
-	if info, err := os.Stat("data"); err == nil && info.IsDir() {
-		filePath = "data/SUPER_ADMIN_CREDENTIALS.txt"
-	}
-
-	err := os.WriteFile(filePath, []byte(content), 0600)
-	if err != nil {
-		return fmt.Errorf("failed to write credentials file: %w", err)
-	}
-
-	log.Printf("✓ Credentials file written: %s", filePath)
-	return nil
-}
-
-// printSetupComplete prints the setup completion message to console
-// DONE
-func printSetupComplete(superAdminEmail, superAdminPassword string, testUsers []TestUser) {
-	fmt.Println()
-	fmt.Println("=============================================================")
-	fmt.Println("  GASSIGEHER SAAS - INSTALLATION COMPLETE")
-	fmt.Println("=============================================================")
-	fmt.Println()
-	fmt.Println("CENTRAL ADMIN CREDENTIALS (SAVE THESE!):")
-	fmt.Printf("  Email:    %s\n", superAdminEmail)
-	fmt.Printf("  Password: %s\n", superAdminPassword)
-	fmt.Println()
-	fmt.Println("ACCESS POINTS:")
-	fmt.Println("  Landing Page:  http://gassigeher.local:8080/landing/")
-	fmt.Println("  Central Admin: http://gassigeher.local:8080/central/")
-	fmt.Println()
-	fmt.Println("NEXT STEPS:")
-	fmt.Println("  1. Login at /central/ with Central Admin credentials")
-	fmt.Println("  2. Create tenants (animal shelters)")
-	fmt.Println("  3. Each tenant gets their own Super Admin on registration")
-	fmt.Println()
-	if len(testUsers) > 0 {
-		fmt.Println("TEST USER CREDENTIALS (for demo tenant only):")
-		for i, user := range testUsers {
-			fmt.Printf("  %d. %s %s / %s / %s\n", i+1, user.FirstName, user.LastName, user.Email, user.Password)
-		}
-		fmt.Println()
-	}
-	fmt.Println("IMPORTANT:")
-	fmt.Println("- Central Admin password saved to: SUPER_ADMIN_CREDENTIALS.txt")
-	fmt.Println("- Change password: Edit file and restart server")
-	fmt.Println()
-	fmt.Println("=============================================================")
-	fmt.Println()
 }

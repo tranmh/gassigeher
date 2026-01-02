@@ -119,15 +119,24 @@ func main() {
 		log.Println("Metrics password has been updated for this session")
 	}
 
-	// DONE: Phase 2 - Run seed data (first-time installations)
-	if err := database.SeedDatabase(db.SqlDB(), cfg.SuperAdminEmail, dialect.Name()); err != nil {
+	// Run seed data (first-time installations)
+	// Uses SeedConfig to properly handle Simple Mode vs SaaS Mode
+	seedConfig := database.SeedConfig{
+		IsSaaSMode:           cfg.IsSaaSMode(),
+		SuperAdminEmail:      cfg.SuperAdminEmail,
+		SuperAdminPassword:   os.Getenv("SUPER_ADMIN_PASSWORD"),
+		CentralAdminEmail:    cfg.CentralAdminEmail,
+		CentralAdminPassword: os.Getenv("CENTRAL_ADMIN_PASSWORD"),
+		DBType:               dialect.Name(),
+	}
+	if err := database.SeedDatabaseWithConfig(db.SqlDB(), seedConfig); err != nil {
 		log.Fatalf("Failed to seed database: %v", err)
 	}
 
-	// DONE: Phase 2 - Check and update Super Admin password
-	superAdminService := services.NewSuperAdminService(db, cfg)
-	if err := superAdminService.CheckAndUpdatePassword(); err != nil {
-		log.Printf("Warning: Failed to check Super Admin password: %v", err)
+	// Sync admin password from .env.secrets if it changed
+	adminPasswordService := services.NewAdminPasswordService(db, cfg)
+	if err := adminPasswordService.SyncPasswordFromEnv(); err != nil {
+		log.Printf("Warning: Failed to sync admin password: %v", err)
 		// Don't exit - allow server to start
 	}
 
