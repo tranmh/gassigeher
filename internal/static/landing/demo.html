@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Live-Demo - Gassigeher</title>
-    <meta name="description" content="Testen Sie Gassigeher kostenlos! Unsere Live-Demo zeigt alle Funktionen des Buchungssystems fuer Tierheime.">
+    <meta name="description" content="Testen Sie Gassigeher kostenlos! Unsere Live-Demo zeigt alle Funktionen des Buchungssystems für Tierheime.">
     <link rel="stylesheet" href="/landing/assets/css/landing.css">
     <link rel="icon" href="/assets/images/favicon.ico">
     <style>
@@ -240,13 +240,13 @@
         <!-- Demo Features -->
         <section class="demo-features">
             <div class="container">
-                <h2>Was Sie in der Demo testen koennen</h2>
+                <h2>Was Sie in der Demo testen können</h2>
                 <div class="features-list">
                     <div class="feature-item">
                         <span class="icon">📅</span>
                         <div>
                             <h4>Buchungen erstellen</h4>
-                            <p>Buchen Sie Spaziergaenge mit verschiedenen Hunden und sehen Sie den Kalender.</p>
+                            <p>Buchen Sie Spaziergänge mit verschiedenen Hunden und sehen Sie den Kalender.</p>
                         </div>
                     </div>
                     <div class="feature-item">
@@ -260,7 +260,7 @@
                         <span class="icon">🎨</span>
                         <div>
                             <h4>Farbkategorien</h4>
-                            <p>Erleben Sie das Farbsystem fuer Erfahrungsstufen von Helfern und Hunden.</p>
+                            <p>Erleben Sie das Farbsystem für Erfahrungsstufen von Helfern und Hunden.</p>
                         </div>
                     </div>
                     <div class="feature-item">
@@ -281,7 +281,7 @@
                         <span class="icon">📊</span>
                         <div>
                             <h4>Dashboard</h4>
-                            <p>Sehen Sie Statistiken und Aktivitaeten auf einen Blick.</p>
+                            <p>Sehen Sie Statistiken und Aktivitäten auf einen Blick.</p>
                         </div>
                     </div>
                 </div>
@@ -292,7 +292,7 @@
         <section class="demo-cta">
             <div class="container">
                 <h2>Bereit, Ihr eigenes Buchungssystem einzurichten?</h2>
-                <p>Die Demo gefaellt Ihnen? Registrieren Sie Ihr Tierheim kostenlos und starten Sie in wenigen Minuten.</p>
+                <p>Die Demo gefällt Ihnen? Registrieren Sie Ihr Tierheim kostenlos und starten Sie in wenigen Minuten.</p>
                 <div class="demo-buttons">
                     <a href="/landing/register.html" class="btn btn-primary btn-large">Kostenlos registrieren</a>
                     <a href="/landing/contact.html" class="btn btn-secondary btn-large">Fragen? Kontaktieren Sie uns</a>
@@ -325,7 +325,7 @@
             try {
                 const response = await fetch('/api/v1/demo/credentials');
                 if (!response.ok) {
-                    throw new Error('Demo-Zugangsdaten nicht verfuegbar');
+                    throw new Error('Demo-Zugangsdaten nicht verfügbar');
                 }
 
                 const data = await response.json();
@@ -334,7 +334,7 @@
                 container.innerHTML = `
                     <div class="error">
                         <p>Die Demo-Zugangsdaten konnten nicht geladen werden.</p>
-                        <p>Bitte versuchen Sie es spaeter erneut.</p>
+                        <p>Bitte versuchen Sie es später erneut.</p>
                     </div>
                 `;
             }
@@ -376,7 +376,7 @@
                     <div class="credential-card">
                         <h3>Demo-Benutzer</h3>
                         <p style="font-size: 0.9rem; color: var(--color-text-light); margin-bottom: 1rem;">
-                            Passwort fuer alle: <strong>demo1234</strong>
+                            Passwort für alle: <strong>demo1234</strong>
                         </p>
                         <div class="user-list">
                             ${data.demo_users.map(user => `
@@ -398,8 +398,8 @@
 
                 <div class="reset-notice">
                     <strong>Automatischer Reset</strong>
-                    <span>Die Demo wird taeglich um Mitternacht auf den Ausgangszustand zurueckgesetzt.</span>
-                    ${data.admin.next_reset_at ? `<br><small>Naechster Reset: ${data.admin.next_reset_at} Uhr</small>` : ''}
+                    <span>Die Demo wird täglich um Mitternacht auf den Ausgangszustand zurückgesetzt.</span>
+                    ${data.admin.next_reset_at ? `<br><small>Nächster Reset: ${data.admin.next_reset_at} Uhr</small>` : ''}
                 </div>
             `;
         }

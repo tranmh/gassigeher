@@ -471,7 +471,7 @@
 
         async function deactivateTenant() {
             if (!currentTenantId) return;
-            if (!confirm('Tierheim wirklich deaktivieren? Benutzer werden sich nicht mehr anmelden konnen.')) return;
+            if (!confirm('Tierheim wirklich deaktivieren? Benutzer werden sich nicht mehr anmelden können.')) return;
 
             try {
                 await centralAPI.deactivateTenant(currentTenantId);

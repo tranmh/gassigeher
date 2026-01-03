@@ -33,7 +33,7 @@ type DemoUser struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 	Level    string `json:"level"`     // green, orange, blue
-	LevelDE  string `json:"level_de"`  // German: Anfaenger, Fortgeschritten, Experte
+	LevelDE  string `json:"level_de"`  // German: Anfänger, Fortgeschritten, Experte
 }
 
 // DemoDog represents a demo dog for display on the landing page

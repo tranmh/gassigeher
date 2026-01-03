@@ -48,7 +48,7 @@ const testTenant = {
 // Dog test data
 const testDogs = [
   { name: 'Bello', breed: 'Labrador', age: 2, category: 'green', size: 'medium' },
-  { name: 'Rex', breed: 'Schaeferhund', age: 3, category: 'green', size: 'large' },
+  { name: 'Rex', breed: 'Schäferhund', age: 3, category: 'green', size: 'large' },
   { name: 'Luna', breed: 'Golden Retriever', age: 4, category: 'orange', size: 'large' },
   { name: 'Max', breed: 'Dackel', age: 5, category: 'green', size: 'small' },
   { name: 'Maja', breed: 'Beagle', age: 2, category: 'green', size: 'medium' },

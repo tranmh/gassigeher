@@ -272,14 +272,14 @@
             <div class="card" id="upload-section">
                 <h3>CSV-Datei hochladen</h3>
                 <p style="color: #666; margin-bottom: 20px;">
-                    Laden Sie eine CSV-Datei mit Hunde-Daten hoch. Unterstutzt werden Komma- und Semikolon-getrennte Dateien.
+                    Laden Sie eine CSV-Datei mit Hunde-Daten hoch. Unterstützt werden Komma- und Semikolon-getrennte Dateien.
                 </p>
 
                 <div class="upload-zone" id="upload-zone">
                     <input type="file" id="file-input" accept=".csv">
                     <div class="upload-icon">📁</div>
-                    <div class="upload-text">Datei hier ablegen oder klicken zum Auswahlen</div>
-                    <div class="upload-hint">Unterstutzt: CSV (max. 10MB)</div>
+                    <div class="upload-text">Datei hier ablegen oder klicken zum Auswählen</div>
+                    <div class="upload-hint">Unterstützt: CSV (max. 10MB)</div>
                 </div>
 
                 <div id="file-info" class="file-info" style="display: none;">
@@ -319,10 +319,10 @@
                 <ul style="margin: 0; padding-left: 20px; color: #666; line-height: 1.8;">
                     <li>Laden Sie zuerst die <strong>Vorlage</strong> herunter, um das erwartete Format zu sehen</li>
                     <li>Die <strong>Name</strong>-Spalte ist erforderlich</li>
-                    <li>Grossen werden automatisch erkannt: klein/small, mittel/medium, gross/large</li>
-                    <li>Farben mussen den konfigurierten Farbkategorien entsprechen (z.B. Grun, Orange, Blau)</li>
-                    <li>Verfugbarkeit wird automatisch erkannt: ja/yes/true/1 = verfugbar</li>
-                    <li>TEO-Exporte konnen direkt importiert werden</li>
+                    <li>Größen werden automatisch erkannt: klein/small, mittel/medium, groß/large</li>
+                    <li>Farben müssen den konfigurierten Farbkategorien entsprechen (z.B. Grün, Orange, Blau)</li>
+                    <li>Verfügbarkeit wird automatisch erkannt: ja/yes/true/1 = verfügbar</li>
+                    <li>TEO-Exporte können direkt importiert werden</li>
                 </ul>
             </div>
         </div>
@@ -347,11 +347,11 @@
             { key: 'name', label: 'Name', required: true },
             { key: 'breed', label: 'Rasse', required: false },
             { key: 'age', label: 'Alter', required: false },
-            { key: 'size', label: 'Grosse', required: false },
+            { key: 'size', label: 'Größe', required: false },
             { key: 'color', label: 'Farbe', required: false },
             { key: 'special_instructions', label: 'Spezialhinweise', required: false },
             { key: 'pickup_location', label: 'Abholort', required: false },
-            { key: 'is_available', label: 'Verfugbar', required: false }
+            { key: 'is_available', label: 'Verfügbar', required: false }
         ];
 
         document.addEventListener('DOMContentLoaded', async () => {
@@ -443,13 +443,13 @@
         function handleFile(file) {
             // Validate file type
             if (!file.name.toLowerCase().endsWith('.csv')) {
-                showAlert('Nur CSV-Dateien werden unterstutzt', 'error');
+                showAlert('Nur CSV-Dateien werden unterstützt', 'error');
                 return;
             }
 
             // Validate file size (10MB max)
             if (file.size > 10 * 1024 * 1024) {
-                showAlert('Datei zu gross (max. 10MB)', 'error');
+                showAlert('Datei zu groß (max. 10MB)', 'error');
                 return;
             }
 
@@ -583,7 +583,7 @@
             }
 
             try {
-                showAlert('Import wird durchgefuhrt...', 'info');
+                showAlert('Import wird durchgeführt...', 'info');
                 updateSteps(3);
 
                 const result = await api.executeImport(currentFile, currentMapping);
@@ -616,7 +616,7 @@
                         </div>
                         <div class="import-stat">
                             <span class="number" style="color: ${result.skipped > 0 ? '#dc3545' : '#666'};">${result.skipped}</span>
-                            <span class="label">Ubersprungen</span>
+                            <span class="label">Übersprungen</span>
                         </div>
                     </div>
             `;

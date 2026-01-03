@@ -335,7 +335,7 @@ func (s *LocalDevSeedService) seedSmallProfile(tenantID, adminID int) error {
 		{"Bella", "Labrador Retriever", "large", 3, "Gruen", true},
 		{"Max", "Golden Retriever", "large", 5, "Gruen", true},
 		{"Luna", "Border Collie", "medium", 4, "Orange", false},
-		{"Rocky", "Deutscher Schaeferhund", "large", 6, "Orange", false},
+		{"Rocky", "Deutscher Schäferhund", "large", 6, "Orange", false},
 		{"Duke", "Rottweiler", "large", 4, "Dunkelblau", false},
 	})
 	if err != nil {
@@ -372,7 +372,7 @@ func (s *LocalDevSeedService) seedMediumProfile(tenantID, adminID int) error {
 		{"Bella", "Labrador Retriever", "large", 3, "Gruen", true},
 		{"Max", "Golden Retriever", "large", 5, "Gruen", true},
 		{"Luna", "Border Collie", "medium", 4, "Orange", false},
-		{"Rocky", "Deutscher Schaeferhund", "large", 6, "Orange", false},
+		{"Rocky", "Deutscher Schäferhund", "large", 6, "Orange", false},
 		{"Duke", "Rottweiler", "large", 4, "Dunkelblau", false},
 		{"Buddy", "Beagle", "medium", 2, "Gruen", false},
 		{"Lucy", "Dackel", "small", 7, "Gruen", false},
@@ -422,7 +422,7 @@ func (s *LocalDevSeedService) seedStressProfile(tenantID, adminID int) error {
 
 	// Create 50 dogs
 	var dogs []dogConfig
-	breeds := []string{"Labrador", "Golden Retriever", "Border Collie", "Schaeferhund", "Rottweiler", "Beagle", "Dackel", "Husky", "Pudel", "Boxer"}
+	breeds := []string{"Labrador", "Golden Retriever", "Border Collie", "Schäferhund", "Rottweiler", "Beagle", "Dackel", "Husky", "Pudel", "Boxer"}
 	sizes := []string{"small", "medium", "large"}
 	colorNames := []string{"Gruen", "Gelb", "Orange", "Hellblau", "Dunkelblau"}
 

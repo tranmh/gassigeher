@@ -113,7 +113,7 @@ func TestDemoUser_Fields(t *testing.T) {
 		Email:    "testuser@demo.test",
 		Password: "demo1234",
 		Level:    "green",
-		LevelDE:  "Anfaenger",
+		LevelDE:  "Anfänger",
 	}
 
 	t.Run("Name field", func(t *testing.T) {
@@ -141,8 +141,8 @@ func TestDemoUser_Fields(t *testing.T) {
 	})
 
 	t.Run("LevelDE field", func(t *testing.T) {
-		if user.LevelDE != "Anfaenger" {
-			t.Errorf("Expected LevelDE 'Anfaenger', got %s", user.LevelDE)
+		if user.LevelDE != "Anfänger" {
+			t.Errorf("Expected LevelDE 'Anfänger', got %s", user.LevelDE)
 		}
 	})
 }
@@ -246,7 +246,7 @@ func TestDemoUser_Levels(t *testing.T) {
 		level   string
 		levelDE string
 	}{
-		{"green", "Anfaenger"},
+		{"green", "Anfänger"},
 		{"orange", "Fortgeschritten"},
 		{"blue", "Experte"},
 	}

@@ -71,7 +71,7 @@ func (h *DemoHandler) GetCredentials(w http.ResponseWriter, r *http.Request) {
 				Email:    h.cfg.DemoUserEmail("anna"),
 				Password: services.DemoUserPassword,
 				Level:    "green",
-				LevelDE:  "Anfaenger",
+				LevelDE:  "Anfänger",
 			},
 			{
 				Name:     "Bernd Orange",
@@ -92,7 +92,7 @@ func (h *DemoHandler) GetCredentials(w http.ResponseWriter, r *http.Request) {
 			{Name: "Bella", Breed: "Labrador Retriever", Category: "green"},
 			{Name: "Max", Breed: "Golden Retriever", Category: "green"},
 			{Name: "Luna", Breed: "Border Collie", Category: "orange"},
-			{Name: "Rocky", Breed: "Deutscher Schaeferhund", Category: "orange"},
+			{Name: "Rocky", Breed: "Deutscher Schäferhund", Category: "orange"},
 			{Name: "Duke", Breed: "Rottweiler", Category: "blue"},
 		},
 	}

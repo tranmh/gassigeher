@@ -212,7 +212,7 @@
             <p style="color: #666; margin-bottom: 20px;">Bitte gib einen Grund für die Ablehnung an:</p>
             <div class="form-group">
                 <label for="reject-reason">Grund *</label>
-                <textarea id="reject-reason" rows="3" required placeholder="z.B. Hund ist an diesem Tag nicht verfuegbar..."></textarea>
+                <textarea id="reject-reason" rows="3" required placeholder="z.B. Hund ist an diesem Tag nicht verfügbar..."></textarea>
             </div>
             <div style="display: flex; gap: 10px; margin-top: 20px;">
                 <button class="btn btn-secondary" data-action="close-reject-modal">Abbrechen</button>
@@ -275,7 +275,7 @@
             try {
                 const userData = await api.getMe();
                 if (!userData.is_admin) {
-                    alert('Zugriff verweigert: Diese Seite ist nur fuer Administratoren zugaenglich.');
+                    alert('Zugriff verweigert: Diese Seite ist nur für Administratoren zugänglich.');
                     window.location.href = '/dashboard.html';
                     return;
                 }
