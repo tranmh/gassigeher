@@ -200,9 +200,9 @@ create_directories() {
     if [[ "$CAN_SUDO" == "true" ]]; then
         $SUDO mkdir -p "$INSTALL_DIR"/{data/app,data/postgres,data/minio,data/caddy,data/caddy-config,logs,logs/caddy,backups,uploads}
         $SUDO chmod 750 "$INSTALL_DIR"
-        if [[ -n "$SUDO" ]]; then
-            $SUDO chown -R "$(id -u):$(id -g)" "$INSTALL_DIR"
-        fi
+        # Set ownership to UID 1000 (container user 'gassigeher') for mounted volumes
+        # This is required because the Docker container runs as non-root user
+        $SUDO chown -R 1000:1000 "$INSTALL_DIR"/{logs,uploads,data/app}
     else
         mkdir -p "$INSTALL_DIR"/{data/app,data/postgres,data/minio,data/caddy,data/caddy-config,logs,logs/caddy,backups,uploads}
         chmod 750 "$INSTALL_DIR"
