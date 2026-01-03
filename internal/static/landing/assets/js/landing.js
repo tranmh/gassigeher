@@ -7,8 +7,49 @@ function getBaseDomain() {
     return hostname;
 }
 
+// Mobile navigation toggle
+function initMobileNav() {
+    const navToggle = document.querySelector('.nav-toggle');
+    const nav = document.querySelector('.nav');
+
+    if (!navToggle || !nav) return;
+
+    navToggle.addEventListener('click', function() {
+        const isOpen = nav.classList.toggle('active');
+        navToggle.classList.toggle('active');
+        navToggle.setAttribute('aria-expanded', isOpen);
+        navToggle.setAttribute('aria-label', isOpen ? 'Menü schließen' : 'Menü öffnen');
+
+        // Prevent body scroll when menu is open
+        document.body.style.overflow = isOpen ? 'hidden' : '';
+    });
+
+    // Close menu when clicking a nav link
+    nav.querySelectorAll('a').forEach(link => {
+        link.addEventListener('click', function() {
+            nav.classList.remove('active');
+            navToggle.classList.remove('active');
+            navToggle.setAttribute('aria-expanded', 'false');
+            navToggle.setAttribute('aria-label', 'Menü öffnen');
+            document.body.style.overflow = '';
+        });
+    });
+
+    // Close menu on escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && nav.classList.contains('active')) {
+            nav.classList.remove('active');
+            navToggle.classList.remove('active');
+            navToggle.setAttribute('aria-expanded', 'false');
+            navToggle.setAttribute('aria-label', 'Menü öffnen');
+            document.body.style.overflow = '';
+        }
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize components
+    initMobileNav();
     initSlugChecker();
     initPlanSelection();
     initBillingCycleToggle();
