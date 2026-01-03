@@ -858,6 +858,27 @@ case "$1" in
         echo "Editing secrets file..."
         ${EDITOR:-nano} "$INSTALL_DIR/.env.secrets"
         ;;
+    build)
+        echo "Building Docker images..."
+        load_env
+        if [[ -n "$2" ]]; then
+            docker compose --profile production build --no-cache "$2"
+        else
+            docker compose --profile production build --no-cache
+        fi
+        ;;
+    rebuild)
+        echo "Rebuilding and restarting Gassigeher..."
+        load_env
+        docker compose --profile production down
+        if [[ -n "$2" ]]; then
+            docker compose --profile production build --no-cache "$2"
+        else
+            docker compose --profile production build --no-cache
+        fi
+        docker compose --profile production up -d
+        echo "Rebuild complete!"
+        ;;
     *)
         echo "Gassigeher Management Script"
         echo ""
@@ -872,6 +893,8 @@ case "$1" in
         echo "  status      Show service status"
         echo "  backup      Run database backup"
         echo "  update      Pull latest code and rebuild"
+        echo "  build       Build images (optional: service name)"
+        echo "  rebuild     Rebuild and restart (optional: service name)"
         echo "  shell       Open shell in app container"
         echo "  db          Open PostgreSQL shell"
         echo "  health      Check application health"

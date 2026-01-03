@@ -3,8 +3,11 @@
 #
 # Pinned versions for reproducible builds:
 # - xcaddy: v0.4.4
-# - Caddy: v2.8.4
-# - caddy-dns/hetzner: v0.0.1
+# - Caddy: v2.10.2
+# - caddy-dns/hetzner/v2: v2.0.0-preview-3 (for Hetzner Cloud API)
+#
+# NOTE: v2 uses the new Hetzner Cloud API (console.hetzner.com)
+#       v1 used the old DNS Console API (dns.hetzner.com) - deprecated Q2 2026
 
 FROM golang:1.23-alpine AS builder
 
@@ -18,8 +21,8 @@ RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@v0.4.4
 # GOTOOLCHAIN=auto allows Go to download required toolchain version
 WORKDIR /build
 ENV GOTOOLCHAIN=auto
-RUN xcaddy build v2.8.4 \
-    --with github.com/caddy-dns/hetzner@v0.0.1
+RUN xcaddy build v2.10.2 \
+    --with github.com/caddy-dns/hetzner/v2@v2.0.0-preview-3
 
 FROM alpine:3.19
 
