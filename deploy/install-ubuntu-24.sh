@@ -46,6 +46,10 @@ CONFIG_FILE=""
 FORCE_MODE=false
 LOCAL_MODE=false
 DRY_RUN=false
+SKIP_FIREWALL=false
+
+# Save original arguments for error messages
+ORIGINAL_ARGS="$*"
 
 # Colors for output
 RED='\033[0;31m'
@@ -98,6 +102,89 @@ check_ubuntu() {
     log_success "OS check passed"
 }
 
+check_prerequisites() {
+    log_info "Checking prerequisites..."
+
+    local errors=0
+
+    # Check for required commands
+    for cmd in curl openssl; do
+        if ! command -v $cmd &> /dev/null; then
+            log_error "Required command not found: $cmd"
+            errors=$((errors + 1))
+        fi
+    done
+
+    # Check disk space (need at least 5GB free)
+    local free_space_kb=$(df -k "${INSTALL_DIR%/*}" 2>/dev/null | tail -1 | awk '{print $4}')
+    if [[ -n "$free_space_kb" && "$free_space_kb" -lt 5242880 ]]; then
+        log_warn "Low disk space: $(( free_space_kb / 1024 ))MB free (recommended: 5GB+)"
+    fi
+
+    # Check available memory (need at least 2GB)
+    local total_mem_kb=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}')
+    if [[ -n "$total_mem_kb" && "$total_mem_kb" -lt 2097152 ]]; then
+        log_warn "Low memory: $(( total_mem_kb / 1024 ))MB total (recommended: 2GB+)"
+    fi
+
+    # Check if ports 80/443 are available (only for production mode)
+    if [[ "$LOCAL_MODE" != "true" ]]; then
+        for port in 80 443; do
+            if ss -tlnp 2>/dev/null | grep -q ":$port "; then
+                log_warn "Port $port is already in use - Caddy may fail to start"
+            fi
+        done
+    fi
+
+    if [[ $errors -gt 0 ]]; then
+        log_error "Prerequisites check failed with $errors error(s)"
+        exit 1
+    fi
+
+    log_success "Prerequisites check passed"
+}
+
+check_root_privileges() {
+    log_info "Checking privileges..."
+
+    # Running as root
+    if [[ $EUID -eq 0 ]]; then
+        log_success "Running as root"
+        return 0
+    fi
+
+    # Has passwordless sudo
+    if sudo -n true 2>/dev/null; then
+        log_success "Running with sudo privileges"
+        return 0
+    fi
+
+    # Neither root nor sudo
+    echo ""
+    log_error "============================================"
+    log_error "  ROOT PRIVILEGES REQUIRED"
+    log_error "============================================"
+    echo ""
+    log_error "This script requires root privileges for:"
+    log_error "  - Installing Docker"
+    log_error "  - Creating /opt/gassigeher directory"
+    log_error "  - Configuring firewall"
+    log_error "  - Setting file permissions"
+    echo ""
+    log_info "Please run with sudo:"
+    log_info "  sudo $0 $ORIGINAL_ARGS"
+    echo ""
+    log_info "Or as root:"
+    log_info "  su -c '$0 $ORIGINAL_ARGS'"
+    echo ""
+    log_info "For non-root installation (advanced users only):"
+    log_info "  1. Install Docker and add your user to 'docker' group"
+    log_info "  2. Create and own $INSTALL_DIR directory"
+    log_info "  3. Run: $0 --no-firewall"
+    echo ""
+    exit 1
+}
+
 generate_password() {
     openssl rand -base64 32 | tr -d '/+=' | cut -c1-32
 }
@@ -118,6 +205,12 @@ parse_env_file() {
         if [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
             local key="${BASH_REMATCH[1]}"
             local value="${BASH_REMATCH[2]}"
+            local was_quoted=false
+
+            # Check if value was quoted before removing quotes
+            if [[ "$value" =~ ^\" || "$value" =~ ^\' ]]; then
+                was_quoted=true
+            fi
 
             # Remove surrounding quotes if present
             value="${value%\"}"
@@ -125,8 +218,8 @@ parse_env_file() {
             value="${value%\'}"
             value="${value#\'}"
 
-            # Remove inline comments (but not in quoted values)
-            if [[ ! "$value" =~ ^[\"\'] ]]; then
+            # Remove inline comments only for unquoted values
+            if [[ "$was_quoted" == "false" ]]; then
                 value="${value%%#*}"
                 value="${value%"${value##*[![:space:]]}"}"  # Trim trailing whitespace
             fi
@@ -175,17 +268,17 @@ install_docker() {
     $SUDO apt-get update
     $SUDO apt-get install -y ca-certificates curl gnupg lsb-release
 
-    # Add Docker GPG key
+    # Add Docker GPG key (--yes to overwrite if exists)
     $SUDO install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | $SUDO gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | $SUDO gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg
     $SUDO chmod a+r /etc/apt/keyrings/docker.gpg
 
     # Add Docker repository
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | $SUDO tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-    # Install Docker
+    # Install Docker and utilities
     $SUDO apt-get update
-    $SUDO apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    $SUDO apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin jq
 
     # Start Docker
     $SUDO systemctl enable docker
@@ -202,7 +295,11 @@ create_directories() {
         $SUDO chmod 750 "$INSTALL_DIR"
         # Set ownership to UID 1000 (container user 'gassigeher') for mounted volumes
         # This is required because the Docker container runs as non-root user
-        $SUDO chown -R 1000:1000 "$INSTALL_DIR"/{logs,uploads,data/app}
+        $SUDO chown -R 1000:1000 "$INSTALL_DIR"/{logs,uploads,data/app,data/caddy,data/caddy-config,logs/caddy}
+        # PostgreSQL runs as UID 999 (postgres user in container)
+        $SUDO chown -R 999:999 "$INSTALL_DIR"/data/postgres
+        # MinIO runs as UID 1000 by default
+        $SUDO chown -R 1000:1000 "$INSTALL_DIR"/data/minio
     else
         mkdir -p "$INSTALL_DIR"/{data/app,data/postgres,data/minio,data/caddy,data/caddy-config,logs,logs/caddy,backups,uploads}
         chmod 750 "$INSTALL_DIR"
@@ -484,7 +581,8 @@ USE_S3=${USE_S3:-true}
 S3_ENDPOINT=${S3_ENDPOINT:-minio:9000}
 S3_BUCKET_NAME=${S3_BUCKET_NAME:-gassigeher-uploads}
 S3_REGION=${S3_REGION:-us-east-1}
-S3_PUBLIC_URL=${S3_PUBLIC_URL:-http://localhost:9000/gassigeher-uploads}
+# S3_PUBLIC_URL is computed based on mode
+S3_PUBLIC_URL=${S3_PUBLIC_URL:-${computed_base_url}/uploads}
 S3_USE_SSL=${S3_USE_SSL:-false}
 
 # ==================================================
@@ -546,13 +644,42 @@ copy_source_code() {
     SOURCE_DIR="$(dirname "$SCRIPT_DIR")"
 
     if [[ -f "$SOURCE_DIR/go.mod" ]]; then
-        # Copy essential files
-        cp -r "$SOURCE_DIR"/{cmd,internal,go.mod,go.sum,.dockerignore} "$INSTALL_DIR/" 2>/dev/null || true
+        # Verify essential files exist
+        local missing_files=()
+        for file in cmd internal go.mod go.sum docker-compose.yml Dockerfile; do
+            if [[ ! -e "$SOURCE_DIR/$file" ]]; then
+                missing_files+=("$file")
+            fi
+        done
+
+        if [[ ${#missing_files[@]} -gt 0 ]]; then
+            log_error "Missing essential files: ${missing_files[*]}"
+            log_error "Please ensure the source code is complete"
+            exit 1
+        fi
+
+        # Copy essential files (fail on error for critical files)
+        cp -r "$SOURCE_DIR"/{cmd,internal,go.mod,go.sum} "$INSTALL_DIR/"
         cp "$SOURCE_DIR/docker-compose.yml" "$INSTALL_DIR/"
-        cp "$SOURCE_DIR/Dockerfile" "$INSTALL_DIR/" 2>/dev/null || true
-        cp "$SOURCE_DIR/Dockerfile.caddy" "$INSTALL_DIR/" 2>/dev/null || true
-        cp "$SOURCE_DIR/Caddyfile" "$INSTALL_DIR/" 2>/dev/null || true
-        cp -r "$SOURCE_DIR/deploy" "$INSTALL_DIR/" 2>/dev/null || true
+        cp "$SOURCE_DIR/Dockerfile" "$INSTALL_DIR/"
+
+        # Optional files (warn if missing)
+        if [[ -f "$SOURCE_DIR/.dockerignore" ]]; then
+            cp "$SOURCE_DIR/.dockerignore" "$INSTALL_DIR/"
+        fi
+        if [[ -f "$SOURCE_DIR/Dockerfile.caddy" ]]; then
+            cp "$SOURCE_DIR/Dockerfile.caddy" "$INSTALL_DIR/"
+        else
+            log_warn "Dockerfile.caddy not found - Caddy will not work in production mode"
+        fi
+        if [[ -f "$SOURCE_DIR/Caddyfile" ]]; then
+            cp "$SOURCE_DIR/Caddyfile" "$INSTALL_DIR/"
+        else
+            log_warn "Caddyfile not found - Caddy will not work in production mode"
+        fi
+        if [[ -d "$SOURCE_DIR/deploy" ]]; then
+            cp -r "$SOURCE_DIR/deploy" "$INSTALL_DIR/"
+        fi
 
         log_success "Source code copied from $SOURCE_DIR"
     else
@@ -576,13 +703,15 @@ BACKUP_DIR="/opt/gassigeher/backups"
 DATE=$(date +%Y%m%d_%H%M%S)
 RETENTION_DAYS=30
 
-# Load environment
+# Load environment (set -a exports all variables)
+set -a
 if [[ -f /opt/gassigeher/.env ]]; then
     source /opt/gassigeher/.env
 fi
 if [[ -f /opt/gassigeher/.env.secrets ]]; then
     source /opt/gassigeher/.env.secrets
 fi
+set +a
 
 mkdir -p "$BACKUP_DIR"
 
@@ -735,6 +864,11 @@ setup_cron_backup() {
 }
 
 setup_firewall() {
+    if [[ "$SKIP_FIREWALL" == "true" ]]; then
+        log_info "Skipping firewall setup (--no-firewall flag)"
+        return
+    fi
+
     if [[ "$CAN_SUDO" != "true" ]]; then
         log_warn "Skipping firewall setup (requires root privileges)"
         return
@@ -764,19 +898,23 @@ start_services() {
         exit 1
     fi
 
-    # Determine profile
-    local profile=""
-    if [[ "$LOCAL_MODE" != "true" ]]; then
-        profile="--profile production"
+    # Start services based on mode
+    if [[ "$LOCAL_MODE" == "true" ]]; then
+        log_info "Running: docker compose up --build -d (development mode)"
+        docker compose up --build -d
+    else
+        log_info "Running: docker compose --profile production up --build -d"
+        docker compose --profile production up --build -d
     fi
-
-    log_info "Running: docker compose $profile up --build -d"
-    docker compose $profile up --build -d
 
     log_info "Waiting for services to start..."
     sleep 10
 
-    docker compose $profile ps
+    if [[ "$LOCAL_MODE" == "true" ]]; then
+        docker compose ps
+    else
+        docker compose --profile production ps
+    fi
 
     log_success "Services started!"
 }
@@ -806,6 +944,8 @@ force_cleanup() {
     if [[ -f "$INSTALL_DIR/docker-compose.yml" ]]; then
         log_info "Stopping containers and removing volumes..."
         cd "$INSTALL_DIR"
+        # Stop containers from all profiles (development and production)
+        docker compose down -v --remove-orphans 2>/dev/null || true
         docker compose --profile production down -v --remove-orphans 2>/dev/null || true
         cd - > /dev/null
         log_success "Containers and volumes removed"
@@ -917,18 +1057,22 @@ show_help() {
     echo "This script deploys Gassigeher in SaaS mode (multi-tenant) using Docker Compose."
     echo "For Simple mode (single shelter), just run the binary directly with .env file."
     echo ""
+    echo "IMPORTANT: This script requires root privileges (sudo or root user)."
+    echo ""
     echo "Options:"
-    echo "  --force       Force complete reinstall (regenerates secrets, deletes data)"
-    echo "  --local       Local testing mode (no SSL, uses gassigeher.local)"
-    echo "  --env FILE    Use custom config file instead of .env.example.saas"
-    echo "  --dry-run     Show what would be done without making changes"
-    echo "  --help        Show this help message"
+    echo "  --force        Force complete reinstall (regenerates secrets, deletes data)"
+    echo "  --local        Local testing mode (no SSL, uses gassigeher.local)"
+    echo "  --env FILE     Use custom config file instead of .env.example.saas"
+    echo "  --no-firewall  Skip firewall configuration (for non-root or custom setup)"
+    echo "  --dry-run      Show what would be done without making changes"
+    echo "  --help         Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $0                         # Install SaaS platform"
-    echo "  $0 --local                 # Local testing (gassigeher.local:8080)"
-    echo "  $0 --force                 # Fresh install (WARNING: deletes all data!)"
-    echo "  $0 --env /path/to/.env     # Use custom config file"
+    echo "  sudo $0                    # Install SaaS platform (recommended)"
+    echo "  sudo $0 --local            # Local testing (gassigeher.local:8080)"
+    echo "  sudo $0 --force            # Fresh install (WARNING: deletes all data!)"
+    echo "  sudo $0 --env /path/.env   # Use custom config file"
+    echo "  sudo $0 --no-firewall      # Skip firewall setup"
     echo ""
     echo "Configuration:"
     echo "  Config template: .env.example.saas"
@@ -938,6 +1082,13 @@ show_help() {
     echo "  On first install, secrets are auto-generated."
     echo "  On subsequent runs, existing config is preserved."
     echo "  Use --force to regenerate all secrets."
+    echo ""
+    echo "Prerequisites:"
+    echo "  - Ubuntu 24.04 LTS (other Linux distros may work)"
+    echo "  - Root/sudo access"
+    echo "  - 5GB+ free disk space"
+    echo "  - 2GB+ RAM"
+    echo "  - Ports 80, 443 available (for production)"
 }
 
 # ============================================
@@ -964,6 +1115,10 @@ main() {
                 DRY_RUN=true
                 shift
                 ;;
+            --no-firewall)
+                SKIP_FIREWALL=true
+                shift
+                ;;
             --help|-h)
                 show_help
                 exit 0
@@ -983,8 +1138,11 @@ main() {
     echo "============================================"
     echo ""
 
+    # Check privileges first (before any operations)
+    check_root_privileges
     check_sudo
     check_ubuntu
+    check_prerequisites
 
     # Force mode cleanup
     if [[ "$FORCE_MODE" == "true" ]]; then

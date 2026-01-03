@@ -245,6 +245,7 @@ services:
       - ./data/caddy:/data
       - ./data/caddy-config:/config
       - ./logs/caddy:/var/log/caddy
+      - ./uploads:/srv/uploads:ro
     environment:
       HETZNER_DNS_TOKEN: ${HETZNER_DNS_TOKEN:-}
     networks:

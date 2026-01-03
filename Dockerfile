@@ -1,7 +1,7 @@
 # Dockerfile for Gassigeher SaaS
 # Multi-stage build for optimized production image
 
-FROM golang:1.24-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
@@ -10,6 +10,9 @@ WORKDIR /app
 
 # Copy go mod files
 COPY go.mod go.sum ./
+
+# GOTOOLCHAIN=auto allows Go to download required toolchain version (1.24+)
+ENV GOTOOLCHAIN=auto
 RUN go mod download
 
 # Copy source
@@ -31,9 +34,8 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /app/gassigeher .
 
-# Copy embedded frontend (already in binary via go:embed)
-# Copy landing page (embedded but kept for reference)
-COPY --from=builder /app/internal/static/landing ./internal/static/landing
+# Note: Frontend and landing pages are embedded in binary via go:embed
+# No additional COPY needed
 
 # Create non-root user for security
 RUN addgroup -g 1000 gassigeher && \

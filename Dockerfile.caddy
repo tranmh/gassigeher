@@ -1,37 +1,52 @@
 # Dockerfile for Caddy with Hetzner DNS plugin
 # Used for wildcard SSL certificates in SaaS mode
+#
+# Pinned versions for reproducible builds:
+# - xcaddy: v0.4.4
+# - Caddy: v2.8.4
+# - caddy-dns/hetzner: v0.0.1
 
 FROM golang:1.23-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git
 
-# Install xcaddy
-RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
+# Install xcaddy (pinned version for reproducibility)
+RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@v0.4.4
 
-# Build Caddy with Hetzner DNS module
+# Build Caddy with Hetzner DNS module (pinned versions)
 # GOTOOLCHAIN=auto allows Go to download required toolchain version
 WORKDIR /build
 ENV GOTOOLCHAIN=auto
-RUN xcaddy build \
-    --with github.com/caddy-dns/hetzner
+RUN xcaddy build v2.8.4 \
+    --with github.com/caddy-dns/hetzner@v0.0.1
 
 FROM alpine:3.19
 
 # Install ca-certificates for HTTPS and tzdata for timezones
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata curl
 
 # Copy custom-built Caddy binary
 COPY --from=builder /build/caddy /usr/bin/caddy
 
-# Create caddy user and directories
-RUN adduser -D -H -h /var/lib/caddy caddy && \
-    mkdir -p /var/log/caddy /etc/caddy /var/lib/caddy && \
-    chown -R caddy:caddy /var/log/caddy /var/lib/caddy
+# Create caddy user and required directories
+# UID 1000 to match host uploads directory permissions
+RUN addgroup -g 1000 caddy && \
+    adduser -u 1000 -G caddy -s /bin/sh -D caddy && \
+    mkdir -p /var/log/caddy /etc/caddy /var/lib/caddy /srv/uploads && \
+    chown -R caddy:caddy /var/log/caddy /var/lib/caddy /etc/caddy /srv/uploads
 
-# Copy Caddyfile
-COPY Caddyfile /etc/caddy/Caddyfile
+# Note: Caddyfile is mounted via docker-compose volume
+# This COPY serves as fallback if running standalone
+COPY --chown=caddy:caddy Caddyfile /etc/caddy/Caddyfile
 
 EXPOSE 80 443
+
+# Run as non-root user for security
+USER caddy
+
+# Health check for container orchestration
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD curl -fsS http://localhost:80/health 2>/dev/null || wget --no-verbose --tries=1 --spider http://localhost:80 || exit 1
 
 CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
