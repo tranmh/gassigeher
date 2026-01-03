@@ -99,6 +99,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY:?S3_ACCESS_KEY must be set in .env.secrets}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?S3_SECRET_KEY must be set in .env.secrets}
+      MINIO_PROMETHEUS_AUTH_TYPE: public
     ports:
       - "9000:9000"   # S3 API
       - "9001:9001"   # Web Console
@@ -154,6 +155,34 @@ services:
           memory: 64M
 
   # ==================================================
+  # PostgreSQL Exporter - Database Metrics
+  # ==================================================
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: gassigeher-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${DB_USER:-gassigeher}:${DB_PASSWORD}@db:5432/${DB_NAME:-gassigeher}?sslmode=disable"
+    networks:
+      - internal
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 64M
+        reservations:
+          cpus: '0.02'
+          memory: 32M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ==================================================
   # Prometheus - Metrics Collection
   # ==================================================
   prometheus:
@@ -167,11 +196,15 @@ services:
       - '--web.enable-lifecycle'
     volumes:
       - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./data/prometheus-secrets:/etc/prometheus/secrets:ro
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"
     networks:
       - internal
+    # Enable host.docker.internal on Linux
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     stop_grace_period: 15s
     deploy:
       resources:
@@ -189,6 +222,8 @@ services:
     depends_on:
       app:
         condition: service_healthy
+      postgres-exporter:
+        condition: service_started
 
   # ==================================================
   # Grafana - Metrics Visualization

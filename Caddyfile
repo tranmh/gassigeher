@@ -1,6 +1,18 @@
 # Caddyfile for Gassigeher SaaS
 # Wildcard SSL for *.gassigeher.org using Hetzner DNS challenge
 
+# Global options
+{
+    # Enable admin API for Prometheus metrics
+    # Accessible at http://caddy:2019/metrics from internal network
+    admin :2019
+
+    # Prometheus metrics
+    servers {
+        metrics
+    }
+}
+
 # Main domain - Landing page and tenant registration
 gassigeher.org {
     tls {

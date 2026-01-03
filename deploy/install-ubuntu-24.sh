@@ -291,7 +291,7 @@ create_directories() {
     log_info "Creating directories..."
 
     if [[ "$CAN_SUDO" == "true" ]]; then
-        $SUDO mkdir -p "$INSTALL_DIR"/{data/app,data/postgres,data/minio,data/caddy,data/caddy-config,logs,logs/caddy,backups,uploads}
+        $SUDO mkdir -p "$INSTALL_DIR"/{data/app,data/postgres,data/minio,data/caddy,data/caddy-config,data/prometheus-secrets,logs,logs/caddy,backups,uploads}
         $SUDO chmod 750 "$INSTALL_DIR"
         # Set ownership to UID 1000 (container user 'gassigeher') for mounted volumes
         # This is required because the Docker container runs as non-root user
@@ -300,9 +300,13 @@ create_directories() {
         $SUDO chown -R 999:999 "$INSTALL_DIR"/data/postgres
         # MinIO runs as UID 1000 by default
         $SUDO chown -R 1000:1000 "$INSTALL_DIR"/data/minio
+        # Prometheus secrets - readable by Prometheus container (UID 65534 = nobody)
+        $SUDO chown -R 65534:65534 "$INSTALL_DIR"/data/prometheus-secrets
+        $SUDO chmod 700 "$INSTALL_DIR"/data/prometheus-secrets
     else
-        mkdir -p "$INSTALL_DIR"/{data/app,data/postgres,data/minio,data/caddy,data/caddy-config,logs,logs/caddy,backups,uploads}
+        mkdir -p "$INSTALL_DIR"/{data/app,data/postgres,data/minio,data/caddy,data/caddy-config,data/prometheus-secrets,logs,logs/caddy,backups,uploads}
         chmod 750 "$INSTALL_DIR"
+        chmod 700 "$INSTALL_DIR"/data/prometheus-secrets
     fi
 
     log_success "Directories created at $INSTALL_DIR"
@@ -515,6 +519,38 @@ EOF
     log_warn "Please configure external service credentials in $secrets_file"
 }
 
+create_prometheus_secrets() {
+    log_info "Creating Prometheus secrets..."
+
+    local secrets_dir="$INSTALL_DIR/data/prometheus-secrets"
+    local password_file="$secrets_dir/metrics_password"
+
+    # Get METRICS_PASSWORD from environment (set by generate_secrets or parse_env_file)
+    local metrics_pass="${METRICS_PASSWORD:-}"
+
+    # If not set, try to read from .env.secrets
+    if [[ -z "$metrics_pass" && -f "$INSTALL_DIR/.env.secrets" ]]; then
+        metrics_pass=$(grep "^METRICS_PASSWORD=" "$INSTALL_DIR/.env.secrets" 2>/dev/null | cut -d'=' -f2)
+    fi
+
+    if [[ -z "$metrics_pass" ]]; then
+        log_warn "METRICS_PASSWORD not found - Prometheus scraping may fail"
+        return 0
+    fi
+
+    # Write password file (no newline - Prometheus expects raw password)
+    if [[ "$CAN_SUDO" == "true" ]]; then
+        echo -n "$metrics_pass" | $SUDO tee "$password_file" > /dev/null
+        $SUDO chown 65534:65534 "$password_file"
+        $SUDO chmod 400 "$password_file"
+    else
+        echo -n "$metrics_pass" > "$password_file"
+        chmod 400 "$password_file"
+    fi
+
+    log_success "Prometheus secrets configured"
+}
+
 create_env_file() {
     log_info "Creating .env file..."
 
@@ -679,6 +715,11 @@ copy_source_code() {
         fi
         if [[ -d "$SOURCE_DIR/deploy" ]]; then
             cp -r "$SOURCE_DIR/deploy" "$INSTALL_DIR/"
+            # Fix permissions - config files need to be readable by containers
+            chmod -R 644 "$INSTALL_DIR/deploy/"*.yml 2>/dev/null || true
+            chmod -R 644 "$INSTALL_DIR/deploy/grafana/provisioning/"*/*.yml 2>/dev/null || true
+            chmod -R 644 "$INSTALL_DIR/deploy/grafana/provisioning/"*/*.json 2>/dev/null || true
+            find "$INSTALL_DIR/deploy" -type d -exec chmod 755 {} \;
         fi
 
         log_success "Source code copied from $SOURCE_DIR"
@@ -885,6 +926,42 @@ setup_firewall() {
     $SUDO ufw --force enable
 
     log_success "Firewall configured (SSH, HTTP, HTTPS allowed)"
+}
+
+install_node_exporter() {
+    log_info "Installing Node Exporter for host metrics..."
+
+    if [[ "$CAN_SUDO" != "true" ]]; then
+        log_warn "Skipping Node Exporter installation (requires root privileges)"
+        log_info "Manual install: apt install prometheus-node-exporter"
+        return
+    fi
+
+    # Check if already installed
+    if systemctl is-active --quiet prometheus-node-exporter 2>/dev/null; then
+        log_success "Node Exporter already running"
+        return
+    fi
+
+    # Install via apt (Ubuntu's official package)
+    $SUDO apt-get update
+    $SUDO apt-get install -y prometheus-node-exporter
+
+    # Enable and start
+    $SUDO systemctl enable prometheus-node-exporter
+    $SUDO systemctl start prometheus-node-exporter
+
+    # Verify
+    if systemctl is-active --quiet prometheus-node-exporter; then
+        log_success "Node Exporter installed and running on port 9100"
+    else
+        log_warn "Node Exporter installed but may not be running"
+    fi
+
+    # Allow Docker networks to reach node_exporter
+    # Docker typically uses 172.16.0.0/12 range for bridge networks
+    $SUDO ufw allow from 172.16.0.0/12 to any port 9100 proto tcp comment "Docker to node_exporter" 2>/dev/null || true
+    log_info "Firewall rule added for Docker to node_exporter"
 }
 
 start_services() {
@@ -1165,6 +1242,9 @@ main() {
     # Generate or load secrets
     generate_secrets
 
+    # Create Prometheus secrets file for scraping authentication
+    create_prometheus_secrets
+
     # Create .env file
     if [[ ! -f "$INSTALL_DIR/.env" || "$FORCE_MODE" == "true" ]]; then
         create_env_file
@@ -1179,9 +1259,10 @@ main() {
     create_backup_script
     create_management_script
 
-    # Setup cron and firewall
+    # Setup cron, firewall, and monitoring
     setup_cron_backup
     setup_firewall
+    install_node_exporter
 
     # Start services
     start_services
