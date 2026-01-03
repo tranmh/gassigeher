@@ -1,5 +1,5 @@
 # Caddyfile for Gassigeher SaaS
-# Wildcard SSL for *.gassigeher.org using Hetzner DNS challenge
+# Wildcard SSL for *.gassigeher.org using Cloudflare DNS challenge
 
 # Global options
 {
@@ -16,7 +16,7 @@
 # Main domain - Landing page and tenant registration
 gassigeher.org {
     tls {
-        dns hetzner {env.HETZNER_DNS_TOKEN}
+        dns cloudflare {env.CLOUDFLARE_API_TOKEN}
     }
 
     # API routes for tenant registration
@@ -56,7 +56,7 @@ gassigeher.org {
 # WWW redirect
 www.gassigeher.org {
     tls {
-        dns hetzner {env.HETZNER_DNS_TOKEN}
+        dns cloudflare {env.CLOUDFLARE_API_TOKEN}
     }
     redir https://gassigeher.org{uri} permanent
 }
@@ -64,7 +64,7 @@ www.gassigeher.org {
 # Central admin dashboard
 admin.gassigeher.org {
     tls {
-        dns hetzner {env.HETZNER_DNS_TOKEN}
+        dns cloudflare {env.CLOUDFLARE_API_TOKEN}
     }
 
     reverse_proxy app:8080
@@ -90,7 +90,7 @@ admin.gassigeher.org {
 # tierheim-goeppingen.gassigeher.org, tierheim-stuttgart.gassigeher.org, etc.
 *.gassigeher.org {
     tls {
-        dns hetzner {env.HETZNER_DNS_TOKEN}
+        dns cloudflare {env.CLOUDFLARE_API_TOKEN}
     }
 
     # Serve uploaded files directly from filesystem (when USE_S3=false)

@@ -20,7 +20,7 @@
 #     - .env.secrets -> Auto-generated passwords and API keys
 #
 #   Manual configuration required in .env.secrets:
-#     - HETZNER_DNS_TOKEN (for wildcard SSL)
+#     - CLOUDFLARE_API_TOKEN (for wildcard SSL)
 #     - STRIPE_* keys (for SaaS billing)
 #     - SMTP_PASSWORD (for email)
 #
@@ -483,8 +483,8 @@ GRAFANA_ADMIN_PASSWORD=${grafana_password}
 # ==================================================
 # Fill these in before starting services:
 
-# Hetzner DNS (for wildcard SSL in production)
-HETZNER_DNS_TOKEN=
+# Cloudflare DNS (for wildcard SSL in production)
+CLOUDFLARE_API_TOKEN=
 
 # Stripe (for SaaS billing - only needed in SaaS Mode)
 STRIPE_SECRET_KEY=
@@ -1121,7 +1121,7 @@ print_summary() {
 
     # Check if external services need configuration
     local needs_config=false
-    if [[ -z "$HETZNER_DNS_TOKEN" && "$LOCAL_MODE" != "true" ]]; then
+    if [[ -z "$CLOUDFLARE_API_TOKEN" && "$LOCAL_MODE" != "true" ]]; then
         needs_config=true
     fi
     if [[ -z "$SMTP_PASSWORD" && -z "$GMAIL_CLIENT_ID" ]]; then
@@ -1132,8 +1132,8 @@ print_summary() {
         echo -e "${YELLOW}Action Required:${NC}"
         echo ""
         echo "  Edit $INSTALL_DIR/.env.secrets to configure:"
-        if [[ -z "$HETZNER_DNS_TOKEN" && "$LOCAL_MODE" != "true" ]]; then
-            echo "    - HETZNER_DNS_TOKEN (for wildcard SSL)"
+        if [[ -z "$CLOUDFLARE_API_TOKEN" && "$LOCAL_MODE" != "true" ]]; then
+            echo "    - CLOUDFLARE_API_TOKEN (for wildcard SSL)"
         fi
         if [[ -z "$SMTP_PASSWORD" && -z "$GMAIL_CLIENT_ID" ]]; then
             echo "    - SMTP_PASSWORD or Gmail API credentials (for email)"

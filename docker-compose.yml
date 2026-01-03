@@ -282,7 +282,7 @@ services:
       - ./logs/caddy:/var/log/caddy
       - ./uploads:/srv/uploads:ro
     environment:
-      HETZNER_DNS_TOKEN: ${HETZNER_DNS_TOKEN:-}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
     networks:
       - internal
       - external

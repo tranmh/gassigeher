@@ -1,13 +1,13 @@
-# Dockerfile for Caddy with Hetzner DNS plugin
+# Dockerfile for Caddy with Cloudflare DNS plugin
 # Used for wildcard SSL certificates in SaaS mode
 #
 # Pinned versions for reproducible builds:
 # - xcaddy: v0.4.4
 # - Caddy: v2.10.2
-# - caddy-dns/hetzner/v2: v2.0.0-preview-3 (for Hetzner Cloud API)
+# - caddy-dns/cloudflare: v0.0.0-20250228175314-1810a74e7128 (latest stable)
 #
-# NOTE: v2 uses the new Hetzner Cloud API (console.hetzner.com)
-#       v1 used the old DNS Console API (dns.hetzner.com) - deprecated Q2 2026
+# Cloudflare DNS is used for ACME DNS-01 challenges (wildcard certificates)
+# Requires a Cloudflare API token with Zone:DNS:Edit permissions
 
 FROM golang:1.23-alpine AS builder
 
@@ -17,12 +17,12 @@ RUN apk add --no-cache git
 # Install xcaddy (pinned version for reproducibility)
 RUN go install github.com/caddyserver/xcaddy/cmd/xcaddy@v0.4.4
 
-# Build Caddy with Hetzner DNS module (pinned versions)
+# Build Caddy with Cloudflare DNS module (pinned versions)
 # GOTOOLCHAIN=auto allows Go to download required toolchain version
 WORKDIR /build
 ENV GOTOOLCHAIN=auto
 RUN xcaddy build v2.10.2 \
-    --with github.com/caddy-dns/hetzner/v2@v2.0.0-preview-3
+    --with github.com/caddy-dns/cloudflare
 
 FROM alpine:3.19
 
