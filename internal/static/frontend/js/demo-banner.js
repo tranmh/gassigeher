@@ -56,13 +56,30 @@ class DemoBanner {
             resetText = ` | <span class="reset-info">Reset: ${this.escapeHtml(nextReset)}</span>`;
         }
 
+        // Build absolute URL to main domain for demo page
+        // demo.gassigeher.org → gassigeher.org/demo
+        // demo.gassigeher.local:8080 → gassigeher.local:8080/demo
+        const host = window.location.host; // includes port if present
+        const hostname = window.location.hostname;
+        const port = window.location.port;
+        const hostParts = hostname.split('.');
+        // Remove 'demo' subdomain to get base domain
+        let baseDomain = hostParts.length > 2
+            ? hostParts.slice(-2).join('.')
+            : hostParts.join('.');
+        // Add port back if present
+        if (port) {
+            baseDomain += ':' + port;
+        }
+        const demoPageUrl = `${window.location.protocol}//${baseDomain}/demo`;
+
         banner.innerHTML = `
             <div class="demo-banner-content">
                 <span class="demo-label">DEMO</span>
                 <span class="demo-text">
                     Dies ist eine Demo-Umgebung. Alle Daten werden taeglich zurueckgesetzt.${resetText}
                 </span>
-                <a href="/landing/demo.html" class="demo-link" target="_blank">Zugangsdaten anzeigen</a>
+                <a href="${demoPageUrl}" class="demo-link" target="_blank">Zugangsdaten anzeigen</a>
             </div>
         `;
 

@@ -742,8 +742,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to get embedded landing pages: %v", err)
 	}
-	// Serve landing pages at /landing/
-	router.PathPrefix("/landing/").Handler(http.StripPrefix("/landing/", http.FileServer(http.FS(landingFS))))
 
 	// Get embedded shared filesystem (for shared resources like FAQ data)
 	sharedFS, err := static.SharedFS()
@@ -758,8 +756,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to get embedded central admin pages: %v", err)
 	}
-	// Serve central admin pages at /central/
-	router.PathPrefix("/central/").Handler(http.StripPrefix("/central/", http.FileServer(http.FS(centralFS))))
 
 	// Get embedded frontend filesystem
 	frontendFS, err := static.FrontendFS()
@@ -767,7 +763,93 @@ func main() {
 		log.Fatalf("Failed to get embedded frontend: %v", err)
 	}
 
-	// Serve specific HTML pages without .html extension
+	// Check if we're in SaaS mode
+	saasMode := cfg.BaseDomain != ""
+
+	// Helper to determine if running in local development
+	isLocalDev := strings.HasPrefix(cfg.BaseDomain, "localhost") || strings.HasSuffix(cfg.BaseDomain, ".local")
+
+	// Helper function to build main domain URL (handles http for local dev)
+	buildMainDomainURL := func(r *http.Request, path string) string {
+		scheme := "https"
+		if isLocalDev && r.TLS == nil {
+			scheme = "http"
+		}
+		url := scheme + "://" + cfg.BaseDomain + path
+		if r.URL.RawQuery != "" {
+			url += "?" + r.URL.RawQuery
+		}
+		return url
+	}
+
+	// Helper function to serve landing pages (main domain only in SaaS mode)
+	serveLandingPage := func(filename string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if saasMode && middleware.IsOnTenantSubdomain(r) {
+				// On tenant subdomain - redirect to main domain
+				http.Redirect(w, r, buildMainDomainURL(r, r.URL.Path), http.StatusTemporaryRedirect)
+				return
+			}
+			serveEmbeddedFile(w, r, landingFS, filename)
+		}
+	}
+
+	// SaaS Mode: Serve landing pages at clean URLs (main domain only)
+	// These routes take precedence over frontend routes when on main domain
+	if saasMode {
+		// Landing page routes (clean URLs without /landing/ prefix)
+		router.HandleFunc("/demo", serveLandingPage("demo.html")).Methods("GET")
+		router.HandleFunc("/pricing", serveLandingPage("pricing.html")).Methods("GET")
+		router.HandleFunc("/faq", serveLandingPage("faq.html")).Methods("GET")
+		router.HandleFunc("/about", serveLandingPage("about.html")).Methods("GET")
+		router.HandleFunc("/contact", serveLandingPage("contact.html")).Methods("GET")
+		router.HandleFunc("/referenzen", serveLandingPage("referenzen.html")).Methods("GET")
+		router.HandleFunc("/agb", serveLandingPage("agb.html")).Methods("GET")
+		router.HandleFunc("/imprint", serveLandingPage("imprint.html")).Methods("GET")
+		router.HandleFunc("/widerrufsbelehrung", serveLandingPage("widerrufsbelehrung.html")).Methods("GET")
+		router.HandleFunc("/sla", serveLandingPage("sla.html")).Methods("GET")
+		// Note: /privacy and /register are handled separately below due to conflicts
+
+		// Landing assets (CSS, JS) - main domain only
+		router.PathPrefix("/landing/assets/").Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if middleware.IsOnTenantSubdomain(r) {
+				// On tenant subdomain - redirect to main domain
+				http.Redirect(w, r, buildMainDomainURL(r, r.URL.Path), http.StatusTemporaryRedirect)
+				return
+			}
+			// Serve from landing filesystem
+			http.StripPrefix("/landing/", http.FileServer(http.FS(landingFS))).ServeHTTP(w, r)
+		}))
+
+		// Block /landing/*.html on all domains (redirect to clean URLs on main domain)
+		router.PathPrefix("/landing/").Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Extract the page name from /landing/xxx.html
+			path := strings.TrimPrefix(r.URL.Path, "/landing/")
+			path = strings.TrimSuffix(path, ".html")
+
+			// Redirect to clean URL on main domain
+			if path == "" || path == "index" {
+				path = ""
+			}
+			http.Redirect(w, r, buildMainDomainURL(r, "/"+path), http.StatusMovedPermanently)
+		}))
+
+		// Central admin pages - main domain only
+		router.PathPrefix("/central/").Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if middleware.IsOnTenantSubdomain(r) {
+				// On tenant subdomain - redirect to main domain
+				http.Redirect(w, r, buildMainDomainURL(r, r.URL.Path), http.StatusTemporaryRedirect)
+				return
+			}
+			// Serve central admin pages
+			http.StripPrefix("/central/", http.FileServer(http.FS(centralFS))).ServeHTTP(w, r)
+		}))
+	} else {
+		// Simple mode - no landing pages, no central admin
+		// Just serve frontend directly
+	}
+
+	// Serve specific HTML pages without .html extension (tenant app pages)
 	router.HandleFunc("/verify", func(w http.ResponseWriter, r *http.Request) {
 		serveEmbeddedFile(w, r, frontendFS, "verify.html")
 	}).Methods("GET")
@@ -778,10 +860,29 @@ func main() {
 		serveEmbeddedFile(w, r, frontendFS, "forgot-password.html")
 	}).Methods("GET")
 
-	// Root path: serve frontend or redirect to landing page
-	// Simple mode (no BASE_DOMAIN): always serve frontend index.html
-	// SaaS mode (BASE_DOMAIN set): redirect to landing if no tenant subdomain
-	saasMode := cfg.BaseDomain != ""
+	// Privacy page - different content for main domain vs tenant
+	router.HandleFunc("/privacy", func(w http.ResponseWriter, r *http.Request) {
+		if saasMode && middleware.IsOnMainDomain(r) {
+			// Main domain - serve landing privacy page
+			serveEmbeddedFile(w, r, landingFS, "privacy.html")
+			return
+		}
+		// Tenant subdomain or Simple mode - serve frontend privacy page
+		serveEmbeddedFile(w, r, frontendFS, "privacy.html")
+	}).Methods("GET")
+
+	// Register page - different content for main domain vs tenant
+	router.HandleFunc("/register", func(w http.ResponseWriter, r *http.Request) {
+		if saasMode && middleware.IsOnMainDomain(r) {
+			// Main domain - serve tenant registration page
+			serveEmbeddedFile(w, r, landingFS, "register.html")
+			return
+		}
+		// Tenant subdomain or Simple mode - serve user registration page
+		serveEmbeddedFile(w, r, frontendFS, "register.html")
+	}).Methods("GET")
+
+	// Root path: landing page (main domain) or frontend (tenant subdomain)
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if !saasMode {
 			// Simple mode - serve frontend directly
@@ -789,10 +890,9 @@ func main() {
 			return
 		}
 		// SaaS mode - check for tenant
-		tenantID := middleware.GetTenantID(r)
-		if tenantID == 0 {
-			// No tenant subdomain - redirect to landing page
-			http.Redirect(w, r, "/landing/", http.StatusTemporaryRedirect)
+		if middleware.IsOnMainDomain(r) {
+			// Main domain - serve landing page directly (no redirect)
+			serveEmbeddedFile(w, r, landingFS, "index.html")
 			return
 		}
 		// Tenant exists - serve the frontend index

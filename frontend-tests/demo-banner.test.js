@@ -101,7 +101,8 @@ describe('DemoBanner.showBanner', () => {
     const banner = document.getElementById('demo-banner');
     const link = banner.querySelector('a.demo-link');
     expect(link).not.toBeNull();
-    expect(link.href).toContain('/landing/demo.html');
+    // Link now points to clean URL on main domain (e.g., http://localhost/demo)
+    expect(link.href).toContain('/demo');
     expect(link.target).toBe('_blank');
   });
 

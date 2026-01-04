@@ -248,7 +248,7 @@
 <body>
     <header class="header">
         <div class="container">
-            <a href="/landing/" class="logo">
+            <a href="/" class="logo">
                 <span>Gassigeher</span>
             </a>
             <button class="nav-toggle" aria-label="Menü öffnen" aria-expanded="false">
@@ -257,12 +257,12 @@
                 <span></span>
             </button>
             <nav class="nav">
-                <a href="/landing/">Startseite</a>
-                <a href="/landing/pricing.html">Preise</a>
-                <a href="/landing/faq.html">FAQ</a>
-                <a href="/landing/about.html">Über uns</a>
-                <a href="/landing/demo.html" class="nav-demo">Demo testen</a>
-                <a href="/landing/register.html" class="btn btn-primary">Jetzt starten</a>
+                <a href="/">Startseite</a>
+                <a href="/pricing">Preise</a>
+                <a href="/faq">FAQ</a>
+                <a href="/about">Über uns</a>
+                <a href="/demo" class="nav-demo">Demo testen</a>
+                <a href="/register" class="btn btn-primary">Jetzt starten</a>
             </nav>
         </div>
     </header>
@@ -281,7 +281,7 @@
                 <div class="faq-banner">
                     <h3>Vielleicht finden Sie Ihre Antwort schon in unseren FAQ?</h3>
                     <p>Viele Fragen wurden bereits beantwortet - schauen Sie doch mal rein!</p>
-                    <a href="/landing/faq.html" class="btn">FAQ durchsuchen</a>
+                    <a href="/faq" class="btn">FAQ durchsuchen</a>
                 </div>
 
                 <div class="contact-grid">
@@ -304,7 +304,7 @@
                                     <!-- Populated by JavaScript -->
                                 </ul>
                                 <div class="faq-deflection-footer">
-                                    Ihre Frage nicht dabei? <a href="/landing/faq.html">Alle FAQ anzeigen</a>
+                                    Ihre Frage nicht dabei? <a href="/faq">Alle FAQ anzeigen</a>
                                 </div>
                             </div>
 
@@ -374,12 +374,12 @@
     <footer class="footer">
         <div class="container">
             <div class="footer-links">
-                <a href="/landing/about.html">Über uns</a>
-                <a href="/landing/imprint.html">Impressum</a>
-                <a href="/landing/privacy.html">Datenschutz</a>
-                <a href="/landing/widerrufsbelehrung.html">Widerrufsrecht</a>
-                <a href="/landing/agb.html">AGB</a>
-                <a href="/landing/sla.html">SLA</a>
+                <a href="/about">Über uns</a>
+                <a href="/imprint">Impressum</a>
+                <a href="/privacy">Datenschutz</a>
+                <a href="/widerrufsbelehrung">Widerrufsrecht</a>
+                <a href="/agb">AGB</a>
+                <a href="/sla">SLA</a>
             </div>
             <div class="footer-bottom">
                 <p>&copy; 2026 Gassigeher. Alle Rechte vorbehalten.</p>
@@ -451,7 +451,7 @@
 
             if (relevantFAQs.length > 0) {
                 faqDeflectionList.innerHTML = relevantFAQs.map(faq =>
-                    `<li><a href="/landing/faq.html#faq-${faq.id}">${escapeHtml(faq.question)}</a></li>`
+                    `<li><a href="/faq#faq-${faq.id}">${escapeHtml(faq.question)}</a></li>`
                 ).join('');
                 faqDeflection.classList.add('show');
             } else {

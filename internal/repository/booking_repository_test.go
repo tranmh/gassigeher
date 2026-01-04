@@ -810,7 +810,13 @@ func TestBookingRepository_GetForReminders(t *testing.T) {
 	defer db.Close()
 
 	repo := NewBookingRepository(db)
-	now := time.Now()
+
+	// Use Berlin time to match GetForReminders() behavior
+	berlinLoc, err := time.LoadLocation("Europe/Berlin")
+	if err != nil {
+		t.Fatalf("Failed to load Europe/Berlin timezone: %v", err)
+	}
+	now := time.Now().In(berlinLoc)
 
 	// Helper to check if adding duration to current time would cross midnight
 	crossesMidnight := func(d time.Duration) bool {

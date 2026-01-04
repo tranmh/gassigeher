@@ -52,9 +52,24 @@ func TenantMiddleware(tenantRepo *repository.TenantRepository, baseDomain string
 			// Extract subdomain from host
 			slug := extractSubdomain(host, baseDomain)
 
-			// If no subdomain or it's "www", skip tenant resolution
+			// Redirect www to base domain (canonical URL)
+			if slug == "www" {
+				// Determine protocol (prefer HTTPS, fallback to request scheme)
+				scheme := "https"
+				if r.TLS == nil && (strings.HasPrefix(baseDomain, "localhost") || strings.HasSuffix(baseDomain, ".local")) {
+					scheme = "http"
+				}
+				targetURL := scheme + "://" + baseDomain + r.URL.Path
+				if r.URL.RawQuery != "" {
+					targetURL += "?" + r.URL.RawQuery
+				}
+				http.Redirect(w, r, targetURL, http.StatusMovedPermanently)
+				return
+			}
+
+			// If no subdomain or it's "admin", skip tenant resolution
 			// This allows the landing page and central admin to work without a tenant
-			if slug == "" || slug == "www" || slug == "admin" {
+			if slug == "" || slug == "admin" {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -202,5 +217,59 @@ func SimpleModeMiddleware(next http.Handler) http.Handler {
 		ctx = context.WithValue(ctx, TenantSlugKey, "default")
 		ctx = context.WithValue(ctx, IsDemoKey, false)
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// IsOnMainDomain checks if the request is on the main domain (no tenant subdomain).
+// Returns true for: gassigeher.org, www.gassigeher.org
+// Returns false for: demo.gassigeher.org, tierheim-xyz.gassigeher.org
+func IsOnMainDomain(r *http.Request) bool {
+	tenantID := GetTenantID(r)
+	return tenantID == 0
+}
+
+// IsOnTenantSubdomain checks if the request is on a tenant subdomain.
+// Returns true for: demo.gassigeher.org, tierheim-xyz.gassigeher.org
+// Returns false for: gassigeher.org, www.gassigeher.org
+func IsOnTenantSubdomain(r *http.Request) bool {
+	tenantID := GetTenantID(r)
+	return tenantID > 0
+}
+
+// MainDomainOnlyMiddleware blocks access on tenant subdomains.
+// Use for routes that should only be accessible on the main domain (landing, central).
+func MainDomainOnlyMiddleware(baseDomain string) func(http.Handler) http.Handler {
+	// Determine if this is a local development environment
+	isLocal := strings.HasPrefix(baseDomain, "localhost") || strings.HasSuffix(baseDomain, ".local")
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if IsOnTenantSubdomain(r) {
+				// Redirect to main domain with same path
+				scheme := "https"
+				if isLocal && r.TLS == nil {
+					scheme = "http"
+				}
+				mainURL := scheme + "://" + baseDomain + r.URL.Path
+				if r.URL.RawQuery != "" {
+					mainURL += "?" + r.URL.RawQuery
+				}
+				http.Redirect(w, r, mainURL, http.StatusTemporaryRedirect)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// TenantOnlyMiddleware blocks access on the main domain.
+// Use for routes that should only be accessible on tenant subdomains.
+func TenantOnlyMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if IsOnMainDomain(r) {
+			http.Error(w, `{"error":"Diese Seite ist nur für Tierheime verfügbar"}`, http.StatusNotFound)
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }
