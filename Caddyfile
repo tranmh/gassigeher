@@ -3,6 +3,10 @@
 
 # Global options
 {
+    # Use Let's Encrypt staging for development/testing (no rate limits)
+    # WARNING: Browsers will show certificate warnings - remove for production!
+    acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+
     # Enable admin API for Prometheus metrics
     # Accessible at http://caddy:2019/metrics from internal network
     admin :2019
