@@ -948,12 +948,12 @@ This is a complete application following the implementation plan. Each phase bui
 
 ## License
 
-This project is licensed under the **GNU General Public License v3.0** (GPL-3.0).
+This project is licensed under the **GNU Affero General Public License v3.0** (AGPL-3.0).
 
 Copyright © 2025 Minh Cuong Tran
 
-This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
 
-See the [gpl-3.0.txt](gpl-3.0.txt) file for the full license text.
+See the [agpl-3.0.txt](agpl-3.0.txt) file for the full license text.
