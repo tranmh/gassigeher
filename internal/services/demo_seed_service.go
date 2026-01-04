@@ -280,29 +280,29 @@ func (s *DemoSeedService) seedDemoUsers(tenantID int, adminPassword string) (map
 			PasswordHash: string(demoHash),
 			IsSuperAdmin: false,
 			IsAdmin:      false,
-			ColorLevel:   "green",
+			ColorLevel:   "single_green", // Anna can only book green dogs (e.g., Max, Luna, Mia)
 			ProfilePhoto: "/assets/images/demo/users/anna.svg",
 		},
 		{
-			Key:          "orange",
+			Key:          "yellow",
 			FirstName:    "Bernd",
 			LastName:     "Schmidt",
 			Email:        s.cfg.DemoUserEmail("bernd"),
 			PasswordHash: string(demoHash),
 			IsSuperAdmin: false,
 			IsAdmin:      false,
-			ColorLevel:   "orange",
+			ColorLevel:   "single_yellow", // Bernd can only book yellow dogs (e.g., Bello, Bruno)
 			ProfilePhoto: "/assets/images/demo/users/bernd.svg",
 		},
 		{
-			Key:          "blue",
+			Key:          "orange",
 			FirstName:    "Clara",
 			LastName:     "Weber",
 			Email:        s.cfg.DemoUserEmail("clara"),
 			PasswordHash: string(demoHash),
 			IsSuperAdmin: false,
 			IsAdmin:      false,
-			ColorLevel:   "blue",
+			ColorLevel:   "single_orange", // Clara can only book orange dogs (e.g., Rocky)
 			ProfilePhoto: "/assets/images/demo/users/clara.svg",
 		},
 	}
@@ -356,13 +356,18 @@ func (s *DemoSeedService) assignUserColors(tenantID, userID int, level string) e
 	}
 
 	// Determine which colors to assign based on level
+	// Single color levels give exactly ONE color to demo users
+	// "blue" level gives ALL colors (for admin)
 	var colorNames []string
 	switch level {
-	case "green":
+	case "single_green":
 		colorNames = []string{"Gruen"}
-	case "orange":
-		colorNames = []string{"Gruen", "Gelb", "Orange"}
+	case "single_yellow":
+		colorNames = []string{"Gelb"}
+	case "single_orange":
+		colorNames = []string{"Orange"}
 	case "blue":
+		// Admin gets all colors
 		colorNames = []string{"Gruen", "Gelb", "Orange", "Hellblau", "Dunkelblau"}
 	default:
 		colorNames = []string{"Gruen"}

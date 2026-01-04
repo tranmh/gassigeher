@@ -190,7 +190,8 @@ func TestProvisioningService_ProvisionTenant(t *testing.T) {
 	defer tx.Rollback()
 
 	// Provision the tenant with federal state "NW" (Nordrhein-Westfalen)
-	err = service.ProvisionTenant(tx, int(tenantID), "NW")
+	// adminUserID=0 means no admin to assign colors to
+	err = service.ProvisionTenant(tx, int(tenantID), "NW", 0)
 	if err != nil {
 		t.Fatalf("ProvisionTenant failed: %v", err)
 	}
@@ -200,10 +201,12 @@ func TestProvisioningService_ProvisionTenant(t *testing.T) {
 	}
 
 	// Verify all data was created
-	var colorCount, ruleCount, settingCount int
+	var colorCount, ruleCount, settingCount, subscriptionCount, dogCount int
 	db.QueryRow("SELECT COUNT(*) FROM color_categories WHERE tenant_id = ?", tenantID).Scan(&colorCount)
 	db.QueryRow("SELECT COUNT(*) FROM booking_time_rules WHERE tenant_id = ?", tenantID).Scan(&ruleCount)
 	db.QueryRow("SELECT COUNT(*) FROM system_settings WHERE tenant_id = ?", tenantID).Scan(&settingCount)
+	db.QueryRow("SELECT COUNT(*) FROM tenant_subscriptions WHERE tenant_id = ?", tenantID).Scan(&subscriptionCount)
+	db.QueryRow("SELECT COUNT(*) FROM dogs WHERE tenant_id = ?", tenantID).Scan(&dogCount)
 
 	if colorCount != 5 {
 		t.Errorf("Expected 5 colors, got %d", colorCount)
@@ -216,12 +219,30 @@ func TestProvisioningService_ProvisionTenant(t *testing.T) {
 	if settingCount != 6 {
 		t.Errorf("Expected 6 settings, got %d", settingCount)
 	}
+	if subscriptionCount != 1 {
+		t.Errorf("Expected 1 subscription, got %d", subscriptionCount)
+	}
+	if dogCount != 1 {
+		t.Errorf("Expected 1 demo dog, got %d", dogCount)
+	}
 
 	// Verify feiertage_state was set correctly
 	var feiertagState string
 	db.QueryRow(`SELECT value FROM system_settings WHERE tenant_id = ? AND "key" = 'feiertage_state'`, tenantID).Scan(&feiertagState)
 	if feiertagState != "NW" {
 		t.Errorf("Expected feiertage_state = 'NW', got '%s'", feiertagState)
+	}
+
+	// Verify demo dog has green color (first color)
+	var dogName string
+	var dogColorID, greenColorID int
+	db.QueryRow("SELECT name, color_id FROM dogs WHERE tenant_id = ?", tenantID).Scan(&dogName, &dogColorID)
+	db.QueryRow("SELECT id FROM color_categories WHERE tenant_id = ? AND sort_order = 1", tenantID).Scan(&greenColorID)
+	if dogName != "Demo-Hund" {
+		t.Errorf("Expected demo dog name 'Demo-Hund', got '%s'", dogName)
+	}
+	if dogColorID != greenColorID {
+		t.Errorf("Expected demo dog to have green color (ID %d), got %d", greenColorID, dogColorID)
 	}
 }
 
@@ -294,7 +315,7 @@ func TestProvisioningService_ProvisionTenant_Idempotent(t *testing.T) {
 
 	// First provision
 	tx1, _ := db.Begin()
-	err = service.ProvisionTenant(tx1, int(tenantID), "BW")
+	err = service.ProvisionTenant(tx1, int(tenantID), "BW", 0)
 	if err != nil {
 		tx1.Rollback()
 		t.Fatalf("First ProvisionTenant failed: %v", err)
@@ -310,7 +331,7 @@ func TestProvisioningService_ProvisionTenant_Idempotent(t *testing.T) {
 	tx2, _ := db.Begin()
 	// Note: Colors and rules will fail due to unique constraints, but settings should be fine
 	// We expect this to fail actually since colors have unique constraint per tenant
-	err = service.ProvisionTenant(tx2, int(tenantID), "BW")
+	err = service.ProvisionTenant(tx2, int(tenantID), "BW", 0)
 	if err == nil {
 		tx2.Commit()
 		// If it succeeded, counts should be the same

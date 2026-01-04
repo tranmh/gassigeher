@@ -306,9 +306,9 @@ func (h *TenantHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 4. Provision default data (colors, booking rules, settings)
-	// Pass federalState so it can be used for holiday detection configuration
-	if err := h.provisioningService.ProvisionTenant(tx, tenantID, req.FederalState); err != nil {
+	// 4. Provision default data (colors, booking rules, settings, demo dog)
+	// Pass federalState for holiday detection and adminUserID to assign all colors
+	if err := h.provisioningService.ProvisionTenant(tx, tenantID, req.FederalState, admin.ID); err != nil {
 		log.Printf("Provisioning error for tenant %d: %v", tenantID, err)
 		respondError(w, http.StatusInternalServerError, "Fehler bei der Einrichtung")
 		return

@@ -172,12 +172,89 @@ func (s *ProvisioningService) CreateDefaultSubscription(tx *sql.Tx, tenantID int
 	return nil
 }
 
+// AssignAllColorsToUser assigns all tenant colors to a user (for super-admin)
+func (s *ProvisioningService) AssignAllColorsToUser(tx *sql.Tx, tenantID, userID int) error {
+	// Get all color IDs for this tenant
+	query := s.db.RebindQuery(`SELECT id FROM color_categories WHERE tenant_id = ?`)
+	rows, err := tx.Query(query, tenantID)
+	if err != nil {
+		return fmt.Errorf("failed to get colors: %w", err)
+	}
+	defer rows.Close()
+
+	var colorIDs []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return fmt.Errorf("failed to scan color id: %w", err)
+		}
+		colorIDs = append(colorIDs, id)
+	}
+
+	// Assign each color to the user
+	insertQuery := s.db.RebindQuery(`INSERT INTO user_colors (tenant_id, user_id, color_id, granted_by) VALUES (?, ?, ?, ?)`)
+	for _, colorID := range colorIDs {
+		_, err := tx.Exec(insertQuery, tenantID, userID, colorID, userID)
+		if err != nil {
+			return fmt.Errorf("failed to assign color %d to user: %w", colorID, err)
+		}
+	}
+
+	return nil
+}
+
+// CreateDemoDog creates a single demo dog for new tenants to test immediately
+func (s *ProvisioningService) CreateDemoDog(tx *sql.Tx, tenantID int) error {
+	// Get the first (green) color for the demo dog
+	query := s.db.RebindQuery(`SELECT id FROM color_categories WHERE tenant_id = ? ORDER BY sort_order ASC LIMIT 1`)
+	var colorID int
+	err := tx.QueryRow(query, tenantID).Scan(&colorID)
+	if err != nil {
+		return fmt.Errorf("failed to get first color: %w", err)
+	}
+
+	// Create demo dog
+	insertQuery := s.db.RebindQuery(`
+		INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, is_featured,
+		                  special_needs, pickup_location, walk_route, walk_duration, special_instructions)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`)
+	_, err = tx.Exec(insertQuery,
+		tenantID,
+		"Demo-Hund",                                   // name
+		"Mischling",                                   // breed
+		"medium",                                      // size
+		3,                                             // age
+		colorID,                                       // color_id (green - accessible to all)
+		s.db.BoolValue(true),                          // is_available
+		s.db.BoolValue(true),                          // is_featured
+		"Keine besonderen Bedürfnisse",                // special_needs
+		"Zwinger 1",                                   // pickup_location
+		"Standardrunde um das Tierheim",               // walk_route
+		30,                                            // walk_duration
+		"Dies ist ein Demo-Hund zum Testen. Sie können diesen Hund bearbeiten oder löschen.", // special_instructions
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create demo dog: %w", err)
+	}
+
+	return nil
+}
+
 // ProvisionTenant creates all default data for a new tenant
 // federalState is used to configure holiday detection for the tenant's region
-func (s *ProvisioningService) ProvisionTenant(tx *sql.Tx, tenantID int, federalState string) error {
+// adminUserID is the ID of the super-admin user to assign all colors to
+func (s *ProvisioningService) ProvisionTenant(tx *sql.Tx, tenantID int, federalState string, adminUserID int) error {
 	// Create default color categories
 	if err := s.CreateDefaultColors(tx, tenantID); err != nil {
 		return fmt.Errorf("CreateDefaultColors failed: %w", err)
+	}
+
+	// Assign all colors to the super-admin
+	if adminUserID > 0 {
+		if err := s.AssignAllColorsToUser(tx, tenantID, adminUserID); err != nil {
+			return fmt.Errorf("AssignAllColorsToUser failed: %w", err)
+		}
 	}
 
 	// Create default booking time rules
@@ -193,6 +270,11 @@ func (s *ProvisioningService) ProvisionTenant(tx *sql.Tx, tenantID int, federalS
 	// Create Free plan subscription
 	if err := s.CreateDefaultSubscription(tx, tenantID); err != nil {
 		return fmt.Errorf("CreateDefaultSubscription failed: %w", err)
+	}
+
+	// Create a demo dog so the admin can test immediately
+	if err := s.CreateDemoDog(tx, tenantID); err != nil {
+		return fmt.Errorf("CreateDemoDog failed: %w", err)
 	}
 
 	return nil
