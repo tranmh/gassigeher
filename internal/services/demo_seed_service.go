@@ -70,7 +70,30 @@ func (s *DemoSeedService) EnsureDemoTenant() error {
 	}
 
 	if tenant != nil {
-		log.Println("Demo tenant already exists, skipping creation")
+		// Demo tenant exists, but check if demo_tenant_state exists too
+		existingState, err := s.demoStateRepo.GetState(tenant.ID)
+		if err != nil {
+			return fmt.Errorf("failed to check demo state: %w", err)
+		}
+
+		if existingState == nil {
+			// Tenant exists but state doesn't - create the state
+			log.Println("Demo tenant exists but state missing, creating state...")
+			now := time.Now()
+			nextReset := s.calculateNextResetTime()
+			state := &models.DemoTenantState{
+				TenantID:      tenant.ID,
+				AdminPassword: DemoAdminPassword,
+				LastResetAt:   &now,
+				NextResetAt:   &nextReset,
+			}
+			if err := s.demoStateRepo.CreateState(state); err != nil {
+				return fmt.Errorf("failed to create demo state: %w", err)
+			}
+			log.Printf("Demo tenant state created for tenant ID: %d", tenant.ID)
+		} else {
+			log.Println("Demo tenant already exists, skipping creation")
+		}
 		return nil
 	}
 
@@ -393,7 +416,7 @@ func (s *DemoSeedService) seedDemoDogs(tenantID int) ([]int, error) {
 			Breed:               "Deutscher Schäferhund",
 			Size:                "large",
 			Age:                 4,
-			ColorName:           "Grün",
+			ColorName:           "Gruen",
 			Photo:               "/assets/images/demo/dogs/max.jpg",
 			SpecialNeeds:        "Keine besonderen Bedürfnisse",
 			PickupLocation:      "Zwinger 1, Gebäude A",
@@ -406,7 +429,7 @@ func (s *DemoSeedService) seedDemoDogs(tenantID int) ([]int, error) {
 			Breed:               "Labrador Retriever",
 			Size:                "large",
 			Age:                 3,
-			ColorName:           "Grün",
+			ColorName:           "Gruen",
 			Photo:               "/assets/images/demo/dogs/luna.jpg",
 			SpecialNeeds:        "Liebt Wasser - nicht am Teich vorbeigehen!",
 			PickupLocation:      "Zwinger 2, Gebäude A",
@@ -445,7 +468,7 @@ func (s *DemoSeedService) seedDemoDogs(tenantID int) ([]int, error) {
 			Breed:               "Beagle",
 			Size:                "small",
 			Age:                 2,
-			ColorName:           "Grün",
+			ColorName:           "Gruen",
 			Photo:               "/assets/images/demo/dogs/mia.jpg",
 			SpecialNeeds:        "Folgt ihrer Nase - immer an der Leine halten!",
 			PickupLocation:      "Zwinger 3, Gebäude A",
@@ -471,7 +494,7 @@ func (s *DemoSeedService) seedDemoDogs(tenantID int) ([]int, error) {
 			Breed:               "Dackel",
 			Size:                "small",
 			Age:                 7,
-			ColorName:           "Grün",
+			ColorName:           "Gruen",
 			Photo:               "/assets/images/demo/dogs/lotte.jpg",
 			SpecialNeeds:        "Rückenschonend - keine Treppen!",
 			PickupLocation:      "Zwinger 6, Gebäude A",
@@ -716,11 +739,32 @@ func (s *DemoSeedService) ResetDemoTenant() error {
 		return fmt.Errorf("failed to re-seed demo data: %w", err)
 	}
 
-	// Update demo state
+	// Update or create demo state
 	now := time.Now()
 	nextReset := s.calculateNextResetTime()
-	if err := s.demoStateRepo.UpdateState(tenant.ID, newPassword, &now, &nextReset); err != nil {
-		return fmt.Errorf("failed to update demo state: %w", err)
+
+	// Check if demo state exists
+	existingState, err := s.demoStateRepo.GetState(tenant.ID)
+	if err != nil {
+		return fmt.Errorf("failed to check demo state: %w", err)
+	}
+
+	if existingState == nil {
+		// Create demo state if it doesn't exist
+		state := &models.DemoTenantState{
+			TenantID:      tenant.ID,
+			AdminPassword: newPassword,
+			LastResetAt:   &now,
+			NextResetAt:   &nextReset,
+		}
+		if err := s.demoStateRepo.CreateState(state); err != nil {
+			return fmt.Errorf("failed to create demo state: %w", err)
+		}
+	} else {
+		// Update existing demo state
+		if err := s.demoStateRepo.UpdateState(tenant.ID, newPassword, &now, &nextReset); err != nil {
+			return fmt.Errorf("failed to update demo state: %w", err)
+		}
 	}
 
 	// SECURITY: GASSI-2025-001 - Use secure log message that doesn't expose password
