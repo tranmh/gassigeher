@@ -402,7 +402,7 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	expires := time.Now().Add(1 * time.Hour)
+	expires := time.Now().Add(24 * time.Hour)
 	user.PasswordResetToken = &resetToken
 	user.PasswordResetExpires = &expires
 

@@ -153,8 +153,8 @@ func TestLoad(t *testing.T) {
 		if cfg.Port != "8080" {
 			t.Errorf("Expected Port '8080', got '%s'", cfg.Port)
 		}
-		if cfg.JWTExpirationHours != 24 {
-			t.Errorf("Expected JWTExpirationHours 24, got %d", cfg.JWTExpirationHours)
+		if cfg.JWTExpirationHours != 720 {
+			t.Errorf("Expected JWTExpirationHours 720, got %d", cfg.JWTExpirationHours)
 		}
 		if cfg.BookingAdvanceDays != 14 {
 			t.Errorf("Expected BookingAdvanceDays 14, got %d", cfg.BookingAdvanceDays)

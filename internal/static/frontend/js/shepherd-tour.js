@@ -5,9 +5,8 @@
  * Features:
  * - User tour: Dashboard → Dogs → Booking flow
  * - Admin tour: Dashboard → Dogs management → Users → Settings
- * - Skip after first completion (localStorage)
- * - Always active on demo tenant
- * - "Replay tour" button in profile/settings
+ * - Shows once per browser (localStorage), dismissed via X or "Überspringen"
+ * - "Replay tour" button in profile/settings to show again
  */
 
 // Shepherd.js is loaded locally in HTML pages that use tours
@@ -20,20 +19,8 @@
     // Tour storage keys
     const STORAGE_KEYS = {
         userTourComplete: 'gassigeher_user_tour_complete',
-        adminTourComplete: 'gassigeher_admin_tour_complete',
-        isDemo: 'gassigeher_is_demo'
+        adminTourComplete: 'gassigeher_admin_tour_complete'
     };
-
-    // Check if we're on demo tenant
-    function isDemoTenant() {
-        // Check subdomain or cached value
-        const hostname = window.location.hostname;
-        // Demo tenant always uses "demo." subdomain regardless of base domain
-        if (hostname.startsWith('demo.')) {
-            return true;
-        }
-        return localStorage.getItem(STORAGE_KEYS.isDemo) === 'true';
-    }
 
     // Check if tour should be skipped (for e2e tests)
     function shouldSkipTour() {
@@ -51,12 +38,8 @@
 
     // Check if tour has been completed
     function isTourComplete(tourType) {
-        // Allow skipping for e2e tests
         if (shouldSkipTour()) {
             return true;
-        }
-        if (isDemoTenant()) {
-            return false; // Always show on demo
         }
         const key = tourType === 'admin' ? STORAGE_KEYS.adminTourComplete : STORAGE_KEYS.userTourComplete;
         return localStorage.getItem(key) === 'true';
@@ -64,9 +47,6 @@
 
     // Mark tour as complete
     function markTourComplete(tourType) {
-        if (isDemoTenant()) {
-            return; // Don't mark complete on demo
-        }
         const key = tourType === 'admin' ? STORAGE_KEYS.adminTourComplete : STORAGE_KEYS.userTourComplete;
         localStorage.setItem(key, 'true');
     }
@@ -399,7 +379,6 @@
     // Export functions to global scope
     window.GassigeherTour = {
         init: initTour,
-        isDemoTenant: isDemoTenant,
         isTourComplete: isTourComplete,
         resetTour: resetTour,
         createReplayButton: createReplayButton,

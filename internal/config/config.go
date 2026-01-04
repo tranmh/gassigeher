@@ -148,7 +148,7 @@ func Load() *Config {
 
 		// JWT (SECURITY: JWT_SECRET must be explicitly set in production)
 		JWTSecret:          getEnvRequired("JWT_SECRET", "change-this-in-production-INSECURE"),
-		JWTExpirationHours: getEnvAsInt("JWT_EXPIRATION_HOURS", 24),
+		JWTExpirationHours: getEnvAsInt("JWT_EXPIRATION_HOURS", 720), // 30 days default
 
 		// Admin Configuration
 		// Simple Mode: SUPER_ADMIN_EMAIL is the local shelter admin

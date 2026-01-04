@@ -589,7 +589,7 @@ DB_CONN_MAX_LIFETIME=${DB_CONN_MAX_LIFETIME:-5}
 # ==================================================
 # Authentication
 # ==================================================
-JWT_EXPIRATION_HOURS=${JWT_EXPIRATION_HOURS:-24}
+JWT_EXPIRATION_HOURS=${JWT_EXPIRATION_HOURS:-720}  # 30 days default
 
 # ==================================================
 # Admin
