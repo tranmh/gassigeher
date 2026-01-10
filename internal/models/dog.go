@@ -99,7 +99,8 @@ type DogFilterRequest struct {
 	Size        *string `json:"size,omitempty"`
 	MinAge      *int    `json:"min_age,omitempty"`
 	MaxAge      *int    `json:"max_age,omitempty"`
-	Category    *string `json:"category,omitempty"`
+	Category    *string `json:"category,omitempty"`    // Legacy filter (green, blue, orange)
+	ColorID     *int    `json:"color_id,omitempty"`    // New color system filter
 	Available   *bool   `json:"available,omitempty"`
 	Search      *string `json:"search,omitempty"` // Search in name, breed
 }

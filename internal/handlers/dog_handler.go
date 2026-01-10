@@ -108,6 +108,13 @@ func (h *DogHandler) ListDogs(w http.ResponseWriter, r *http.Request) {
 		filter.Category = &category
 	}
 
+	// New color system filter by color_id
+	if colorID := r.URL.Query().Get("color_id"); colorID != "" {
+		if id, err := strconv.Atoi(colorID); err == nil {
+			filter.ColorID = &id
+		}
+	}
+
 	// Accept both "available" and "is_available" for backwards compatibility
 	availableParam := r.URL.Query().Get("available")
 	if availableParam == "" {

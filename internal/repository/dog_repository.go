@@ -287,6 +287,13 @@ func (r *DogRepository) FindAll(filter *models.DogFilterRequest, tenantID int) (
 			args = append(args, colorName)
 		}
 
+		// Direct color_id filter (new color system)
+		// Validate color belongs to same tenant for security in SaaS mode
+		if filter.ColorID != nil {
+			query += " AND color_id = ? AND color_id IN (SELECT id FROM color_categories WHERE tenant_id = dogs.tenant_id)"
+			args = append(args, *filter.ColorID)
+		}
+
 		if filter.Available != nil {
 			query += " AND is_available = ?"
 			args = append(args, *filter.Available)
