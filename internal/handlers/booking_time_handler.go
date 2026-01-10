@@ -28,7 +28,8 @@ func NewBookingTimeHandler(
 }
 
 // GetAvailableSlots returns available time slots for a date
-// GET /api/booking-times/available?date=YYYY-MM-DD
+// GET /api/booking-times/available?date=YYYY-MM-DD&dog_id=123
+// Optional dog_id parameter filters out periods already booked by that dog
 func (h *BookingTimeHandler) GetAvailableSlots(w http.ResponseWriter, r *http.Request) {
 	// SaaS: Extract tenant ID from context
 	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
@@ -39,9 +40,43 @@ func (h *BookingTimeHandler) GetAvailableSlots(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// Get base available slots
 	slots, err := h.bookingTimeService.GetAvailableTimeSlots(r.Context(), tenantID, date)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Optional: Filter by dog_id to exclude periods already booked by this dog
+	dogIDStr := r.URL.Query().Get("dog_id")
+	if dogIDStr != "" {
+		dogID, err := strconv.Atoi(dogIDStr)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "invalid dog_id parameter")
+			return
+		}
+
+		bookedPeriods, filteredSlots, err := h.bookingTimeService.FilterSlotsForDog(r.Context(), tenantID, dogID, date, slots)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "Failed to filter slots")
+			return
+		}
+
+		// Convert booked periods to a simpler format for the response
+		bookedPeriodsInfo := make([]map[string]interface{}, len(bookedPeriods))
+		for i, period := range bookedPeriods {
+			bookedPeriodsInfo[i] = map[string]interface{}{
+				"rule_name":  period.RuleName,
+				"start_time": period.StartTime,
+				"end_time":   period.EndTime,
+			}
+		}
+
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"date":           date,
+			"slots":          filteredSlots,
+			"booked_periods": bookedPeriodsInfo,
+		})
 		return
 	}
 

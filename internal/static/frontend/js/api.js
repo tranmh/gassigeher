@@ -615,8 +615,12 @@ class API {
 
     // BOOKING TIME ENDPOINTS
 
-    async getAvailableTimeSlots(date) {
-        return this.request('GET', `/booking-times/available?date=${date}`);
+    async getAvailableTimeSlots(date, dogId = null) {
+        let url = `/booking-times/available?date=${date}`;
+        if (dogId) {
+            url += `&dog_id=${dogId}`;
+        }
+        return this.request('GET', url);
     }
 
     async getRulesForDate(date) {

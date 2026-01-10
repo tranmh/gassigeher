@@ -40,17 +40,20 @@ func NewBookingHandler(db *database.DB, cfg *config.Config) *BookingHandler {
 		log.Printf("Warning: Failed to initialize email service: %v", err)
 	}
 
-	// Initialize booking time service
+	// Initialize repositories
 	settingsRepo := repository.NewSettingsRepository(db)
 	bookingTimeRepo := repository.NewBookingTimeRepository(db)
 	holidayRepo := repository.NewHolidayRepository(db)
+	bookingRepo := repository.NewBookingRepository(db)
+
+	// Initialize booking time service with booking repo for period-based checks
 	holidayService := services.NewHolidayService(holidayRepo, settingsRepo)
-	bookingTimeService := services.NewBookingTimeService(bookingTimeRepo, holidayService, settingsRepo)
+	bookingTimeService := services.NewBookingTimeService(bookingTimeRepo, holidayService, settingsRepo, bookingRepo)
 
 	return &BookingHandler{
 		db:                 db,
 		cfg:                cfg,
-		bookingRepo:        repository.NewBookingRepository(db),
+		bookingRepo:        bookingRepo,
 		dogRepo:            repository.NewDogRepository(db),
 		userRepo:           repository.NewUserRepository(db),
 		userColorRepo:      repository.NewUserColorRepository(db),
@@ -188,20 +191,28 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check for double-booking (tenant-aware for defense-in-depth)
-	isDoubleBooked, err := h.bookingRepo.CheckDoubleBooking(tenantID, req.DogID, req.Date, req.ScheduledTime)
-	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to check availability")
-		return
-	}
-	if isDoubleBooked {
-		respondError(w, http.StatusConflict, "This dog is already booked for this time")
-		return
-	}
-
 	// Validate booking time (check if time is allowed/blocked)
 	if err := h.bookingTimeService.ValidateBookingTime(r.Context(), tenantID, req.Date, req.ScheduledTime); err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Check period-based availability (replaces simple double-booking check)
+	// Each dog can only have ONE booking per period (morning/afternoon) per day
+	// TENANT ISOLATION: tenantID from context is passed to service
+	isAvailable, existingBooking, period, err := h.bookingTimeService.CheckPeriodAvailability(
+		r.Context(), tenantID, req.DogID, req.Date, req.ScheduledTime,
+	)
+	if err != nil {
+		// CheckPeriodAvailability returns user-facing validation errors
+		// (e.g., buffer time violation, time outside periods)
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if !isAvailable && existingBooking != nil && period != nil {
+		errorMsg := fmt.Sprintf("Dieser Hund ist bereits für %s (%s-%s) gebucht",
+			period.RuleName, period.StartTime, period.EndTime)
+		respondError(w, http.StatusConflict, errorMsg)
 		return
 	}
 
@@ -623,14 +634,28 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check for double-booking at new time (tenant-aware for defense-in-depth)
-	isDoubleBooked, err := h.bookingRepo.CheckDoubleBooking(tenantID, booking.DogID, req.Date, req.ScheduledTime)
-	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to check availability")
+	// Validate booking time (check if new time is allowed/blocked)
+	if err := h.bookingTimeService.ValidateBookingTime(r.Context(), tenantID, req.Date, req.ScheduledTime); err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if isDoubleBooked {
-		respondError(w, http.StatusConflict, "Dog is already booked for this time")
+
+	// Check period-based availability at new time
+	// Each dog can only have ONE booking per period (morning/afternoon) per day
+	isAvailable, existingBooking, period, err := h.bookingTimeService.CheckPeriodAvailability(
+		r.Context(), tenantID, booking.DogID, req.Date, req.ScheduledTime,
+	)
+	if err != nil {
+		// CheckPeriodAvailability returns user-facing validation errors
+		// (e.g., buffer time violation, time outside periods)
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	// Only block if there's a DIFFERENT booking in the period (not the one being moved)
+	if !isAvailable && existingBooking != nil && existingBooking.ID != booking.ID && period != nil {
+		errorMsg := fmt.Sprintf("Dieser Hund ist bereits für %s (%s-%s) gebucht",
+			period.RuleName, period.StartTime, period.EndTime)
+		respondError(w, http.StatusConflict, errorMsg)
 		return
 	}
 
@@ -639,6 +664,11 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 	booking.ScheduledTime = req.ScheduledTime
 
 	if err := h.bookingRepo.Update(booking, tenantID); err != nil {
+		// Handle race condition: another booking may have been created in this period
+		if isUniqueConstraintError(err.Error()) {
+			respondError(w, http.StatusConflict, "Dieser Zeitraum ist inzwischen belegt, bitte erneut versuchen")
+			return
+		}
 		respondError(w, http.StatusInternalServerError, "Failed to move booking")
 		return
 	}

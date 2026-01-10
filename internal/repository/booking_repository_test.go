@@ -1567,3 +1567,187 @@ func TestBookingRepository_MarkReminderSent(t *testing.T) {
 		}
 	})
 }
+
+// TestBookingRepository_CheckPeriodBooking tests period-based booking blocking
+func TestBookingRepository_CheckPeriodBooking(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewBookingRepository(db)
+
+	// Test date for all tests
+	testDate := "2025-12-01"
+
+	t.Run("returns nil when no booking in period", func(t *testing.T) {
+		// No bookings exist for this dog/date yet
+		booking, err := repo.CheckPeriodBooking(0, 1, testDate, "08:00", "12:00")
+		if err != nil {
+			t.Fatalf("CheckPeriodBooking() failed: %v", err)
+		}
+		if booking != nil {
+			t.Error("Expected nil when no booking in period")
+		}
+	})
+
+	t.Run("returns booking when booking exists at period start", func(t *testing.T) {
+		// Create booking at 08:00
+		booking := &models.Booking{
+			TenantID:      0,
+			UserID:        1,
+			DogID:         1,
+			Date:          testDate,
+			ScheduledTime: "08:00",
+		}
+		err := repo.Create(booking)
+		if err != nil {
+			t.Fatalf("Failed to create booking: %v", err)
+		}
+
+		// Check period 08:00-12:00
+		found, err := repo.CheckPeriodBooking(0, 1, testDate, "08:00", "12:00")
+		if err != nil {
+			t.Fatalf("CheckPeriodBooking() failed: %v", err)
+		}
+		if found == nil {
+			t.Fatal("Expected to find booking at period start")
+		}
+		if found.ScheduledTime != "08:00" {
+			t.Errorf("Expected scheduled_time '08:00', got '%s'", found.ScheduledTime)
+		}
+	})
+
+	t.Run("returns booking when booking exists in middle of period", func(t *testing.T) {
+		// Create booking at 10:00 (middle of morning period)
+		booking := &models.Booking{
+			TenantID:      0,
+			UserID:        1,
+			DogID:         2, // Different dog
+			Date:          testDate,
+			ScheduledTime: "10:00",
+		}
+		repo.Create(booking)
+
+		// Check period 08:00-12:00
+		found, err := repo.CheckPeriodBooking(0, 2, testDate, "08:00", "12:00")
+		if err != nil {
+			t.Fatalf("CheckPeriodBooking() failed: %v", err)
+		}
+		if found == nil {
+			t.Fatal("Expected to find booking in middle of period")
+		}
+		if found.ScheduledTime != "10:00" {
+			t.Errorf("Expected scheduled_time '10:00', got '%s'", found.ScheduledTime)
+		}
+	})
+
+	t.Run("returns nil when booking at period end time (exclusive)", func(t *testing.T) {
+		// Create booking at 12:00 (period 08:00-12:00 is exclusive of end)
+		booking := &models.Booking{
+			TenantID:      0,
+			UserID:        1,
+			DogID:         3, // Different dog
+			Date:          testDate,
+			ScheduledTime: "12:00",
+		}
+		repo.Create(booking)
+
+		// Check period 08:00-12:00 (12:00 should NOT be included)
+		found, err := repo.CheckPeriodBooking(0, 3, testDate, "08:00", "12:00")
+		if err != nil {
+			t.Fatalf("CheckPeriodBooking() failed: %v", err)
+		}
+		if found != nil {
+			t.Error("Expected nil when booking at period end time (exclusive)")
+		}
+	})
+
+	t.Run("returns nil for cancelled bookings", func(t *testing.T) {
+		// Create booking and then cancel it
+		booking := &models.Booking{
+			TenantID:      0,
+			UserID:        2,
+			DogID:         4, // Different dog
+			Date:          testDate,
+			ScheduledTime: "09:00",
+		}
+		repo.Create(booking)
+		repo.Cancel(booking.ID, 0, nil) // Cancel it
+
+		// Check period should return nil (cancelled bookings don't block)
+		found, err := repo.CheckPeriodBooking(0, 4, testDate, "08:00", "12:00")
+		if err != nil {
+			t.Fatalf("CheckPeriodBooking() failed: %v", err)
+		}
+		if found != nil {
+			t.Error("Expected nil for cancelled bookings")
+		}
+	})
+
+	t.Run("returns nil for booking in different period", func(t *testing.T) {
+		// Dog 1 already has booking at 08:00 in morning period
+		// Check afternoon period 14:00-18:00 for same dog
+		found, err := repo.CheckPeriodBooking(0, 1, testDate, "14:00", "18:00")
+		if err != nil {
+			t.Fatalf("CheckPeriodBooking() failed: %v", err)
+		}
+		if found != nil {
+			t.Error("Expected nil for booking in different period")
+		}
+	})
+
+	t.Run("tenant isolation - does not find other tenant's booking", func(t *testing.T) {
+		// Create booking for tenant 1
+		booking := &models.Booking{
+			TenantID:      1,
+			UserID:        1,
+			DogID:         1,
+			Date:          "2025-12-02", // Different date to avoid conflicts
+			ScheduledTime: "09:00",
+		}
+		repo.Create(booking)
+
+		// Check with tenant 2 - should not find tenant 1's booking
+		found, err := repo.CheckPeriodBooking(2, 1, "2025-12-02", "08:00", "12:00")
+		if err != nil {
+			t.Fatalf("CheckPeriodBooking() failed: %v", err)
+		}
+		if found != nil {
+			t.Error("Expected nil - should not find other tenant's booking (tenant isolation)")
+		}
+
+		// Verify tenant 1 can find their own booking
+		found, err = repo.CheckPeriodBooking(1, 1, "2025-12-02", "08:00", "12:00")
+		if err != nil {
+			t.Fatalf("CheckPeriodBooking() failed: %v", err)
+		}
+		if found == nil {
+			t.Error("Expected tenant 1 to find their own booking")
+		}
+	})
+
+	t.Run("returns correct booking fields", func(t *testing.T) {
+		// Use existing booking from earlier test (dog 1, 08:00, testDate)
+		found, err := repo.CheckPeriodBooking(0, 1, testDate, "08:00", "12:00")
+		if err != nil {
+			t.Fatalf("CheckPeriodBooking() failed: %v", err)
+		}
+		if found == nil {
+			t.Fatal("Expected to find booking")
+		}
+
+		// Verify fields are populated correctly
+		if found.ID == 0 {
+			t.Error("Expected ID to be set")
+		}
+		if found.DogID != 1 {
+			t.Errorf("Expected DogID 1, got %d", found.DogID)
+		}
+		// Date may have T00:00:00Z suffix from database, check prefix
+		if !strings.HasPrefix(found.Date, testDate) {
+			t.Errorf("Expected Date to start with '%s', got '%s'", testDate, found.Date)
+		}
+		if found.Status != "scheduled" {
+			t.Errorf("Expected Status 'scheduled', got '%s'", found.Status)
+		}
+	})
+}

@@ -26,7 +26,7 @@ func setupBookingTimeHandlerTest(t *testing.T) (*database.DB, *BookingTimeHandle
 	holidayRepo := repository.NewHolidayRepository(db)
 	settingsRepo := repository.NewSettingsRepository(db)
 	holidayService := services.NewHolidayService(holidayRepo, settingsRepo)
-	bookingTimeService := services.NewBookingTimeService(bookingTimeRepo, holidayService, settingsRepo)
+	bookingTimeService := services.NewBookingTimeService(bookingTimeRepo, holidayService, settingsRepo, nil)
 	handler := NewBookingTimeHandler(bookingTimeRepo, bookingTimeService)
 
 	cleanup := func() {

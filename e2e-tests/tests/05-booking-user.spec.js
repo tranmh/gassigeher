@@ -661,4 +661,419 @@ test.describe('Booking - Adding Walk Notes', () => {
 
 });
 
-// DONE: Booking tests - creation, validation, business rules, double booking prevention, cancellation, viewing
+test.describe('Period-Based Booking Blocking', () => {
+
+  test('should BLOCK booking same dog in same period (morning)', async ({ page }, testInfo) => {
+    const config = getConfigFromTestInfo(testInfo);
+    const credentials = config.credentials.admin;
+
+    const loginPage = new LoginPage(page, testInfo);
+    await loginPage.goto();
+    await loginPage.loginAndWait(credentials.email, credentials.password);
+
+    // CRITICAL BUSINESS RULE: Only 1 booking per period per dog per day
+    // If dog is booked at 09:00 (morning), cannot book at 10:00 (also morning)
+
+    // Book a dog for 5 days from now to avoid conflicts with other tests
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 5);
+    const dateStr = futureDate.toISOString().split('T')[0];
+
+    // Get first available dog
+    const dogsResponse = await page.request.get('/api/dogs?is_available=true');
+    const dogsData = await dogsResponse.json();
+    const dogs = Array.isArray(dogsData) ? dogsData : (dogsData.dogs || []);
+
+    if (!dogs || dogs.length === 0) {
+      console.log(`[${config.mode}] No available dogs for period blocking test`);
+      return;
+    }
+
+    const testDog = dogs[0];
+    console.log(`[${config.mode}] Testing period blocking with dog:`, testDog.name, 'ID:', testDog.id);
+
+    // First booking at 09:00 (morning period)
+    const firstBooking = await page.request.post('/api/bookings', {
+      data: {
+        dog_id: testDog.id,
+        date: dateStr,
+        scheduled_time: '09:00',
+      }
+    });
+
+    const firstStatus = firstBooking.status();
+    console.log(`[${config.mode}] First booking at 09:00 status:`, firstStatus);
+
+    if (firstStatus === 201 || firstStatus === 200) {
+      // Try to book same dog at 10:00 (also morning period) - should FAIL
+      const secondBooking = await page.request.post('/api/bookings', {
+        data: {
+          dog_id: testDog.id,
+          date: dateStr,
+          scheduled_time: '10:00', // Still in morning period (08:30-12:00)
+        }
+      });
+
+      const secondStatus = secondBooking.status();
+      const secondBody = await secondBooking.text();
+      console.log(`[${config.mode}] Second booking at 10:00 (same period) status:`, secondStatus);
+      console.log(`[${config.mode}] Second booking response:`, secondBody);
+
+      // Second booking should fail with 409 Conflict
+      expect(secondStatus).toBe(409);
+
+      // Should contain German error message about period blocking
+      expect(secondBody).toContain('bereits');
+
+      if (secondStatus < 400) {
+        console.error(`[${config.mode}] 🐛 CRITICAL BUG: Period-based blocking NOT working! Same dog booked twice in morning!`);
+      }
+    } else {
+      console.log(`[${config.mode}] First booking failed (status ${firstStatus}) - cannot test period blocking`);
+    }
+  });
+
+  test('should ALLOW booking same dog in DIFFERENT period (afternoon)', async ({ page }, testInfo) => {
+    const config = getConfigFromTestInfo(testInfo);
+    const credentials = config.credentials.admin;
+
+    const loginPage = new LoginPage(page, testInfo);
+    await loginPage.goto();
+    await loginPage.loginAndWait(credentials.email, credentials.password);
+
+    // CRITICAL BUSINESS RULE: Can book dog in different period
+    // If dog is booked at 09:00 (morning), CAN book at 14:00 (afternoon)
+
+    // Book a dog for 6 days from now to avoid conflicts
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 6);
+    const dateStr = futureDate.toISOString().split('T')[0];
+
+    // Get first available dog
+    const dogsResponse = await page.request.get('/api/dogs?is_available=true');
+    const dogsData = await dogsResponse.json();
+    const dogs = Array.isArray(dogsData) ? dogsData : (dogsData.dogs || []);
+
+    if (!dogs || dogs.length === 0) {
+      console.log(`[${config.mode}] No available dogs for cross-period test`);
+      return;
+    }
+
+    const testDog = dogs[0];
+    console.log(`[${config.mode}] Testing cross-period booking with dog:`, testDog.name);
+
+    // First booking at 09:00 (morning period)
+    const morningBooking = await page.request.post('/api/bookings', {
+      data: {
+        dog_id: testDog.id,
+        date: dateStr,
+        scheduled_time: '09:00',
+      }
+    });
+
+    const morningStatus = morningBooking.status();
+    console.log(`[${config.mode}] Morning booking at 09:00 status:`, morningStatus);
+
+    if (morningStatus === 201 || morningStatus === 200) {
+      // Try to book same dog at 14:00 (afternoon period) - should SUCCEED
+      const afternoonBooking = await page.request.post('/api/bookings', {
+        data: {
+          dog_id: testDog.id,
+          date: dateStr,
+          scheduled_time: '14:00', // Afternoon period (14:00-17:00)
+        }
+      });
+
+      const afternoonStatus = afternoonBooking.status();
+      console.log(`[${config.mode}] Afternoon booking at 14:00 (different period) status:`, afternoonStatus);
+
+      // Afternoon booking SHOULD succeed (201 or 200)
+      expect(afternoonStatus).toBeLessThan(400);
+
+      if (afternoonStatus >= 400) {
+        const errorBody = await afternoonBooking.text();
+        console.error(`[${config.mode}] 🐛 CRITICAL BUG: Cross-period booking rejected! Error: ${errorBody}`);
+      } else {
+        console.log(`[${config.mode}] ✅ Cross-period booking works correctly`);
+      }
+    }
+  });
+
+  test('should show booked periods info in booking modal', async ({ page }, testInfo) => {
+    const config = getConfigFromTestInfo(testInfo);
+    const credentials = config.credentials.admin;
+
+    const loginPage = new LoginPage(page, testInfo);
+    await loginPage.goto();
+    await loginPage.loginAndWait(credentials.email, credentials.password);
+
+    // CRITICAL UX: When a dog already has a booking in a period,
+    // the booking modal should show this info to the user
+
+    // First create a booking
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 8);
+    const dateStr = futureDate.toISOString().split('T')[0];
+
+    const dogsResponse = await page.request.get('/api/dogs?is_available=true');
+    const dogsData = await dogsResponse.json();
+    const dogs = Array.isArray(dogsData) ? dogsData : (dogsData.dogs || []);
+
+    if (!dogs || dogs.length === 0) {
+      console.log(`[${config.mode}] No available dogs for booked periods display test`);
+      return;
+    }
+
+    const testDog = dogs[0];
+
+    // Create a morning booking first
+    const booking = await page.request.post('/api/bookings', {
+      data: {
+        dog_id: testDog.id,
+        date: dateStr,
+        scheduled_time: '09:00',
+      }
+    });
+
+    if (booking.status() === 201 || booking.status() === 200) {
+      // Now open the booking modal for the same dog and date
+      const dogsPage = new DogsPage(page, testInfo);
+      await dogsPage.goto();
+
+      // Open booking modal for the test dog
+      const opened = await dogsPage.clickDogCardAndOpenBookingModal(0);
+      const bookingModal = new BookingModalPage(page);
+      const modalVisible = opened && await bookingModal.isVisible();
+
+      if (modalVisible) {
+        // Set the date to the same date as our booking
+        await bookingModal.fillBookingForm({ date: dateStr });
+
+        // Wait for the booked periods info to load
+        await page.waitForTimeout(1500);
+
+        // Check if booked periods info is shown
+        const bookedPeriodsInfo = page.locator('#booked-periods-info');
+        const isVisible = await bookedPeriodsInfo.isVisible().catch(() => false);
+
+        console.log(`[${config.mode}] Booked periods info visible:`, isVisible);
+
+        if (isVisible) {
+          const infoText = await bookedPeriodsInfo.textContent();
+          console.log(`[${config.mode}] Booked periods info content:`, infoText);
+
+          // Should mention the booked period (Vormittag/Morning)
+          const hasPeriodInfo = infoText.includes('Vormittag') || infoText.includes('Morning') ||
+                               infoText.includes('08:') || infoText.includes('12:');
+          console.log(`[${config.mode}] Shows period name/times:`, hasPeriodInfo);
+
+          expect(hasPeriodInfo).toBe(true);
+        } else {
+          console.warn(`[${config.mode}] ⚠️ UX NOTE: Booked periods info not visible - user may not know which periods are blocked`);
+        }
+
+        await bookingModal.close();
+      }
+    }
+  });
+
+  test('should BLOCK booking too close to period end (buffer time)', async ({ page }, testInfo) => {
+    const config = getConfigFromTestInfo(testInfo);
+    const credentials = config.credentials.admin;
+
+    const loginPage = new LoginPage(page, testInfo);
+    await loginPage.goto();
+    await loginPage.loginAndWait(credentials.email, credentials.password);
+
+    // CRITICAL BUSINESS RULE: Cannot book within 30 minutes of period end
+    // Morning period ends at 12:00, so 11:45 should be rejected
+
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 9);
+    const dateStr = futureDate.toISOString().split('T')[0];
+
+    const dogsResponse = await page.request.get('/api/dogs?is_available=true');
+    const dogsData = await dogsResponse.json();
+    const dogs = Array.isArray(dogsData) ? dogsData : (dogsData.dogs || []);
+
+    if (!dogs || dogs.length === 0) {
+      console.log(`[${config.mode}] No available dogs for buffer time test`);
+      return;
+    }
+
+    const testDog = dogs[0];
+    console.log(`[${config.mode}] Testing buffer time with dog:`, testDog.name);
+
+    // Try to book at 11:45 (within 30 min of period end at 12:00) - should FAIL
+    const bufferBooking = await page.request.post('/api/bookings', {
+      data: {
+        dog_id: testDog.id,
+        date: dateStr,
+        scheduled_time: '11:45', // Too close to period end (12:00)
+      }
+    });
+
+    const bufferStatus = bufferBooking.status();
+    const bufferBody = await bufferBooking.text();
+    console.log(`[${config.mode}] Booking at 11:45 (buffer violation) status:`, bufferStatus);
+    console.log(`[${config.mode}] Buffer booking response:`, bufferBody);
+
+    // Booking should fail due to buffer time
+    expect(bufferStatus).toBeGreaterThanOrEqual(400);
+
+    // Should contain error about buffer time
+    const hasBufferError = bufferBody.includes('Minuten') || bufferBody.includes('buffer') ||
+                          bufferBody.includes('Ende') || bufferBody.includes('end');
+    console.log(`[${config.mode}] Has buffer time error message:`, hasBufferError);
+
+    if (bufferStatus < 400) {
+      console.error(`[${config.mode}] 🐛 CRITICAL BUG: Buffer time validation NOT working! Booking accepted too close to period end!`);
+    }
+  });
+
+  test('should show filtered time slots when dog has existing booking', async ({ page }, testInfo) => {
+    const config = getConfigFromTestInfo(testInfo);
+    const credentials = config.credentials.admin;
+
+    const loginPage = new LoginPage(page, testInfo);
+    await loginPage.goto();
+    await loginPage.loginAndWait(credentials.email, credentials.password);
+
+    // When a dog already has a morning booking, morning time slots should be filtered out
+
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 10);
+    const dateStr = futureDate.toISOString().split('T')[0];
+
+    const dogsResponse = await page.request.get('/api/dogs?is_available=true');
+    const dogsData = await dogsResponse.json();
+    const dogs = Array.isArray(dogsData) ? dogsData : (dogsData.dogs || []);
+
+    if (!dogs || dogs.length === 0) {
+      console.log(`[${config.mode}] No available dogs for filtered slots test`);
+      return;
+    }
+
+    const testDog = dogs[0];
+
+    // Create a morning booking first
+    const booking = await page.request.post('/api/bookings', {
+      data: {
+        dog_id: testDog.id,
+        date: dateStr,
+        scheduled_time: '09:00',
+      }
+    });
+
+    if (booking.status() === 201 || booking.status() === 200) {
+      // Now check the available slots API for this dog
+      const slotsResponse = await page.request.get(
+        `/api/booking-times/available?date=${dateStr}&dog_id=${testDog.id}`
+      );
+      const slotsData = await slotsResponse.json();
+
+      console.log(`[${config.mode}] Available slots for dog with morning booking:`, slotsData);
+
+      // Morning slots (08:30-11:30) should NOT be present
+      const slots = slotsData.slots || [];
+      const hasMorningSlot = slots.some(slot => {
+        const hour = parseInt(slot.split(':')[0]);
+        return hour >= 8 && hour < 12;
+      });
+
+      console.log(`[${config.mode}] Morning slots still available:`, hasMorningSlot);
+
+      // Should NOT have morning slots since morning period is booked
+      expect(hasMorningSlot).toBe(false);
+
+      // Should have booked_periods info
+      const bookedPeriods = slotsData.booked_periods || [];
+      console.log(`[${config.mode}] Booked periods returned:`, bookedPeriods);
+      expect(bookedPeriods.length).toBeGreaterThan(0);
+
+      // Afternoon slots SHOULD still be available
+      const hasAfternoonSlot = slots.some(slot => {
+        const hour = parseInt(slot.split(':')[0]);
+        return hour >= 14;
+      });
+
+      console.log(`[${config.mode}] Afternoon slots available:`, hasAfternoonSlot);
+      expect(hasAfternoonSlot).toBe(true);
+    }
+  });
+
+  test('should allow rebooking after cancellation', async ({ page }, testInfo) => {
+    const config = getConfigFromTestInfo(testInfo);
+    const credentials = config.credentials.admin;
+
+    const loginPage = new LoginPage(page, testInfo);
+    await loginPage.goto();
+    await loginPage.loginAndWait(credentials.email, credentials.password);
+
+    // CRITICAL: After cancelling a booking, the period should be available again
+
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 11);
+    const dateStr = futureDate.toISOString().split('T')[0];
+
+    const dogsResponse = await page.request.get('/api/dogs?is_available=true');
+    const dogsData = await dogsResponse.json();
+    const dogs = Array.isArray(dogsData) ? dogsData : (dogsData.dogs || []);
+
+    if (!dogs || dogs.length === 0) {
+      console.log(`[${config.mode}] No available dogs for rebooking test`);
+      return;
+    }
+
+    const testDog = dogs[0];
+
+    // Create a booking
+    const createResponse = await page.request.post('/api/bookings', {
+      data: {
+        dog_id: testDog.id,
+        date: dateStr,
+        scheduled_time: '09:00',
+      }
+    });
+
+    if (createResponse.status() === 201 || createResponse.status() === 200) {
+      const bookingData = await createResponse.json();
+      const bookingId = bookingData.id;
+
+      console.log(`[${config.mode}] Created booking ID:`, bookingId);
+
+      // Cancel the booking
+      const cancelResponse = await page.request.put(`/api/bookings/${bookingId}/cancel`, {
+        data: { reason: 'E2E test cancellation' }
+      });
+
+      console.log(`[${config.mode}] Cancel status:`, cancelResponse.status());
+
+      if (cancelResponse.status() === 200) {
+        // Now try to book the same time again - should SUCCEED
+        const rebookResponse = await page.request.post('/api/bookings', {
+          data: {
+            dog_id: testDog.id,
+            date: dateStr,
+            scheduled_time: '09:00',
+          }
+        });
+
+        const rebookStatus = rebookResponse.status();
+        console.log(`[${config.mode}] Rebooking after cancellation status:`, rebookStatus);
+
+        // Rebooking should succeed
+        expect(rebookStatus).toBeLessThan(400);
+
+        if (rebookStatus >= 400) {
+          console.error(`[${config.mode}] 🐛 CRITICAL BUG: Cannot rebook after cancellation!`);
+        } else {
+          console.log(`[${config.mode}] ✅ Rebooking after cancellation works correctly`);
+        }
+      }
+    }
+  });
+
+});
+
+// DONE: Booking tests - creation, validation, business rules, double booking prevention, cancellation, viewing, period-based blocking

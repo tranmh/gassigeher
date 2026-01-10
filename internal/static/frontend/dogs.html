@@ -131,6 +131,12 @@
                     <h6 style="margin: 0 0 10px 0; font-size: 0.9rem;">Erlaubte Buchungszeiten:</h6>
                     <ul id="time-rules-list" style="margin: 0; padding-left: 20px; font-size: 0.85rem;"></ul>
                 </div>
+                <!-- Booked Periods Info Box (shown when dog has existing bookings) -->
+                <div id="booked-periods-info" class="alert alert-warning" style="display: none; margin-top: 15px; padding: 15px; background: color-mix(in srgb, #f0ad4e 10%, white); border-left: 3px solid #f0ad4e; border-radius: 4px;">
+                    <h6 style="margin: 0 0 10px 0; font-size: 0.9rem;">Dieser Hund ist bereits gebucht für:</h6>
+                    <ul id="booked-periods-list" style="margin: 0; padding-left: 20px; font-size: 0.85rem;"></ul>
+                    <small style="display: block; margin-top: 8px; color: #856404;">Pro Zeitraum ist nur eine Buchung pro Hund möglich.</small>
+                </div>
                 <input type="hidden" id="booking-dog-id">
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" data-action="close-booking-modal">Abbrechen</button>
@@ -753,13 +759,37 @@
         }
 
         // Load available time slots based on selected date
+        // Track current request to prevent race conditions when rapidly changing dates
+        let currentTimeSlotsRequest = null;
+
         async function loadAvailableTimeSlots(date) {
             if (!date) return;
 
+            // Generate unique request ID to handle race conditions
+            const requestId = Date.now();
+            currentTimeSlotsRequest = requestId;
+
+            // Get UI elements for booked periods (used in both success and error paths)
+            const bookedPeriodsInfo = document.getElementById('booked-periods-info');
+            const bookedPeriodsList = document.getElementById('booked-periods-list');
+
             try {
-                // Load available slots from API
-                const response = await api.getAvailableTimeSlots(date);
+                // Get dog ID from the form (if booking modal is open)
+                // Fix: Handle empty string as null to avoid sending dog_id= parameter
+                const dogIdInput = document.getElementById('booking-dog-id');
+                const dogId = (dogIdInput && dogIdInput.value) ? dogIdInput.value : null;
+
+                // Load available slots from API (with dog_id to filter booked periods)
+                const response = await api.getAvailableTimeSlots(date, dogId);
+
+                // Check if this response is still relevant (user may have changed date)
+                if (currentTimeSlotsRequest !== requestId) {
+                    console.log('Ignoring stale time slots response for date:', date);
+                    return;
+                }
+
                 const slots = response.slots || [];
+                const bookedPeriods = response.booked_periods || [];
 
                 const timeSelect = document.getElementById('booking-time');
                 timeSelect.innerHTML = '<option value="">Bitte wählen...</option>';
@@ -771,8 +801,27 @@
                     timeSelect.appendChild(option);
                 });
 
+                // Display booked periods info if any
+                if (bookedPeriods.length > 0) {
+                    bookedPeriodsList.innerHTML = '';
+                    bookedPeriods.forEach(period => {
+                        const li = document.createElement('li');
+                        li.textContent = `${period.rule_name}: ${period.start_time} - ${period.end_time}`;
+                        bookedPeriodsList.appendChild(li);
+                    });
+                    bookedPeriodsInfo.style.display = 'block';
+                } else {
+                    bookedPeriodsInfo.style.display = 'none';
+                }
+
                 // Load and display time rules for the date
                 const rules = await api.getRulesForDate(date);
+
+                // Check again after second API call
+                if (currentTimeSlotsRequest !== requestId) {
+                    return;
+                }
+
                 const rulesList = document.getElementById('time-rules-list');
                 const rulesInfo = document.getElementById('time-rules-info');
 
@@ -789,6 +838,20 @@
 
             } catch (error) {
                 console.error('Failed to load time slots:', error);
+
+                // Only update UI if this is still the current request
+                if (currentTimeSlotsRequest !== requestId) {
+                    return;
+                }
+
+                // Clear booked periods info on error to avoid showing stale data
+                if (bookedPeriodsInfo) {
+                    bookedPeriodsInfo.style.display = 'none';
+                }
+                if (bookedPeriodsList) {
+                    bookedPeriodsList.innerHTML = '';
+                }
+
                 // Fallback to basic time options if API fails
                 updateTimeOptionsLegacy();
             }

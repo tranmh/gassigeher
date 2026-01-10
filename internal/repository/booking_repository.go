@@ -312,6 +312,68 @@ func (r *BookingRepository) CheckDoubleBooking(tenantID, dogID int, date, schedu
 	return count > 0, nil
 }
 
+// CheckPeriodBooking checks if a dog has any scheduled booking within a time period.
+// Returns the existing booking if found, nil if the period is available.
+// TENANT ISOLATION: Query includes tenant_id to ensure bookings from other tenants are not visible.
+// SaaS: Always filters by tenant_id for tenant isolation (tenant_id=0 for Simple-Mode)
+func (r *BookingRepository) CheckPeriodBooking(tenantID, dogID int, date, periodStart, periodEnd string) (*models.Booking, error) {
+	query := `
+		SELECT id, tenant_id, user_id, dog_id, date, scheduled_time, status,
+		       completed_at, user_notes, admin_cancellation_reason, created_at, updated_at
+		FROM bookings
+		WHERE tenant_id = ?
+		  AND dog_id = ?
+		  AND date = ?
+		  AND scheduled_time >= ?
+		  AND scheduled_time < ?
+		  AND status = 'scheduled'
+		LIMIT 1
+	`
+
+	booking := &models.Booking{}
+	var tenantIDNull sql.NullInt64
+	var completedAt sql.NullTime
+	var userNotes, adminCancellationReason sql.NullString
+
+	err := r.db.QueryRow(query, tenantID, dogID, date, periodStart, periodEnd).Scan(
+		&booking.ID,
+		&tenantIDNull,
+		&booking.UserID,
+		&booking.DogID,
+		&booking.Date,
+		&booking.ScheduledTime,
+		&booking.Status,
+		&completedAt,
+		&userNotes,
+		&adminCancellationReason,
+		&booking.CreatedAt,
+		&booking.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil // No booking in this period - available
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to check period booking: %w", err)
+	}
+
+	// Set nullable fields
+	if tenantIDNull.Valid {
+		booking.TenantID = int(tenantIDNull.Int64)
+	}
+	if completedAt.Valid {
+		booking.CompletedAt = &completedAt.Time
+	}
+	if userNotes.Valid {
+		booking.UserNotes = &userNotes.String
+	}
+	if adminCancellationReason.Valid {
+		booking.AdminCancellationReason = &adminCancellationReason.String
+	}
+
+	return booking, nil
+}
+
 // AutoComplete marks all past scheduled bookings as completed
 func (r *BookingRepository) AutoComplete() (int, error) {
 	// Get current date and time in Europe/Berlin timezone for consistency

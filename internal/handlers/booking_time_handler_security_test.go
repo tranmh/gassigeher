@@ -98,7 +98,7 @@ func setupSecurityTest(t *testing.T) (*database.DB, *BookingTimeHandler, *Holida
 	holidayRepo := repository.NewHolidayRepository(db)
 	settingsRepo := repository.NewSettingsRepository(db)
 	holidayService := services.NewHolidayService(holidayRepo, settingsRepo)
-	bookingTimeService := services.NewBookingTimeService(bookingTimeRepo, holidayService, settingsRepo)
+	bookingTimeService := services.NewBookingTimeService(bookingTimeRepo, holidayService, settingsRepo, nil)
 
 	bookingTimeHandler := NewBookingTimeHandler(bookingTimeRepo, bookingTimeService)
 	holidayHandler := NewHolidayHandler(holidayRepo, holidayService)

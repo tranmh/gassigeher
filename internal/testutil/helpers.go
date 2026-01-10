@@ -152,19 +152,8 @@ func SetupTestDBWithType(t *testing.T, dbType string) *database.DB {
 		(0, 'default_color_for_new_users', '1', ?)
 	`, now, now, now, now, now, now, now, now, now, now, now, now, now)
 
-	// Insert booking time rules for tenant 0 (default)
-	// Weekday rules with blocked periods (German names for error messages)
-	_, _ = rawDB.Exec(`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked, created_at, updated_at) VALUES
-		(0, 'weekday', 'Vormittag', '08:30', '12:00', 0, ?, ?),
-		(0, 'weekday', 'Mittagspause', '12:00', '14:00', 1, ?, ?),
-		(0, 'weekday', 'Nachmittag', '14:00', '17:00', 0, ?, ?),
-		(0, 'weekday', 'Fütterungszeit', '17:00', '18:00', 1, ?, ?),
-		(0, 'weekday', 'Abend', '18:00', '19:00', 0, ?, ?),
-		(0, 'weekend', 'Vormittag', '09:00', '12:00', 0, ?, ?),
-		(0, 'weekend', 'Nachmittag', '14:00', '17:00', 0, ?, ?),
-		(0, 'holiday', 'Vormittag', '10:00', '12:00', 0, ?, ?),
-		(0, 'holiday', 'Nachmittag', '14:00', '16:00', 0, ?, ?)
-	`, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now)
+	// Booking time rules for tenant 0 are now seeded in schema 001_schema.go
+	// No need to insert them here
 
 	// Wrap in database.DB for cross-database support
 	sqlxDB := sqlx.NewDb(rawDB, driverName)
@@ -383,16 +372,17 @@ func truncateAndResetData(t *testing.T, db *sql.DB, dialect database.Dialect) {
 	`, now, now, now, now, now, now, now, now, now, now, now, now, now)
 
 	// 5. Default booking time rules (matches expected test data, German names) - use tenant_id=0
+	// Note: For PostgreSQL fast tests, we need to re-insert after truncation since migrations only run once
 	_, _ = db.Exec(`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked, created_at, updated_at) VALUES
-		(0, 'weekday', 'Vormittag', '08:30', '12:00', 0, ?, ?),
-		(0, 'weekday', 'Mittagspause', '12:00', '14:00', 1, ?, ?),
-		(0, 'weekday', 'Nachmittag', '14:00', '17:00', 0, ?, ?),
-		(0, 'weekday', 'Fütterungszeit', '17:00', '18:00', 1, ?, ?),
-		(0, 'weekday', 'Abend', '18:00', '19:00', 0, ?, ?),
-		(0, 'weekend', 'Vormittag', '09:00', '12:00', 0, ?, ?),
-		(0, 'weekend', 'Nachmittag', '14:00', '17:00', 0, ?, ?),
-		(0, 'holiday', 'Vormittag', '10:00', '12:00', 0, ?, ?),
-		(0, 'holiday', 'Nachmittag', '14:00', '16:00', 0, ?, ?)
+		(0, 'weekday', 'Vormittag', '08:30', '12:00', false, ?, ?),
+		(0, 'weekday', 'Mittagspause', '12:00', '14:00', true, ?, ?),
+		(0, 'weekday', 'Nachmittag', '14:00', '17:00', false, ?, ?),
+		(0, 'weekday', 'Fütterungszeit', '17:00', '18:00', true, ?, ?),
+		(0, 'weekday', 'Abend', '18:00', '19:00', false, ?, ?),
+		(0, 'weekend', 'Vormittag', '09:00', '12:00', false, ?, ?),
+		(0, 'weekend', 'Nachmittag', '14:00', '17:00', false, ?, ?),
+		(0, 'holiday', 'Vormittag', '10:00', '12:00', false, ?, ?),
+		(0, 'holiday', 'Nachmittag', '14:00', '16:00', false, ?, ?)
 	`, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now)
 }
 

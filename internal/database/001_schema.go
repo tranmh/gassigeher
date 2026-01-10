@@ -550,6 +550,18 @@ INSERT INTO color_categories (id, tenant_id, name, hex_code, sort_order) VALUES
   (3, 0, 'Orange', '#f97316', 3),
   (4, 0, 'Hellblau', '#38bdf8', 4),
   (5, 0, 'Dunkelblau', '#3b82f6', 5);
+
+-- Insert default booking time rules (tenant_id=0 for default/Simple-Mode tenant)
+INSERT OR IGNORE INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked) VALUES
+  (0, 'weekday', 'Vormittag', '08:30', '12:00', 0),
+  (0, 'weekday', 'Mittagspause', '12:00', '14:00', 1),
+  (0, 'weekday', 'Nachmittag', '14:00', '17:00', 0),
+  (0, 'weekday', 'Fütterungszeit', '17:00', '18:00', 1),
+  (0, 'weekday', 'Abend', '18:00', '19:00', 0),
+  (0, 'weekend', 'Vormittag', '09:00', '12:00', 0),
+  (0, 'weekend', 'Nachmittag', '14:00', '17:00', 0),
+  (0, 'holiday', 'Vormittag', '10:00', '12:00', 0),
+  (0, 'holiday', 'Nachmittag', '14:00', '16:00', 0);
 `,
 			"postgres": `
 -- Tenants table (central)
@@ -1096,6 +1108,19 @@ INSERT INTO color_categories (id, tenant_id, name, hex_code, sort_order) VALUES
   (3, 0, 'Orange', '#f97316', 3),
   (4, 0, 'Hellblau', '#38bdf8', 4),
   (5, 0, 'Dunkelblau', '#3b82f6', 5);
+
+-- Insert default booking time rules (tenant_id=0 for default/Simple-Mode tenant)
+INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked) VALUES
+  (0, 'weekday', 'Vormittag', '08:30', '12:00', FALSE),
+  (0, 'weekday', 'Mittagspause', '12:00', '14:00', TRUE),
+  (0, 'weekday', 'Nachmittag', '14:00', '17:00', FALSE),
+  (0, 'weekday', 'Fütterungszeit', '17:00', '18:00', TRUE),
+  (0, 'weekday', 'Abend', '18:00', '19:00', FALSE),
+  (0, 'weekend', 'Vormittag', '09:00', '12:00', FALSE),
+  (0, 'weekend', 'Nachmittag', '14:00', '17:00', FALSE),
+  (0, 'holiday', 'Vormittag', '10:00', '12:00', FALSE),
+  (0, 'holiday', 'Nachmittag', '14:00', '16:00', FALSE)
+ON CONFLICT DO NOTHING;
 
 -- Reset sequences after explicit ID inserts (PostgreSQL requires this)
 -- Use GREATEST to ensure value is at least 1 (sequences can't be set to 0)

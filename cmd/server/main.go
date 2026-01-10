@@ -357,8 +357,9 @@ func main() {
 	bookingTimeRepo := repository.NewBookingTimeRepository(db)
 	holidayRepo := repository.NewHolidayRepository(db)
 	settingsRepo := repository.NewSettingsRepository(db)
+	bookingRepo := repository.NewBookingRepository(db)
 	holidayService := services.NewHolidayService(holidayRepo, settingsRepo)
-	bookingTimeService := services.NewBookingTimeService(bookingTimeRepo, holidayService, settingsRepo)
+	bookingTimeService := services.NewBookingTimeService(bookingTimeRepo, holidayService, settingsRepo, bookingRepo)
 
 	// Initialize booking time handlers
 	bookingTimeHandler := handlers.NewBookingTimeHandler(bookingTimeRepo, bookingTimeService)

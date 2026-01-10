@@ -88,21 +88,8 @@ func setupRegressionTest(t *testing.T) (*database.DB, func()) {
 		t.Fatalf("Expected 4 dogs inserted, got %d", rowsAffected)
 	}
 
-	// Insert booking time rules for tenant 0
-	_, err = db.Exec(`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked, created_at, updated_at) VALUES
-		(0, 'weekday', 'Vormittag', '08:30', '12:00', 0, ?, ?),
-		(0, 'weekday', 'Mittagspause', '12:00', '14:00', 1, ?, ?),
-		(0, 'weekday', 'Nachmittag', '14:00', '17:00', 0, ?, ?),
-		(0, 'weekday', 'Fütterungszeit', '17:00', '18:00', 1, ?, ?),
-		(0, 'weekday', 'Abend', '18:00', '19:00', 0, ?, ?),
-		(0, 'weekend', 'Vormittag', '09:00', '12:00', 0, ?, ?),
-		(0, 'weekend', 'Nachmittag', '14:00', '17:00', 0, ?, ?),
-		(0, 'holiday', 'Vormittag', '10:00', '12:00', 0, ?, ?),
-		(0, 'holiday', 'Nachmittag', '14:00', '16:00', 0, ?, ?)
-	`, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now, now)
-	if err != nil {
-		t.Fatalf("Failed to insert booking time rules: %v", err)
-	}
+	// Booking time rules for tenant 0 are now seeded in schema 001_schema.go
+	// No need to insert them here
 
 	// Update registration_password for test purposes
 	// Note: "key" is a SQL reserved word, must be quoted for PostgreSQL compatibility
