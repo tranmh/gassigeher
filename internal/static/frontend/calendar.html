@@ -335,7 +335,14 @@
                     <label for="availability-filter">🐕 Verfügbarkeit:</label>
                     <select id="availability-filter" data-action-change="load-calendar">
                         <option value="all">Alle Hunde</option>
-                        <option value="available">Nur verfügbare Hunde</option>
+                        <option value="available" selected>Nur verfügbare Hunde</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="access-filter">🔓 Anzeige:</label>
+                    <select id="access-filter" data-action-change="render-calendar">
+                        <option value="mine" selected>Nur meine Hunde</option>
+                        <option value="all">Alle Hunde anzeigen</option>
                     </select>
                 </div>
             </div>
@@ -401,10 +408,12 @@
         let bookings = [];
         let blockedDates = [];
         let allColors = [];
+        let userColors = [];  // Colors the current user has unlocked
 
         // Register page-specific action handlers for CSP compliance
         registerActions({
             'load-calendar': function(e) { loadCalendar(); },
+            'render-calendar': function(e) { renderCalendar(); renderMobileView(); },
             'switch-view': function(e, id, value) { e.preventDefault(); switchView(value); },
             'quick-book': function(e, id, value) { e.preventDefault(); quickBook(parseInt(id), value); },
             'logout': function(e) { e.preventDefault(); logout(); }
@@ -424,6 +433,7 @@
 
             try {
                 const currentUser = await api.getMe();
+                userColors = currentUser.colors || [];
                 updateHeaderPhoto(currentUser);
                 showAdminLinkIfAdmin(currentUser);
             } catch (error) {
@@ -553,10 +563,16 @@
             });
 
             // Filter dogs with valid names
+            const accessFilter = document.getElementById('access-filter').value;
             const validDogs = allDogs.filter(dog => {
                 if (!dog || !dog.id || !dog.name) return false;
                 const visibleName = dog.name.replace(/[\s\u00A0\u2000-\u200B\u2028\u2029\u3000]/g, '');
-                return visibleName.length > 0;
+                if (visibleName.length === 0) return false;
+                // Filter by access if "mine" is selected
+                if (accessFilter === 'mine' && !canUserAccessDog(dog.color_id)) {
+                    return false;
+                }
+                return true;
             });
 
             // Dog rows
@@ -620,13 +636,15 @@
             const isBlocked = isGloballyBlocked || isDogSpecificBlocked;
 
             const dog = allDogs.find(d => d.id === dogId);
+            const canAccess = canUserAccessDog(dog?.color_id);
 
             return {
                 dogBookings,
                 isBlocked,
                 isGloballyBlocked,
                 isDogSpecificBlocked,
-                isDogAvailable: dog?.is_available
+                isDogAvailable: dog?.is_available,
+                canAccess
             };
         }
 
@@ -635,6 +653,16 @@
                 return `<div class="calendar-cell unavailable">
                     <span style="font-size: 1.5rem;">❌</span>
                     <div style="font-size: 0.7rem; margin-top: 4px;">Hund nicht verfügbar</div>
+                </div>`;
+            }
+
+            // Check if user has the required color for this dog
+            if (!data.canAccess) {
+                const dogColor = getColorForDog(dog);
+                const colorName = dogColor ? dogColor.name : 'unbekannte';
+                return `<div class="calendar-cell unavailable">
+                    <span style="font-size: 1.5rem;">🔒</span>
+                    <div style="font-size: 0.7rem; margin-top: 4px;">Farbe ${colorName} erforderlich</div>
                 </div>`;
             }
 
@@ -684,9 +712,23 @@
             return allColors.find(c => c.id === dog.color_id);
         }
 
+        function canUserAccessDog(dogColorId) {
+            // User can access dog if they have the dog's color
+            if (!dogColorId) return true;  // Dogs without color are accessible to all
+            return userColors.some(c => c.id === dogColorId);
+        }
+
         function quickBook(dogId, date) {
             const dog = allDogs.find(d => d.id === dogId);
             if (!dog) return;
+
+            // Check if user has access to this dog's color
+            if (!canUserAccessDog(dog.color_id)) {
+                const dogColor = getColorForDog(dog);
+                const colorName = dogColor ? dogColor.name : 'erforderliche';
+                showAlert('error', `Du benötigst die Farbe "${colorName}" um diesen Hund zu buchen.`);
+                return;
+            }
 
             // Redirect to dogs page with pre-filled booking
             localStorage.setItem('pendingBooking', JSON.stringify({ dogId, date }));
@@ -741,11 +783,17 @@
             let html = '';
 
             // Filter dogs with valid names (same logic as desktop)
+            const accessFilter = document.getElementById('access-filter').value;
             const validDogs = allDogs.filter(dog => {
                 if (!dog || !dog.id) return false;
                 if (!dog.name) return false;
                 const visibleName = dog.name.replace(/[\s\u00A0\u2000-\u200B\u2028\u2029\u3000]/g, '');
-                return visibleName.length > 0;
+                if (visibleName.length === 0) return false;
+                // Filter by access if "mine" is selected
+                if (accessFilter === 'mine' && !canUserAccessDog(dog.color_id)) {
+                    return false;
+                }
+                return true;
             });
 
             validDogs.forEach(dog => {
@@ -764,6 +812,13 @@
                         html += `<div class="day-slot unavailable">
                             <div><strong>${dayName} ${dateDisplay}</strong></div>
                             <div style="color: #999;">❌ Nicht verfügbar</div>
+                        </div>`;
+                    } else if (!cellData.canAccess) {
+                        // User doesn't have the required color
+                        const colorName = dogColor ? dogColor.name : 'unbekannte';
+                        html += `<div class="day-slot unavailable">
+                            <div><strong>${dayName} ${dateDisplay}</strong></div>
+                            <div style="color: #999;">🔒 Farbe ${colorName} erforderlich</div>
                         </div>`;
                     } else if (cellData.isBlocked) {
                         // Show different message for global vs dog-specific blocks
