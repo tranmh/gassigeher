@@ -229,7 +229,7 @@ Response (JSON)
 - Users have assigned colors, dogs have required colors
 - Users can only book dogs whose color they possess
 - Colors are customizable per tenant (not fixed to green/blue/orange)
-- Admins/Super-Admins bypass color check and can book any dog
+- ALL users (including Admins) must have the dog's color to book
 - Frontend shows locked dogs with 🔒 icon
 
 ## Critical Implementation Details
@@ -323,6 +323,7 @@ Configurable time slots managed via `BookingTimeService`:
 - **Day types**: weekday, weekend, holiday
 - **Time slots**: Morning, afternoon, evening with configurable start/end times
 - **Blocked periods**: Feeding times, rest periods
+- **Buffer time**: 30 minutes minimum before period end (e.g., 11:45 excluded when period ends at 12:00)
 - **Approval workflow**: Certain times may require admin approval
 - Admin configures via `admin-settings.html`
 - API: `GET/PUT /api/booking-times/rules`, `GET /api/booking-times/available-slots`

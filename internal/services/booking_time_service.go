@@ -10,6 +10,12 @@ import (
 	"github.com/tranmh/gassigeher/internal/repository"
 )
 
+const (
+	// MinWalkBufferMinutes is the minimum time buffer before period end
+	// to ensure enough time for the actual walk (e.g., excludes 11:45 when period ends at 12:00)
+	MinWalkBufferMinutes = 30
+)
+
 type BookingTimeService struct {
 	bookingTimeRepo *repository.BookingTimeRepository
 	holidayService  *HolidayService
@@ -126,8 +132,11 @@ func (s *BookingTimeService) GetAvailableTimeSlots(ctx context.Context, tenantID
 		endTime, _ := time.Parse("15:04", rule.EndTime)
 
 		// Generate slots in granularity intervals
+		// Apply buffer time to ensure enough time for the walk before period end
+		cutoffTime := endTime.Add(-MinWalkBufferMinutes * time.Minute)
+
 		current := startTime
-		for current.Before(endTime) {
+		for !current.After(cutoffTime) {
 			slots = append(slots, current.Format("15:04"))
 			current = current.Add(time.Duration(granularity) * time.Minute)
 		}

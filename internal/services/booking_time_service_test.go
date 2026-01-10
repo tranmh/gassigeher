@@ -179,10 +179,11 @@ func TestGetAvailableTimeSlots_Granularity(t *testing.T) {
 	}
 
 	// Verify 15-minute intervals present in morning window
+	// Note: 11:45 excluded due to 30-minute buffer before period end (12:00)
 	expectedSlots := []string{
 		"09:00", "09:15", "09:30", "09:45",
 		"10:00", "10:15", "10:30", "10:45",
-		"11:00", "11:15", "11:30", "11:45",
+		"11:00", "11:15", "11:30",
 	}
 
 	for _, expected := range expectedSlots {
