@@ -154,14 +154,14 @@
             justify-content: center;
         }
         .modal-content {
-            background-color: var(--card-bg);
+            background-color: #fff;
             padding: 30px;
-            border-radius: var(--border-radius);
+            border-radius: 6px;
             max-width: 500px;
             width: 90%;
             position: relative;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            border: 1px solid var(--border-light);
+            border: 1px solid #e1e8e5;
         }
         .modal-close {
             position: absolute;
@@ -169,12 +169,12 @@
             top: 15px;
             font-size: 28px;
             font-weight: bold;
-            color: var(--text-gray);
+            color: #666;
             cursor: pointer;
             transition: color 0.2s ease;
         }
         .modal-close:hover {
-            color: var(--error-red);
+            color: #e74c3c;
         }
         .form-actions {
             display: flex;
@@ -547,7 +547,7 @@
                     const reports = walkData.reports || [];
 
                     walkHistoryHtml = `
-                        <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid var(--border-light);">
+                        <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #e1e8e5;">
                             <h4 style="margin: 0 0 15px 0; display: flex; align-items: center; gap: 8px;">
                                 📊 Spaziergang-Historie
                             </h4>
@@ -614,7 +614,7 @@
                     </div>
                     ${careInfoHtml}
                     ${walkHistoryHtml}
-                    <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid var(--border-light); display: flex; gap: 10px;">
+                    <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #e1e8e5; display: flex; gap: 10px;">
                         <button class="btn" data-action="book-dog" data-id="${dog.id}">🗓️ Spaziergang buchen</button>
                         <button class="btn btn-secondary" data-action="close-dog-detail-modal">Schließen</button>
                     </div>
