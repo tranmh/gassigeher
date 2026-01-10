@@ -218,15 +218,15 @@ func (h *WalkReportHandler) GetDogWalkReports(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Get dog info
-	dog, err := h.dogRepo.FindByID(dogID)
+	// Get dog info - SECURITY FIX: Use FindByIDAndTenant to enforce tenant isolation
+	dog, err := h.dogRepo.FindByIDAndTenant(dogID, tenantID)
 	if err != nil {
+		// Return 404 for both "not found" and "wrong tenant" to prevent tenant enumeration
+		if err == repository.ErrNotFound || err == repository.ErrTenantMismatch {
+			respondError(w, http.StatusNotFound, "Hund nicht gefunden")
+			return
+		}
 		respondError(w, http.StatusInternalServerError, "Failed to get dog")
-		return
-	}
-
-	if dog == nil {
-		respondError(w, http.StatusNotFound, "Hund nicht gefunden")
 		return
 	}
 
