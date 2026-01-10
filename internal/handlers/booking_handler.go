@@ -125,26 +125,23 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check color-based access (admins and super admins bypass this check)
+	// Check color-based access - ALL users must have the dog's color
 	// Uses the NEW color system: user must have the dog's color assigned
-	if !user.IsAdmin && !user.IsSuperAdmin {
-		// Get user's assigned colors
-		userColorIDs, err := h.userColorRepo.GetUserColorIDs(tenantID, userID)
-		if err != nil {
-			respondError(w, http.StatusInternalServerError, "Failed to check user permissions")
-			return
-		}
+	userColorIDs, err := h.userColorRepo.GetUserColorIDs(tenantID, userID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to check user permissions")
+		return
+	}
 
-		// Check if user has the dog's color
-		dogColorID := 0
-		if dog.ColorID != nil {
-			dogColorID = *dog.ColorID
-		}
+	// Check if user has the dog's color
+	dogColorID := 0
+	if dog.ColorID != nil {
+		dogColorID = *dog.ColorID
+	}
 
-		if !repository.CanUserAccessDogByColor(userColorIDs, dogColorID) {
-			respondError(w, http.StatusForbidden, "Du hast nicht die erforderliche Farbkategorie für diesen Hund")
-			return
-		}
+	if !repository.CanUserAccessDogByColor(userColorIDs, dogColorID) {
+		respondError(w, http.StatusForbidden, "Du hast nicht die erforderliche Farbkategorie für diesen Hund")
+		return
 	}
 
 	// BUGFIX #4: Check if date is in the past with consistent timezone handling
