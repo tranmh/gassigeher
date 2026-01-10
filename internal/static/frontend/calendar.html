@@ -494,9 +494,16 @@
         async function loadCalendar() {
             try {
                 const colorFilter = document.getElementById('color-filter').value;
+                const availabilityFilter = document.getElementById('availability-filter').value;
 
-                // Fetch dogs
-                const params = colorFilter ? { color_id: colorFilter } : {};
+                // Fetch dogs with filters
+                const params = {};
+                if (colorFilter) {
+                    params.color_id = colorFilter;
+                }
+                if (availabilityFilter === 'available') {
+                    params.is_available = 'true';
+                }
                 allDogs = await api.getDogs(params);
 
                 // Fetch bookings for next 14 days
