@@ -85,6 +85,13 @@
                             <!-- Dynamic color options loaded from API -->
                         </select>
                     </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>Anzeige</label>
+                        <select id="access-filter" data-action-change="apply-filters">
+                            <option value="mine" selected>Nur meine Hunde</option>
+                            <option value="all">Alle Hunde anzeigen</option>
+                        </select>
+                    </div>
                 </div>
                 <div style="margin-top: 15px;">
                     <button class="btn" data-action="apply-filters" data-i18n="common.apply">Anwenden</button>
@@ -434,19 +441,35 @@
             document.getElementById('filter-breed').value = '';
             document.getElementById('filter-size').value = '';
             document.getElementById('filter-color').value = '';
+            document.getElementById('access-filter').value = 'mine';
             loadDogs();
         }
 
         function renderDogs() {
             const container = document.getElementById('dogs-list');
 
-            if (currentDogs.length === 0) {
-                container.innerHTML = '<p data-i18n="dogs.no_dogs">Keine Hunde gefunden</p>';
-                window.i18n.updateElement(container.querySelector('p'));
+            // Apply access filter
+            const accessFilter = document.getElementById('access-filter').value;
+            const filteredDogs = currentDogs.filter(dog => {
+                if (accessFilter === 'mine' && !canUserAccessDog(dog.color_id)) {
+                    return false;
+                }
+                return true;
+            });
+
+            if (filteredDogs.length === 0) {
+                const message = accessFilter === 'mine'
+                    ? '<p>Keine Hunde für deine Farben verfügbar.</p>'
+                    : '<p data-i18n="dogs.no_dogs">Keine Hunde gefunden</p>';
+                container.innerHTML = message;
+                const msgEl = container.querySelector('p');
+                if (msgEl && msgEl.dataset.i18n) {
+                    window.i18n.updateElement(msgEl);
+                }
                 return;
             }
 
-            container.innerHTML = currentDogs.map(dog => {
+            container.innerHTML = filteredDogs.map(dog => {
                 const canAccess = canUserAccessDog(dog.color_id);
                 const isUnavailable = !dog.is_available;
                 const safeDogName = sanitizeHTML(dog.name);
