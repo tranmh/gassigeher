@@ -820,7 +820,9 @@ case "$1" in
     restart)
         echo "Restarting Gassigeher..."
         load_env
-        docker compose --profile production restart
+        docker compose --profile production down
+        docker compose --profile production up -d
+        echo "Restart complete!"
         ;;
     logs)
         load_env
@@ -888,7 +890,7 @@ case "$1" in
         echo "  start       Start all services (production with Caddy)"
         echo "  start-dev   Start services (development, no Caddy)"
         echo "  stop        Stop all services"
-        echo "  restart     Restart all services"
+        echo "  restart     Restart all services (reloads env config)"
         echo "  logs        View logs (optional: app, db, caddy, minio)"
         echo "  status      Show service status"
         echo "  backup      Run database backup"
