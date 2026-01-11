@@ -60,6 +60,7 @@ echo [OK] Version: %VERSION% (%GIT_COMMIT%)
 echo.
 
 echo [5/8] Building application for Windows...
+set CGO_ENABLED=0
 go build -ldflags "%LDFLAGS%" -o gassigeher.exe ./cmd/server
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Windows build failed
@@ -69,6 +70,7 @@ echo [OK] Windows build successful: gassigeher.exe v%VERSION% (%GIT_COMMIT%)
 echo.
 
 echo [6/8] Building application for Linux (cross-compile)...
+set CGO_ENABLED=0
 set GOOS=linux
 set GOARCH=amd64
 go build -ldflags "%LDFLAGS%" -o gassigeher ./cmd/server
@@ -77,6 +79,7 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 echo [OK] Linux build successful: gassigeher v%VERSION% (%GIT_COMMIT%)
+set CGO_ENABLED=
 set GOOS=
 set GOARCH=
 echo.
