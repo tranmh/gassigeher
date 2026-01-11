@@ -796,6 +796,7 @@ func (s *DemoSeedService) deleteAllTenantData(tenantID int) error {
 		"color_categories",
 		"system_settings",
 		"booking_time_rules",
+		"custom_holidays",
 	}
 
 	for _, table := range tables {
@@ -803,6 +804,30 @@ func (s *DemoSeedService) deleteAllTenantData(tenantID int) error {
 		if _, err := s.db.Exec(query, tenantID); err != nil {
 			log.Printf("Warning: failed to delete from %s: %v", table, err)
 		}
+	}
+
+	// Reset tenant_settings to defaults (don't delete - it has 1:1 relationship with tenant)
+	_, err := s.db.Exec(`
+		UPDATE tenant_settings SET
+			theme_preset = 'classic',
+			color_primary = NULL,
+			color_secondary = NULL,
+			color_accent = NULL,
+			color_background = NULL,
+			color_text = NULL,
+			logo_url = NULL,
+			favicon_url = NULL,
+			welcome_message = NULL,
+			tagline = NULL,
+			description = NULL,
+			footer_text = NULL,
+			website_url = NULL,
+			donation_url = NULL,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE tenant_id = ?
+	`, tenantID)
+	if err != nil {
+		log.Printf("Warning: failed to reset tenant_settings: %v", err)
 	}
 
 	return nil
