@@ -965,11 +965,11 @@ func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request)
 
 	// Get all dogs
 	var dogs []map[string]interface{}
-	rows, err := h.db.Query(`
+	rows, err := h.db.Query(h.db.Rebind(`
 		SELECT id, name, breed, size, age, color_id, is_featured, is_available,
 		       external_link, photo, special_instructions, pickup_location,
 		       created_at, updated_at
-		FROM dogs WHERE tenant_id = ?`, tenantID)
+		FROM dogs WHERE tenant_id = ?`), tenantID)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
@@ -1022,7 +1022,7 @@ func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request)
 
 	// Get all bookings with user and dog info
 	var bookings []map[string]interface{}
-	rows, err = h.db.Query(`
+	rows, err = h.db.Query(h.db.Rebind(`
 		SELECT b.id, b.user_id, b.dog_id, b.date, b.walk_type, b.status,
 		       b.notes, b.created_at,
 		       u.first_name, u.last_name, u.email,
@@ -1031,7 +1031,7 @@ func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request)
 		LEFT JOIN users u ON b.user_id = u.id
 		LEFT JOIN dogs d ON b.dog_id = d.id
 		WHERE b.tenant_id = ?
-		ORDER BY b.date DESC`, tenantID)
+		ORDER BY b.date DESC`), tenantID)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
@@ -1079,10 +1079,10 @@ func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request)
 
 	// Get tenant settings
 	var tenantSettings map[string]interface{}
-	settingsRow := h.db.QueryRow(`
+	settingsRow := h.db.QueryRow(h.db.Rebind(`
 		SELECT welcome_message, footer_text, website_url, donation_url,
 		       logo_url, favicon_url
-		FROM tenant_settings WHERE tenant_id = ?`, tenantID)
+		FROM tenant_settings WHERE tenant_id = ?`), tenantID)
 	var welcomeMsg, footerText, websiteURL, donationURL, logoURL, faviconURL *string
 	if settingsRow.Scan(&welcomeMsg, &footerText, &websiteURL, &donationURL, &logoURL, &faviconURL) == nil {
 		tenantSettings = map[string]interface{}{
@@ -1098,9 +1098,9 @@ func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request)
 
 	// Get blocked dates
 	var blockedDates []map[string]interface{}
-	rows, err = h.db.Query(`
+	rows, err = h.db.Query(h.db.Rebind(`
 		SELECT id, date, reason, dog_id, created_at
-		FROM blocked_dates WHERE tenant_id = ?`, tenantID)
+		FROM blocked_dates WHERE tenant_id = ?`), tenantID)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {

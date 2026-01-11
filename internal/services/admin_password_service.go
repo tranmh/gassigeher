@@ -75,8 +75,8 @@ func (s *AdminPasswordService) SyncPasswordFromEnv() error {
 		return fmt.Errorf("failed to hash new password: %w", err)
 	}
 
-	_, err = s.db.Exec("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = 1",
-		string(newHash), time.Now())
+	updateQuery := s.db.Rebind("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = 1")
+	_, err = s.db.Exec(updateQuery, string(newHash), time.Now())
 	if err != nil {
 		return fmt.Errorf("failed to update password in database: %w", err)
 	}

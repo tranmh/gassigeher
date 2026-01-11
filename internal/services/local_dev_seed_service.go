@@ -269,9 +269,10 @@ func (s *LocalDevSeedService) seedBookingRules(tenantID int) error {
 		{"holiday", "afternoon", "14:00", "16:00", false},
 	}
 
+	insertQuery := s.db.Rebind(`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked) VALUES (?, ?, ?, ?, ?, ?)`)
 	for _, r := range rules {
 		_, err := s.db.Exec(
-			`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked) VALUES (?, ?, ?, ?, ?, ?)`,
+			insertQuery,
 			tenantID, r.DayType, r.RuleName, r.StartTime, r.EndTime, r.IsBlocked,
 		)
 		if err != nil {
@@ -804,7 +805,7 @@ func (s *LocalDevSeedService) deleteAllTenantData(tenantID int) error {
 	}
 
 	for _, table := range tables {
-		query := fmt.Sprintf("DELETE FROM %s WHERE tenant_id = ?", table)
+		query := s.db.Rebind(fmt.Sprintf("DELETE FROM %s WHERE tenant_id = ?", table))
 		if _, err := s.db.Exec(query, tenantID); err != nil {
 			log.Printf("Warning: failed to delete from %s: %v", table, err)
 		}

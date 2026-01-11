@@ -1264,13 +1264,13 @@ func (h *UserHandler) ExportMyData(w http.ResponseWriter, r *http.Request) {
 
 	// Get user's bookings
 	var bookings []map[string]interface{}
-	rows, err := h.db.Query(`
+	rows, err := h.db.Query(h.db.Rebind(`
 		SELECT b.id, b.date, b.walk_type, b.status, b.notes, b.created_at,
 		       d.name as dog_name, d.breed as dog_breed
 		FROM bookings b
 		LEFT JOIN dogs d ON b.dog_id = d.id
 		WHERE b.user_id = ? AND b.tenant_id = ?
-		ORDER BY b.date DESC`, userID, tenantID)
+		ORDER BY b.date DESC`), userID, tenantID)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
@@ -1310,13 +1310,13 @@ func (h *UserHandler) ExportMyData(w http.ResponseWriter, r *http.Request) {
 
 	// Get user's walk reports
 	var walkReports []map[string]interface{}
-	rows, err = h.db.Query(`
+	rows, err = h.db.Query(h.db.Rebind(`
 		SELECT wr.id, wr.booking_id, wr.weather, wr.mood_before, wr.mood_after,
 		       wr.walked_distance_meters, wr.duration_minutes, wr.notes, wr.created_at
 		FROM walk_reports wr
 		JOIN bookings b ON wr.booking_id = b.id
 		WHERE b.user_id = ? AND b.tenant_id = ?
-		ORDER BY wr.created_at DESC`, userID, tenantID)
+		ORDER BY wr.created_at DESC`), userID, tenantID)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
@@ -1358,11 +1358,11 @@ func (h *UserHandler) ExportMyData(w http.ResponseWriter, r *http.Request) {
 
 	// Get user's experience requests
 	var experienceRequests []map[string]interface{}
-	rows, err = h.db.Query(`
+	rows, err = h.db.Query(h.db.Rebind(`
 		SELECT id, requested_level, reason, status, admin_notes, created_at, updated_at
 		FROM experience_requests
 		WHERE user_id = ? AND tenant_id = ?
-		ORDER BY created_at DESC`, userID, tenantID)
+		ORDER BY created_at DESC`), userID, tenantID)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
@@ -1399,13 +1399,13 @@ func (h *UserHandler) ExportMyData(w http.ResponseWriter, r *http.Request) {
 
 	// Get user's color requests
 	var colorRequests []map[string]interface{}
-	rows, err = h.db.Query(`
+	rows, err = h.db.Query(h.db.Rebind(`
 		SELECT cr.id, cr.status, cr.reason, cr.admin_notes, cr.created_at, cr.updated_at,
 		       cc.name as color_name, cc.hex_code
 		FROM color_requests cr
 		LEFT JOIN color_categories cc ON cr.color_id = cc.id
 		WHERE cr.user_id = ? AND cr.tenant_id = ?
-		ORDER BY cr.created_at DESC`, userID, tenantID)
+		ORDER BY cr.created_at DESC`), userID, tenantID)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {

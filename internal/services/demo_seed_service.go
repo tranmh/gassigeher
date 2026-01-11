@@ -660,7 +660,8 @@ func (s *DemoSeedService) seedDemoBookings(tenantID int, userIDs map[string]int,
 func (s *DemoSeedService) seedBookingTimeRules(tenantID int) error {
 	// Check if rules already exist (idempotent)
 	var existingCount int
-	err := s.db.QueryRow("SELECT COUNT(*) FROM booking_time_rules WHERE tenant_id = ?", tenantID).Scan(&existingCount)
+	countQuery := s.db.Rebind("SELECT COUNT(*) FROM booking_time_rules WHERE tenant_id = ?")
+	err := s.db.QueryRow(countQuery, tenantID).Scan(&existingCount)
 	if err != nil {
 		return fmt.Errorf("failed to check existing rules: %w", err)
 	}
@@ -686,9 +687,10 @@ func (s *DemoSeedService) seedBookingTimeRules(tenantID int) error {
 		{"holiday", "afternoon", "14:00", "16:00", false},
 	}
 
+	insertQuery := s.db.Rebind(`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked) VALUES (?, ?, ?, ?, ?, ?)`)
 	for _, r := range rules {
 		_, err := s.db.Exec(
-			`INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked) VALUES (?, ?, ?, ?, ?, ?)`,
+			insertQuery,
 			tenantID, r.DayType, r.RuleName, r.StartTime, r.EndTime, r.IsBlocked,
 		)
 		if err != nil {
@@ -800,14 +802,14 @@ func (s *DemoSeedService) deleteAllTenantData(tenantID int) error {
 	}
 
 	for _, table := range tables {
-		query := fmt.Sprintf("DELETE FROM %s WHERE tenant_id = ?", table)
+		query := s.db.Rebind(fmt.Sprintf("DELETE FROM %s WHERE tenant_id = ?", table))
 		if _, err := s.db.Exec(query, tenantID); err != nil {
 			log.Printf("Warning: failed to delete from %s: %v", table, err)
 		}
 	}
 
 	// Reset tenant_settings to defaults (don't delete - it has 1:1 relationship with tenant)
-	_, err := s.db.Exec(`
+	updateQuery := s.db.Rebind(`
 		UPDATE tenant_settings SET
 			theme_preset = 'classic',
 			color_primary = NULL,
@@ -825,7 +827,8 @@ func (s *DemoSeedService) deleteAllTenantData(tenantID int) error {
 			donation_url = NULL,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE tenant_id = ?
-	`, tenantID)
+	`)
+	_, err := s.db.Exec(updateQuery, tenantID)
 	if err != nil {
 		log.Printf("Warning: failed to reset tenant_settings: %v", err)
 	}

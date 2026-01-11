@@ -138,11 +138,11 @@ func (c *TenantActivityChecker) CheckAndFlagInactiveTenants() error {
 		// Check last booking date for this tenant
 		// BUG FIX: Check and log database errors instead of ignoring them
 		var lastBooking *time.Time
-		bookingQuery := `
+		bookingQuery := c.db.Rebind(`
 			SELECT MAX(created_at)
 			FROM bookings
 			WHERE tenant_id = ?
-		`
+		`)
 		if err := c.db.QueryRow(bookingQuery, tenantID).Scan(&lastBooking); err != nil && err != sql.ErrNoRows {
 			log.Printf("Error querying bookings for tenant %d: %v", tenantID, err)
 			continue // Skip this tenant due to database error
@@ -151,11 +151,11 @@ func (c *TenantActivityChecker) CheckAndFlagInactiveTenants() error {
 		// Check last user activity for this tenant
 		// BUG FIX: Check and log database errors instead of ignoring them
 		var lastActivity *time.Time
-		activityQuery := `
+		activityQuery := c.db.Rebind(`
 			SELECT MAX(last_activity_at)
 			FROM users
 			WHERE tenant_id = ? AND is_active = ?
-		`
+		`)
 		if err := c.db.QueryRow(activityQuery, tenantID, c.db.BoolValue(true)).Scan(&lastActivity); err != nil && err != sql.ErrNoRows {
 			log.Printf("Error querying user activity for tenant %d: %v", tenantID, err)
 			continue // Skip this tenant due to database error
@@ -193,11 +193,11 @@ func (c *TenantActivityChecker) CheckAndFlagInactiveTenants() error {
 
 	// Flag inactive tenants in the database
 	// BUG FIX: Update inactivity_flagged_at (not just updated_at)
-	flagQuery := `
+	flagQuery := c.db.Rebind(`
 		UPDATE tenants
 		SET inactivity_flagged_at = ?
 		WHERE id = ? AND status = 'active'
-	`
+	`)
 	now := time.Now()
 
 	for _, tenant := range tenantsToFlag {
@@ -220,7 +220,7 @@ func (c *TenantActivityChecker) GetInactiveTenants() ([]TenantActivity, error) {
 
 	// Use parameterized boolean for PostgreSQL compatibility
 	isActiveTrue := c.db.BoolValue(true)
-	query := `
+	query := c.db.Rebind(`
 		SELECT
 			t.id,
 			t.slug,
@@ -232,7 +232,7 @@ func (c *TenantActivityChecker) GetInactiveTenants() ([]TenantActivity, error) {
 		FROM tenants t
 		WHERE t.status = 'active'
 		ORDER BY t.name
-	`
+	`)
 
 	rows, err := c.db.Query(query, isActiveTrue, isActiveTrue)
 	if err != nil {
@@ -310,7 +310,7 @@ func (c *TenantActivityChecker) GetInactiveTenants() ([]TenantActivity, error) {
 func (c *TenantActivityChecker) GetAllTenantActivity() ([]TenantActivity, error) {
 	// Use parameterized boolean for PostgreSQL compatibility
 	isActiveTrue := c.db.BoolValue(true)
-	query := `
+	query := c.db.Rebind(`
 		SELECT
 			t.id,
 			t.slug,
@@ -322,7 +322,7 @@ func (c *TenantActivityChecker) GetAllTenantActivity() ([]TenantActivity, error)
 		FROM tenants t
 		WHERE t.status = 'active'
 		ORDER BY t.name
-	`
+	`)
 
 	rows, err := c.db.Query(query, isActiveTrue, isActiveTrue)
 	if err != nil {

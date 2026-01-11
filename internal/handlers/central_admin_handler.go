@@ -97,7 +97,7 @@ func (h *CentralAdminHandler) GetPlatformStats(w http.ResponseWriter, r *http.Re
 	}
 
 	// Total users
-	err = h.db.QueryRow(`SELECT COUNT(*) FROM users WHERE is_deleted = ?`, h.db.BoolValue(false)).Scan(&stats.TotalUsers)
+	err = h.db.QueryRow(h.db.Rebind(`SELECT COUNT(*) FROM users WHERE is_deleted = ?`), h.db.BoolValue(false)).Scan(&stats.TotalUsers)
 	if err != nil {
 		log.Printf("Error getting total users: %v", err)
 	}
@@ -116,14 +116,14 @@ func (h *CentralAdminHandler) GetPlatformStats(w http.ResponseWriter, r *http.Re
 
 	// Bookings this month
 	startOfMonth := time.Now().Format("2006-01") + "-01"
-	err = h.db.QueryRow(`SELECT COUNT(*) FROM bookings WHERE date >= ?`, startOfMonth).Scan(&stats.BookingsThisMonth)
+	err = h.db.QueryRow(h.db.Rebind(`SELECT COUNT(*) FROM bookings WHERE date >= ?`), startOfMonth).Scan(&stats.BookingsThisMonth)
 	if err != nil {
 		log.Printf("Error getting bookings this month: %v", err)
 	}
 
 	// New tenants this week
 	oneWeekAgo := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
-	err = h.db.QueryRow(`SELECT COUNT(*) FROM tenants WHERE created_at >= ?`, oneWeekAgo).Scan(&stats.NewTenantsThisWeek)
+	err = h.db.QueryRow(h.db.Rebind(`SELECT COUNT(*) FROM tenants WHERE created_at >= ?`), oneWeekAgo).Scan(&stats.NewTenantsThisWeek)
 	if err != nil {
 		log.Printf("Error getting new tenants: %v", err)
 	}
@@ -164,7 +164,7 @@ func (h *CentralAdminHandler) ListTenants(w http.ResponseWriter, r *http.Request
 
 	query += ` ORDER BY t.created_at DESC`
 
-	rows, err := h.db.Query(query, args...)
+	rows, err := h.db.Query(h.db.Rebind(query), args...)
 	if err != nil {
 		log.Printf("Error listing tenants: %v", err)
 		respondError(w, http.StatusInternalServerError, "Fehler beim Laden der Tierheime")
@@ -214,13 +214,13 @@ func (h *CentralAdminHandler) GetTenant(w http.ResponseWriter, r *http.Request) 
 
 	// Get additional stats (log errors but don't fail the request - stats are supplementary)
 	var userCount, dogCount, bookingCount int
-	if err := h.db.QueryRow(`SELECT COUNT(*) FROM users WHERE tenant_id = ? AND is_deleted = ?`, tenantID, h.db.BoolValue(false)).Scan(&userCount); err != nil {
+	if err := h.db.QueryRow(h.db.Rebind(`SELECT COUNT(*) FROM users WHERE tenant_id = ? AND is_deleted = ?`), tenantID, h.db.BoolValue(false)).Scan(&userCount); err != nil {
 		log.Printf("Warning: Failed to get user count for tenant %d: %v", tenantID, err)
 	}
-	if err := h.db.QueryRow(`SELECT COUNT(*) FROM dogs WHERE tenant_id = ?`, tenantID).Scan(&dogCount); err != nil {
+	if err := h.db.QueryRow(h.db.Rebind(`SELECT COUNT(*) FROM dogs WHERE tenant_id = ?`), tenantID).Scan(&dogCount); err != nil {
 		log.Printf("Warning: Failed to get dog count for tenant %d: %v", tenantID, err)
 	}
-	if err := h.db.QueryRow(`SELECT COUNT(*) FROM bookings WHERE tenant_id = ?`, tenantID).Scan(&bookingCount); err != nil {
+	if err := h.db.QueryRow(h.db.Rebind(`SELECT COUNT(*) FROM bookings WHERE tenant_id = ?`), tenantID).Scan(&bookingCount); err != nil {
 		log.Printf("Warning: Failed to get booking count for tenant %d: %v", tenantID, err)
 	}
 
@@ -352,12 +352,12 @@ func (h *CentralAdminHandler) DeactivateTenant(w http.ResponseWriter, r *http.Re
 // ListCentralAdmins returns all central admins
 // GET /api/central-admin/admins
 func (h *CentralAdminHandler) ListCentralAdmins(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.db.Query(`
+	rows, err := h.db.Query(h.db.Rebind(`
 		SELECT id, first_name, last_name, email, is_active, created_at, last_activity_at
 		FROM users
 		WHERE is_central_admin = ? AND is_deleted = ?
 		ORDER BY created_at ASC
-	`, h.db.BoolValue(true), h.db.BoolValue(false))
+	`), h.db.BoolValue(true), h.db.BoolValue(false))
 	if err != nil {
 		log.Printf("Error listing central admins: %v", err)
 		respondError(w, http.StatusInternalServerError, "Fehler beim Laden der Administratoren")
@@ -417,7 +417,7 @@ func (h *CentralAdminHandler) PromoteToCentralAdmin(w http.ResponseWriter, r *ht
 	}
 
 	// Update user
-	_, err = h.db.Exec(`UPDATE users SET is_central_admin = ? WHERE id = ?`, h.db.BoolValue(true), userID)
+	_, err = h.db.Exec(h.db.Rebind(`UPDATE users SET is_central_admin = ? WHERE id = ?`), h.db.BoolValue(true), userID)
 	if err != nil {
 		log.Printf("Error promoting to central admin: %v", err)
 		respondError(w, http.StatusInternalServerError, "Fehler beim Befördern")
@@ -460,7 +460,7 @@ func (h *CentralAdminHandler) DemoteFromCentralAdmin(w http.ResponseWriter, r *h
 	}
 
 	// Update user
-	_, err = h.db.Exec(`UPDATE users SET is_central_admin = ? WHERE id = ?`, h.db.BoolValue(false), userID)
+	_, err = h.db.Exec(h.db.Rebind(`UPDATE users SET is_central_admin = ? WHERE id = ?`), h.db.BoolValue(false), userID)
 	if err != nil {
 		log.Printf("Error demoting from central admin: %v", err)
 		respondError(w, http.StatusInternalServerError, "Fehler beim Degradieren")
@@ -550,14 +550,14 @@ func (h *CentralAdminHandler) SearchUsers(w http.ResponseWriter, r *http.Request
 
 	if searchTerm == "" {
 		// No search term - return all users with pagination
-		err = h.db.QueryRow(`SELECT COUNT(*) FROM users WHERE is_deleted = ?`, isDeletedFalse).Scan(&totalCount)
+		err = h.db.QueryRow(h.db.Rebind(`SELECT COUNT(*) FROM users WHERE is_deleted = ?`), isDeletedFalse).Scan(&totalCount)
 		if err != nil {
 			log.Printf("Error counting users: %v", err)
 			respondError(w, http.StatusInternalServerError, "Fehler bei der Abfrage")
 			return
 		}
 
-		rows, err = h.db.Query(`
+		rows, err = h.db.Query(h.db.Rebind(`
 			SELECT u.id, u.tenant_id, u.first_name, u.last_name, u.email, u.is_admin, u.is_super_admin,
 			       u.is_central_admin, u.is_active, u.created_at, t.name as tenant_name
 			FROM users u
@@ -565,23 +565,23 @@ func (h *CentralAdminHandler) SearchUsers(w http.ResponseWriter, r *http.Request
 			WHERE u.is_deleted = ?
 			ORDER BY u.last_name, u.first_name
 			LIMIT ? OFFSET ?
-		`, isDeletedFalse, limit, offset)
+		`), isDeletedFalse, limit, offset)
 	} else {
 		// Search with term - escape LIKE wildcards to prevent injection
 		escapedTerm := escapeSQLLikeWildcards(searchTerm)
 		searchPattern := "%" + escapedTerm + "%"
-		err = h.db.QueryRow(`
+		err = h.db.QueryRow(h.db.Rebind(`
 			SELECT COUNT(*) FROM users u
 			WHERE u.is_deleted = ?
 			  AND (u.first_name LIKE ? ESCAPE '!' OR u.last_name LIKE ? ESCAPE '!' OR u.email LIKE ? ESCAPE '!')
-		`, isDeletedFalse, searchPattern, searchPattern, searchPattern).Scan(&totalCount)
+		`), isDeletedFalse, searchPattern, searchPattern, searchPattern).Scan(&totalCount)
 		if err != nil {
 			log.Printf("Error counting users: %v", err)
 			respondError(w, http.StatusInternalServerError, "Fehler bei der Abfrage")
 			return
 		}
 
-		rows, err = h.db.Query(`
+		rows, err = h.db.Query(h.db.Rebind(`
 			SELECT u.id, u.tenant_id, u.first_name, u.last_name, u.email, u.is_admin, u.is_super_admin,
 			       u.is_central_admin, u.is_active, u.created_at, t.name as tenant_name
 			FROM users u
@@ -590,7 +590,7 @@ func (h *CentralAdminHandler) SearchUsers(w http.ResponseWriter, r *http.Request
 			  AND (u.first_name LIKE ? ESCAPE '!' OR u.last_name LIKE ? ESCAPE '!' OR u.email LIKE ? ESCAPE '!')
 			ORDER BY u.last_name, u.first_name
 			LIMIT ? OFFSET ?
-		`, isDeletedFalse, searchPattern, searchPattern, searchPattern, limit, offset)
+		`), isDeletedFalse, searchPattern, searchPattern, searchPattern, limit, offset)
 	}
 
 	if err != nil {
@@ -664,9 +664,9 @@ func (h *CentralAdminHandler) ExportTenantData(w http.ResponseWriter, r *http.Re
 	// Get dogs
 	// BUG FIX #5: Use defer func() to check rows.Close() error
 	var dogs []models.Dog
-	rows, err := h.db.Query(`SELECT id, tenant_id, name, breed, size, age,
+	rows, err := h.db.Query(h.db.Rebind(`SELECT id, tenant_id, name, breed, size, age,
 		color_id, is_featured, is_available, external_link, photo, photo_thumbnail,
-		created_at, updated_at FROM dogs WHERE tenant_id = ?`, tenantID)
+		created_at, updated_at FROM dogs WHERE tenant_id = ?`), tenantID)
 	if err == nil {
 		defer func() {
 			if closeErr := rows.Close(); closeErr != nil {
@@ -692,7 +692,7 @@ func (h *CentralAdminHandler) ExportTenantData(w http.ResponseWriter, r *http.Re
 	// Get bookings count (not full data for performance)
 	// BUG FIX #4: Fail the export on QueryRow error instead of just logging a warning
 	var bookingCount int
-	if err := h.db.QueryRow(`SELECT COUNT(*) FROM bookings WHERE tenant_id = ?`, tenantID).Scan(&bookingCount); err != nil {
+	if err := h.db.QueryRow(h.db.Rebind(`SELECT COUNT(*) FROM bookings WHERE tenant_id = ?`), tenantID).Scan(&bookingCount); err != nil {
 		log.Printf("ERROR: Failed to get booking count for tenant %d: %v", tenantID, err)
 		respondError(w, http.StatusInternalServerError, "Fehler beim Exportieren der Buchungsdaten")
 		return
