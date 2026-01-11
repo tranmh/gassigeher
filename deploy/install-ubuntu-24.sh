@@ -722,7 +722,16 @@ copy_source_code() {
             find "$INSTALL_DIR/deploy" -type d -exec chmod 755 {} \;
         fi
 
-        log_success "Source code copied from $SOURCE_DIR"
+        # Write version info while we still have access to .git
+        local git_commit="unknown"
+        if [[ -d "$SOURCE_DIR/.git" ]]; then
+            git_commit=$(cd "$SOURCE_DIR" && git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+        fi
+        cat > "$INSTALL_DIR/.version" << EOF
+VERSION=2.0
+GIT_COMMIT=$git_commit
+EOF
+        log_success "Source code copied from $SOURCE_DIR (commit: $git_commit)"
     else
         log_error "Source code not found at $SOURCE_DIR"
         log_error "Please run this script from the deploy/ directory of the source code"
@@ -992,12 +1001,16 @@ install_node_exporter() {
 prepare_version_info() {
     log_info "Preparing version info..."
 
-    # Get version info for ldflags (same mechanism as bat.sh)
-    export VERSION="2.0"
-    # Get git commit from source directory (install directory may not have .git)
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    SOURCE_DIR="$(dirname "$SCRIPT_DIR")"
-    export GIT_COMMIT=$(cd "$SOURCE_DIR" && git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    # Read version info from .version file created during copy_source_code
+    if [[ -f "$INSTALL_DIR/.version" ]]; then
+        source "$INSTALL_DIR/.version"
+        export VERSION="${VERSION:-2.0}"
+        export GIT_COMMIT="${GIT_COMMIT:-unknown}"
+    else
+        # Fallback if .version file doesn't exist
+        export VERSION="2.0"
+        export GIT_COMMIT="unknown"
+    fi
     export BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
     log_success "Version: ${VERSION} (${GIT_COMMIT}) built at ${BUILD_TIME}"

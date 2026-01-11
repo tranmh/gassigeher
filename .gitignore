@@ -44,6 +44,7 @@ e2e-tests/test-results.json
 nul
 gassigeher-new.exe
 server.exe
+.version
 
 actions-runner/
 node_modules/
