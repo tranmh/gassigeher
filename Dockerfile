@@ -20,8 +20,10 @@ COPY . .
 
 # Build with version info
 ARG VERSION=dev
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-    -ldflags="-w -s -X github.com/tranmh/gassigeher/internal/version.Version=${VERSION}" \
+    -ldflags="-w -s -X github.com/tranmh/gassigeher/internal/version.Version=${VERSION} -X github.com/tranmh/gassigeher/internal/version.GitCommit=${GIT_COMMIT} -X github.com/tranmh/gassigeher/internal/version.BuildTime=${BUILD_TIME}" \
     -o gassigeher ./cmd/server
 
 # Runtime image

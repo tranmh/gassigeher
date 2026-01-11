@@ -987,6 +987,20 @@ install_node_exporter() {
     log_info "Firewall rule added for Docker to node_exporter"
 }
 
+prepare_version_info() {
+    log_info "Preparing version info..."
+
+    # Get version info for ldflags (same mechanism as bat.sh)
+    export VERSION="2.0"
+    # Get git commit from source directory (install directory may not have .git)
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    SOURCE_DIR="$(dirname "$SCRIPT_DIR")"
+    export GIT_COMMIT=$(cd "$SOURCE_DIR" && git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    export BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+    log_success "Version: ${VERSION} (${GIT_COMMIT}) built at ${BUILD_TIME}"
+}
+
 start_services() {
     log_info "Building and starting services..."
 
@@ -997,6 +1011,9 @@ start_services() {
         log_error "Secrets not loaded. Please check .env.secrets"
         exit 1
     fi
+
+    # Prepare version info for docker build
+    prepare_version_info
 
     # Start services based on mode
     if [[ "$LOCAL_MODE" == "true" ]]; then
@@ -1025,7 +1042,7 @@ force_cleanup() {
     log_warn "============================================"
     echo ""
     log_warn "This will:"
-    log_warn "  1. Stop all running containers"
+    log_warn "  1. Stop ALL Gassigeher-related containers (from any directory)"
     log_warn "  2. DELETE the entire directory: $INSTALL_DIR"
     log_warn "  3. This includes: database, uploads, backups, logs, secrets"
     echo ""
@@ -1041,17 +1058,32 @@ force_cleanup() {
     echo ""
     log_info "Proceeding with force cleanup..."
 
+    # Stop ALL gassigeher-related containers (from any directory, any naming convention)
+    log_info "Stopping all Gassigeher-related containers..."
+    local containers=$(docker ps -aq --filter "name=gassigeher" 2>/dev/null)
+    if [[ -n "$containers" ]]; then
+        docker stop $containers 2>/dev/null || true
+        docker rm -f $containers 2>/dev/null || true
+        log_success "Stopped and removed Gassigeher containers"
+    fi
+
+    # Also stop containers from docker-compose in install directory (if exists)
     if [[ -f "$INSTALL_DIR/docker-compose.yml" ]]; then
-        log_info "Stopping containers and removing volumes..."
+        log_info "Stopping containers from install directory..."
         cd "$INSTALL_DIR"
         # Stop containers from all profiles (development and production)
         docker compose down -v --remove-orphans 2>/dev/null || true
         docker compose --profile production down -v --remove-orphans 2>/dev/null || true
         cd - > /dev/null
-        log_success "Containers and volumes removed"
     fi
 
-    docker volume ls -q | grep -i gassi | xargs -r docker volume rm 2>/dev/null || true
+    # Remove all gassigeher-related volumes
+    log_info "Removing Gassigeher volumes..."
+    docker volume ls -q | grep -i gassi | xargs -r docker volume rm -f 2>/dev/null || true
+
+    # Remove all gassigeher-related networks
+    log_info "Removing Gassigeher networks..."
+    docker network ls -q --filter "name=gassigeher" | xargs -r docker network rm 2>/dev/null || true
 
     if [[ -d "$INSTALL_DIR" ]]; then
         log_info "Deleting $INSTALL_DIR..."
