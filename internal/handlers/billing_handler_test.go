@@ -97,13 +97,15 @@ func TestBillingHandler_GetPlans(t *testing.T) {
 // TestBillingHandler_GetUsage tests GET /api/billing/usage
 func TestBillingHandler_GetUsage(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	handler := NewBillingHandler(db, nil, nil)
 
 	// Seed some dogs for tenant 0
 	testutil.SeedTestDog(t, db, "Max", "Labrador", "green")
 	testutil.SeedTestDog(t, db, "Bella", "Poodle", "green")
 
-	t.Run("returns usage for tenant", func(t *testing.T) {
+	t.Run("Simple-Mode returns unlimited (-1)", func(t *testing.T) {
+		// Simple-Mode: No BaseDomain configured
+		handler := NewBillingHandler(db, nil, nil)
+
 		req := httptest.NewRequest(http.MethodGet, "/api/billing/usage", nil)
 		req = req.WithContext(contextWithTenantID(req.Context(), 0))
 		w := httptest.NewRecorder()
@@ -129,12 +131,40 @@ func TestBillingHandler_GetUsage(t *testing.T) {
 		if !ok {
 			t.Fatal("Expected dogs_limit in response")
 		}
+		if int(dogsLimit) != -1 {
+			t.Errorf("Expected dogs_limit = -1 (unlimited) for Simple-Mode, got %d", int(dogsLimit))
+		}
+	})
+
+	t.Run("SaaS-Mode returns subscription limit", func(t *testing.T) {
+		// SaaS-Mode: BaseDomain is configured
+		cfg := &config.Config{BaseDomain: "gassigeher.org"}
+		handler := NewBillingHandler(db, cfg, nil)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/billing/usage", nil)
+		req = req.WithContext(contextWithTenantID(req.Context(), 0))
+		w := httptest.NewRecorder()
+
+		handler.GetUsage(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &response)
+
+		dogsLimit, ok := response["dogs_limit"].(float64)
+		if !ok {
+			t.Fatal("Expected dogs_limit in response")
+		}
 		if int(dogsLimit) != 10 {
-			t.Errorf("Expected dogs_limit = 10 for free tier, got %d", int(dogsLimit))
+			t.Errorf("Expected dogs_limit = 10 for SaaS-Mode free tier, got %d", int(dogsLimit))
 		}
 	})
 
 	t.Run("returns error when tenant not in context", func(t *testing.T) {
+		handler := NewBillingHandler(db, nil, nil)
 		req := httptest.NewRequest(http.MethodGet, "/api/billing/usage", nil)
 		w := httptest.NewRecorder()
 
@@ -476,9 +506,12 @@ func TestBillingHandler_CreateCheckout_PlanSlugValidation(t *testing.T) {
 
 // TestBillingHandler_GetUsage_ShowsOverLimitWarning tests that usage endpoint shows over_limit warning
 // Enhancement: Show visual indication when tenant is over their subscription limit
+// Note: This test requires SaaS-Mode (BaseDomain set) for subscription limits to apply
 func TestBillingHandler_GetUsage_ShowsOverLimitWarning(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	handler := NewBillingHandler(db, nil, nil)
+	// SaaS-Mode: BaseDomain must be set for subscription limits
+	cfg := &config.Config{BaseDomain: "gassigeher.org"}
+	handler := NewBillingHandler(db, cfg, nil)
 
 	// Create 15 dogs for tenant 0 (over the 10 dog limit for Free plan)
 	for i := 0; i < 15; i++ {

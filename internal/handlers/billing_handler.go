@@ -159,13 +159,20 @@ func (h *BillingHandler) GetUsage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get dog limit from subscription
-	dogsLimit, err := h.subscriptionRepo.GetTenantDogLimit(tenantID)
-	if err != nil {
-		log.Printf("ERROR: Failed to get dog limit for tenant %d: %v", tenantID, err)
-		respondError(w, http.StatusInternalServerError, "Fehler beim Laden des Limits")
-		return
+	// Simple-Mode: Always unlimited (no paywall)
+	// SaaS-Mode: Check subscription tier
+	var dogsLimit int = -1 // Default unlimited
+	if h.cfg != nil && h.cfg.BaseDomain != "" {
+		// SaaS-Mode: Get dog limit from subscription
+		var err error
+		dogsLimit, err = h.subscriptionRepo.GetTenantDogLimit(tenantID)
+		if err != nil {
+			log.Printf("ERROR: Failed to get dog limit for tenant %d: %v", tenantID, err)
+			respondError(w, http.StatusInternalServerError, "Fehler beim Laden des Limits")
+			return
+		}
 	}
+	// Simple-Mode (BaseDomain == ""): dogsLimit stays -1 (unlimited)
 
 	// Calculate over-limit status
 	overLimit := false

@@ -278,11 +278,13 @@ func TestDogHandler_CreateDog(t *testing.T) {
 }
 
 // TestDogHandler_CreateDog_DogLimitEnforcement tests 10-dog limit per tenant (TDD RED Phase)
+// Note: Requires SaaS-Mode (BaseDomain set) for subscription limits to apply
 func TestDogHandler_CreateDog_DogLimitEnforcement(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	cfg := &config.Config{
 		JWTSecret:          "test-secret",
 		JWTExpirationHours: 24,
+		BaseDomain:         "gassigeher.org", // SaaS-Mode: Enable subscription limits
 	}
 	handler := NewDogHandler(db, cfg)
 
@@ -1831,13 +1833,13 @@ func TestDogHandler_CreateDog_NegativeAgeValidation(t *testing.T) {
 
 // TestDogHandler_CreateDog_ErrorMessageUsesActualLimit tests that the error message
 // uses the actual dog limit from the subscription, not a hardcoded "10"
-// TDD RED PHASE: This test should FAIL because the error message currently says
-// "Maximum von 10 Hunden" regardless of the actual limit
+// Note: Requires SaaS-Mode (BaseDomain set) for subscription limits to apply
 func TestDogHandler_CreateDog_ErrorMessageUsesActualLimit(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	cfg := &config.Config{
 		JWTSecret:          "test-secret",
 		JWTExpirationHours: 24,
+		BaseDomain:         "gassigeher.org", // SaaS-Mode: Enable subscription limits
 	}
 	handler := NewDogHandler(db, cfg)
 

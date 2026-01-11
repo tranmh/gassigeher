@@ -188,9 +188,11 @@ func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
 
 	// Get dog limit from subscription (will be used for atomic create)
-	// tenant_id=0 (Simple-Mode) can also have subscription limits
-	var dogLimit int = -1 // Default unlimited if no subscription
-	if ok {
+	// Simple-Mode: Always unlimited (no paywall)
+	// SaaS-Mode: Check subscription tier
+	var dogLimit int = -1 // Default unlimited
+	if h.config.BaseDomain != "" && ok {
+		// SaaS-Mode: Check subscription tier for dog limit
 		var err error
 		dogLimit, err = h.subscriptionRepo.GetTenantDogLimit(tenantID)
 		if err != nil {
@@ -199,6 +201,7 @@ func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Simple-Mode (BaseDomain == ""): dogLimit stays -1 (unlimited)
 
 	// Validate and sanitize required fields (prevents XSS and enforces length limits)
 	sanitizedName, valErr := ValidateDogName(req.Name)
