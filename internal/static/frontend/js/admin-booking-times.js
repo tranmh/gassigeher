@@ -336,10 +336,22 @@
         setTimeout(() => container.innerHTML = '', 5000);
     }
 
-    // Initialize - set default year to current year
+    // Initialize - dynamically populate year options and set to current year
     const currentYear = new Date().getFullYear();
     const yearSelect = document.getElementById('holiday-year-select');
-    yearSelect.value = currentYear;
+
+    // Clear existing options and generate year options dynamically
+    // Include 2 years before and 2 years after current year
+    yearSelect.innerHTML = '';
+    for (let year = currentYear - 2; year <= currentYear + 2; year++) {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = year;
+        if (year === currentYear) {
+            option.selected = true;
+        }
+        yearSelect.appendChild(option);
+    }
 
     // Load initial data
     loadSettings();
