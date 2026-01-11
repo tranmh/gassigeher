@@ -1359,3 +1359,365 @@ func TestImageService_PathTraversalPrevention(t *testing.T) {
 		}
 	})
 }
+
+// =============================================================================
+// FAVICON TESTS
+// =============================================================================
+
+// TestImageService_ProcessFavicon tests favicon processing
+func TestImageService_ProcessFavicon(t *testing.T) {
+	tempDir := t.TempDir()
+	service := NewImageService(tempDir)
+
+	tests := []struct {
+		name         string
+		imageWidth   int
+		imageHeight  int
+		format       string
+		expectError  bool
+		validateFunc func(t *testing.T, faviconPath string)
+	}{
+		{
+			name:        "Process square PNG favicon",
+			imageWidth:  512,
+			imageHeight: 512,
+			format:      "png",
+			expectError: false,
+			validateFunc: func(t *testing.T, faviconPath string) {
+				fullPath := filepath.Join(tempDir, faviconPath)
+
+				// Check file exists
+				if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+					t.Errorf("Favicon file does not exist: %s", fullPath)
+				}
+
+				// Check dimensions (should be <= FaviconMaxSize x FaviconMaxSize)
+				img, err := imaging.Open(fullPath)
+				if err != nil {
+					t.Fatalf("Failed to open favicon: %v", err)
+				}
+				bounds := img.Bounds()
+				if bounds.Dx() > FaviconMaxSize || bounds.Dy() > FaviconMaxSize {
+					t.Errorf("Favicon too large: %dx%d, expected max %dx%d",
+						bounds.Dx(), bounds.Dy(), FaviconMaxSize, FaviconMaxSize)
+				}
+
+				// Check it's a PNG
+				if filepath.Ext(fullPath) != ".png" {
+					t.Errorf("Expected PNG extension, got: %s", filepath.Ext(fullPath))
+				}
+			},
+		},
+		{
+			name:        "Process large square image (should resize)",
+			imageWidth:  1024,
+			imageHeight: 1024,
+			format:      "png",
+			expectError: false,
+			validateFunc: func(t *testing.T, faviconPath string) {
+				fullPath := filepath.Join(tempDir, faviconPath)
+
+				img, err := imaging.Open(fullPath)
+				if err != nil {
+					t.Fatalf("Failed to open favicon: %v", err)
+				}
+				bounds := img.Bounds()
+
+				// Should be resized to FaviconMaxSize
+				if bounds.Dx() > FaviconMaxSize || bounds.Dy() > FaviconMaxSize {
+					t.Errorf("Favicon should be resized to max %d, got %dx%d",
+						FaviconMaxSize, bounds.Dx(), bounds.Dy())
+				}
+			},
+		},
+		{
+			name:        "Process JPEG favicon (converts to PNG)",
+			imageWidth:  256,
+			imageHeight: 256,
+			format:      "jpeg",
+			expectError: false,
+			validateFunc: func(t *testing.T, faviconPath string) {
+				fullPath := filepath.Join(tempDir, faviconPath)
+
+				// Should always be PNG (for transparency support)
+				if filepath.Ext(fullPath) != ".png" {
+					t.Errorf("Favicon should always be PNG, got: %s", filepath.Ext(fullPath))
+				}
+			},
+		},
+		{
+			name:        "Process small favicon (no upscaling)",
+			imageWidth:  64,
+			imageHeight: 64,
+			format:      "png",
+			expectError: false,
+			validateFunc: func(t *testing.T, faviconPath string) {
+				fullPath := filepath.Join(tempDir, faviconPath)
+
+				img, err := imaging.Open(fullPath)
+				if err != nil {
+					t.Fatalf("Failed to open favicon: %v", err)
+				}
+				bounds := img.Bounds()
+
+				// Should NOT be upscaled
+				if bounds.Dx() > 64 || bounds.Dy() > 64 {
+					t.Errorf("Favicon was upscaled: %dx%d, original was 64x64",
+						bounds.Dx(), bounds.Dy())
+				}
+			},
+		},
+		{
+			name:        "Process rectangular image (fits within square)",
+			imageWidth:  800,
+			imageHeight: 400,
+			format:      "png",
+			expectError: false,
+			validateFunc: func(t *testing.T, faviconPath string) {
+				fullPath := filepath.Join(tempDir, faviconPath)
+
+				img, err := imaging.Open(fullPath)
+				if err != nil {
+					t.Fatalf("Failed to open favicon: %v", err)
+				}
+				bounds := img.Bounds()
+
+				// Should fit within FaviconMaxSize
+				if bounds.Dx() > FaviconMaxSize || bounds.Dy() > FaviconMaxSize {
+					t.Errorf("Favicon should fit within %d, got %dx%d",
+						FaviconMaxSize, bounds.Dx(), bounds.Dy())
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create test image
+			buf, err := createTestImage(tt.imageWidth, tt.imageHeight, tt.format)
+			if err != nil {
+				t.Fatalf("Failed to create test image: %v", err)
+			}
+
+			file := createMultipartFile(buf)
+
+			// Process the favicon
+			faviconPath, err := service.ProcessFavicon(file)
+
+			if tt.expectError {
+				if err == nil {
+					t.Error("Expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			// Validate path format (always PNG)
+			expectedPath := "settings/site_favicon.png"
+			if faviconPath != expectedPath {
+				t.Errorf("Expected path '%s', got %s", expectedPath, faviconPath)
+			}
+
+			// Run custom validation
+			if tt.validateFunc != nil {
+				tt.validateFunc(t, faviconPath)
+			}
+		})
+	}
+}
+
+// TestImageService_ProcessFavicon_InvalidInput tests error cases for favicon processing
+func TestImageService_ProcessFavicon_InvalidInput(t *testing.T) {
+	tempDir := t.TempDir()
+	service := NewImageService(tempDir)
+
+	t.Run("Invalid image data", func(t *testing.T) {
+		buf := bytes.NewBuffer([]byte("not an image"))
+		file := createMultipartFile(buf)
+
+		_, err := service.ProcessFavicon(file)
+		if err == nil {
+			t.Error("Expected error for invalid image data")
+		}
+	})
+
+	t.Run("Corrupted JPEG", func(t *testing.T) {
+		buf := bytes.NewBuffer([]byte("\xFF\xD8\xFF\xE0\x00\x10JFIF"))
+		file := createMultipartFile(buf)
+
+		_, err := service.ProcessFavicon(file)
+		if err == nil {
+			t.Error("Expected error for corrupted JPEG")
+		}
+	})
+}
+
+// TestImageService_DeleteFavicon tests favicon deletion
+func TestImageService_DeleteFavicon(t *testing.T) {
+	tempDir := t.TempDir()
+	service := NewImageService(tempDir)
+
+	// Create settings directory and test favicon file
+	settingsDir := filepath.Join(tempDir, "settings")
+	os.MkdirAll(settingsDir, 0755)
+
+	faviconPath := filepath.Join(settingsDir, "site_favicon.png")
+
+	t.Run("Delete existing favicon", func(t *testing.T) {
+		// Create dummy favicon file
+		os.WriteFile(faviconPath, []byte("test favicon content"), 0644)
+
+		err := service.DeleteFavicon()
+		if err != nil {
+			t.Fatalf("Delete failed: %v", err)
+		}
+
+		// Verify file is deleted
+		if _, err := os.Stat(faviconPath); !os.IsNotExist(err) {
+			t.Error("Favicon file still exists")
+		}
+	})
+
+	t.Run("Delete non-existent favicon (idempotent)", func(t *testing.T) {
+		// Delete again should not error
+		err := service.DeleteFavicon()
+		if err != nil {
+			t.Errorf("Delete should be idempotent: %v", err)
+		}
+	})
+}
+
+// TestImageService_ProcessFavicon_Overwrites tests that uploading a new favicon overwrites the old one
+func TestImageService_ProcessFavicon_Overwrites(t *testing.T) {
+	tempDir := t.TempDir()
+	service := NewImageService(tempDir)
+
+	settingsDir := filepath.Join(tempDir, "settings")
+	faviconPath := filepath.Join(settingsDir, "site_favicon.png")
+
+	t.Run("Overwrite existing favicon", func(t *testing.T) {
+		// Upload first favicon
+		buf1, _ := createTestImage(128, 128, "png")
+		file1 := createMultipartFile(buf1)
+		path1, err := service.ProcessFavicon(file1)
+		if err != nil {
+			t.Fatalf("First upload failed: %v", err)
+		}
+
+		if path1 != "settings/site_favicon.png" {
+			t.Errorf("Expected PNG path, got %s", path1)
+		}
+
+		// Get first file size
+		stat1, _ := os.Stat(faviconPath)
+		size1 := stat1.Size()
+
+		// Upload second favicon (different size)
+		buf2, _ := createTestImage(256, 256, "png")
+		file2 := createMultipartFile(buf2)
+		path2, err := service.ProcessFavicon(file2)
+		if err != nil {
+			t.Fatalf("Second upload failed: %v", err)
+		}
+
+		// Same path
+		if path1 != path2 {
+			t.Errorf("Expected same path, got %s and %s", path1, path2)
+		}
+
+		// File size should be different (indicating file was overwritten)
+		stat2, _ := os.Stat(faviconPath)
+		size2 := stat2.Size()
+
+		if size1 == size2 {
+			t.Error("Favicon should have been overwritten with different content")
+		}
+	})
+}
+
+// TestImageService_ProcessFavicon_TenantIsolation tests that favicons are isolated per tenant
+func TestImageService_ProcessFavicon_TenantIsolation(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create two services for different tenants
+	serviceTenantA := NewImageServiceWithTenant(tempDir, "shelter-north")
+	serviceTenantB := NewImageServiceWithTenant(tempDir, "shelter-south")
+
+	// Both tenants upload a favicon
+	bufA, _ := createTestImage(256, 256, "png")
+	fileA := createMultipartFile(bufA)
+	pathA, err := serviceTenantA.ProcessFavicon(fileA)
+	if err != nil {
+		t.Fatalf("Tenant A favicon upload failed: %v", err)
+	}
+
+	bufB, _ := createTestImage(512, 512, "png")
+	fileB := createMultipartFile(bufB)
+	pathB, err := serviceTenantB.ProcessFavicon(fileB)
+	if err != nil {
+		t.Fatalf("Tenant B favicon upload failed: %v", err)
+	}
+
+	// CRITICAL: Paths must be different (tenant isolated)
+	if pathA == pathB {
+		t.Errorf("TENANT ISOLATION BUG: Favicon paths should be different!\nTenant A: %s\nTenant B: %s", pathA, pathB)
+	}
+
+	// Verify paths contain tenant slug
+	if !containsSubstring(pathA, "shelter-north") {
+		t.Errorf("Favicon path should contain tenant slug 'shelter-north': %s", pathA)
+	}
+	if !containsSubstring(pathB, "shelter-south") {
+		t.Errorf("Favicon path should contain tenant slug 'shelter-south': %s", pathB)
+	}
+
+	// Verify both files exist
+	fullPathA := filepath.Join(tempDir, pathA)
+	fullPathB := filepath.Join(tempDir, pathB)
+
+	if _, err := os.Stat(fullPathA); os.IsNotExist(err) {
+		t.Errorf("Tenant A favicon should exist: %s", fullPathA)
+	}
+	if _, err := os.Stat(fullPathB); os.IsNotExist(err) {
+		t.Errorf("Tenant B favicon should exist: %s", fullPathB)
+	}
+}
+
+// TestImageService_DeleteFavicon_TenantIsolation tests that deleting favicon respects tenant isolation
+func TestImageService_DeleteFavicon_TenantIsolation(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create services for two tenants
+	serviceTenantA := NewImageServiceWithTenant(tempDir, "org-alpha")
+	_ = NewImageServiceWithTenant(tempDir, "org-beta") // Just verify it doesn't affect other tenants
+
+	// Create test favicon files for both tenants
+	dirA := filepath.Join(tempDir, "org-alpha", "settings")
+	dirB := filepath.Join(tempDir, "org-beta", "settings")
+	os.MkdirAll(dirA, 0755)
+	os.MkdirAll(dirB, 0755)
+
+	faviconA := filepath.Join(dirA, "site_favicon.png")
+	faviconB := filepath.Join(dirB, "site_favicon.png")
+	os.WriteFile(faviconA, []byte("org alpha favicon"), 0644)
+	os.WriteFile(faviconB, []byte("org beta favicon"), 0644)
+
+	// Org Alpha deletes their favicon
+	err := serviceTenantA.DeleteFavicon()
+	if err != nil {
+		t.Fatalf("Delete failed: %v", err)
+	}
+
+	// Org Alpha's favicon should be deleted
+	if _, err := os.Stat(faviconA); !os.IsNotExist(err) {
+		t.Error("Org Alpha's favicon should be deleted")
+	}
+
+	// Org Beta's favicon should still exist
+	if _, err := os.Stat(faviconB); os.IsNotExist(err) {
+		t.Error("TENANT ISOLATION BUG: Org Beta's favicon should NOT be deleted!")
+	}
+}

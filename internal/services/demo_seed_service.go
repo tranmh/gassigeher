@@ -706,6 +706,9 @@ func (s *DemoSeedService) initializeDemoSettings(tenantID int) error {
 		"booking_advance_days":      "14",
 		"cancellation_notice_hours": "12",
 		"auto_deactivation_days":    "365",
+		// Demo branding - use bundled assets instead of external URLs
+		"site_logo":    "/assets/images/demo/branding/logo.png",
+		"site_favicon": "/assets/images/demo/branding/favicon.png",
 	}
 
 	for key, value := range settings {

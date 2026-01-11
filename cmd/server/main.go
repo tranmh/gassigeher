@@ -434,6 +434,9 @@ func main() {
 	// Site logo (public - for displaying logo on all pages)
 	router.HandleFunc("/api/v1/settings/logo", settingsHandler.GetLogo).Methods("GET")
 
+	// Site favicon (public - for displaying favicon in browser tab)
+	router.HandleFunc("/api/v1/settings/favicon", settingsHandler.GetFavicon).Methods("GET")
+
 	// WhatsApp group settings (public - for displaying join button)
 	router.HandleFunc("/api/v1/settings/whatsapp", settingsHandler.GetWhatsAppSettings).Methods("GET")
 
@@ -569,9 +572,11 @@ func main() {
 
 	// System settings (admin only)
 	admin.HandleFunc("/settings", settingsHandler.GetAllSettings).Methods("GET")
-	// Logo routes must be registered BEFORE {key} to avoid being matched by the wildcard
+	// Logo and favicon routes must be registered BEFORE {key} to avoid being matched by the wildcard
 	admin.HandleFunc("/settings/logo", settingsHandler.UploadLogo).Methods("POST")
 	admin.HandleFunc("/settings/logo", settingsHandler.ResetLogo).Methods("DELETE")
+	admin.HandleFunc("/settings/favicon", settingsHandler.UploadFavicon).Methods("POST")
+	admin.HandleFunc("/settings/favicon", settingsHandler.ResetFavicon).Methods("DELETE")
 	admin.HandleFunc("/settings/{key}", settingsHandler.UpdateSetting).Methods("PUT")
 
 	// Experience requests management (admin only)

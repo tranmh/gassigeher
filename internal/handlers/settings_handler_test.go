@@ -1167,5 +1167,367 @@ func contains(s, substr string) bool {
 	return strings.Contains(s, substr)
 }
 
+// TestSettingsHandler_GetFavicon tests the public favicon endpoint
+func TestSettingsHandler_GetFavicon(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+		UploadDir:          t.TempDir(),
+	}
+	handler := NewSettingsHandler(db, cfg)
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
+
+	t.Run("returns placeholder favicon URL when no custom favicon", func(t *testing.T) {
+		// Clear the favicon setting first to test default behavior
+		db.Exec(`DELETE FROM system_settings WHERE "key" = 'site_favicon' AND tenant_id = 0`)
+
+		req := httptest.NewRequest("GET", "/api/settings/favicon", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+
+		handler.GetFavicon(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", rec.Code)
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		faviconURL, ok := response["favicon_url"].(string)
+		if !ok {
+			t.Fatal("Expected favicon_url in response")
+		}
+
+		// Should return placeholder favicon
+		expectedPlaceholder := "/assets/images/placeholders/favicon-placeholder.svg"
+		if faviconURL != expectedPlaceholder {
+			t.Errorf("Expected placeholder favicon URL %s, got %s", expectedPlaceholder, faviconURL)
+		}
+	})
+
+	t.Run("returns custom favicon URL when uploaded", func(t *testing.T) {
+		// Insert setting with custom path
+		db.Exec(`INSERT INTO system_settings (tenant_id, "key", value) VALUES (0, 'site_favicon', '/uploads/settings/site_favicon.png') ON CONFLICT DO NOTHING`)
+		db.Exec(`UPDATE system_settings SET value = ? WHERE "key" = ? AND tenant_id = 0`, "/uploads/settings/site_favicon.png", "site_favicon")
+
+		// Create the actual favicon file
+		settingsDir := filepath.Join(cfg.UploadDir, "settings")
+		os.MkdirAll(settingsDir, 0755)
+		faviconPath := filepath.Join(settingsDir, "site_favicon.png")
+		os.WriteFile(faviconPath, []byte("fake favicon content"), 0644)
+
+		req := httptest.NewRequest("GET", "/api/settings/favicon", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+
+		handler.GetFavicon(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", rec.Code)
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		faviconURL, ok := response["favicon_url"].(string)
+		if !ok {
+			t.Fatal("Expected favicon_url in response")
+		}
+
+		// Should be the uploads path
+		if faviconURL != "/uploads/settings/site_favicon.png" {
+			t.Errorf("Expected custom favicon URL '/uploads/settings/site_favicon.png', got %s", faviconURL)
+		}
+	})
+
+	t.Run("no authentication required", func(t *testing.T) {
+		// Reset to placeholder
+		db.Exec(`UPDATE system_settings SET value = ? WHERE "key" = ? AND tenant_id = 0`,
+			"/assets/images/placeholders/favicon-placeholder.svg", "site_favicon")
+
+		// Request without any auth context - but needs tenant context for multi-tenant
+		req := httptest.NewRequest("GET", "/api/settings/favicon", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+
+		handler.GetFavicon(rec, req)
+
+		// Should still work
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200 (no auth required), got %d", rec.Code)
+		}
+	})
+}
+
+// TestSettingsHandler_UploadFavicon tests favicon upload endpoint
+func TestSettingsHandler_UploadFavicon(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	uploadDir := t.TempDir()
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+		UploadDir:          uploadDir,
+	}
+	handler := NewSettingsHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
+
+	t.Run("admin can upload favicon", func(t *testing.T) {
+		// Create square test image (512x512)
+		imgBuf := createTestJPEG(512, 512)
+
+		req, err := createMultipartRequest("POST", "/api/settings/favicon", "favicon", "test-favicon.jpg", imgBuf.Bytes())
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UploadFavicon(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		// Should return new favicon URL
+		faviconURL, ok := response["favicon_url"].(string)
+		if !ok {
+			t.Fatal("Expected favicon_url in response")
+		}
+
+		// Favicon is always saved as PNG
+		if faviconURL != "/uploads/settings/site_favicon.png" {
+			t.Errorf("Expected '/uploads/settings/site_favicon.png', got %s", faviconURL)
+		}
+
+		// Verify file exists
+		faviconPath := filepath.Join(uploadDir, "settings", "site_favicon.png")
+		if _, err := os.Stat(faviconPath); os.IsNotExist(err) {
+			t.Error("Favicon file was not created")
+		}
+
+		// Verify database updated (with /uploads/ prefix)
+		var dbValue string
+		db.QueryRow(`SELECT value FROM system_settings WHERE "key" = ?`, "site_favicon").Scan(&dbValue)
+		if dbValue != "/uploads/settings/site_favicon.png" {
+			t.Errorf("Database not updated, got value: %s", dbValue)
+		}
+	})
+
+	t.Run("invalid image rejected", func(t *testing.T) {
+		req, err := createMultipartRequest("POST", "/api/settings/favicon", "favicon", "test.txt", []byte("not an image"))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UploadFavicon(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400 for invalid image, got %d", rec.Code)
+		}
+	})
+
+	t.Run("missing file rejected", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/api/settings/favicon", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UploadFavicon(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400 for missing file, got %d", rec.Code)
+		}
+	})
+}
+
+// TestSettingsHandler_ResetFavicon tests favicon reset endpoint
+func TestSettingsHandler_ResetFavicon(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	uploadDir := t.TempDir()
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+		UploadDir:          uploadDir,
+	}
+	handler := NewSettingsHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
+
+	// Setup: create a custom favicon
+	settingsDir := filepath.Join(uploadDir, "settings")
+	os.MkdirAll(settingsDir, 0755)
+	faviconPath := filepath.Join(settingsDir, "site_favicon.png")
+	os.WriteFile(faviconPath, []byte("custom favicon content"), 0644)
+	db.Exec(`INSERT INTO system_settings (tenant_id, "key", value) VALUES (0, 'site_favicon', '/uploads/settings/site_favicon.png') ON CONFLICT DO NOTHING`)
+	db.Exec(`UPDATE system_settings SET value = ? WHERE "key" = ? AND tenant_id = 0`, "/uploads/settings/site_favicon.png", "site_favicon")
+
+	t.Run("admin can reset favicon to placeholder", func(t *testing.T) {
+		req := httptest.NewRequest("DELETE", "/api/settings/favicon", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ResetFavicon(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		// Should return placeholder favicon URL
+		faviconURL, ok := response["favicon_url"].(string)
+		if !ok {
+			t.Fatal("Expected favicon_url in response")
+		}
+
+		// Should be the placeholder
+		expectedPlaceholder := "/assets/images/placeholders/favicon-placeholder.svg"
+		if faviconURL != expectedPlaceholder {
+			t.Errorf("Expected placeholder favicon URL %s, got %s", expectedPlaceholder, faviconURL)
+		}
+
+		// Verify database updated
+		var dbValue string
+		db.QueryRow(`SELECT value FROM system_settings WHERE "key" = ? AND tenant_id = 0`, "site_favicon").Scan(&dbValue)
+		if dbValue != expectedPlaceholder {
+			t.Errorf("Database not reset to placeholder, got value: %s", dbValue)
+		}
+
+		// Verify custom file deleted
+		if _, err := os.Stat(faviconPath); !os.IsNotExist(err) {
+			t.Error("Custom favicon file was not deleted")
+		}
+	})
+
+	t.Run("reset is idempotent", func(t *testing.T) {
+		// Reset again (favicon already at placeholder)
+		req := httptest.NewRequest("DELETE", "/api/settings/favicon", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ResetFavicon(rec, req)
+
+		// Should succeed even when already at placeholder
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200 for idempotent reset, got %d", rec.Code)
+		}
+	})
+}
+
+// TestSettingsHandler_FaviconWorkflow tests the complete favicon upload/get/reset workflow
+func TestSettingsHandler_FaviconWorkflow(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	uploadDir := t.TempDir()
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+		UploadDir:          uploadDir,
+	}
+	handler := NewSettingsHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
+
+	// Placeholder favicon URL
+	placeholderFavicon := "/assets/images/placeholders/favicon-placeholder.svg"
+
+	// Clear favicon setting to test default behavior
+	db.Exec(`DELETE FROM system_settings WHERE "key" = 'site_favicon' AND tenant_id = 0`)
+
+	// Step 1: Get default (placeholder) favicon
+	t.Run("Step 1: Get placeholder favicon", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/settings/favicon", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+		handler.GetFavicon(rec, req)
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		if response["favicon_url"] != placeholderFavicon {
+			t.Errorf("Expected placeholder favicon %s, got %v", placeholderFavicon, response["favicon_url"])
+		}
+	})
+
+	// Step 2: Upload custom favicon
+	t.Run("Step 2: Upload custom favicon", func(t *testing.T) {
+		imgBuf := createTestJPEG(256, 256)
+		req, _ := createMultipartRequest("POST", "/api/settings/favicon", "favicon", "custom.jpg", imgBuf.Bytes())
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.UploadFavicon(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Upload failed: %s", rec.Body.String())
+		}
+	})
+
+	// Step 3: Get custom favicon
+	t.Run("Step 3: Get custom favicon", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/settings/favicon", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+		handler.GetFavicon(rec, req)
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		if response["favicon_url"] != "/uploads/settings/site_favicon.png" {
+			t.Errorf("Expected custom favicon path, got %v", response["favicon_url"])
+		}
+	})
+
+	// Step 4: Reset to placeholder
+	t.Run("Step 4: Reset to placeholder", func(t *testing.T) {
+		req := httptest.NewRequest("DELETE", "/api/settings/favicon", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ResetFavicon(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Reset failed: %s", rec.Body.String())
+		}
+	})
+
+	// Step 5: Verify back to placeholder
+	t.Run("Step 5: Verify back to placeholder", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/settings/favicon", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+		handler.GetFavicon(rec, req)
+
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+
+		if response["favicon_url"] != placeholderFavicon {
+			t.Errorf("Expected placeholder favicon after reset, got %v", response["favicon_url"])
+		}
+	})
+}
+
 // Suppress unused import warning
 var _ = fmt.Sprintf

@@ -444,6 +444,22 @@ class API {
         return this.request('DELETE', '/settings/logo');
     }
 
+    // FAVICON ENDPOINTS
+
+    async getFavicon() {
+        return this.request('GET', '/settings/favicon');
+    }
+
+    async uploadFavicon(file) {
+        const formData = new FormData();
+        formData.append('favicon', file);
+        return this.uploadFile('/settings/favicon', formData);
+    }
+
+    async resetFavicon() {
+        return this.request('DELETE', '/settings/favicon');
+    }
+
     // WHATSAPP SETTINGS ENDPOINTS
 
     async getWhatsAppSettings() {

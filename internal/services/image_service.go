@@ -33,6 +33,7 @@ const (
 	JPEGQuality    = 85   // JPEG compression quality (1-100)
 	LogoMaxWidth   = 1200 // Max width for site logo
 	LogoMaxHeight  = 200  // Max height for site logo (banner format)
+	FaviconMaxSize = 512  // Max size for favicon (square, browsers will scale down)
 )
 
 // NewImageService creates a new image service with local filesystem storage
@@ -459,6 +460,61 @@ func (s *ImageService) DeleteLogo() error {
 		if err := os.Remove(logoPath); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("failed to delete logo: %w", err)
 		}
+	}
+	return nil
+}
+
+// ProcessFavicon processes an uploaded site favicon image
+// Returns the relative path (e.g., "settings/site_favicon.png")
+// Always saves as PNG to preserve transparency (favicons often have transparency)
+func (s *ImageService) ProcessFavicon(file multipart.File) (string, error) {
+	// Reset file pointer to beginning
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return "", fmt.Errorf("failed to seek file: %w", err)
+	}
+
+	// Decode the uploaded image
+	img, err := imaging.Decode(file)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode image: %w", err)
+	}
+
+	// Create settings directory if it doesn't exist
+	// Use tenant-aware base path for SaaS-Mode isolation
+	settingsDir := filepath.Join(s.getTenantBasePath(), "settings")
+	if err := os.MkdirAll(settingsDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create settings directory: %w", err)
+	}
+
+	// Delete existing favicon file first
+	s.DeleteFavicon()
+
+	// Resize to fit favicon dimensions (square)
+	resized := s.resizeImage(img, FaviconMaxSize, FaviconMaxSize)
+
+	// Save as PNG to preserve transparency
+	filename := "site_favicon.png"
+	filePath := filepath.Join(settingsDir, filename)
+	if err := s.savePNG(resized, filePath); err != nil {
+		return "", fmt.Errorf("failed to save favicon: %w", err)
+	}
+
+	// Return relative path including tenant prefix
+	// SaaS-Mode: "{tenantSlug}/settings/site_favicon.png"
+	// Simple-Mode: "settings/site_favicon.png"
+	return s.getTenantRelativePath(filepath.Join("settings", filename)), nil
+}
+
+// DeleteFavicon removes the custom site favicon file
+// Does not return error if file doesn't exist (idempotent)
+func (s *ImageService) DeleteFavicon() error {
+	// Use tenant-aware base path for SaaS-Mode isolation
+	settingsDir := filepath.Join(s.getTenantBasePath(), "settings")
+
+	// Delete favicon file (PNG only - we always save as PNG)
+	faviconPath := filepath.Join(settingsDir, "site_favicon.png")
+	if err := os.Remove(faviconPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to delete favicon: %w", err)
 	}
 	return nil
 }

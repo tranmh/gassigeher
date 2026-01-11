@@ -6,6 +6,7 @@
     <title>Branding - Gassigeher Admin</title>
     <link rel="stylesheet" href="/assets/css/main.css">
     <script src="/js/theme-loader.js"></script>
+    <script src="/js/favicon-loader.js"></script>
 </head>
 <body>
     <header>
@@ -58,6 +59,63 @@
             </p>
 
             <div id="alert-container"></div>
+
+            <!-- Logo & Favicon -->
+            <div class="card">
+                <h2>Logo & Favicon</h2>
+                <p style="font-size: 0.85rem; color: #666; margin-bottom: 20px;">
+                    Lade ein eigenes Logo und Favicon hoch. Das Logo wird oben auf jeder Seite angezeigt,
+                    das Favicon erscheint im Browser-Tab.
+                </p>
+
+                <!-- Logo Upload -->
+                <div style="margin-bottom: 30px;">
+                    <h3 style="font-size: 1rem; margin-bottom: 10px;">Logo (Banner)</h3>
+                    <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">
+                        Empfohlene Größe: max. 1200×200 Pixel (horizontal). JPEG oder PNG.
+                    </p>
+                    <div style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;">
+                        <div id="logo-preview-container" style="flex-shrink: 0; padding: 10px; background: #f5f5f5; border-radius: 8px; min-width: 200px; text-align: center;">
+                            <img id="logo-preview" src="/assets/images/placeholders/logo-placeholder.svg"
+                                 alt="Logo Vorschau" style="max-width: 300px; max-height: 100px; object-fit: contain;">
+                        </div>
+                        <div style="flex: 1; min-width: 200px;">
+                            <input type="file" id="logo-file" accept=".jpg,.jpeg,.png" style="display: none;">
+                            <button class="btn btn-secondary" data-action="upload-logo" style="margin-bottom: 10px;">
+                                Logo hochladen
+                            </button>
+                            <button class="btn btn-outline" data-action="reset-logo" style="margin-left: 10px; margin-bottom: 10px;">
+                                Zurücksetzen
+                            </button>
+                            <p id="logo-status" style="font-size: 0.85rem; color: #666; margin-top: 5px;"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Favicon Upload -->
+                <div>
+                    <h3 style="font-size: 1rem; margin-bottom: 10px;">Favicon (Browser-Tab)</h3>
+                    <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">
+                        Empfohlene Größe: 512×512 Pixel (quadratisch). JPEG oder PNG.
+                    </p>
+                    <div style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;">
+                        <div id="favicon-preview-container" style="flex-shrink: 0; padding: 10px; background: #f5f5f5; border-radius: 8px; text-align: center;">
+                            <img id="favicon-preview" src="/assets/images/placeholders/favicon-placeholder.svg"
+                                 alt="Favicon Vorschau" style="width: 64px; height: 64px; object-fit: contain;">
+                        </div>
+                        <div style="flex: 1; min-width: 200px;">
+                            <input type="file" id="favicon-file" accept=".jpg,.jpeg,.png" style="display: none;">
+                            <button class="btn btn-secondary" data-action="upload-favicon" style="margin-bottom: 10px;">
+                                Favicon hochladen
+                            </button>
+                            <button class="btn btn-outline" data-action="reset-favicon" style="margin-left: 10px; margin-bottom: 10px;">
+                                Zurücksetzen
+                            </button>
+                            <p id="favicon-status" style="font-size: 0.85rem; color: #666; margin-top: 5px;"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <!-- Hero Section Branding -->
             <div class="card">
@@ -266,7 +324,11 @@
         // Register page-specific action handlers
         registerActions({
             'save-branding': function(e) { e.preventDefault(); saveBranding(); },
-            'clear-custom-colors': function(e) { e.preventDefault(); clearCustomColors(); }
+            'clear-custom-colors': function(e) { e.preventDefault(); clearCustomColors(); },
+            'upload-logo': function(e) { e.preventDefault(); document.getElementById('logo-file').click(); },
+            'reset-logo': function(e) { e.preventDefault(); resetLogo(); },
+            'upload-favicon': function(e) { e.preventDefault(); document.getElementById('favicon-file').click(); },
+            'reset-favicon': function(e) { e.preventDefault(); resetFavicon(); }
         });
 
         // Check admin access
@@ -451,14 +513,158 @@
             });
         }
 
+        // Logo/Favicon handling
+
+        // Load current logo and favicon
+        async function loadLogoAndFavicon() {
+            try {
+                // Load logo
+                const logoResult = await api.getLogo();
+                if (logoResult && logoResult.logo_url) {
+                    document.getElementById('logo-preview').src = logoResult.logo_url;
+                }
+
+                // Load favicon
+                const faviconResult = await api.getFavicon();
+                if (faviconResult && faviconResult.favicon_url) {
+                    document.getElementById('favicon-preview').src = faviconResult.favicon_url;
+                }
+            } catch (error) {
+                console.error('Error loading logo/favicon:', error);
+            }
+        }
+
+        // Handle logo file selection
+        function setupLogoFileHandler() {
+            const logoFile = document.getElementById('logo-file');
+            logoFile.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                // Validate file type
+                const validTypes = ['image/jpeg', 'image/png'];
+                if (!validTypes.includes(file.type)) {
+                    showAlert('Nur JPEG und PNG Dateien sind erlaubt.', 'error');
+                    return;
+                }
+
+                // Validate file size (max 10MB)
+                if (file.size > 10 * 1024 * 1024) {
+                    showAlert('Die Datei ist zu groß (max. 10 MB).', 'error');
+                    return;
+                }
+
+                document.getElementById('logo-status').textContent = 'Wird hochgeladen...';
+
+                try {
+                    const result = await api.uploadLogo(file);
+                    if (result && result.logo_url) {
+                        document.getElementById('logo-preview').src = result.logo_url + '?t=' + Date.now();
+                        document.getElementById('logo-status').textContent = 'Logo erfolgreich hochgeladen!';
+                        showAlert('Logo erfolgreich hochgeladen!', 'success');
+                    }
+                } catch (error) {
+                    console.error('Error uploading logo:', error);
+                    document.getElementById('logo-status').textContent = '';
+                    showAlert('Fehler beim Hochladen des Logos: ' + (error.message || 'Unbekannter Fehler'), 'error');
+                }
+
+                // Reset file input
+                logoFile.value = '';
+            });
+        }
+
+        // Handle favicon file selection
+        function setupFaviconFileHandler() {
+            const faviconFile = document.getElementById('favicon-file');
+            faviconFile.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                // Validate file type
+                const validTypes = ['image/jpeg', 'image/png'];
+                if (!validTypes.includes(file.type)) {
+                    showAlert('Nur JPEG und PNG Dateien sind erlaubt.', 'error');
+                    return;
+                }
+
+                // Validate file size (max 10MB)
+                if (file.size > 10 * 1024 * 1024) {
+                    showAlert('Die Datei ist zu groß (max. 10 MB).', 'error');
+                    return;
+                }
+
+                document.getElementById('favicon-status').textContent = 'Wird hochgeladen...';
+
+                try {
+                    const result = await api.uploadFavicon(file);
+                    if (result && result.favicon_url) {
+                        document.getElementById('favicon-preview').src = result.favicon_url + '?t=' + Date.now();
+                        document.getElementById('favicon-status').textContent = 'Favicon erfolgreich hochgeladen!';
+                        showAlert('Favicon erfolgreich hochgeladen!', 'success');
+                        // Reload favicon in browser tab
+                        if (typeof window.reloadFavicon === 'function') {
+                            window.reloadFavicon();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error uploading favicon:', error);
+                    document.getElementById('favicon-status').textContent = '';
+                    showAlert('Fehler beim Hochladen des Favicons: ' + (error.message || 'Unbekannter Fehler'), 'error');
+                }
+
+                // Reset file input
+                faviconFile.value = '';
+            });
+        }
+
+        // Reset logo to default
+        async function resetLogo() {
+            if (!confirm('Logo wirklich auf den Standard zurücksetzen?')) return;
+
+            try {
+                const result = await api.resetLogo();
+                if (result && result.logo_url) {
+                    document.getElementById('logo-preview').src = result.logo_url + '?t=' + Date.now();
+                    showAlert('Logo auf Standard zurückgesetzt.', 'success');
+                }
+            } catch (error) {
+                console.error('Error resetting logo:', error);
+                showAlert('Fehler beim Zurücksetzen des Logos: ' + (error.message || 'Unbekannter Fehler'), 'error');
+            }
+        }
+
+        // Reset favicon to default
+        async function resetFavicon() {
+            if (!confirm('Favicon wirklich auf den Standard zurücksetzen?')) return;
+
+            try {
+                const result = await api.resetFavicon();
+                if (result && result.favicon_url) {
+                    document.getElementById('favicon-preview').src = result.favicon_url + '?t=' + Date.now();
+                    showAlert('Favicon auf Standard zurückgesetzt.', 'success');
+                    // Reload favicon in browser tab
+                    if (typeof window.reloadFavicon === 'function') {
+                        window.reloadFavicon();
+                    }
+                }
+            } catch (error) {
+                console.error('Error resetting favicon:', error);
+                showAlert('Fehler beim Zurücksetzen des Favicons: ' + (error.message || 'Unbekannter Fehler'), 'error');
+            }
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', async () => {
             await window.i18n.load();
             await checkAccess();
             await loadBranding();
+            await loadLogoAndFavicon();
             syncColorInputs();
             setupLivePreview();
             setupThemePresetListener();
+            setupLogoFileHandler();
+            setupFaviconFileHandler();
         });
     </script>
 </body>

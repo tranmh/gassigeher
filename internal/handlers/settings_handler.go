@@ -34,6 +34,18 @@ func NewSettingsHandler(db *database.DB, cfg *config.Config) *SettingsHandler {
 	}
 }
 
+// getImageServiceForRequest returns a tenant-aware ImageService for SaaS-Mode,
+// or the default service for Simple-Mode. This ensures proper file path isolation.
+func (h *SettingsHandler) getImageServiceForRequest(r *http.Request) *services.ImageService {
+	tenantSlug, _ := r.Context().Value(middleware.TenantSlugKey).(string)
+	if tenantSlug != "" {
+		// SaaS-Mode: Create tenant-aware service for proper file isolation
+		return services.NewImageServiceWithTenant(h.cfg.UploadDir, tenantSlug)
+	}
+	// Simple-Mode: Use default service (no tenant isolation needed)
+	return h.imageService
+}
+
 // GetAllSettings gets all system settings (admin only)
 func (h *SettingsHandler) GetAllSettings(w http.ResponseWriter, r *http.Request) {
 	// SaaS: Extract tenant ID from context
@@ -93,6 +105,9 @@ const defaultLogoURL = "https://www.tierheim-goeppingen.de/wp-content/uploads/20
 
 // Placeholder logo URL for SaaS-Mode tenants without custom logo
 const placeholderLogoURL = "/assets/images/placeholders/logo-placeholder.svg"
+
+// Placeholder favicon URL for tenants without custom favicon
+const placeholderFaviconURL = "/assets/images/placeholders/favicon-placeholder.svg"
 
 // GetLogo returns the current logo URL (public endpoint, no auth required)
 func (h *SettingsHandler) GetLogo(w http.ResponseWriter, r *http.Request) {
@@ -168,8 +183,9 @@ func (h *SettingsHandler) UploadLogo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Process and save logo
-	logoPath, err := h.imageService.ProcessLogo(file)
+	// Process and save logo (use tenant-aware service for SaaS-Mode)
+	imageService := h.getImageServiceForRequest(r)
+	logoPath, err := imageService.ProcessLogo(file)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to process logo")
 		return
@@ -227,8 +243,9 @@ func (h *SettingsHandler) ResetLogo(w http.ResponseWriter, r *http.Request) {
 	// SaaS: Extract tenant ID from context
 	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
 
-	// Delete custom logo file (if exists)
-	h.imageService.DeleteLogo()
+	// Delete custom logo file (use tenant-aware service for SaaS-Mode)
+	imageService := h.getImageServiceForRequest(r)
+	imageService.DeleteLogo()
 
 	// Determine default logo based on mode
 	var resetLogoURL string
@@ -250,5 +267,117 @@ func (h *SettingsHandler) ResetLogo(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{
 		"message":  "Logo reset to default",
 		"logo_url": resetLogoURL,
+	})
+}
+
+// GetFavicon returns the current favicon URL (public endpoint, no auth required)
+func (h *SettingsHandler) GetFavicon(w http.ResponseWriter, r *http.Request) {
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	setting, err := h.settingsRepo.Get(tenantID, "site_favicon")
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to get favicon setting")
+		return
+	}
+
+	// Return custom favicon URL or placeholder if not set
+	var faviconURL string
+	if setting != nil && setting.Value != "" {
+		faviconURL = setting.Value
+	} else {
+		faviconURL = placeholderFaviconURL
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"favicon_url": faviconURL})
+}
+
+// UploadFavicon handles uploading a custom site favicon (admin only)
+func (h *SettingsHandler) UploadFavicon(w http.ResponseWriter, r *http.Request) {
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	// SECURITY: Limit request body size to prevent DoS attacks
+	maxSizeMB := h.cfg.MaxUploadSizeMB
+	if maxSizeMB <= 0 {
+		maxSizeMB = 10 // Default 10MB if not configured
+	}
+	maxSize := int64(maxSizeMB) << 20
+	r.Body = http.MaxBytesReader(w, r.Body, maxSize)
+
+	// Parse multipart form with max size limit
+	if err := r.ParseMultipartForm(maxSize); err != nil {
+		respondError(w, http.StatusBadRequest, "File too large or invalid form data")
+		return
+	}
+
+	// Get file from form
+	file, header, err := r.FormFile("favicon")
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "No file uploaded")
+		return
+	}
+	defer file.Close()
+
+	// Validate file extension
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" {
+		respondError(w, http.StatusBadRequest, "Only JPEG and PNG files are allowed")
+		return
+	}
+
+	// Validate MIME type (magic bytes) to prevent file type spoofing
+	if errMsg, valid := ValidateImageMIMEType(file); !valid {
+		respondError(w, http.StatusBadRequest, errMsg)
+		return
+	}
+	// Reset file reader position after MIME check
+	if _, err := file.Seek(0, 0); err != nil {
+		log.Printf("Error seeking file: %v", err)
+		respondError(w, http.StatusInternalServerError, "Fehler beim Verarbeiten der Datei")
+		return
+	}
+
+	// Process and save favicon (use tenant-aware service for SaaS-Mode)
+	imageService := h.getImageServiceForRequest(r)
+	faviconPath, err := imageService.ProcessFavicon(file)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to process favicon")
+		return
+	}
+
+	// Upsert setting with local path (prefixed with /uploads/)
+	// Use Upsert because site_favicon setting may not exist yet
+	localURL := "/uploads/" + faviconPath
+	if err := h.settingsRepo.Upsert(tenantID, "site_favicon", localURL); err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to update favicon setting")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{
+		"message":     "Favicon uploaded successfully",
+		"favicon_url": localURL,
+	})
+}
+
+// ResetFavicon resets the site favicon to the placeholder (admin only)
+func (h *SettingsHandler) ResetFavicon(w http.ResponseWriter, r *http.Request) {
+	// SaaS: Extract tenant ID from context
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	// Delete custom favicon file (use tenant-aware service for SaaS-Mode)
+	imageService := h.getImageServiceForRequest(r)
+	imageService.DeleteFavicon()
+
+	// Reset setting to placeholder URL
+	// Use Upsert because site_favicon setting may not exist yet
+	if err := h.settingsRepo.Upsert(tenantID, "site_favicon", placeholderFaviconURL); err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to reset favicon setting")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{
+		"message":     "Favicon reset to default",
+		"favicon_url": placeholderFaviconURL,
 	})
 }
