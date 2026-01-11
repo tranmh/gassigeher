@@ -179,6 +179,7 @@ func (h *WalkReportHandler) GetReport(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetReportByBooking gets a walk report by booking ID
+// Returns 200 with null body if no report exists (not 404) since "no report" is expected
 func (h *WalkReportHandler) GetReportByBooking(w http.ResponseWriter, r *http.Request) {
 	// SaaS: Extract tenant ID from context
 	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
@@ -197,11 +198,8 @@ func (h *WalkReportHandler) GetReportByBooking(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	if report == nil {
-		respondError(w, http.StatusNotFound, "Bericht nicht gefunden")
-		return
-	}
-
+	// Return 200 with null if no report exists - this is not an error case
+	// since many completed bookings won't have reports yet
 	respondJSON(w, http.StatusOK, report)
 }
 

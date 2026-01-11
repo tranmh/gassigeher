@@ -700,9 +700,9 @@ Get a single walk report by ID.
 
 Get the walk report for a specific booking.
 
-**Response:** `200 OK` - Same as Get Walk Report
+**Response:** `200 OK` - Same as Get Walk Report, or `null` if no report exists for the booking.
 
-**Response:** `404 Not Found` if no report exists for the booking.
+Note: Returns `200` with `null` body (not `404`) when no report exists, since this is an expected case for many completed bookings.
 
 ---
 

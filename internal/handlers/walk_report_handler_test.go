@@ -383,7 +383,7 @@ func TestWalkReportHandler_GetReportByBooking(t *testing.T) {
 		}
 	})
 
-	t.Run("returns 404 for booking without report", func(t *testing.T) {
+	t.Run("returns 200 with null for booking without report", func(t *testing.T) {
 		// Create another booking without a report
 		noReportBooking, _ := db.Exec(`
 			INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status)
@@ -399,8 +399,13 @@ func TestWalkReportHandler_GetReportByBooking(t *testing.T) {
 		rec := httptest.NewRecorder()
 		handler.GetReportByBooking(rec, req)
 
-		if rec.Code != http.StatusNotFound {
-			t.Errorf("Expected status 404, got %d", rec.Code)
+		// Returns 200 with null body since "no report" is expected, not an error
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", rec.Code)
+		}
+		// Body should be "null"
+		if rec.Body.String() != "null\n" {
+			t.Errorf("Expected null body, got %s", rec.Body.String())
 		}
 	})
 }
