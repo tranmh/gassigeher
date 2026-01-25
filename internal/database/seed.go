@@ -51,6 +51,31 @@ func EnsureDefaultTenant(db *sql.DB, dbType string) error {
 	}
 
 	if count > 0 {
+		// Default tenant exists, but check if tenant_settings also exists
+		var settingsCount int
+		err = db.QueryRow("SELECT COUNT(*) FROM tenant_settings WHERE tenant_id = 0").Scan(&settingsCount)
+		if err != nil {
+			return fmt.Errorf("failed to check default tenant settings: %w", err)
+		}
+
+		if settingsCount == 0 {
+			// Create missing tenant_settings for existing default tenant
+			now := time.Now()
+			var settingsQuery string
+			if dbType == "postgres" {
+				settingsQuery = `INSERT INTO tenant_settings (tenant_id, theme_preset, created_at, updated_at)
+					VALUES (0, 'classic', $1, $2)`
+			} else {
+				settingsQuery = `INSERT INTO tenant_settings (tenant_id, theme_preset, created_at, updated_at)
+					VALUES (0, 'classic', ?, ?)`
+			}
+			_, err = db.Exec(settingsQuery, now, now)
+			if err != nil {
+				return fmt.Errorf("failed to create default tenant settings: %w", err)
+			}
+			log.Println("✓ Created missing tenant settings for default tenant (id=0)")
+		}
+
 		return nil // Default tenant already exists
 	}
 
@@ -72,6 +97,23 @@ func EnsureDefaultTenant(db *sql.DB, dbType string) error {
 	}
 
 	log.Println("✓ Created default tenant (id=0) for Simple-Mode")
+
+	// Create default tenant_settings for the default tenant
+	var settingsQuery string
+	if dbType == "postgres" {
+		settingsQuery = `INSERT INTO tenant_settings (tenant_id, theme_preset, created_at, updated_at)
+			VALUES (0, 'classic', $1, $2)`
+	} else {
+		settingsQuery = `INSERT INTO tenant_settings (tenant_id, theme_preset, created_at, updated_at)
+			VALUES (0, 'classic', ?, ?)`
+	}
+
+	_, err = db.Exec(settingsQuery, now, now)
+	if err != nil {
+		return fmt.Errorf("failed to create default tenant settings: %w", err)
+	}
+
+	log.Println("✓ Created default tenant settings for Simple-Mode")
 	return nil
 }
 
