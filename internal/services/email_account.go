@@ -41,8 +41,12 @@ func (s *EmailService) SendAccountDeactivated(to, name, reason string) error {
 
             <div class="info-box">
                 <h4 style="margin-top: 0;">Wie kann ich mein Konto reaktivieren?</h4>
-                <p>Wenn Sie Ihr Konto reaktivieren möchten, können Sie eine Reaktivierungsanfrage stellen. Ein Administrator wird Ihre Anfrage prüfen.</p>
+                <p>Wenn Sie Ihr Konto reaktivieren möchten, können Sie eine Reaktivierungsanfrage über die <a href="{{.BaseURL}}/login.html" style="color: #82b965; text-decoration: underline;">Anmeldeseite</a> stellen. Ein Administrator wird Ihre Anfrage prüfen.</p>
             </div>
+
+            <p style="text-align: center; margin-top: 20px;">
+                <a href="{{.BaseURL}}/login.html" style="display: inline-block; padding: 12px 30px; background-color: #82b965; color: white; text-decoration: none; border-radius: 6px;">Zur Anmeldung</a>
+            </p>
 
             <p>Bei Fragen wenden Sie sich bitte an unseren Support.</p>
         </div>
@@ -57,8 +61,9 @@ func (s *EmailService) SendAccountDeactivated(to, name, reason string) error {
 	t := template.Must(template.New("deactivated").Parse(tmpl))
 	var body bytes.Buffer
 	data := map[string]string{
-		"Name":   name,
-		"Reason": reason,
+		"Name":    name,
+		"Reason":  reason,
+		"BaseURL": s.baseURL,
 	}
 	if err := t.Execute(&body, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)

@@ -467,7 +467,11 @@ func (s *EmailService) SendBookingConfirmation(to, name, dogName, date, schedule
             </div>
 
             <p>Sie erhalten eine Erinnerung 1 Stunde vor Ihrem Spaziergang.</p>
-            <p>Falls Sie den Termin stornieren möchten, tun Sie dies bitte mindestens 12 Stunden im Voraus über Ihr Dashboard.</p>
+            <p>Falls Sie den Termin stornieren möchten, tun Sie dies bitte mindestens 12 Stunden im Voraus in Ihrem <a href="{{.BaseURL}}/dashboard.html" style="color: #82b965; text-decoration: underline;">Dashboard</a>.</p>
+
+            <p style="text-align: center; margin-top: 20px;">
+                <a href="{{.BaseURL}}/dashboard.html" style="display: inline-block; padding: 12px 30px; background-color: #82b965; color: white; text-decoration: none; border-radius: 6px;">Zum Dashboard</a>
+            </p>
         </div>
         <div class="footer">
             <p>© 2025 Gassigeher. Alle Rechte vorbehalten.</p>
@@ -484,6 +488,7 @@ func (s *EmailService) SendBookingConfirmation(to, name, dogName, date, schedule
 		"DogName":       dogName,
 		"Date":          date,
 		"ScheduledTime": scheduledTime,
+		"BaseURL":       s.baseURL,
 	}
 	if err := t.Execute(&body, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
@@ -534,7 +539,11 @@ func (s *EmailService) SendBookingCancellation(to, name, dogName, date, schedule
                 </div>
             </div>
 
-            <p>Sie können jederzeit eine neue Buchung vornehmen.</p>
+            <p>Sie können jederzeit eine neue Buchung in Ihrem <a href="{{.BaseURL}}/dashboard.html" style="color: #82b965; text-decoration: underline;">Dashboard</a> vornehmen.</p>
+
+            <p style="text-align: center; margin-top: 20px;">
+                <a href="{{.BaseURL}}/dashboard.html" style="display: inline-block; padding: 12px 30px; background-color: #82b965; color: white; text-decoration: none; border-radius: 6px;">Neue Buchung</a>
+            </p>
         </div>
         <div class="footer">
             <p>© 2025 Gassigeher. Alle Rechte vorbehalten.</p>
@@ -551,6 +560,7 @@ func (s *EmailService) SendBookingCancellation(to, name, dogName, date, schedule
 		"DogName":       dogName,
 		"Date":          date,
 		"ScheduledTime": scheduledTime,
+		"BaseURL":       s.baseURL,
 	}
 	if err := t.Execute(&body, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
@@ -607,7 +617,11 @@ func (s *EmailService) SendAdminCancellation(to, name, dogName, date, scheduledT
                 {{.Reason}}
             </div>
 
-            <p>Wir entschuldigen uns für die Unannehmlichkeiten. Sie können gerne einen anderen Termin buchen.</p>
+            <p>Wir entschuldigen uns für die Unannehmlichkeiten.</p>
+
+            <p style="text-align: center; margin-top: 20px;">
+                <a href="{{.BaseURL}}/dashboard.html" style="display: inline-block; padding: 12px 30px; background-color: #82b965; color: white; text-decoration: none; border-radius: 6px;">Neuen Termin buchen</a>
+            </p>
         </div>
         <div class="footer">
             <p>© 2025 Gassigeher. Alle Rechte vorbehalten.</p>
@@ -625,6 +639,7 @@ func (s *EmailService) SendAdminCancellation(to, name, dogName, date, scheduledT
 		"Date":          date,
 		"ScheduledTime": scheduledTime,
 		"Reason":        reason,
+		"BaseURL":       s.baseURL,
 	}
 	if err := t.Execute(&body, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
@@ -676,6 +691,10 @@ func (s *EmailService) SendBookingReminder(to, name, dogName, date, scheduledTim
             </div>
 
             <p>Viel Spaß beim Spaziergang!</p>
+
+            <p style="font-size: 12px; color: #666; margin-top: 20px;">
+                Falls Sie kurzfristig absagen müssen, können Sie dies in Ihrem <a href="{{.BaseURL}}/dashboard.html" style="color: #82b965;">Dashboard</a> tun.
+            </p>
         </div>
         <div class="footer">
             <p>© 2025 Gassigeher. Alle Rechte vorbehalten.</p>
@@ -692,6 +711,7 @@ func (s *EmailService) SendBookingReminder(to, name, dogName, date, scheduledTim
 		"DogName":       dogName,
 		"Date":          date,
 		"ScheduledTime": scheduledTime,
+		"BaseURL":       s.baseURL,
 	}
 	if err := t.Execute(&body, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
@@ -763,7 +783,13 @@ func (s *EmailService) SendBookingMoved(to, name, dogName, oldDate, oldTime, new
                 {{.Reason}}
             </div>
 
-            <p>Wir entschuldigen uns für die Unannehmlichkeiten. Bei Fragen oder Problemen wenden Sie sich bitte an uns.</p>
+            <p>Wir entschuldigen uns für die Unannehmlichkeiten. Sie können Ihre Buchung in Ihrem <a href="{{.BaseURL}}/dashboard.html" style="color: #82b965; text-decoration: underline;">Dashboard</a> einsehen.</p>
+
+            <p style="text-align: center; margin-top: 20px;">
+                <a href="{{.BaseURL}}/dashboard.html" style="display: inline-block; padding: 12px 30px; background-color: #17a2b8; color: white; text-decoration: none; border-radius: 6px;">Buchung ansehen</a>
+            </p>
+
+            <p>Bei Fragen oder Problemen wenden Sie sich bitte an uns.</p>
         </div>
         <div class="footer">
             <p>© 2025 Gassigeher. Alle Rechte vorbehalten.</p>
@@ -783,6 +809,7 @@ func (s *EmailService) SendBookingMoved(to, name, dogName, oldDate, oldTime, new
 		"NewDate": newDate,
 		"NewTime": newTime,
 		"Reason":  reason,
+		"BaseURL": s.baseURL,
 	}
 	if err := t.Execute(&body, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
@@ -834,7 +861,11 @@ func (s *EmailService) SendBookingApproved(to, name, dogName, date, scheduledTim
             </div>
 
             <p>Sie können nun wie geplant mit {{.DogName}} spazieren gehen.</p>
-            <p>Falls Sie den Termin stornieren möchten, tun Sie dies bitte mindestens 12 Stunden im Voraus über Ihr Dashboard.</p>
+            <p>Falls Sie den Termin stornieren möchten, tun Sie dies bitte mindestens 12 Stunden im Voraus in Ihrem <a href="{{.BaseURL}}/dashboard.html" style="color: #82b965; text-decoration: underline;">Dashboard</a>.</p>
+
+            <p style="text-align: center; margin-top: 20px;">
+                <a href="{{.BaseURL}}/dashboard.html" style="display: inline-block; padding: 12px 30px; background-color: #28a745; color: white; text-decoration: none; border-radius: 6px;">Zum Dashboard</a>
+            </p>
         </div>
         <div class="footer">
             <p>© 2025 Gassigeher. Alle Rechte vorbehalten.</p>
@@ -851,6 +882,7 @@ func (s *EmailService) SendBookingApproved(to, name, dogName, date, scheduledTim
 		"DogName":       dogName,
 		"Date":          date,
 		"ScheduledTime": scheduledTime,
+		"BaseURL":       s.baseURL,
 	}
 	if err := t.Execute(&body, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
@@ -907,7 +939,11 @@ func (s *EmailService) SendBookingRejected(to, name, dogName, date, scheduledTim
                 <p style="margin-bottom: 0;">{{.Reason}}</p>
             </div>
 
-            <p>Bitte versuchen Sie eine Buchung zu einem anderen Zeitpunkt oder kontaktieren Sie uns bei Fragen.</p>
+            <p>Bitte versuchen Sie eine Buchung zu einem anderen Zeitpunkt in Ihrem <a href="{{.BaseURL}}/dashboard.html" style="color: #82b965; text-decoration: underline;">Dashboard</a> oder kontaktieren Sie uns bei Fragen.</p>
+
+            <p style="text-align: center; margin-top: 20px;">
+                <a href="{{.BaseURL}}/dashboard.html" style="display: inline-block; padding: 12px 30px; background-color: #82b965; color: white; text-decoration: none; border-radius: 6px;">Anderen Termin buchen</a>
+            </p>
         </div>
         <div class="footer">
             <p>© 2025 Gassigeher. Alle Rechte vorbehalten.</p>
@@ -925,6 +961,7 @@ func (s *EmailService) SendBookingRejected(to, name, dogName, date, scheduledTim
 		"Date":          date,
 		"ScheduledTime": scheduledTime,
 		"Reason":        reason,
+		"BaseURL":       s.baseURL,
 	}
 	if err := t.Execute(&body, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
@@ -1140,7 +1177,11 @@ func (s *EmailService) SendExperienceLevelDenied(to, name, level string, message
             </div>
             {{end}}
 
-            <p>Sie können weiterhin Hunde Ihres aktuellen Levels buchen und jederzeit einen neuen Antrag stellen.</p>
+            <p>Sie können weiterhin Hunde Ihres aktuellen Levels buchen und jederzeit einen neuen Antrag in Ihrem <a href="{{.BaseURL}}/profile.html" style="color: #82b965; text-decoration: underline;">Profil</a> stellen.</p>
+
+            <p style="text-align: center; margin-top: 20px;">
+                <a href="{{.BaseURL}}/profile.html" style="display: inline-block; padding: 12px 30px; background-color: #82b965; color: white; text-decoration: none; border-radius: 6px;">Zum Profil</a>
+            </p>
         </div>
         <div class="footer">
             <p>© 2025 Gassigeher. Alle Rechte vorbehalten.</p>
@@ -1153,8 +1194,9 @@ func (s *EmailService) SendExperienceLevelDenied(to, name, level string, message
 	t := template.Must(template.New("denied").Parse(tmpl))
 	var body bytes.Buffer
 	data := map[string]interface{}{
-		"Name":  name,
-		"Level": levelLabel,
+		"Name":    name,
+		"Level":   levelLabel,
+		"BaseURL": s.baseURL,
 		"Message": func() string {
 			if message != nil {
 				return *message
