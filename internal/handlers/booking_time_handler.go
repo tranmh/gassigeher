@@ -72,10 +72,23 @@ func (h *BookingTimeHandler) GetAvailableSlots(w http.ResponseWriter, r *http.Re
 			}
 		}
 
+		// Get daily booking limit info for this dog
+		canBook, currentCount, maxAllowed, _ := h.bookingTimeService.CheckDailyBookingLimit(tenantID, dogID, date)
+
+		// If daily limit reached, return empty slots (single source of truth)
+		// Frontend will show the banner explaining why no slots are available
+		slotsToReturn := filteredSlots
+		if !canBook {
+			slotsToReturn = []string{}
+		}
+
 		respondJSON(w, http.StatusOK, map[string]interface{}{
-			"date":           date,
-			"slots":          filteredSlots,
-			"booked_periods": bookedPeriodsInfo,
+			"date":                date,
+			"slots":               slotsToReturn,
+			"booked_periods":      bookedPeriodsInfo,
+			"daily_booking_count": currentCount,
+			"daily_booking_limit": maxAllowed,
+			"daily_limit_reached": !canBook,
 		})
 		return
 	}

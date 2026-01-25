@@ -1017,3 +1017,302 @@ func TestBookingTimeService_CheckPeriodAvailability_CrossPeriod(t *testing.T) {
 		}
 	})
 }
+
+// ============ Daily Booking Limit Tests ============
+
+// Test CheckDailyBookingLimit
+func TestBookingTimeService_CheckDailyBookingLimit(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	defer db.Close()
+
+	bookingTimeRepo := repository.NewBookingTimeRepository(db)
+	holidayRepo := repository.NewHolidayRepository(db)
+	settingsRepo := repository.NewSettingsRepository(db)
+	bookingRepo := repository.NewBookingRepository(db)
+	holidayService := NewHolidayService(holidayRepo, settingsRepo)
+	service := NewBookingTimeService(bookingTimeRepo, holidayService, settingsRepo, bookingRepo)
+
+	// Create test users and dog
+	now := time.Now()
+	for i := 1; i <= 3; i++ {
+		_, err := db.Exec(`
+			INSERT INTO users (id, tenant_id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
+			VALUES (?, 0, 'Test', 'User', ?, 'hash', 1, 1, ?, ?, ?)
+		`, i, fmt.Sprintf("user%d@example.com", i), now, now, now)
+		if err != nil {
+			t.Fatalf("Failed to create test user %d: %v", i, err)
+		}
+	}
+
+	_, err := db.Exec(`
+		INSERT INTO dogs (id, tenant_id, name, breed, color_id, is_available, created_at)
+		VALUES (1, 0, 'Buddy', 'Labrador', 1, 1, ?)
+	`, now)
+	if err != nil {
+		t.Fatalf("Failed to create test dog: %v", err)
+	}
+
+	testDate := "2025-12-20"
+
+	t.Run("allows booking when under limit", func(t *testing.T) {
+		canBook, count, max, err := service.CheckDailyBookingLimit(0, 1, testDate)
+		if err != nil {
+			t.Fatalf("CheckDailyBookingLimit() failed: %v", err)
+		}
+		if !canBook {
+			t.Error("Expected booking to be allowed")
+		}
+		if count != 0 {
+			t.Errorf("Expected count 0, got %d", count)
+		}
+		if max != 2 {
+			t.Errorf("Expected default max 2, got %d", max)
+		}
+	})
+
+	t.Run("blocks booking when limit reached", func(t *testing.T) {
+		testDate2 := "2025-12-21"
+		// Create 2 bookings (default limit)
+		_, err := db.Exec(`
+			INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at, updated_at)
+			VALUES (0, 1, 1, ?, '09:00', 'scheduled', ?, ?)
+		`, testDate2, now, now)
+		if err != nil {
+			t.Fatalf("Failed to create booking 1: %v", err)
+		}
+
+		_, err = db.Exec(`
+			INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at, updated_at)
+			VALUES (0, 2, 1, ?, '14:00', 'scheduled', ?, ?)
+		`, testDate2, now, now)
+		if err != nil {
+			t.Fatalf("Failed to create booking 2: %v", err)
+		}
+
+		canBook, count, max, err := service.CheckDailyBookingLimit(0, 1, testDate2)
+		if err != nil {
+			t.Fatalf("CheckDailyBookingLimit() failed: %v", err)
+		}
+		if canBook {
+			t.Error("Expected booking to be blocked")
+		}
+		if count != 2 {
+			t.Errorf("Expected count 2, got %d", count)
+		}
+		if max != 2 {
+			t.Errorf("Expected max 2, got %d", max)
+		}
+	})
+
+	t.Run("respects custom setting value", func(t *testing.T) {
+		testDate3 := "2025-12-22"
+		// Set custom limit to 3
+		err := settingsRepo.Upsert(0, "max_bookings_per_dog_per_day", "3")
+		if err != nil {
+			t.Fatalf("Failed to update setting: %v", err)
+		}
+
+		// Create 2 bookings
+		_, err = db.Exec(`
+			INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at, updated_at)
+			VALUES (0, 1, 1, ?, '09:00', 'scheduled', ?, ?)
+		`, testDate3, now, now)
+		if err != nil {
+			t.Fatalf("Failed to create booking: %v", err)
+		}
+		_, err = db.Exec(`
+			INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at, updated_at)
+			VALUES (0, 2, 1, ?, '14:00', 'scheduled', ?, ?)
+		`, testDate3, now, now)
+		if err != nil {
+			t.Fatalf("Failed to create booking: %v", err)
+		}
+
+		canBook, count, max, err := service.CheckDailyBookingLimit(0, 1, testDate3)
+		if err != nil {
+			t.Fatalf("CheckDailyBookingLimit() failed: %v", err)
+		}
+		if !canBook {
+			t.Error("Expected booking to be allowed (3 limit, 2 existing)")
+		}
+		if count != 2 {
+			t.Errorf("Expected count 2, got %d", count)
+		}
+		if max != 3 {
+			t.Errorf("Expected max 3, got %d", max)
+		}
+	})
+
+	t.Run("uses default when setting missing", func(t *testing.T) {
+		// Tenant 99 has no settings
+		canBook, _, max, err := service.CheckDailyBookingLimit(99, 1, testDate)
+		if err != nil {
+			t.Fatalf("CheckDailyBookingLimit() failed: %v", err)
+		}
+		if !canBook {
+			t.Error("Expected booking allowed")
+		}
+		if max != 2 {
+			t.Errorf("Expected default max 2, got %d", max)
+		}
+	})
+
+	t.Run("cancelled bookings don't count toward limit", func(t *testing.T) {
+		testDate4 := "2025-12-23"
+		// Reset setting to default (2)
+		settingsRepo.Upsert(0, "max_bookings_per_dog_per_day", "2")
+
+		// Create 2 bookings, cancel 1
+		result, err := db.Exec(`
+			INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at, updated_at)
+			VALUES (0, 1, 1, ?, '09:00', 'scheduled', ?, ?)
+		`, testDate4, now, now)
+		if err != nil {
+			t.Fatalf("Failed to create booking: %v", err)
+		}
+		bookingID, _ := result.LastInsertId()
+
+		_, err = db.Exec(`
+			INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at, updated_at)
+			VALUES (0, 2, 1, ?, '14:00', 'scheduled', ?, ?)
+		`, testDate4, now, now)
+		if err != nil {
+			t.Fatalf("Failed to create booking: %v", err)
+		}
+
+		// Cancel first booking
+		_, err = db.Exec("UPDATE bookings SET status = 'cancelled' WHERE id = ?", bookingID)
+		if err != nil {
+			t.Fatalf("Failed to cancel booking: %v", err)
+		}
+
+		// Should be able to book (only 1 scheduled)
+		canBook, count, _, err := service.CheckDailyBookingLimit(0, 1, testDate4)
+		if err != nil {
+			t.Fatalf("CheckDailyBookingLimit() failed: %v", err)
+		}
+		if !canBook {
+			t.Error("Expected booking to be allowed after cancellation")
+		}
+		if count != 1 {
+			t.Errorf("Expected count 1 (cancelled shouldn't count), got %d", count)
+		}
+	})
+}
+
+// Test CheckDailyBookingLimitForMove
+func TestBookingTimeService_CheckDailyBookingLimitForMove(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	defer db.Close()
+
+	bookingTimeRepo := repository.NewBookingTimeRepository(db)
+	holidayRepo := repository.NewHolidayRepository(db)
+	settingsRepo := repository.NewSettingsRepository(db)
+	bookingRepo := repository.NewBookingRepository(db)
+	holidayService := NewHolidayService(holidayRepo, settingsRepo)
+	service := NewBookingTimeService(bookingTimeRepo, holidayService, settingsRepo, bookingRepo)
+
+	// Create test users and dog
+	now := time.Now()
+	for i := 1; i <= 3; i++ {
+		_, err := db.Exec(`
+			INSERT INTO users (id, tenant_id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
+			VALUES (?, 0, 'Test', 'User', ?, 'hash', 1, 1, ?, ?, ?)
+		`, i, fmt.Sprintf("moveuser%d@example.com", i), now, now, now)
+		if err != nil {
+			t.Fatalf("Failed to create test user %d: %v", i, err)
+		}
+	}
+
+	_, err := db.Exec(`
+		INSERT INTO dogs (id, tenant_id, name, breed, color_id, is_available, created_at)
+		VALUES (2, 0, 'Max', 'Shepherd', 1, 1, ?)
+	`, now)
+	if err != nil {
+		t.Fatalf("Failed to create test dog: %v", err)
+	}
+
+	// Set default limit to 2
+	settingsRepo.Upsert(0, "max_bookings_per_dog_per_day", "2")
+
+	t.Run("blocks move to day already at limit", func(t *testing.T) {
+		sourceDate := "2025-12-27"
+		targetDate := "2025-12-28"
+
+		// Create booking to move on source date
+		result, err := db.Exec(`
+			INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at, updated_at)
+			VALUES (0, 1, 2, ?, '09:00', 'scheduled', ?, ?)
+		`, sourceDate, now, now)
+		if err != nil {
+			t.Fatalf("Failed to create booking: %v", err)
+		}
+		bookingID, _ := result.LastInsertId()
+
+		// Create 2 bookings on target date (at limit)
+		_, err = db.Exec(`
+			INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at, updated_at)
+			VALUES (0, 2, 2, ?, '09:00', 'scheduled', ?, ?)
+		`, targetDate, now, now)
+		if err != nil {
+			t.Fatalf("Failed to create target booking 1: %v", err)
+		}
+		_, err = db.Exec(`
+			INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at, updated_at)
+			VALUES (0, 3, 2, ?, '14:00', 'scheduled', ?, ?)
+		`, targetDate, now, now)
+		if err != nil {
+			t.Fatalf("Failed to create target booking 2: %v", err)
+		}
+
+		// Move should be blocked
+		canBook, count, max, err := service.CheckDailyBookingLimitForMove(0, 2, targetDate, sourceDate, int(bookingID))
+		if err != nil {
+			t.Fatalf("CheckDailyBookingLimitForMove() failed: %v", err)
+		}
+		if canBook {
+			t.Error("Expected move to be blocked (target at limit)")
+		}
+		if count != 2 {
+			t.Errorf("Expected count 2, got %d", count)
+		}
+		if max != 2 {
+			t.Errorf("Expected max 2, got %d", max)
+		}
+	})
+
+	t.Run("allows same-day move even when at limit", func(t *testing.T) {
+		sameDate := "2025-12-29"
+
+		// Create 2 bookings on same date (at limit)
+		result, err := db.Exec(`
+			INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at, updated_at)
+			VALUES (0, 1, 2, ?, '09:00', 'scheduled', ?, ?)
+		`, sameDate, now, now)
+		if err != nil {
+			t.Fatalf("Failed to create booking 1: %v", err)
+		}
+		bookingID, _ := result.LastInsertId()
+
+		_, err = db.Exec(`
+			INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at, updated_at)
+			VALUES (0, 2, 2, ?, '14:00', 'scheduled', ?, ?)
+		`, sameDate, now, now)
+		if err != nil {
+			t.Fatalf("Failed to create booking 2: %v", err)
+		}
+
+		// Move within same day should succeed (booking being moved doesn't count against itself)
+		canBook, count, _, err := service.CheckDailyBookingLimitForMove(0, 2, sameDate, sameDate, int(bookingID))
+		if err != nil {
+			t.Fatalf("CheckDailyBookingLimitForMove() failed: %v", err)
+		}
+		if !canBook {
+			t.Error("Expected same-day move to be allowed")
+		}
+		// Count should be 1 (excluding the booking being moved)
+		if count != 1 {
+			t.Errorf("Expected count 1 (excluding moved booking), got %d", count)
+		}
+	})
+}

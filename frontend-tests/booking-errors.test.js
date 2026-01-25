@@ -462,3 +462,270 @@ describe('Edge cases and error handling', () => {
         expect(BookingErrors.parseError('LeVeL tOo LoW').code).toBe('level_too_low');
     });
 });
+
+describe('BookingErrors - Daily Dog Limit Feature', () => {
+    describe('parseError with structured daily_dog_limit error', () => {
+        test('should detect error_type: daily_dog_limit from backend response', () => {
+            const backendError = {
+                error: 'Dieser Hund wurde für heute bereits 2 Mal gebucht.',
+                error_type: 'daily_dog_limit',
+                existing_bookings: [
+                    { period_name: 'Vormittag', start_time: '09:00', end_time: '12:00' },
+                    { period_name: 'Nachmittag', start_time: '14:00', end_time: '16:30' }
+                ],
+                current_count: 2,
+                max_allowed: 2
+            };
+
+            const result = BookingErrors.parseError(backendError);
+            expect(result.code).toBe('daily_dog_limit');
+        });
+
+        test('should detect error_type from error.data (API client format)', () => {
+            const apiError = {
+                message: 'Request failed',
+                data: {
+                    error: 'Dieser Hund wurde für heute bereits 2 Mal gebucht.',
+                    error_type: 'daily_dog_limit',
+                    existing_bookings: [],
+                    current_count: 2,
+                    max_allowed: 2
+                }
+            };
+
+            const result = BookingErrors.parseError(apiError);
+            expect(result.code).toBe('daily_dog_limit');
+        });
+
+        test('should fall back to max_bookings_reached for generic limit errors', () => {
+            // Without error_type field, should use string matching
+            const result = BookingErrors.parseError({ error: 'booking limit reached' });
+            expect(result.code).toBe('max_bookings_reached');
+        });
+    });
+
+    describe('getDailyDogLimitErrorInfo', () => {
+        test('should generate error info with existing bookings list', () => {
+            const errorData = {
+                error_type: 'daily_dog_limit',
+                existing_bookings: [
+                    { period_name: 'Vormittag', start_time: '09:00', end_time: '12:00' },
+                    { period_name: 'Nachmittag', start_time: '14:00', end_time: '16:30' }
+                ],
+                current_count: 2,
+                max_allowed: 2
+            };
+
+            const result = BookingErrors.getDailyDogLimitErrorInfo(errorData);
+
+            expect(result.code).toBe('daily_dog_limit');
+            expect(result.title).toBe('Tageslimit erreicht');
+            expect(result.message).toContain('2 Mal gebucht');
+            expect(result.solution).toContain('2 Buchungen');
+            expect(result.customHtml).toContain('Vormittag');
+            expect(result.customHtml).toContain('09:00 - 12:00');
+            expect(result.customHtml).toContain('Nachmittag');
+            expect(result.customHtml).toContain('14:00 - 16:30');
+        });
+
+        test('should handle empty bookings list', () => {
+            const errorData = {
+                error_type: 'daily_dog_limit',
+                existing_bookings: [],
+                current_count: 0,
+                max_allowed: 2
+            };
+
+            const result = BookingErrors.getDailyDogLimitErrorInfo(errorData);
+
+            expect(result.code).toBe('daily_dog_limit');
+            expect(result.customHtml).toBe('');
+        });
+
+        test('should handle missing existing_bookings array', () => {
+            const errorData = {
+                error_type: 'daily_dog_limit',
+                current_count: 2,
+                max_allowed: 2
+            };
+
+            const result = BookingErrors.getDailyDogLimitErrorInfo(errorData);
+
+            expect(result.code).toBe('daily_dog_limit');
+            expect(result.customHtml).toBe('');
+        });
+
+        test('should use default max_allowed of 2 when not provided', () => {
+            const errorData = {
+                error_type: 'daily_dog_limit',
+                existing_bookings: [],
+                current_count: 2
+            };
+
+            const result = BookingErrors.getDailyDogLimitErrorInfo(errorData);
+
+            expect(result.solution).toContain('2 Buchungen');
+        });
+
+        test('should handle booking without end_time', () => {
+            const errorData = {
+                error_type: 'daily_dog_limit',
+                existing_bookings: [
+                    { period_name: 'Buchung', start_time: '09:00', end_time: '' }
+                ],
+                current_count: 1,
+                max_allowed: 2
+            };
+
+            const result = BookingErrors.getDailyDogLimitErrorInfo(errorData);
+
+            expect(result.customHtml).toContain('Buchung: 09:00');
+            expect(result.customHtml).not.toContain('09:00 - ');
+        });
+
+        test('should read max_allowed from configuration', () => {
+            const errorData = {
+                error_type: 'daily_dog_limit',
+                existing_bookings: [
+                    { period_name: 'Vormittag', start_time: '09:00', end_time: '12:00' }
+                ],
+                current_count: 3,
+                max_allowed: 3  // Custom limit from config
+            };
+
+            const result = BookingErrors.getDailyDogLimitErrorInfo(errorData);
+
+            expect(result.message).toContain('3 Mal gebucht');
+            expect(result.solution).toContain('3 Buchungen');
+        });
+    });
+
+    describe('getDailyDogLimitErrorInfo - XSS Prevention', () => {
+        test('XSS: should escape period_name', () => {
+            const errorData = {
+                error_type: 'daily_dog_limit',
+                existing_bookings: [
+                    { period_name: '<script>alert("XSS")</script>', start_time: '09:00', end_time: '12:00' }
+                ],
+                current_count: 1,
+                max_allowed: 2
+            };
+
+            const result = BookingErrors.getDailyDogLimitErrorInfo(errorData);
+
+            expect(result.customHtml).not.toContain('<script>');
+            expect(result.customHtml).toContain('&lt;script&gt;');
+        });
+
+        test('XSS: should escape start_time', () => {
+            const errorData = {
+                error_type: 'daily_dog_limit',
+                existing_bookings: [
+                    { period_name: 'Vormittag', start_time: '"><img src=x onerror=alert(1)>', end_time: '12:00' }
+                ],
+                current_count: 1,
+                max_allowed: 2
+            };
+
+            const result = BookingErrors.getDailyDogLimitErrorInfo(errorData);
+
+            // Should escape < to &lt; (preventing HTML injection)
+            expect(result.customHtml).not.toContain('<img');
+            expect(result.customHtml).toContain('&lt;img');
+        });
+
+        test('XSS: should escape end_time', () => {
+            const errorData = {
+                error_type: 'daily_dog_limit',
+                existing_bookings: [
+                    { period_name: 'Vormittag', start_time: '09:00', end_time: '<svg onload=alert(1)>' }
+                ],
+                current_count: 1,
+                max_allowed: 2
+            };
+
+            const result = BookingErrors.getDailyDogLimitErrorInfo(errorData);
+
+            // Should escape < to &lt; (preventing HTML injection)
+            expect(result.customHtml).not.toContain('<svg');
+            expect(result.customHtml).toContain('&lt;svg');
+        });
+    });
+
+    describe('renderError with customHtml', () => {
+        test('should include customHtml in rendered output', () => {
+            const errorInfo = {
+                title: 'Tageslimit erreicht',
+                message: 'Test message',
+                solution: 'Test solution',
+                icon: '📅',
+                customHtml: '<div class="test-content">Custom Content</div>'
+            };
+
+            const html = BookingErrors.renderError(errorInfo);
+
+            expect(html).toContain('<div class="test-content">Custom Content</div>');
+        });
+
+        test('should handle missing customHtml gracefully', () => {
+            const errorInfo = {
+                title: 'Test',
+                message: 'Test message',
+                solution: 'Test solution',
+                icon: '⚠️'
+                // No customHtml
+            };
+
+            const html = BookingErrors.renderError(errorInfo);
+
+            expect(html).toContain('Test message');
+            expect(html).not.toContain('undefined');
+        });
+    });
+
+    describe('show - Daily Dog Limit Integration', () => {
+        test('should display daily dog limit error modal with bookings list', () => {
+            const backendError = {
+                error: 'Dieser Hund wurde für heute bereits 2 Mal gebucht.',
+                error_type: 'daily_dog_limit',
+                existing_bookings: [
+                    { period_name: 'Vormittag', start_time: '09:00', end_time: '12:00' },
+                    { period_name: 'Nachmittag', start_time: '14:00', end_time: '16:30' }
+                ],
+                current_count: 2,
+                max_allowed: 2
+            };
+
+            BookingErrors.show(backendError);
+
+            const modal = document.getElementById('booking-error-modal');
+            expect(modal).not.toBeNull();
+            expect(modal.textContent).toContain('Tageslimit erreicht');
+            expect(modal.textContent).toContain('Vormittag');
+            expect(modal.textContent).toContain('09:00');
+            expect(modal.textContent).toContain('Nachmittag');
+        });
+
+        test('should display daily dog limit from API client error format', () => {
+            // Simulate how API client wraps errors
+            const apiError = new Error('Request failed');
+            apiError.data = {
+                error: 'Dieser Hund wurde für heute bereits 2 Mal gebucht.',
+                error_type: 'daily_dog_limit',
+                existing_bookings: [
+                    { period_name: 'Abend', start_time: '18:00', end_time: '20:00' }
+                ],
+                current_count: 1,
+                max_allowed: 1
+            };
+
+            BookingErrors.show(apiError);
+
+            const modal = document.getElementById('booking-error-modal');
+            expect(modal).not.toBeNull();
+            expect(modal.textContent).toContain('Abend');
+            expect(modal.textContent).toContain('18:00');
+            expect(modal.textContent).toContain('1 Buchungen');
+        });
+    });
+});

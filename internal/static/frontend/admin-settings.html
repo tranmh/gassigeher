@@ -92,6 +92,18 @@
                     </p>
                     <button class="btn" data-action="update-setting" data-key="auto_deactivation_days" data-element="auto-deactivation-days" style="margin-top: 10px;">Speichern</button>
                 </div>
+
+                <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;">
+
+                <!-- Max Bookings Per Dog Per Day -->
+                <div class="form-group">
+                    <label data-i18n="admin_dashboard.max_bookings_per_dog_per_day">Max. Buchungen pro Hund pro Tag</label>
+                    <input type="number" id="max-bookings-per-dog" min="1" max="10">
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        Wie oft kann ein Hund maximal pro Tag gebucht werden?
+                    </p>
+                    <button class="btn" data-action="update-setting" data-key="max_bookings_per_dog_per_day" data-element="max-bookings-per-dog" style="margin-top: 10px;">Speichern</button>
+                </div>
             </div>
 
             <!-- Registration Password Section -->
@@ -335,6 +347,7 @@
                 document.getElementById('booking-advance-days').value = settings['booking_advance_days'] || '14';
                 document.getElementById('cancellation-notice-hours').value = settings['cancellation_notice_hours'] || '12';
                 document.getElementById('auto-deactivation-days').value = settings['auto_deactivation_days'] || '365';
+                document.getElementById('max-bookings-per-dog').value = settings['max_bookings_per_dog_per_day'] || '2';
                 document.getElementById('registration-password').value = settings['registration_password'] || '';
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Laden der Einstellungen');

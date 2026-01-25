@@ -216,6 +216,19 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check daily booking limit for dog
+	canBook, currentCount, maxAllowed, err := h.bookingTimeService.CheckDailyBookingLimit(tenantID, req.DogID, req.Date)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to check booking limit")
+		return
+	}
+	if !canBook {
+		// Get existing bookings to show user what's already booked
+		existingBookings, _ := h.bookingRepo.GetDailyBookingsForDog(tenantID, req.DogID, req.Date)
+		h.respondDailyLimitError(w, r, tenantID, req.Date, existingBookings, currentCount, maxAllowed)
+		return
+	}
+
 	// Check if booking requires approval
 	requiresApproval, err := h.bookingTimeService.RequiresApproval(tenantID, req.ScheduledTime)
 	if err != nil {
@@ -659,6 +672,22 @@ func (h *BookingHandler) MoveBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check daily booking limit for dog at target date
+	// Uses special method that excludes the booking being moved for same-day moves
+	canBook, currentCount, maxAllowed, err := h.bookingTimeService.CheckDailyBookingLimitForMove(
+		tenantID, booking.DogID, req.Date, oldDate, booking.ID,
+	)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to check booking limit")
+		return
+	}
+	if !canBook {
+		// Get existing bookings at target date to show user what's already booked
+		existingBookings, _ := h.bookingRepo.GetDailyBookingsForDog(tenantID, booking.DogID, req.Date)
+		h.respondDailyLimitError(w, r, tenantID, req.Date, existingBookings, currentCount, maxAllowed)
+		return
+	}
+
 	// Update booking
 	booking.Date = req.Date
 	booking.ScheduledTime = req.ScheduledTime
@@ -972,6 +1001,58 @@ func (h *BookingHandler) RejectPendingBooking(w http.ResponseWriter, r *http.Req
 	respondJSON(w, http.StatusOK, map[string]string{
 		"message": "Booking rejected successfully",
 	})
+}
+
+// DailyLimitBookingInfo represents a booking with its period info for error display
+type DailyLimitBookingInfo struct {
+	PeriodName string `json:"period_name"`
+	StartTime  string `json:"start_time"`
+	EndTime    string `json:"end_time"`
+}
+
+// DailyLimitErrorResponse is the structured error response for daily booking limit exceeded
+type DailyLimitErrorResponse struct {
+	Error            string                  `json:"error"`
+	ErrorType        string                  `json:"error_type"`
+	ExistingBookings []DailyLimitBookingInfo `json:"existing_bookings"`
+	CurrentCount     int                     `json:"current_count"`
+	MaxAllowed       int                     `json:"max_allowed"`
+}
+
+// respondDailyLimitError sends a structured error response when daily booking limit is exceeded
+func (h *BookingHandler) respondDailyLimitError(w http.ResponseWriter, r *http.Request, tenantID int, date string, existingBookings []*models.Booking, currentCount, maxAllowed int) {
+	// Build list of existing bookings with their period info
+	var bookingInfos []DailyLimitBookingInfo
+	for _, booking := range existingBookings {
+		// Get period info for this booking's scheduled time
+		period, err := h.bookingTimeService.GetPeriodForTime(r.Context(), tenantID, date, booking.ScheduledTime)
+		if err == nil && period != nil {
+			bookingInfos = append(bookingInfos, DailyLimitBookingInfo{
+				PeriodName: period.RuleName,
+				StartTime:  period.StartTime,
+				EndTime:    period.EndTime,
+			})
+		} else {
+			// Fallback if period lookup fails
+			bookingInfos = append(bookingInfos, DailyLimitBookingInfo{
+				PeriodName: "Buchung",
+				StartTime:  booking.ScheduledTime,
+				EndTime:    "",
+			})
+		}
+	}
+
+	response := DailyLimitErrorResponse{
+		Error:            fmt.Sprintf("Dieser Hund wurde für heute bereits %d Mal gebucht. Weitere Buchungen sind für diesen Tag nicht möglich.", currentCount),
+		ErrorType:        "daily_dog_limit",
+		ExistingBookings: bookingInfos,
+		CurrentCount:     currentCount,
+		MaxAllowed:       maxAllowed,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusConflict)
+	json.NewEncoder(w).Encode(response)
 }
 
 // isUniqueConstraintError checks if an error is a unique constraint violation

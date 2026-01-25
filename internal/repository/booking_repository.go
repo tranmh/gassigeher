@@ -374,6 +374,59 @@ func (r *BookingRepository) CheckPeriodBooking(tenantID, dogID int, date, period
 	return booking, nil
 }
 
+// CountDailyBookingsForDog counts scheduled bookings for a dog on a specific date.
+// Only counts bookings with status 'scheduled' (not cancelled/completed).
+// TENANT ISOLATION: Always filters by tenant_id (tenant_id=0 for Simple-Mode)
+func (r *BookingRepository) CountDailyBookingsForDog(tenantID, dogID int, date string) (int, error) {
+	query := `
+		SELECT COUNT(*)
+		FROM bookings
+		WHERE tenant_id = ? AND dog_id = ? AND date = ? AND status = 'scheduled'
+	`
+
+	var count int
+	err := r.db.QueryRow(query, tenantID, dogID, date).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count daily bookings: %w", err)
+	}
+
+	return count, nil
+}
+
+// GetDailyBookingsForDog returns all scheduled bookings for a dog on a specific date.
+// Used to provide detailed error messages when daily booking limit is reached.
+// TENANT ISOLATION: Always filters by tenant_id (tenant_id=0 for Simple-Mode)
+func (r *BookingRepository) GetDailyBookingsForDog(tenantID, dogID int, date string) ([]*models.Booking, error) {
+	query := `
+		SELECT id, tenant_id, user_id, dog_id, date, scheduled_time, status,
+		       requires_approval, approval_status, created_at, updated_at
+		FROM bookings
+		WHERE tenant_id = ? AND dog_id = ? AND date = ? AND status = 'scheduled'
+		ORDER BY scheduled_time ASC
+	`
+
+	rows, err := r.db.Query(query, tenantID, dogID, date)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get daily bookings: %w", err)
+	}
+	defer rows.Close()
+
+	var bookings []*models.Booking
+	for rows.Next() {
+		var b models.Booking
+		err := rows.Scan(
+			&b.ID, &b.TenantID, &b.UserID, &b.DogID, &b.Date, &b.ScheduledTime, &b.Status,
+			&b.RequiresApproval, &b.ApprovalStatus, &b.CreatedAt, &b.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan booking: %w", err)
+		}
+		bookings = append(bookings, &b)
+	}
+
+	return bookings, nil
+}
+
 // AutoComplete marks all past scheduled bookings as completed
 func (r *BookingRepository) AutoComplete() (int, error) {
 	// Get current date and time in Europe/Berlin timezone for consistency

@@ -70,6 +70,12 @@ var settingConstraints = map[string]SettingConstraint{
 		Type:     "whatsapp_link",
 		Required: false, // Empty is allowed
 	},
+	"max_bookings_per_dog_per_day": {
+		Type:     "integer",
+		Min:      1,
+		Max:      10,
+		Required: true,
+	},
 }
 
 // ValidateSetting validates a setting value based on its key

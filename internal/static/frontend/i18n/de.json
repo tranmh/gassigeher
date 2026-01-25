@@ -375,6 +375,7 @@
     "booking_advance_days": "Buchungsvorlauf (Tage)",
     "cancellation_notice_hours": "Stornierungsfrist (Stunden)",
     "auto_deactivation_days": "Auto-Deaktivierung (Tage)",
+    "max_bookings_per_dog_per_day": "Max. Buchungen pro Hund pro Tag",
     "setting_updated": "Einstellung aktualisiert",
     "settings_description": "Systemweite Einstellungen verwalten"
   },

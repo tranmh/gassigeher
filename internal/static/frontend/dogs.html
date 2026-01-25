@@ -119,6 +119,26 @@
         <div class="modal-content">
             <span class="modal-close" data-action="close-booking-modal">&times;</span>
             <h2 id="modal-title">Spaziergang buchen</h2>
+            <!-- Daily Booking Limit Warning Banner -->
+            <div id="daily-limit-banner" class="alert alert-error" style="display: none; margin-bottom: 15px; padding: 15px; background: color-mix(in srgb, #dc3545 10%, white); border-left: 3px solid #dc3545; border-radius: 4px;">
+                <div style="display: flex; align-items: flex-start; gap: 10px;">
+                    <span style="font-size: 1.5rem;">🚫</span>
+                    <div style="flex: 1;">
+                        <strong id="daily-limit-title" style="color: #721c24;">Tageslimit erreicht</strong>
+                        <p id="daily-limit-message" style="margin: 5px 0 0 0; font-size: 0.9rem; color: #721c24;">
+                            Dieser Hund wurde heute bereits <span id="daily-limit-count">2</span>/<span id="daily-limit-max">2</span> Mal gebucht.
+                        </p>
+                        <!-- Show booked periods within the banner -->
+                        <div id="daily-limit-bookings" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(114, 28, 36, 0.2);">
+                            <strong style="font-size: 0.85rem; color: #721c24;">Bereits gebucht für:</strong>
+                            <ul id="daily-limit-bookings-list" style="margin: 5px 0 0 0; padding-left: 20px; font-size: 0.85rem; color: #721c24;"></ul>
+                        </div>
+                        <p style="margin: 10px 0 0 0; font-size: 0.85rem; color: #856404; background: #fff3cd; padding: 8px; border-radius: 4px;">
+                            💡 Wählen Sie ein anderes Datum oder einen anderen Hund aus.
+                        </p>
+                    </div>
+                </div>
+            </div>
             <form id="booking-form" data-action-submit="submit-booking">
                 <div class="form-group">
                     <label for="booking-date">Datum *</label>
@@ -796,6 +816,9 @@
             // Get UI elements for booked periods (used in both success and error paths)
             const bookedPeriodsInfo = document.getElementById('booked-periods-info');
             const bookedPeriodsList = document.getElementById('booked-periods-list');
+            const dailyLimitBanner = document.getElementById('daily-limit-banner');
+            const timeSelect = document.getElementById('booking-time');
+            const submitBtn = document.querySelector('#booking-form button[type="submit"]');
 
             try {
                 // Get dog ID from the form (if booking modal is open)
@@ -814,16 +837,61 @@
 
                 const slots = response.slots || [];
                 const bookedPeriods = response.booked_periods || [];
+                const dailyLimitReached = response.daily_limit_reached || false;
+                const dailyBookingCount = response.daily_booking_count || 0;
+                const dailyBookingLimit = response.daily_booking_limit || 2;
 
-                const timeSelect = document.getElementById('booking-time');
-                timeSelect.innerHTML = '<option value="">Bitte wählen...</option>';
+                // Handle daily booking limit
+                if (dailyLimitReached && dailyLimitBanner) {
+                    // Update banner text with count
+                    document.getElementById('daily-limit-count').textContent = dailyBookingCount;
+                    document.getElementById('daily-limit-max').textContent = dailyBookingLimit;
 
-                slots.forEach(slot => {
-                    const option = document.createElement('option');
-                    option.value = slot;
-                    option.textContent = slot;
-                    timeSelect.appendChild(option);
-                });
+                    // Populate the booked periods list within the banner
+                    const dailyLimitBookingsList = document.getElementById('daily-limit-bookings-list');
+                    dailyLimitBookingsList.innerHTML = '';
+                    bookedPeriods.forEach(period => {
+                        const li = document.createElement('li');
+                        li.textContent = `${period.rule_name}: ${period.start_time} - ${period.end_time}`;
+                        dailyLimitBookingsList.appendChild(li);
+                    });
+
+                    dailyLimitBanner.style.display = 'block';
+
+                    // Hide the separate booked periods info (it's now in the banner)
+                    if (bookedPeriodsInfo) {
+                        bookedPeriodsInfo.style.display = 'none';
+                    }
+
+                    // Disable time select and submit button
+                    timeSelect.disabled = true;
+                    timeSelect.innerHTML = '<option value="">Tageslimit erreicht</option>';
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.style.opacity = '0.5';
+                        submitBtn.style.cursor = 'not-allowed';
+                    }
+                } else {
+                    // Hide banner and enable form
+                    if (dailyLimitBanner) {
+                        dailyLimitBanner.style.display = 'none';
+                    }
+                    timeSelect.disabled = false;
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.style.opacity = '1';
+                        submitBtn.style.cursor = 'pointer';
+                    }
+
+                    // Populate time slots
+                    timeSelect.innerHTML = '<option value="">Bitte wählen...</option>';
+                    slots.forEach(slot => {
+                        const option = document.createElement('option');
+                        option.value = slot;
+                        option.textContent = slot;
+                        timeSelect.appendChild(option);
+                    });
+                }
 
                 // Display booked periods info if any
                 if (bookedPeriods.length > 0) {
@@ -961,10 +1029,14 @@
                 console.error('[BOOKING ERROR] Error message:', error.message);
                 console.error('[BOOKING ERROR] Error stack:', error.stack);
 
+                // Get dog name from currentDogs array for error context
+                const bookingDog = currentDogs.find(d => d.id === dogId);
+                const dogName = bookingDog?.name || 'Hund';
+
                 // Use BookingErrors for user-friendly error display
                 if (window.BookingErrors) {
                     const context = {
-                        dog: currentBookingDog?.name || 'Hund',
+                        dog: dogName,
                         date: date
                     };
                     BookingErrors.show(error, context);

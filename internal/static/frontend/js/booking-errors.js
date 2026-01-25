@@ -153,6 +153,14 @@ const BookingErrors = {
             },
             icon: '🔢'
         },
+        'daily_dog_limit': {
+            title: 'Tageslimit erreicht',
+            // message and solution are dynamically generated based on existing bookings
+            message: '',
+            solution: '',
+            icon: '📅',
+            customRender: true  // Flag to use custom rendering
+        },
 
         // Approval errors
         'approval_required': {
@@ -196,6 +204,13 @@ const BookingErrors = {
     parseError(error, context = {}) {
         let errorCode = 'server_error';
         let serverMessage = '';
+
+        // Check for structured daily_dog_limit error from backend
+        // API client attaches response data to error.data
+        const errorData = error?.data || error;
+        if (errorData?.error_type === 'daily_dog_limit') {
+            return this.getDailyDogLimitErrorInfo(errorData, context);
+        }
 
         // Extract error message from various formats
         if (typeof error === 'string') {
@@ -278,6 +293,50 @@ const BookingErrors = {
     },
 
     /**
+     * Get error info for daily dog booking limit exceeded
+     * Creates custom message with existing bookings list
+     * @param {Object} errorData - Structured error from backend with existing_bookings
+     * @param {Object} context - Additional context (dog name, date)
+     * @returns {Object} Error information with custom HTML content
+     */
+    getDailyDogLimitErrorInfo(errorData, context = {}) {
+        const errorDef = this.errorMap['daily_dog_limit'];
+        const existingBookings = errorData.existing_bookings || [];
+        const maxAllowed = errorData.max_allowed || 2;
+        const currentCount = errorData.current_count || existingBookings.length;
+
+        // Build the existing bookings list HTML
+        let bookingsListHtml = '';
+        if (existingBookings.length > 0) {
+            bookingsListHtml = '<div style="text-align: left; margin: 12px 0; padding: 12px; background: var(--bg-light, #f7fafc); border-radius: 6px;">';
+            bookingsListHtml += '<strong>Dieser Hund ist bereits gebucht für:</strong><ul style="margin: 8px 0 0 0; padding-left: 20px;">';
+            for (const booking of existingBookings) {
+                const periodName = this.escapeHtml(booking.period_name);
+                const startTime = this.escapeHtml(booking.start_time);
+                const endTime = this.escapeHtml(booking.end_time);
+                if (endTime) {
+                    bookingsListHtml += `<li>${periodName}: ${startTime} - ${endTime}</li>`;
+                } else {
+                    bookingsListHtml += `<li>${periodName}: ${startTime}</li>`;
+                }
+            }
+            bookingsListHtml += '</ul></div>';
+        }
+
+        // Build the main message
+        const message = `Dieser Hund wurde für heute bereits ${currentCount} Mal gebucht.`;
+        const solution = `Das Tageslimit von ${maxAllowed} Buchungen pro Hund ist erreicht. Weitere Buchungen sind für diesen Tag nicht möglich.`;
+
+        return {
+            ...errorDef,
+            code: 'daily_dog_limit',
+            message: message,
+            solution: solution,
+            customHtml: bookingsListHtml
+        };
+    },
+
+    /**
      * Show error modal with explanation and action button
      * @param {Object} errorInfo - Structured error information
      * @param {HTMLElement} container - Optional container for inline display
@@ -330,6 +389,9 @@ const BookingErrors = {
             }
         }
 
+        // Include custom HTML content if present (already sanitized in getDailyDogLimitErrorInfo)
+        const customHtml = errorInfo.customHtml || '';
+
         return `
             <div class="booking-error" style="
                 padding: 20px;
@@ -342,6 +404,7 @@ const BookingErrors = {
                 <h3 style="margin: 0 0 8px; color: var(--error-title, #c53030);">
                     ${safeTitle}
                 </h3>
+                ${customHtml}
                 <p style="margin: 0 0 12px; color: var(--text-dark);">
                     ${safeMessage}
                 </p>

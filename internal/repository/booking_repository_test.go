@@ -1751,3 +1751,145 @@ func TestBookingRepository_CheckPeriodBooking(t *testing.T) {
 		}
 	})
 }
+
+// TestBookingRepository_CountDailyBookingsForDog tests counting daily bookings for a dog
+func TestBookingRepository_CountDailyBookingsForDog(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewBookingRepository(db)
+	testDate := "2025-12-15"
+
+	t.Run("returns 0 when no bookings exist", func(t *testing.T) {
+		count, err := repo.CountDailyBookingsForDog(0, 1, testDate)
+		if err != nil {
+			t.Fatalf("CountDailyBookingsForDog() failed: %v", err)
+		}
+		if count != 0 {
+			t.Errorf("Expected 0, got %d", count)
+		}
+	})
+
+	t.Run("counts only scheduled bookings", func(t *testing.T) {
+		// Create 2 scheduled + 1 cancelled
+		booking1 := &models.Booking{TenantID: 0, UserID: 1, DogID: 1, Date: "2025-12-16", ScheduledTime: "09:00"}
+		booking2 := &models.Booking{TenantID: 0, UserID: 2, DogID: 1, Date: "2025-12-16", ScheduledTime: "14:00"}
+		booking3 := &models.Booking{TenantID: 0, UserID: 3, DogID: 1, Date: "2025-12-16", ScheduledTime: "18:00"}
+
+		repo.Create(booking1)
+		repo.Create(booking2)
+		repo.Create(booking3)
+
+		// Cancel booking3
+		repo.Cancel(booking3.ID, 0, nil)
+
+		count, err := repo.CountDailyBookingsForDog(0, 1, "2025-12-16")
+		if err != nil {
+			t.Fatalf("CountDailyBookingsForDog() failed: %v", err)
+		}
+		if count != 2 {
+			t.Errorf("Expected 2 (cancelled should not count), got %d", count)
+		}
+	})
+
+	t.Run("isolates by tenant_id", func(t *testing.T) {
+		// Create tenants first (foreign key constraint)
+		now := time.Now()
+		db.Exec(`INSERT INTO tenants (id, slug, name, contact_email, status, created_at, updated_at)
+		         VALUES (1, 'tenant1', 'Tenant 1', 'tenant1@test.com', 'active', ?, ?)`, now, now)
+		db.Exec(`INSERT INTO tenants (id, slug, name, contact_email, status, created_at, updated_at)
+		         VALUES (2, 'tenant2', 'Tenant 2', 'tenant2@test.com', 'active', ?, ?)`, now, now)
+
+		// Create users for each tenant
+		db.Exec(`INSERT INTO users (id, tenant_id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
+		         VALUES (10, 1, 'Tenant1', 'User', 't1user@test.com', 'hash', 1, 1, ?, ?, ?)`, now, now, now)
+		db.Exec(`INSERT INTO users (id, tenant_id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
+		         VALUES (11, 2, 'Tenant2', 'User', 't2user@test.com', 'hash', 1, 1, ?, ?, ?)`, now, now, now)
+
+		// Create dogs for each tenant
+		db.Exec(`INSERT INTO dogs (id, tenant_id, name, breed, color_id, is_available, created_at)
+		         VALUES (10, 1, 'Tenant1Dog', 'Lab', 1, 1, ?)`, now)
+		db.Exec(`INSERT INTO dogs (id, tenant_id, name, breed, color_id, is_available, created_at)
+		         VALUES (11, 2, 'Tenant2Dog', 'Lab', 1, 1, ?)`, now)
+
+		// Insert bookings directly to ensure proper tenant_id
+		db.Exec(`INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at, updated_at)
+		         VALUES (1, 10, 10, '2025-12-17', '09:00', 'scheduled', ?, ?)`, now, now)
+		db.Exec(`INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at, updated_at)
+		         VALUES (1, 10, 10, '2025-12-17', '14:00', 'scheduled', ?, ?)`, now, now)
+		db.Exec(`INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at, updated_at)
+		         VALUES (2, 11, 11, '2025-12-17', '09:00', 'scheduled', ?, ?)`, now, now)
+
+		// Tenant 1 should have 2 bookings for dog 10
+		count1, err := repo.CountDailyBookingsForDog(1, 10, "2025-12-17")
+		if err != nil {
+			t.Fatalf("CountDailyBookingsForDog() for tenant 1 failed: %v", err)
+		}
+		// Tenant 2 should have 1 booking for dog 11
+		count2, err := repo.CountDailyBookingsForDog(2, 11, "2025-12-17")
+		if err != nil {
+			t.Fatalf("CountDailyBookingsForDog() for tenant 2 failed: %v", err)
+		}
+
+		if count1 != 2 {
+			t.Errorf("Tenant 1: expected 2, got %d", count1)
+		}
+		if count2 != 1 {
+			t.Errorf("Tenant 2: expected 1, got %d", count2)
+		}
+
+		// Cross-tenant check: Tenant 1 should not see tenant 2's dog
+		crossCount, err := repo.CountDailyBookingsForDog(1, 11, "2025-12-17")
+		if err != nil {
+			t.Fatalf("CountDailyBookingsForDog() cross-tenant failed: %v", err)
+		}
+		if crossCount != 0 {
+			t.Errorf("Cross-tenant: expected 0 (tenant isolation), got %d", crossCount)
+		}
+	})
+
+	t.Run("isolates by dog_id", func(t *testing.T) {
+		// Dog 2 has 3 bookings, Dog 3 has 1 booking
+		repo.Create(&models.Booking{TenantID: 0, UserID: 1, DogID: 2, Date: "2025-12-18", ScheduledTime: "09:00"})
+		repo.Create(&models.Booking{TenantID: 0, UserID: 2, DogID: 2, Date: "2025-12-18", ScheduledTime: "14:00"})
+		repo.Create(&models.Booking{TenantID: 0, UserID: 3, DogID: 2, Date: "2025-12-18", ScheduledTime: "18:00"})
+		repo.Create(&models.Booking{TenantID: 0, UserID: 1, DogID: 3, Date: "2025-12-18", ScheduledTime: "09:00"})
+
+		countDog2, err := repo.CountDailyBookingsForDog(0, 2, "2025-12-18")
+		if err != nil {
+			t.Fatalf("CountDailyBookingsForDog() for dog 2 failed: %v", err)
+		}
+		countDog3, err := repo.CountDailyBookingsForDog(0, 3, "2025-12-18")
+		if err != nil {
+			t.Fatalf("CountDailyBookingsForDog() for dog 3 failed: %v", err)
+		}
+
+		if countDog2 != 3 {
+			t.Errorf("Dog 2: expected 3, got %d", countDog2)
+		}
+		if countDog3 != 1 {
+			t.Errorf("Dog 3: expected 1, got %d", countDog3)
+		}
+	})
+
+	t.Run("isolates by date", func(t *testing.T) {
+		repo.Create(&models.Booking{TenantID: 0, UserID: 1, DogID: 4, Date: "2025-12-19", ScheduledTime: "09:00"})
+		repo.Create(&models.Booking{TenantID: 0, UserID: 2, DogID: 4, Date: "2025-12-20", ScheduledTime: "09:00"})
+
+		count19, err := repo.CountDailyBookingsForDog(0, 4, "2025-12-19")
+		if err != nil {
+			t.Fatalf("CountDailyBookingsForDog() for Dec 19 failed: %v", err)
+		}
+		count20, err := repo.CountDailyBookingsForDog(0, 4, "2025-12-20")
+		if err != nil {
+			t.Fatalf("CountDailyBookingsForDog() for Dec 20 failed: %v", err)
+		}
+
+		if count19 != 1 {
+			t.Errorf("Dec 19: expected 1, got %d", count19)
+		}
+		if count20 != 1 {
+			t.Errorf("Dec 20: expected 1, got %d", count20)
+		}
+	})
+}

@@ -359,6 +359,7 @@
     "booking_advance_days": "Booking Advance (days)",
     "cancellation_notice_hours": "Cancellation Notice (hours)",
     "auto_deactivation_days": "Auto Deactivation (days)",
+    "max_bookings_per_dog_per_day": "Max Bookings Per Dog Per Day",
     "setting_updated": "Setting updated",
     "settings_description": "Manage system-wide settings"
   },

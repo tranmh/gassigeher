@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -1513,4 +1514,247 @@ func TestBookingHandler_UniqueConstraintErrorMessages(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestBookingHandler_DailyBookingLimit tests the max bookings per dog per day feature
+func TestBookingHandler_DailyBookingLimit(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewBookingHandler(db, cfg)
+
+	// Create test users and dog
+	authService := services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours)
+	hash, _ := authService.HashPassword("Test1234")
+
+	userID1 := testutil.SeedTestUser(t, db, "limit1@example.com", "Limit User 1", "green")
+	userID2 := testutil.SeedTestUser(t, db, "limit2@example.com", "Limit User 2", "green")
+	userID3 := testutil.SeedTestUser(t, db, "limit3@example.com", "Limit User 3", "green")
+	dogID := testutil.SeedTestDog(t, db, "Limit Dog", "Labrador", "green")
+
+	// Update users to verified and active
+	db.Exec("UPDATE users SET is_verified = 1, is_active = 1, password_hash = ? WHERE id = ?", hash, userID1)
+	db.Exec("UPDATE users SET is_verified = 1, is_active = 1, password_hash = ? WHERE id = ?", hash, userID2)
+	db.Exec("UPDATE users SET is_verified = 1, is_active = 1, password_hash = ? WHERE id = ?", hash, userID3)
+
+	// Set default limit to 2
+	settingsRepo := repository.NewSettingsRepository(db)
+	settingsRepo.Upsert(0, "max_bookings_per_dog_per_day", "2")
+
+	testDate := time.Now().AddDate(0, 0, 7).Format("2006-01-02") // 7 days from now
+
+	t.Run("blocks third booking when limit is 2", func(t *testing.T) {
+		// Create 2 existing bookings on test date (in different periods)
+		// Morning booking at 09:00
+		testutil.SeedTestBooking(t, db, userID1, dogID, testDate, "09:00", "scheduled")
+		// Evening booking at 18:00
+		testutil.SeedTestBooking(t, db, userID2, dogID, testDate, "18:00", "scheduled")
+
+		// Third booking in afternoon (different period) should fail due to daily limit
+		reqBody := map[string]interface{}{
+			"dog_id":         dogID,
+			"date":           testDate,
+			"scheduled_time": "14:30",
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/bookings", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), userID3, "limit3@example.com", false)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateBooking(rec, req)
+
+		if rec.Code != http.StatusConflict {
+			t.Errorf("Expected 409 Conflict, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		// Verify error message mentions daily booking limit
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+		if response["error"] == nil || response["error"] == "" {
+			t.Error("Expected error message in response")
+		}
+		errorMsg, _ := response["error"].(string)
+		if !strings.Contains(errorMsg, "gebucht") && !strings.Contains(errorMsg, "Buchungen") {
+			t.Errorf("Expected error to contain 'gebucht' or 'Buchungen', got: %s", errorMsg)
+		}
+		// Verify structured error includes max_allowed
+		if response["max_allowed"] == nil {
+			t.Error("Expected max_allowed in structured error response")
+		}
+	})
+
+	t.Run("allows booking after cancellation", func(t *testing.T) {
+		testDate2 := time.Now().AddDate(0, 0, 8).Format("2006-01-02")
+
+		// Create 2 bookings in different periods, cancel one
+		bookingID := testutil.SeedTestBooking(t, db, userID1, dogID, testDate2, "09:00", "scheduled")  // morning
+		testutil.SeedTestBooking(t, db, userID2, dogID, testDate2, "18:00", "scheduled")  // evening
+
+		// Cancel morning booking
+		db.Exec("UPDATE bookings SET status = 'cancelled' WHERE id = ?", bookingID)
+
+		// New booking in afternoon should succeed (only 1 scheduled, cancelled doesn't count)
+		reqBody := map[string]interface{}{
+			"dog_id":         dogID,
+			"date":           testDate2,
+			"scheduled_time": "14:30",
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/bookings", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), userID3, "limit3@example.com", false)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateBooking(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Errorf("Expected 201 Created, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("respects custom limit setting", func(t *testing.T) {
+		testDate3 := time.Now().AddDate(0, 0, 9).Format("2006-01-02")
+
+		// Set custom limit to 3
+		settingsRepo.Upsert(0, "max_bookings_per_dog_per_day", "3")
+
+		// Create 2 bookings in different periods
+		testutil.SeedTestBooking(t, db, userID1, dogID, testDate3, "09:00", "scheduled")  // morning
+		testutil.SeedTestBooking(t, db, userID2, dogID, testDate3, "18:00", "scheduled")  // evening
+
+		// Third booking in afternoon should succeed (limit is 3)
+		reqBody := map[string]interface{}{
+			"dog_id":         dogID,
+			"date":           testDate3,
+			"scheduled_time": "14:30",
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/bookings", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), userID3, "limit3@example.com", false)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.CreateBooking(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Errorf("Expected 201 Created with limit 3, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		// Reset limit to 2 for other tests
+		settingsRepo.Upsert(0, "max_bookings_per_dog_per_day", "2")
+	})
+}
+
+// TestBookingHandler_MoveBookingDailyLimit tests move booking respects daily limit
+func TestBookingHandler_MoveBookingDailyLimit(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewBookingHandler(db, cfg)
+
+	// Create test users and dog
+	authService := services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours)
+	hash, _ := authService.HashPassword("Test1234")
+
+	adminID := testutil.SeedTestUser(t, db, "moveadmin@example.com", "Move Admin", "green")
+	userID1 := testutil.SeedTestUser(t, db, "moveuser1@example.com", "Move User 1", "green")
+	userID2 := testutil.SeedTestUser(t, db, "moveuser2@example.com", "Move User 2", "green")
+	userID3 := testutil.SeedTestUser(t, db, "moveuser3@example.com", "Move User 3", "green")
+	dogID := testutil.SeedTestDog(t, db, "Move Dog", "Shepherd", "green")
+
+	// Update admin and users
+	db.Exec("UPDATE users SET is_verified = 1, is_active = 1, is_admin = 1, password_hash = ? WHERE id = ?", hash, adminID)
+	db.Exec("UPDATE users SET is_verified = 1, is_active = 1, password_hash = ? WHERE id = ?", hash, userID1)
+	db.Exec("UPDATE users SET is_verified = 1, is_active = 1, password_hash = ? WHERE id = ?", hash, userID2)
+	db.Exec("UPDATE users SET is_verified = 1, is_active = 1, password_hash = ? WHERE id = ?", hash, userID3)
+
+	// Set default limit to 2
+	settingsRepo := repository.NewSettingsRepository(db)
+	settingsRepo.Upsert(0, "max_bookings_per_dog_per_day", "2")
+
+	sourceDate := time.Now().AddDate(0, 0, 10).Format("2006-01-02")
+	targetDate := time.Now().AddDate(0, 0, 11).Format("2006-01-02")
+
+	t.Run("blocks move to day already at limit", func(t *testing.T) {
+		// Create booking to move on source date
+		bookingID := testutil.SeedTestBooking(t, db, userID1, dogID, sourceDate, "09:00", "scheduled")
+
+		// Create 2 bookings on target date (at limit) - use morning and evening, leaving afternoon free
+		testutil.SeedTestBooking(t, db, userID2, dogID, targetDate, "09:00", "scheduled")  // morning
+		testutil.SeedTestBooking(t, db, userID3, dogID, targetDate, "18:00", "scheduled")  // evening
+
+		// Try to move to target date in afternoon (free period, but daily limit exceeded)
+		reqBody := map[string]interface{}{
+			"date":           targetDate,
+			"scheduled_time": "14:30",
+			"reason":         "Test move",
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/bookings/%d/move", bookingID), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), adminID, "moveadmin@example.com", true)
+		req = req.WithContext(ctx)
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", bookingID)})
+
+		rec := httptest.NewRecorder()
+		handler.MoveBooking(rec, req)
+
+		if rec.Code != http.StatusConflict {
+			t.Errorf("Expected 409 Conflict, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		// Verify error is from daily limit, not period conflict
+		var response map[string]interface{}
+		json.Unmarshal(rec.Body.Bytes(), &response)
+		errorMsg, _ := response["error"].(string)
+		if !strings.Contains(errorMsg, "gebucht") && !strings.Contains(errorMsg, "Buchungen") {
+			t.Errorf("Expected error to contain 'gebucht' or 'Buchungen', got: %s", errorMsg)
+		}
+		// Verify structured error includes max_allowed
+		if response["max_allowed"] == nil {
+			t.Error("Expected max_allowed in structured error response")
+		}
+	})
+
+	t.Run("allows same-day move at limit", func(t *testing.T) {
+		sameDayDate := time.Now().AddDate(0, 0, 12).Format("2006-01-02")
+
+		// Create 2 bookings on same date (at limit) - use morning and evening
+		bookingID := testutil.SeedTestBooking(t, db, userID1, dogID, sameDayDate, "09:00", "scheduled")  // morning
+		testutil.SeedTestBooking(t, db, userID2, dogID, sameDayDate, "18:00", "scheduled")  // evening
+
+		// Move first booking to different time in afternoon (free period)
+		reqBody := map[string]interface{}{
+			"date":           sameDayDate,
+			"scheduled_time": "14:30",
+			"reason":         "Same-day move test",
+		}
+
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/api/bookings/%d/move", bookingID), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), adminID, "moveadmin@example.com", true)
+		req = req.WithContext(ctx)
+		req = mux.SetURLVars(req, map[string]string{"id": fmt.Sprintf("%d", bookingID)})
+
+		rec := httptest.NewRecorder()
+		handler.MoveBooking(rec, req)
+
+		// Should succeed because the moved booking doesn't count against itself
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected 200 OK for same-day move, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+	})
 }

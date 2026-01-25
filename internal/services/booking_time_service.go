@@ -314,6 +314,56 @@ func (s *BookingTimeService) CheckPeriodAvailability(
 	return true, nil, period, nil
 }
 
+// CheckDailyBookingLimit checks if a dog can accept another booking on the given date.
+// Returns: canBook, currentCount, maxAllowed, error
+// TENANT ISOLATION: Uses tenant-specific setting and booking count.
+func (s *BookingTimeService) CheckDailyBookingLimit(tenantID, dogID int, date string) (bool, int, int, error) {
+	// Get setting (default: 2)
+	maxAllowed := 2
+	if setting, err := s.settingsRepo.Get(tenantID, "max_bookings_per_dog_per_day"); err == nil && setting != nil {
+		if val, parseErr := strconv.Atoi(setting.Value); parseErr == nil && val > 0 {
+			maxAllowed = val
+		}
+	}
+
+	// Count existing scheduled bookings
+	currentCount, err := s.bookingRepo.CountDailyBookingsForDog(tenantID, dogID, date)
+	if err != nil {
+		return false, 0, maxAllowed, err
+	}
+
+	return currentCount < maxAllowed, currentCount, maxAllowed, nil
+}
+
+// CheckDailyBookingLimitForMove checks the limit for moving a booking.
+// Excludes the booking being moved from the count when checking the target date.
+// TENANT ISOLATION: Uses tenant-specific setting and booking count.
+func (s *BookingTimeService) CheckDailyBookingLimitForMove(tenantID, dogID int, targetDate, sourceDate string, bookingID int) (bool, int, int, error) {
+	// Get setting (default: 2)
+	maxAllowed := 2
+	if setting, err := s.settingsRepo.Get(tenantID, "max_bookings_per_dog_per_day"); err == nil && setting != nil {
+		if val, parseErr := strconv.Atoi(setting.Value); parseErr == nil && val > 0 {
+			maxAllowed = val
+		}
+	}
+
+	// Count existing scheduled bookings on target date
+	currentCount, err := s.bookingRepo.CountDailyBookingsForDog(tenantID, dogID, targetDate)
+	if err != nil {
+		return false, 0, maxAllowed, err
+	}
+
+	// If moving within the same day, the booking being moved doesn't count against itself
+	if targetDate == sourceDate {
+		currentCount-- // Exclude the booking being moved
+		if currentCount < 0 {
+			currentCount = 0
+		}
+	}
+
+	return currentCount < maxAllowed, currentCount, maxAllowed, nil
+}
+
 // FilterSlotsForDog filters available slots to exclude periods already booked by the dog.
 // Returns: booked periods for this dog, filtered available slots, error
 // TENANT ISOLATION: All lookups scoped to tenant_id.
