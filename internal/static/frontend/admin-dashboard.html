@@ -28,6 +28,7 @@
                         <a href="#">Buchungen</a>
                         <div class="nav-dropdown-menu">
                             <a href="/admin-bookings.html">📅 Alle Buchungen</a>
+                            <a href="/admin-calendar.html">📆 Kalenderübersicht</a>
                             <a href="/admin-booking-approvals.html">✓ Genehmigungen</a>
                             <a href="/admin-booking-times.html">⏰ Buchungszeiten</a>
                             <a href="/admin-blocked-dates.html">🚫 Gesperrte Tage</a>
@@ -65,46 +66,77 @@
             <div id="alert-container"></div>
 
             <!-- Statistics Grid -->
+            <style>
+                .stat-tile-link {
+                    text-decoration: none;
+                    display: block;
+                    transition: transform 0.2s ease, box-shadow 0.2s ease;
+                    border-radius: 8px;
+                }
+                .stat-tile-link:hover {
+                    transform: translateY(-4px);
+                    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+                }
+                .stat-tile-link .card {
+                    margin: 0;
+                }
+            </style>
             <div id="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 30px 0;">
-                <div class="card" style="text-align: center; padding: 25px; background: linear-gradient(135deg, var(--color-primary, #82b965) 0%, var(--color-secondary, #6fa050) 100%); color: white;">
-                    <h2 style="margin: 0 0 10px 0; font-size: 2.5rem;" id="stat-total-walks">-</h2>
-                    <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;" data-i18n="admin_dashboard.total_walks">Gesamt Spaziergänge</p>
-                </div>
+                <a href="/admin-bookings.html?status=completed" class="stat-tile-link" title="Alle abgeschlossenen Buchungen anzeigen">
+                    <div class="card" style="text-align: center; padding: 25px; background: linear-gradient(135deg, var(--color-primary, #82b965) 0%, var(--color-secondary, #6fa050) 100%); color: white;">
+                        <h2 style="margin: 0 0 10px 0; font-size: 2.5rem;" id="stat-total-walks">-</h2>
+                        <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;" data-i18n="admin_dashboard.total_walks">Gesamt Spaziergänge</p>
+                    </div>
+                </a>
 
-                <div class="card" style="text-align: center; padding: 25px; background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: white;">
-                    <h2 style="margin: 0 0 10px 0; font-size: 2.5rem;" id="stat-upcoming-today">-</h2>
-                    <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;" data-i18n="admin_dashboard.upcoming_today">Heute anstehend</p>
-                </div>
+                <a href="#" id="tile-upcoming-today" class="stat-tile-link" title="Heutige Buchungen anzeigen">
+                    <div class="card" style="text-align: center; padding: 25px; background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: white;">
+                        <h2 style="margin: 0 0 10px 0; font-size: 2.5rem;" id="stat-upcoming-today">-</h2>
+                        <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;" data-i18n="admin_dashboard.upcoming_today">Heute anstehend</p>
+                    </div>
+                </a>
 
-                <div class="card" style="text-align: center; padding: 25px; background: linear-gradient(135deg, #28a745 0%, #218838 100%); color: white;">
-                    <h2 style="margin: 0 0 10px 0; font-size: 2.5rem;" id="stat-active-users">-</h2>
-                    <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;" data-i18n="admin_dashboard.active_users">Aktive Benutzer</p>
-                </div>
+                <a href="/admin-users.html?filter=active" class="stat-tile-link" title="Alle aktiven Benutzer anzeigen">
+                    <div class="card" style="text-align: center; padding: 25px; background: linear-gradient(135deg, #28a745 0%, #218838 100%); color: white;">
+                        <h2 style="margin: 0 0 10px 0; font-size: 2.5rem;" id="stat-active-users">-</h2>
+                        <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;" data-i18n="admin_dashboard.active_users">Aktive Benutzer</p>
+                    </div>
+                </a>
 
-                <div class="card" style="text-align: center; padding: 25px; background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%); color: #26272b;">
-                    <h2 style="margin: 0 0 10px 0; font-size: 2.5rem;" id="stat-inactive-users">-</h2>
-                    <p style="margin: 0; font-size: 0.9rem; opacity: 0.8;" data-i18n="admin_dashboard.inactive_users">Inaktive Benutzer</p>
-                </div>
+                <a href="/admin-users.html?filter=inactive" class="stat-tile-link" title="Alle inaktiven Benutzer anzeigen">
+                    <div class="card" style="text-align: center; padding: 25px; background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%); color: #26272b;">
+                        <h2 style="margin: 0 0 10px 0; font-size: 2.5rem;" id="stat-inactive-users">-</h2>
+                        <p style="margin: 0; font-size: 0.9rem; opacity: 0.8;" data-i18n="admin_dashboard.inactive_users">Inaktive Benutzer</p>
+                    </div>
+                </a>
 
-                <div class="card" style="text-align: center; padding: 25px;">
-                    <h2 style="margin: 0 0 10px 0; font-size: 2.5rem; color: var(--color-primary, #82b965);" id="stat-available-dogs">-</h2>
-                    <p style="margin: 0; font-size: 0.9rem; color: #666;" data-i18n="admin_dashboard.available_dogs">Verfügbare Hunde</p>
-                </div>
+                <a href="/admin-dogs.html?filter=available" class="stat-tile-link" title="Alle verfügbaren Hunde anzeigen">
+                    <div class="card" style="text-align: center; padding: 25px;">
+                        <h2 style="margin: 0 0 10px 0; font-size: 2.5rem; color: var(--color-primary, #82b965);" id="stat-available-dogs">-</h2>
+                        <p style="margin: 0; font-size: 0.9rem; color: #666;" data-i18n="admin_dashboard.available_dogs">Verfügbare Hunde</p>
+                    </div>
+                </a>
 
-                <div class="card" style="text-align: center; padding: 25px;">
-                    <h2 style="margin: 0 0 10px 0; font-size: 2.5rem; color: #dc3545;" id="stat-unavailable-dogs">-</h2>
-                    <p style="margin: 0; font-size: 0.9rem; color: #666;" data-i18n="admin_dashboard.unavailable_dogs">Nicht verfügbare Hunde</p>
-                </div>
+                <a href="/admin-dogs.html?filter=unavailable" class="stat-tile-link" title="Alle nicht verfügbaren Hunde anzeigen">
+                    <div class="card" style="text-align: center; padding: 25px;">
+                        <h2 style="margin: 0 0 10px 0; font-size: 2.5rem; color: #dc3545;" id="stat-unavailable-dogs">-</h2>
+                        <p style="margin: 0; font-size: 0.9rem; color: #666;" data-i18n="admin_dashboard.unavailable_dogs">Nicht verfügbare Hunde</p>
+                    </div>
+                </a>
 
-                <div class="card" style="text-align: center; padding: 25px;">
-                    <h2 style="margin: 0 0 10px 0; font-size: 2.5rem; color: #17a2b8;" id="stat-experience-reqs">-</h2>
-                    <p style="margin: 0; font-size: 0.9rem; color: #666;" data-i18n="admin_dashboard.pending_color_requests">Farben-Anfragen</p>
-                </div>
+                <a href="/admin-color-requests.html" class="stat-tile-link" title="Alle Farb-Anfragen anzeigen">
+                    <div class="card" style="text-align: center; padding: 25px;">
+                        <h2 style="margin: 0 0 10px 0; font-size: 2.5rem; color: #17a2b8;" id="stat-experience-reqs">-</h2>
+                        <p style="margin: 0; font-size: 0.9rem; color: #666;" data-i18n="admin_dashboard.pending_color_requests">Farben-Anfragen</p>
+                    </div>
+                </a>
 
-                <div class="card" style="text-align: center; padding: 25px;">
-                    <h2 style="margin: 0 0 10px 0; font-size: 2.5rem; color: #ffc107;" id="stat-reactivation-reqs">-</h2>
-                    <p style="margin: 0; font-size: 0.9rem; color: #666;" data-i18n="admin_dashboard.pending_reactivation_requests">Reaktivierungsanfragen</p>
-                </div>
+                <a href="/admin-reactivation-requests.html" class="stat-tile-link" title="Alle Reaktivierungsanfragen anzeigen">
+                    <div class="card" style="text-align: center; padding: 25px;">
+                        <h2 style="margin: 0 0 10px 0; font-size: 2.5rem; color: #ffc107;" id="stat-reactivation-reqs">-</h2>
+                        <p style="margin: 0; font-size: 0.9rem; color: #666;" data-i18n="admin_dashboard.pending_reactivation_requests">Reaktivierungsanfragen</p>
+                    </div>
+                </a>
             </div>
 
             <!-- Plan Usage Widget (SaaS) -->
@@ -196,6 +228,10 @@
 
             // Initialize impersonation banner (shows if impersonating)
             await ImpersonationBanner.init();
+
+            // Set today's date for the "Today's Walks" tile link
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('tile-upcoming-today').href = `/admin-bookings.html?status=scheduled&date_from=${today}&date_to=${today}`;
 
             loadStats();
             loadActivity();

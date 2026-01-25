@@ -208,7 +208,7 @@ func (r *BookingRepository) FindAll(filter *models.BookingFilterRequest) ([]*mod
 		}
 	}
 
-	query += " ORDER BY date ASC, scheduled_time ASC"
+	query += " ORDER BY date DESC, scheduled_time DESC"
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
