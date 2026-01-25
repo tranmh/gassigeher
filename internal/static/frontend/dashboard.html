@@ -72,8 +72,8 @@
     </main>
 
     <!-- Booking Modal (for quick booking from dog page) -->
-    <div id="booking-modal" class="modal hidden" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-        <div class="card" style="max-width: 500px; margin: 20px;">
+    <div id="booking-modal" class="modal hidden" style="display: none;">
+        <div class="modal-content">
             <h3 data-i18n="bookings.book_dog">Hund buchen</h3>
             <form id="booking-form">
                 <div class="form-group">
@@ -84,7 +84,7 @@
                     <label data-i18n="bookings.scheduled_time">Geplante Uhrzeit</label>
                     <input type="time" id="booking-time" required>
                 </div>
-                <div style="display: flex; gap: 10px;">
+                <div class="form-actions">
                     <button type="submit" class="btn" data-i18n="bookings.confirm_booking">Buchung bestätigen</button>
                     <button type="button" class="btn btn-secondary" data-action="close-booking-modal" data-i18n="common.cancel">Abbrechen</button>
                 </div>
@@ -93,9 +93,9 @@
     </div>
 
     <!-- Walk Report Modal -->
-    <div id="walk-report-modal" class="modal hidden" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto;">
-        <div class="card" style="max-width: 600px; margin: 20px auto; position: relative;">
-            <button type="button" data-action="close-walk-report-modal" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
+    <div id="walk-report-modal" class="modal hidden" style="display: none;">
+        <div class="modal-content" style="max-width: 600px;">
+            <button type="button" class="modal-close" data-action="close-walk-report-modal">&times;</button>
             <h3 data-i18n="walkReport.title">Spaziergang-Bericht</h3>
 
             <form id="walk-report-form" data-action-submit="submit-walk-report">
@@ -157,7 +157,7 @@
                     </div>
                 </div>
 
-                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <div class="form-actions">
                     <button type="submit" class="btn" id="report-submit-btn" data-i18n="walkReport.submit">Bericht speichern</button>
                     <button type="button" class="btn btn-secondary" data-action="close-walk-report-modal" data-i18n="common.cancel">Abbrechen</button>
                 </div>
@@ -166,12 +166,12 @@
     </div>
 
     <!-- View Report Modal (read-only) -->
-    <div id="view-report-modal" class="modal hidden" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto;">
-        <div class="card" style="max-width: 600px; margin: 20px auto; position: relative;">
-            <button type="button" data-action="close-view-report-modal" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
+    <div id="view-report-modal" class="modal hidden" style="display: none;">
+        <div class="modal-content" style="max-width: 600px;">
+            <button type="button" class="modal-close" data-action="close-view-report-modal">&times;</button>
             <h3 data-i18n="walkReport.title">Spaziergang-Bericht</h3>
             <div id="view-report-content"></div>
-            <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <div class="form-actions">
                 <button type="button" class="btn btn-secondary" data-action="close-view-report-modal" data-i18n="common.close">Schließen</button>
             </div>
         </div>

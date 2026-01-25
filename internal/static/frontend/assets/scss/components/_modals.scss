@@ -1,0 +1,86 @@
+// ============================================================================
+// Modal Component
+// ============================================================================
+// Consistent modal styling with scroll support for all screen sizes
+
+@use '../abstracts' as *;
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: $z-index-modal;
+    padding: $spacing-md;
+    box-sizing: border-box;
+}
+
+.modal-content {
+    background-color: $card-bg;
+    padding: $spacing-lg;
+    border-radius: $border-radius;
+    max-width: 500px;
+    width: 100%;
+    max-height: 90vh;           // KEY FIX: Limits modal height to viewport
+    overflow-y: auto;           // KEY FIX: Enables scrolling when content exceeds height
+    position: relative;
+    box-shadow: $shadow-xl;
+    border: 1px solid $border-light;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $spacing-md;
+    padding-bottom: $spacing-sm;
+    border-bottom: 1px solid $border-light;
+
+    h3 {
+        margin: 0;
+    }
+}
+
+.modal-close {
+    position: absolute;
+    right: 15px;
+    top: 15px;
+    font-size: 28px;
+    font-weight: bold;
+    color: #666;
+    cursor: pointer;
+    background: none;
+    border: none;
+    transition: color $transition-fast;
+
+    &:hover {
+        color: $error-red;
+    }
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: $spacing-md;
+
+    button {
+        flex: 1;
+    }
+}
+
+// Mobile responsiveness
+@media (max-width: $breakpoint-mobile) {
+    .modal {
+        padding: $spacing-sm;
+    }
+
+    .modal-content {
+        max-height: calc(100vh - 20px);
+        padding: $spacing-md;
+    }
+}

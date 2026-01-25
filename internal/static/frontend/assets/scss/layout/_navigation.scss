@@ -106,7 +106,7 @@ nav {
     background: linear-gradient(180deg, $header-bg 0%, $primary-green 100%);
     box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
     @include transition(left);
-    z-index: $z-index-modal;
+    z-index: $z-index-nav-mobile;
     overflow-y: auto;
     padding-top: 60px;
 
@@ -170,7 +170,7 @@ nav {
     position: fixed;
     @include absolute-fill;
     background: rgba(0, 0, 0, 0.5);
-    z-index: $z-index-modal-overlay;
+    z-index: $z-index-nav-overlay;
 
     &.active {
       display: block;

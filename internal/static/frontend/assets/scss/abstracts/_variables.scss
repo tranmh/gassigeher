@@ -110,10 +110,16 @@ $transition-slow: 0.5s ease;
 // Z-Index Scale
 // ----------------------------------------------------------------------------
 // Organized z-index values to prevent conflicts
-$z-index-dropdown: 1001;
-$z-index-sticky: 1000;
-$z-index-modal-overlay: 998;
-$z-index-modal: 999;
+// Layer 1: Navigation elements
+$z-index-sticky: 1000;           // Sticky header
+$z-index-dropdown: 1001;         // Desktop dropdown menus
+// Layer 2: Mobile navigation (above header, below modals)
+$z-index-nav-overlay: 1050;      // Mobile nav dark overlay
+$z-index-nav-mobile: 1051;       // Mobile nav sidebar
+// Layer 3: Modals (above all navigation)
+$z-index-modal-overlay: 1100;    // Modal backdrop (semantic alias)
+$z-index-modal: 1100;            // Modal dialogs
+// Layer 4: Notifications (always on top)
 $z-index-toast: 9999;
 
 // ----------------------------------------------------------------------------
