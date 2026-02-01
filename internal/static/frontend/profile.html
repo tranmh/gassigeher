@@ -205,6 +205,52 @@
                 </button>
             </div>
 
+            <!-- Calendar Sync -->
+            <div class="card" style="border-left: 4px solid #007bff;">
+                <h3 style="color: #007bff;">📅 Kalender-Synchronisation</h3>
+                <p style="margin-bottom: 15px;">Synchronisiere deine gebuchten Spaziergänge mit deinem Kalender (Google Calendar, Apple Calendar, Outlook).</p>
+                
+                <div id="calendar-sync-content">
+                    <div id="calendar-loading" style="display: flex; align-items: center; gap: 10px; color: #666;">
+                        <span class="spinner-small"></span> Lade...
+                    </div>
+                    
+                    <div id="calendar-url-section" style="display: none;">
+                        <div class="form-group">
+                            <label>Kalender-Link</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="text" id="calendar-url" readonly 
+                                       style="flex: 1; background: #f0f0f0; font-family: monospace; font-size: 0.85rem;">
+                                <button class="btn btn-secondary" data-action="copy-calendar-url" title="Link kopieren">
+                                    📋 Kopieren
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 15px;">
+                            <p style="font-size: 0.85rem; color: #666; margin-bottom: 10px;">
+                                <strong>So fügst du den Kalender hinzu:</strong>
+                            </p>
+                            <ol style="font-size: 0.85rem; color: #666; margin-left: 20px; line-height: 1.6;">
+                                <li><strong>Google Calendar:</strong> Einstellungen → "Kalender hinzufügen" → "Per URL" → Link einfügen</li>
+                                <li><strong>Apple Calendar:</strong> Ablage → "Neues Kalenderabonnement" → Link einfügen</li>
+                                <li><strong>Outlook:</strong> "Kalender hinzufügen" → "Aus dem Internet abonnieren" → Link einfügen</li>
+                            </ol>
+                        </div>
+                        
+                        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+                            <button class="btn btn-secondary" data-action="regenerate-calendar-token" 
+                                    style="background: #f8f9fa; color: #dc3545; border-color: #dc3545;">
+                                🔄 Link neu generieren
+                            </button>
+                            <p style="font-size: 0.8rem; color: #999; margin-top: 8px;">
+                                Generiere einen neuen Link, falls der alte kompromittiert wurde. Der alte Link wird ungültig.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- WhatsApp Group -->
             <div class="card" id="whatsapp-card" style="display: none; border-left: 4px solid #25d366;">
                 <h3 style="color: #25d366;">💬 WhatsApp-Gruppe</h3>
@@ -269,6 +315,34 @@
                     localStorage.removeItem('gassigeher_user_tour_complete');
                     window.location.href = '/dashboard.html';
                 }
+            },
+            'copy-calendar-url': async function(e) {
+                e.preventDefault();
+                const urlInput = document.getElementById('calendar-url');
+                if (urlInput && urlInput.value) {
+                    try {
+                        await navigator.clipboard.writeText(urlInput.value);
+                        showAlert('success', 'Link wurde in die Zwischenablage kopiert!');
+                    } catch (err) {
+                        // Fallback for older browsers
+                        urlInput.select();
+                        document.execCommand('copy');
+                        showAlert('success', 'Link wurde kopiert!');
+                    }
+                }
+            },
+            'regenerate-calendar-token': async function(e) {
+                e.preventDefault();
+                if (!confirm('Möchtest du wirklich einen neuen Kalender-Link generieren? Der alte Link wird ungültig.')) {
+                    return;
+                }
+                try {
+                    const response = await api.request('/calendar/token/regenerate', { method: 'POST' });
+                    document.getElementById('calendar-url').value = response.webcal_url || response.feed_url;
+                    showAlert('success', 'Neuer Kalender-Link wurde generiert!');
+                } catch (error) {
+                    showAlert('error', error.message || 'Fehler beim Generieren des Links');
+                }
             }
         });
 
@@ -316,6 +390,7 @@
                 renderAvailableColors();
                 renderMyRequests();
                 loadWhatsAppSettings();
+                loadCalendarToken();
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Laden');
             }
@@ -680,6 +755,40 @@
                     // Billing not available - Simple mode, don't show section
                     console.log('Billing not available (Simple mode)');
                 }
+            }
+        }
+
+        async function loadCalendarToken() {
+            const loadingEl = document.getElementById('calendar-loading');
+            const urlSection = document.getElementById('calendar-url-section');
+            
+            try {
+                const response = await api.request('/calendar/token', { method: 'GET' });
+                
+                // Hide loading, show URL section
+                loadingEl.style.display = 'none';
+                urlSection.style.display = 'block';
+                
+                // Set the calendar URL (prefer webcal:// for direct calendar app opening)
+                // BUG FIX: Sanitize URL before displaying
+                const calendarUrl = response.webcal_url || response.feed_url;
+                if (calendarUrl && (calendarUrl.startsWith('webcal://') || calendarUrl.startsWith('http'))) {
+                    document.getElementById('calendar-url').value = calendarUrl;
+                } else {
+                    throw new Error('Ungültige Kalender-URL erhalten');
+                }
+            } catch (error) {
+                // BUG FIX: Show more detailed error message
+                let errorMsg = 'Fehler beim Laden des Kalender-Links';
+                if (error.message) {
+                    if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+                        errorMsg = 'Bitte melde dich erneut an';
+                    } else if (error.message.includes('500')) {
+                        errorMsg = 'Server-Fehler. Bitte versuche es später erneut.';
+                    }
+                }
+                loadingEl.innerHTML = '<span style="color: #dc3545;">' + sanitizeHTML(errorMsg) + '</span>';
+                console.error('Error loading calendar token:', error);
             }
         }
     </script>

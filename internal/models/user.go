@@ -30,6 +30,7 @@ type User struct {
 	VerificationTokenExpires *time.Time `json:"-"`
 	PasswordResetToken       *string    `json:"-"`
 	PasswordResetExpires     *time.Time `json:"-"`
+	CalendarToken            *string    `json:"-"` // Token for iCal feed authentication
 	ProfilePhoto             *string    `json:"profile_photo,omitempty"`
 	AnonymousID              *string    `json:"anonymous_id,omitempty"`
 	TermsAcceptedAt          time.Time  `json:"terms_accepted_at"`

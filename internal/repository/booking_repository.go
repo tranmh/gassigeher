@@ -914,3 +914,97 @@ func (r *BookingRepository) RejectBooking(bookingID int, tenantID int, adminID i
 
 	return nil
 }
+
+// FindUpcomingByUser gets all upcoming bookings for a user with dog information
+// Used for iCal calendar feed generation
+// SaaS: Filters by tenant_id for tenant isolation
+// BUG FIX: Added tenant filter to dog JOIN to prevent cross-tenant data leakage
+func (r *BookingRepository) FindUpcomingByUser(userID int, tenantID int) ([]*models.Booking, error) {
+	query := `
+		SELECT b.id, b.tenant_id, b.user_id, b.dog_id, b.date, b.scheduled_time, b.status,
+		       b.completed_at, b.user_notes, b.admin_cancellation_reason, b.created_at, b.updated_at,
+		       b.requires_approval, b.approval_status,
+		       d.id, d.name, d.breed, d.pickup_location, d.walk_duration
+		FROM bookings b
+		LEFT JOIN dogs d ON b.dog_id = d.id AND d.tenant_id = b.tenant_id
+		WHERE b.user_id = ? AND b.tenant_id = ? AND b.status IN ('scheduled', 'pending_approval') AND b.date >= ?
+		ORDER BY b.date ASC, b.scheduled_time ASC
+	`
+
+	currentDate := time.Now().Format("2006-01-02")
+	rows, err := r.db.Query(query, userID, tenantID, currentDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query upcoming bookings: %w", err)
+	}
+	defer rows.Close()
+
+	bookings := []*models.Booking{}
+	for rows.Next() {
+		booking := &models.Booking{}
+		var tenantIDNull sql.NullInt64
+		var dogID, dogIDFromJoin sql.NullInt64
+		var dogName, dogBreed, dogPickupLocation sql.NullString
+		var dogWalkDuration sql.NullInt64
+
+		err := rows.Scan(
+			&booking.ID,
+			&tenantIDNull,
+			&booking.UserID,
+			&dogID,
+			&booking.Date,
+			&booking.ScheduledTime,
+			&booking.Status,
+			&booking.CompletedAt,
+			&booking.UserNotes,
+			&booking.AdminCancellationReason,
+			&booking.CreatedAt,
+			&booking.UpdatedAt,
+			&booking.RequiresApproval,
+			&booking.ApprovalStatus,
+			&dogIDFromJoin,
+			&dogName,
+			&dogBreed,
+			&dogPickupLocation,
+			&dogWalkDuration,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan booking: %w", err)
+		}
+
+		if tenantIDNull.Valid {
+			booking.TenantID = int(tenantIDNull.Int64)
+		}
+		if dogID.Valid {
+			booking.DogID = int(dogID.Int64)
+		}
+
+		// Attach dog information
+		if dogIDFromJoin.Valid {
+			booking.Dog = &models.Dog{
+				ID: int(dogIDFromJoin.Int64),
+			}
+			if dogName.Valid {
+				booking.Dog.Name = dogName.String
+			}
+			if dogBreed.Valid {
+				booking.Dog.Breed = dogBreed.String
+			}
+			if dogPickupLocation.Valid {
+				booking.Dog.PickupLocation = &dogPickupLocation.String
+			}
+			if dogWalkDuration.Valid {
+				duration := int(dogWalkDuration.Int64)
+				booking.Dog.WalkDuration = &duration
+			}
+		}
+
+		booking.Date = normalizeDate(booking.Date)
+		bookings = append(bookings, booking)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating upcoming bookings: %w", err)
+	}
+
+	return bookings, nil
+}

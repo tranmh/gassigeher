@@ -313,6 +313,7 @@ func main() {
 	marketingHandler := handlers.NewMarketingHandler(db)
 	promoCodeHandler := handlers.NewPromoCodeHandler(db, cfg)
 	importHandler := handlers.NewImportHandler(db)
+	calendarHandler := handlers.NewCalendarHandler(db, cfg)
 
 	// Initialize global cache service
 	cacheService := services.NewDefaultCacheService()
@@ -470,6 +471,17 @@ func main() {
 	// Consent versions (public - for displaying current ToS/Privacy versions)
 	router.HandleFunc("/api/v1/consent/versions", consentHandler.GetCurrentConsentVersions).Methods("GET")
 
+	// Calendar iCal feed (public - auth via token in URL)
+	// BUG FIX: Added rate limiting to prevent token enumeration attacks
+	// BUG FIX: Route explicitly matches {token}.ics pattern
+	if cfg.RateLimitEnabled {
+		calendarFeedRoute := router.PathPrefix("/api/calendar/feed/").Subrouter()
+		calendarFeedRoute.Use(middleware.RateLimitAuthEndpoint) // 3 req/min per IP
+		calendarFeedRoute.HandleFunc("/{token}", calendarHandler.GetFeed).Methods("GET")
+	} else {
+		router.HandleFunc("/api/calendar/feed/{token}", calendarHandler.GetFeed).Methods("GET")
+	}
+
 	// Protected routes (authenticated users)
 	protected := router.PathPrefix("/api/v1").Subrouter()
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
@@ -492,6 +504,10 @@ func main() {
 	protected.HandleFunc("/users/me/consent/history", consentHandler.GetConsentHistory).Methods("GET")
 	protected.HandleFunc("/users/me/consent", consentHandler.UpdateConsent).Methods("POST")
 	protected.HandleFunc("/users/me", userHandler.DeleteAccount).Methods("DELETE")
+
+	// Calendar token management
+	protected.HandleFunc("/calendar/token", calendarHandler.GetToken).Methods("GET")
+	protected.HandleFunc("/calendar/token/regenerate", calendarHandler.RegenerateToken).Methods("POST")
 
 	// Tenant info (authenticated users)
 	protected.HandleFunc("/tenants/me", tenantHandler.GetCurrentTenant).Methods("GET")

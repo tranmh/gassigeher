@@ -809,3 +809,85 @@ func (r *UserRepository) ClearMustChangePassword(userID int) error {
 	}
 	return nil
 }
+
+// GetCalendarToken retrieves a user's calendar token
+func (r *UserRepository) GetCalendarToken(userID int) (*string, error) {
+	var token sql.NullString
+	query := `SELECT calendar_token FROM users WHERE id = ?`
+	err := r.db.QueryRow(query, userID).Scan(&token)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("user not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get calendar token: %w", err)
+	}
+	if !token.Valid {
+		return nil, nil
+	}
+	return &token.String, nil
+}
+
+// SetCalendarToken sets a user's calendar token
+func (r *UserRepository) SetCalendarToken(userID int, token string) error {
+	query := `UPDATE users SET calendar_token = ?, updated_at = ? WHERE id = ?`
+	result, err := r.db.Exec(query, token, time.Now(), userID)
+	if err != nil {
+		return fmt.Errorf("failed to set calendar token: %w", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("user not found")
+	}
+	return nil
+}
+
+// ClearCalendarToken clears a user's calendar token (for regeneration)
+func (r *UserRepository) ClearCalendarToken(userID int) error {
+	query := `UPDATE users SET calendar_token = NULL, updated_at = ? WHERE id = ?`
+	_, err := r.db.Exec(query, time.Now(), userID)
+	if err != nil {
+		return fmt.Errorf("failed to clear calendar token: %w", err)
+	}
+	return nil
+}
+
+// FindByCalendarToken finds a user by their calendar token
+// Returns user with basic info needed for iCal feed generation
+func (r *UserRepository) FindByCalendarToken(token string) (*models.User, error) {
+	query := `
+		SELECT id, tenant_id, first_name, last_name, email, is_active, is_deleted
+		FROM users
+		WHERE calendar_token = ? AND is_deleted = ?
+	`
+	user := &models.User{}
+	var firstName, lastName sql.NullString
+	var tenantID sql.NullInt64
+	err := r.db.QueryRow(query, token, r.db.BoolValue(false)).Scan(
+		&user.ID,
+		&tenantID,
+		&firstName,
+		&lastName,
+		&user.Email,
+		&user.IsActive,
+		&user.IsDeleted,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user by calendar token: %w", err)
+	}
+	if tenantID.Valid {
+		user.TenantID = int(tenantID.Int64)
+	}
+	if firstName.Valid {
+		user.FirstName = firstName.String
+	}
+	if lastName.Valid {
+		user.LastName = lastName.String
+	}
+	return user, nil
+}

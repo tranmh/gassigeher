@@ -36,6 +36,7 @@ func rewriteAPIPath(path string) (string, bool) {
 		"/api/ready",
 		"/api/version",
 		"/api/metrics",
+		"/api/calendar/feed", // Calendar iCal feed (public, auth via token in URL)
 	}
 	for _, route := range unversionedRoutes {
 		if strings.HasPrefix(path, route) {
