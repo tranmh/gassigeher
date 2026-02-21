@@ -21,15 +21,16 @@ import (
 
 // DogHandler handles dog-related endpoints
 type DogHandler struct {
-	dogRepo          *repository.DogRepository
-	userRepo         *repository.UserRepository
-	bookingRepo      *repository.BookingRepository
-	subscriptionRepo *repository.SubscriptionRepository  // SaaS: For checking dog limits
-	colorRepo        *repository.ColorCategoryRepository // For resolving legacy category to color_id
-	imageService     *services.ImageService
-	emailService     *services.EmailService
-	s3Service        *services.S3Service // SaaS: For S3 storage
-	config           *config.Config
+	dogRepo              *repository.DogRepository
+	userRepo             *repository.UserRepository
+	bookingRepo          *repository.BookingRepository
+	recurringBookingRepo *repository.RecurringBookingRepository
+	subscriptionRepo     *repository.SubscriptionRepository  // SaaS: For checking dog limits
+	colorRepo            *repository.ColorCategoryRepository // For resolving legacy category to color_id
+	imageService         *services.ImageService
+	emailService         *services.EmailService
+	s3Service            *services.S3Service // SaaS: For S3 storage
+	config               *config.Config
 }
 
 // NewDogHandler creates a new dog handler
@@ -67,15 +68,16 @@ func NewDogHandler(db *database.DB, cfg *config.Config) *DogHandler {
 	}
 
 	return &DogHandler{
-		dogRepo:          repository.NewDogRepository(db),
-		userRepo:         repository.NewUserRepository(db),
-		bookingRepo:      repository.NewBookingRepository(db),
-		subscriptionRepo: repository.NewSubscriptionRepository(db),  // SaaS: For dog limit checks
-		colorRepo:        repository.NewColorCategoryRepository(db), // For resolving legacy category to color_id
-		imageService:     services.NewImageService(cfg.UploadDir),
-		emailService:     emailService,
-		s3Service:        s3Service,
-		config:           cfg,
+		dogRepo:              repository.NewDogRepository(db),
+		userRepo:             repository.NewUserRepository(db),
+		bookingRepo:          repository.NewBookingRepository(db),
+		recurringBookingRepo: repository.NewRecurringBookingRepository(db),
+		subscriptionRepo:     repository.NewSubscriptionRepository(db),  // SaaS: For dog limit checks
+		colorRepo:            repository.NewColorCategoryRepository(db), // For resolving legacy category to color_id
+		imageService:         services.NewImageService(cfg.UploadDir),
+		emailService:         emailService,
+		s3Service:            s3Service,
+		config:               cfg,
 	}
 }
 
@@ -849,6 +851,53 @@ func (h *DogHandler) ToggleAvailability(w http.ResponseWriter, r *http.Request) 
 	if err := h.dogRepo.ToggleAvailability(id, tenantID, req.IsAvailable, req.UnavailableReason); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to toggle availability")
 		return
+	}
+
+	// Auto-cancel future bookings when dog becomes unavailable
+	if !req.IsAvailable {
+		reason := "Hund ist derzeit nicht verfügbar"
+		if req.UnavailableReason != nil && *req.UnavailableReason != "" {
+			reason = *req.UnavailableReason
+		}
+
+		// Cancel all future scheduled bookings for this dog
+		cancelledBookings, cancelErr := h.bookingRepo.CancelFutureByDogID(id, tenantID, reason)
+		if cancelErr != nil {
+			log.Printf("Warning: Failed to auto-cancel bookings for unavailable dog %d: %v", id, cancelErr)
+		} else if len(cancelledBookings) > 0 {
+			log.Printf("Auto-cancelled %d future bookings for dog %d (marked unavailable)", len(cancelledBookings), id)
+
+			// Send cancellation emails to affected users
+			if h.emailService != nil {
+				for _, b := range cancelledBookings {
+					if b.User != nil && b.User.Email != nil {
+						go h.emailService.SendAdminCancellation(
+							*b.User.Email,
+							b.User.FirstName,
+							dog.Name,
+							b.Date,
+							b.ScheduledTime,
+							reason,
+						)
+					}
+				}
+			}
+		}
+
+		// Cancel related active recurring series (independent of individual bookings)
+		activeSeriesList, seriesErr := h.recurringBookingRepo.FindActiveByDog(id, tenantID)
+		if seriesErr != nil {
+			log.Printf("Warning: Failed to find recurring series for dog %d: %v", id, seriesErr)
+		} else {
+			for _, series := range activeSeriesList {
+				if err := h.recurringBookingRepo.Cancel(series.ID, tenantID); err != nil {
+					log.Printf("Warning: Failed to cancel recurring series %d: %v", series.ID, err)
+				}
+			}
+			if len(activeSeriesList) > 0 {
+				log.Printf("Auto-cancelled %d recurring series for dog %d", len(activeSeriesList), id)
+			}
+		}
 	}
 
 	// Get updated dog (tenant already verified above)

@@ -76,6 +76,18 @@ var settingConstraints = map[string]SettingConstraint{
 		Max:      10,
 		Required: true,
 	},
+	"recurring_booking_max_weeks": {
+		Type:     "integer",
+		Min:      1,
+		Max:      52,
+		Required: true,
+	},
+	"max_active_recurring_series": {
+		Type:     "integer",
+		Min:      1,
+		Max:      20,
+		Required: true,
+	},
 }
 
 // ValidateSetting validates a setting value based on its key

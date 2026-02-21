@@ -20,16 +20,17 @@ import (
 
 // BookingHandler handles booking-related HTTP requests
 type BookingHandler struct {
-	db                 *database.DB
-	cfg                *config.Config
-	bookingRepo        *repository.BookingRepository
-	dogRepo            *repository.DogRepository
-	userRepo           *repository.UserRepository
-	userColorRepo      *repository.UserColorRepository
-	blockedDateRepo    *repository.BlockedDateRepository
-	settingsRepo       *repository.SettingsRepository
-	bookingTimeService *services.BookingTimeService
-	emailService       *services.EmailService
+	db                   *database.DB
+	cfg                  *config.Config
+	bookingRepo          *repository.BookingRepository
+	recurringBookingRepo *repository.RecurringBookingRepository
+	dogRepo              *repository.DogRepository
+	userRepo             *repository.UserRepository
+	userColorRepo        *repository.UserColorRepository
+	blockedDateRepo      *repository.BlockedDateRepository
+	settingsRepo         *repository.SettingsRepository
+	bookingTimeService   *services.BookingTimeService
+	emailService         *services.EmailService
 }
 
 // NewBookingHandler creates a new booking handler
@@ -51,16 +52,17 @@ func NewBookingHandler(db *database.DB, cfg *config.Config) *BookingHandler {
 	bookingTimeService := services.NewBookingTimeService(bookingTimeRepo, holidayService, settingsRepo, bookingRepo)
 
 	return &BookingHandler{
-		db:                 db,
-		cfg:                cfg,
-		bookingRepo:        bookingRepo,
-		dogRepo:            repository.NewDogRepository(db),
-		userRepo:           repository.NewUserRepository(db),
-		userColorRepo:      repository.NewUserColorRepository(db),
-		blockedDateRepo:    repository.NewBlockedDateRepository(db),
-		settingsRepo:       settingsRepo,
-		bookingTimeService: bookingTimeService,
-		emailService:       emailService,
+		db:                   db,
+		cfg:                  cfg,
+		bookingRepo:          bookingRepo,
+		recurringBookingRepo: repository.NewRecurringBookingRepository(db),
+		dogRepo:              repository.NewDogRepository(db),
+		userRepo:             repository.NewUserRepository(db),
+		userColorRepo:        repository.NewUserColorRepository(db),
+		blockedDateRepo:      repository.NewBlockedDateRepository(db),
+		settingsRepo:         settingsRepo,
+		bookingTimeService:   bookingTimeService,
+		emailService:         emailService,
 	}
 }
 

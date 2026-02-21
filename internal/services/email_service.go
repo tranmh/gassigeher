@@ -1314,3 +1314,191 @@ func (s *EmailService) SendTenantWelcomeEmail(to, tenantName, adminName, tenantS
 
 	return s.SendEmail(to, subject, body.String())
 }
+
+// SendRecurringBookingConfirmation sends confirmation for a recurring booking series
+func (s *EmailService) SendRecurringBookingConfirmation(to, name, dogName string, dates []string, scheduledTime string, requiresApproval bool) error {
+	subject := fmt.Sprintf("Wiederkehrende Buchung bestätigt - %s", dogName)
+	if requiresApproval {
+		subject = fmt.Sprintf("Wiederkehrende Buchung eingereicht - %s (Genehmigung ausstehend)", dogName)
+	}
+
+	tmpl := `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #26272b; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #82b965; color: white; padding: 20px; text-align: center; border-radius: 6px 6px 0 0; }
+        .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 6px 6px; }
+        .booking-details { background-color: white; padding: 20px; margin: 20px 0; border-radius: 6px; border-left: 4px solid #82b965; }
+        .date-list { list-style: none; padding: 0; }
+        .date-list li { padding: 8px 12px; margin: 4px 0; background-color: #f0f7ec; border-radius: 4px; }
+        .label { font-weight: 600; color: #666; }
+        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        .pending-badge { display: inline-block; padding: 4px 12px; background-color: #f59e0b; color: white; border-radius: 12px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            {{if .RequiresApproval}}
+            <h1>⏳ Buchungsserie eingereicht</h1>
+            {{else}}
+            <h1>✅ Buchungsserie bestätigt!</h1>
+            {{end}}
+        </div>
+        <div class="content">
+            <p>Hallo {{.Name}},</p>
+            {{if .RequiresApproval}}
+            <p>Ihre wiederkehrende Buchungsserie wurde eingereicht und wartet auf Genehmigung durch einen Administrator.</p>
+            {{else}}
+            <p>Ihre wiederkehrende Buchungsserie wurde erfolgreich erstellt.</p>
+            {{end}}
+
+            <div class="booking-details">
+                <h3 style="margin-top: 0;">Seriendetails</h3>
+                <div style="margin: 10px 0;">
+                    <span class="label">Hund:</span> {{.DogName}}
+                </div>
+                <div style="margin: 10px 0;">
+                    <span class="label">Uhrzeit:</span> {{.ScheduledTime}} Uhr
+                </div>
+                <div style="margin: 10px 0;">
+                    <span class="label">Anzahl Termine:</span> {{.DateCount}}
+                </div>
+                {{if .RequiresApproval}}
+                <div style="margin: 10px 0;">
+                    <span class="pending-badge">Genehmigung ausstehend</span>
+                </div>
+                {{end}}
+            </div>
+
+            <div class="booking-details">
+                <h3 style="margin-top: 0;">Gebuchte Termine</h3>
+                <ul class="date-list">
+                {{range .Dates}}
+                    <li>📅 {{.}}</li>
+                {{end}}
+                </ul>
+            </div>
+
+            <p>Sie erhalten für jeden Termin eine Erinnerung 1 Stunde vorher.</p>
+            <p>Sie können die gesamte Serie oder einzelne Termine in Ihrem <a href="{{.BaseURL}}/dashboard.html" style="color: #82b965; text-decoration: underline;">Dashboard</a> verwalten.</p>
+
+            <p style="text-align: center; margin-top: 20px;">
+                <a href="{{.BaseURL}}/dashboard.html" style="display: inline-block; padding: 12px 30px; background-color: #82b965; color: white; text-decoration: none; border-radius: 6px;">Zum Dashboard</a>
+            </p>
+        </div>
+        <div class="footer">
+            <p>© 2025 Gassigeher. Alle Rechte vorbehalten.</p>
+        </div>
+    </div>
+</body>
+</html>
+`
+
+	t := template.Must(template.New("recurring_confirmation").Parse(tmpl))
+	var body bytes.Buffer
+	data := struct {
+		Name             string
+		DogName          string
+		ScheduledTime    string
+		DateCount        int
+		Dates            []string
+		RequiresApproval bool
+		BaseURL          string
+	}{
+		Name:             name,
+		DogName:          dogName,
+		ScheduledTime:    scheduledTime,
+		DateCount:        len(dates),
+		Dates:            dates,
+		RequiresApproval: requiresApproval,
+		BaseURL:          s.baseURL,
+	}
+	if err := t.Execute(&body, data); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return s.SendEmail(to, subject, body.String())
+}
+
+// SendRecurringSeriesCancelled sends notification when a recurring series is cancelled
+func (s *EmailService) SendRecurringSeriesCancelled(to, name, dogName string, cancelledCount int, reason string) error {
+	subject := fmt.Sprintf("Wiederkehrende Buchungsserie storniert - %s", dogName)
+
+	tmpl := `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #26272b; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #e74c3c; color: white; padding: 20px; text-align: center; border-radius: 6px 6px 0 0; }
+        .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 6px 6px; }
+        .cancel-details { background-color: white; padding: 20px; margin: 20px 0; border-radius: 6px; border-left: 4px solid #e74c3c; }
+        .label { font-weight: 600; color: #666; }
+        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>❌ Buchungsserie storniert</h1>
+        </div>
+        <div class="content">
+            <p>Hallo {{.Name}},</p>
+            <p>Ihre wiederkehrende Buchungsserie wurde storniert.</p>
+
+            <div class="cancel-details">
+                <h3 style="margin-top: 0;">Details</h3>
+                <div style="margin: 10px 0;">
+                    <span class="label">Hund:</span> {{.DogName}}
+                </div>
+                <div style="margin: 10px 0;">
+                    <span class="label">Stornierte Termine:</span> {{.CancelledCount}}
+                </div>
+                <div style="margin: 10px 0;">
+                    <span class="label">Grund:</span> {{.Reason}}
+                </div>
+            </div>
+
+            <p>Bereits abgeschlossene Spaziergänge bleiben in Ihrer Buchungshistorie erhalten.</p>
+            <p>Sie können jederzeit eine neue Buchungsserie in Ihrem <a href="{{.BaseURL}}/dashboard.html" style="color: #82b965; text-decoration: underline;">Dashboard</a> erstellen.</p>
+
+            <p style="text-align: center; margin-top: 20px;">
+                <a href="{{.BaseURL}}/dashboard.html" style="display: inline-block; padding: 12px 30px; background-color: #82b965; color: white; text-decoration: none; border-radius: 6px;">Zum Dashboard</a>
+            </p>
+        </div>
+        <div class="footer">
+            <p>© 2025 Gassigeher. Alle Rechte vorbehalten.</p>
+        </div>
+    </div>
+</body>
+</html>
+`
+
+	t := template.Must(template.New("recurring_cancelled").Parse(tmpl))
+	var body bytes.Buffer
+	data := struct {
+		Name           string
+		DogName        string
+		CancelledCount int
+		Reason         string
+		BaseURL        string
+	}{
+		Name:           name,
+		DogName:        dogName,
+		CancelledCount: cancelledCount,
+		Reason:         reason,
+		BaseURL:        s.baseURL,
+	}
+	if err := t.Execute(&body, data); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return s.SendEmail(to, subject, body.String())
+}

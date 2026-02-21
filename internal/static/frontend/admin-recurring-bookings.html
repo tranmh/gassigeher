@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wiederkehrende Buchungen - Gassigeher Admin</title>
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <script src="/js/theme-loader.js"></script>
+    <style>
+        .series-card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid var(--color-primary, #82b965);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .series-card.cancelled {
+            border-left-color: #dc3545;
+            opacity: 0.7;
+        }
+        .series-card.completed {
+            border-left-color: #6c757d;
+            opacity: 0.7;
+        }
+        .series-card.pending-approval {
+            border-left-color: #ffc107;
+        }
+        .series-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+        .series-info-item {
+            display: flex;
+            flex-direction: column;
+        }
+        .series-info-item label {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 3px;
+        }
+        .series-info-item span {
+            font-weight: 600;
+        }
+        .series-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        .series-actions button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+        }
+        .btn-approve {
+            background: #28a745;
+            color: white;
+        }
+        .btn-approve:hover {
+            background: #218838;
+        }
+        .btn-reject {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-reject:hover {
+            background: #c82333;
+        }
+        .btn-cancel-series {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-cancel-series:hover {
+            background: #c82333;
+        }
+        .btn-view-bookings {
+            background: var(--color-primary, #82b965);
+            color: white;
+        }
+        .btn-view-bookings:hover {
+            opacity: 0.9;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .status-badge.active {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-badge.cancelled {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status-badge.completed {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+        .status-badge.pending-approval {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        .empty-state h3 {
+            margin-bottom: 10px;
+            color: var(--color-primary, #82b965);
+        }
+        .filter-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .filter-tab {
+            padding: 10px 20px;
+            background: var(--card-bg);
+            border: 2px solid var(--border-light);
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .filter-tab.active {
+            background: var(--color-primary, #82b965);
+            color: white;
+            border-color: var(--color-primary, #82b965);
+        }
+        .filter-tab .count {
+            background: rgba(0,0,0,0.1);
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 5px;
+            font-size: 0.85rem;
+        }
+        .filter-tab.active .count {
+            background: rgba(255,255,255,0.3);
+        }
+        .recurrence-label {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            background: #e8f4fd;
+            color: #0c5460;
+            margin-left: 8px;
+        }
+        .bookings-detail {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0,0,0,0.03);
+            border-radius: 6px;
+            display: none;
+        }
+        .bookings-detail.visible {
+            display: block;
+        }
+        .bookings-detail table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .bookings-detail th,
+        .bookings-detail td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-light);
+            font-size: 0.9rem;
+        }
+        .bookings-detail th {
+            font-weight: 600;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <button class="menu-toggle" data-action="toggle-menu" aria-label="Menu">☰</button>
+            <a href="/" class="logo">Gassigeher Admin</a>
+            <nav id="main-nav">
+                <ul>
+                    <li><a href="/admin-dashboard.html" data-i18n="admin_dashboard.title">Dashboard</a></li>
+                    <li><a href="/admin-dogs.html" data-i18n="dogs.manage_dogs">Hunde</a></li>
+                    <li class="nav-dropdown">
+                        <a href="#">Buchungen</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-bookings.html">📅 Alle Buchungen</a>
+                            <a href="/admin-calendar.html">📆 Kalenderübersicht</a>
+                            <a href="/admin-booking-approvals.html">✓ Genehmigungen</a>
+                            <a href="/admin-recurring-bookings.html">🔁 Wiederkehrende</a>
+                            <a href="/admin-booking-times.html">⏰ Buchungszeiten</a>
+                            <a href="/admin-blocked-dates.html">🚫 Gesperrte Tage</a>
+                        </div>
+                    </li>
+                    <li class="nav-dropdown">
+                        <a href="#">Benutzer</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-users.html">👥 Alle Benutzer</a>
+                            <a href="/admin-color-requests.html">🎨 Farb-Anfragen</a>
+                            <a href="/admin-reactivation-requests.html">🔄 Reaktivierungen</a>
+                        </div>
+                    </li>
+                    <li class="nav-dropdown">
+                        <a href="#">Einstellungen</a>
+                        <div class="nav-dropdown-menu">
+                            <a href="/admin-settings.html">⚙️ System</a>
+                            <a href="/admin-branding.html">🎨 Branding</a>
+                            <a href="/admin-reference-page.html">📋 Referenzseite</a>
+                        </div>
+                    </li>
+                    <li id="super-admin-colors-link" style="display:none;"><a href="/admin-colors.html">🎨 Farben</a></li>
+                    <li><a href="/dashboard.html" class="area-switcher" data-i18n="nav.user_area">👤 Benutzer-Bereich</a></li>
+                    <li><a href="#" data-action="logout" data-i18n="nav.logout">Abmelden</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <div class="nav-overlay" id="nav-overlay" data-action="toggle-menu"></div>
+
+    <main style="padding: 40px 0;">
+        <div class="container">
+            <h1 data-i18n="recurring.admin_title">Wiederkehrende Buchungen</h1>
+            <p style="color: #666; margin-bottom: 30px;" data-i18n="recurring.admin_description">
+                Verwalte alle wiederkehrenden Buchungsserien. Genehmige, lehne ab oder storniere Serien.
+            </p>
+
+            <div id="alert-container"></div>
+
+            <!-- Filter Tabs -->
+            <div class="filter-tabs">
+                <button class="filter-tab active" data-filter="active" data-action="set-filter" data-value="active">
+                    <span data-i18n="recurring.status_active">Aktiv</span> <span class="count" id="active-count">0</span>
+                </button>
+                <button class="filter-tab" data-filter="pending" data-action="set-filter" data-value="pending">
+                    <span data-i18n="recurring.pending_approval">Genehmigung ausstehend</span> <span class="count" id="pending-count">0</span>
+                </button>
+                <button class="filter-tab" data-filter="cancelled" data-action="set-filter" data-value="cancelled">
+                    <span data-i18n="recurring.status_cancelled">Storniert</span> <span class="count" id="cancelled-count">0</span>
+                </button>
+                <button class="filter-tab" data-filter="all" data-action="set-filter" data-value="all">
+                    <span data-i18n="recurring.filter_all">Alle</span> <span class="count" id="all-count">0</span>
+                </button>
+            </div>
+
+            <!-- Series List -->
+            <div id="series-list">
+                <div class="empty-state">
+                    <div class="spinner"></div>
+                    <p data-i18n="recurring.loading">Laden...</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Cancel Reason Modal -->
+    <div id="cancel-modal" class="modal" data-action="close-cancel-modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3 data-i18n="recurring.cancel_modal_title">Serie stornieren</h3>
+            <p style="color: #666; margin-bottom: 20px;" data-i18n="recurring.cancel_modal_text">Bitte gib einen Grund für die Stornierung an:</p>
+            <div class="form-group">
+                <label for="cancel-reason" data-i18n="recurring.reason_label">Grund *</label>
+                <textarea id="cancel-reason" rows="3" required placeholder="z.B. Hund ist nicht mehr verfügbar..." data-i18n-placeholder="recurring.cancel_reason_placeholder"></textarea>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-secondary" data-action="close-cancel-modal" data-i18n="common.cancel">Abbrechen</button>
+                <button class="btn btn-cancel-series" data-action="confirm-cancel" data-i18n="recurring.cancel_button">Stornieren</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reject Reason Modal -->
+    <div id="reject-modal" class="modal" data-action="close-reject-modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3 data-i18n="recurring.reject_modal_title">Serie ablehnen</h3>
+            <p style="color: #666; margin-bottom: 20px;" data-i18n="recurring.reject_modal_text">Bitte gib einen Grund für die Ablehnung an:</p>
+            <div class="form-group">
+                <label for="reject-reason" data-i18n="recurring.reason_label">Grund *</label>
+                <textarea id="reject-reason" rows="3" required placeholder="z.B. Zeitraum nicht erlaubt..." data-i18n-placeholder="recurring.reject_reason_placeholder"></textarea>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-secondary" data-action="close-reject-modal" data-i18n="common.cancel">Abbrechen</button>
+                <button class="btn btn-reject" data-action="confirm-reject" data-i18n="recurring.reject_button">Ablehnen</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/logo-banner.js"></script>
+    <script src="/js/nav-menu.js"></script>
+    <script src="/js/i18n.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/sanitize.js"></script>
+    <script src="/js/impersonation-banner.js"></script>
+    <script src="/js/demo-banner.js"></script>
+    <script src="/js/event-handlers.js"></script>
+    <script>
+        let allSeries = [];
+        let currentFilter = 'active';
+        let cancellingSeriesId = null;
+        let rejectingSeriesId = null;
+
+        function getDayNames() {
+            return [
+                i18n.t('recurring.sunday'), i18n.t('recurring.monday'), i18n.t('recurring.tuesday'),
+                i18n.t('recurring.wednesday'), i18n.t('recurring.thursday'), i18n.t('recurring.friday'),
+                i18n.t('recurring.saturday')
+            ];
+        }
+
+        // Register page-specific action handlers for CSP compliance
+        registerActions({
+            'set-filter': function(e, id, value) {
+                e.preventDefault();
+                setFilter(value);
+            },
+            'toggle-bookings': function(e, id) {
+                e.preventDefault();
+                toggleBookingsDetail(parseInt(id));
+            },
+            'open-cancel-modal': function(e, id) {
+                e.preventDefault();
+                openCancelModal(parseInt(id));
+            },
+            'close-cancel-modal': function(e) {
+                e.preventDefault();
+                closeCancelModal();
+            },
+            'close-cancel-modal-overlay': function(e) {
+                if (e.target === this) {
+                    e.preventDefault();
+                    closeCancelModal();
+                }
+            },
+            'confirm-cancel': function(e) {
+                e.preventDefault();
+                confirmCancel();
+            },
+            'approve-series': function(e, id) {
+                e.preventDefault();
+                approveSeries(parseInt(id));
+            },
+            'open-reject-modal': function(e, id) {
+                e.preventDefault();
+                openRejectModal(parseInt(id));
+            },
+            'close-reject-modal': function(e) {
+                e.preventDefault();
+                closeRejectModal();
+            },
+            'close-reject-modal-overlay': function(e) {
+                if (e.target === this) {
+                    e.preventDefault();
+                    closeRejectModal();
+                }
+            },
+            'confirm-reject': function(e) {
+                e.preventDefault();
+                confirmReject();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!api.isAuthenticated()) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // Check if user is admin
+            try {
+                const userData = await api.getMe();
+                if (!userData.is_admin) {
+                    alert(i18n.t('recurring.access_denied'));
+                    window.location.href = '/dashboard.html';
+                    return;
+                }
+                // Show colors link for super-admins
+                if (userData.is_super_admin) {
+                    const colorsLink = document.getElementById('super-admin-colors-link');
+                    if (colorsLink) colorsLink.style.display = '';
+                }
+            } catch (error) {
+                console.error('Failed to verify admin status:', error);
+                window.location.href = '/dashboard.html';
+                return;
+            }
+
+            await window.i18n.load();
+            window.i18n.updateElement(document.body);
+
+            // Initialize impersonation banner
+            await ImpersonationBanner.init();
+
+            await loadSeries();
+
+            // Auto-refresh every 30 seconds
+            setInterval(loadSeries, 30000);
+        });
+
+        async function loadSeries() {
+            try {
+                const series = await api.adminListRecurringSeries();
+                allSeries = series || [];
+
+                // Update counts
+                const active = allSeries.filter(s => s.status === 'active').length;
+                const pending = allSeries.filter(s => s.status === 'active' && hasPendingApproval(s)).length;
+                const cancelled = allSeries.filter(s => s.status === 'cancelled').length;
+
+                document.getElementById('active-count').textContent = active;
+                document.getElementById('pending-count').textContent = pending;
+                document.getElementById('cancelled-count').textContent = cancelled;
+                document.getElementById('all-count').textContent = allSeries.length;
+
+                renderSeries();
+            } catch (error) {
+                console.error('Failed to load recurring series:', error);
+                showAlert('error', i18n.t('recurring.load_error'));
+            }
+        }
+
+        function hasPendingApproval(series) {
+            // A series has pending approval if it has bookings with approval_status === 'pending'
+            if (series.bookings) {
+                return series.bookings.some(b => b.approval_status === 'pending' && b.status === 'scheduled');
+            }
+            // Fallback: check if remaining_bookings > 0 but we don't have booking details
+            return false;
+        }
+
+        function setFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.filter === filter);
+            });
+            renderSeries();
+        }
+
+        function renderSeries() {
+            const container = document.getElementById('series-list');
+
+            let filtered = allSeries;
+            if (currentFilter === 'active') {
+                filtered = allSeries.filter(s => s.status === 'active');
+            } else if (currentFilter === 'pending') {
+                filtered = allSeries.filter(s => s.status === 'active' && hasPendingApproval(s));
+            } else if (currentFilter === 'cancelled') {
+                filtered = allSeries.filter(s => s.status === 'cancelled');
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>${getEmptyMessage()}</h3>
+                        <p>${getEmptyDescription()}</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(series => renderSeriesCard(series)).join('');
+        }
+
+        function renderSeriesCard(series) {
+            const safeDogName = series.dog ? sanitizeHTML(series.dog.name) : `Hund #${series.dog_id}`;
+            const safeUserName = series.user
+                ? sanitizeHTML(`${series.user.first_name || ''} ${series.user.last_name || ''}`.trim())
+                : `User #${series.user_id}`;
+            const statusClass = series.status;
+            const isPendingApproval = series.status === 'active' && hasPendingApproval(series);
+            const cardClass = isPendingApproval ? 'pending-approval' : statusClass;
+
+            const recurrenceLabel = getRecurrenceLabel(series);
+
+            return `
+                <div class="series-card ${cardClass}">
+                    <div style="display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h4 style="margin: 0 0 5px 0;">
+                                ${safeDogName}
+                                ${getStatusBadge(series, isPendingApproval)}
+                                <span class="recurrence-label">${sanitizeHTML(recurrenceLabel)}</span>
+                            </h4>
+                            <p style="margin: 0; color: #666; font-size: 0.9rem;">
+                                ${i18n.t('recurring.user_label')}: ${safeUserName}
+                            </p>
+                        </div>
+                        <span style="font-size: 0.85rem; color: #666;">
+                            ${i18n.t('recurring.created_label')}: ${formatDateTime(series.created_at)}
+                        </span>
+                    </div>
+
+                    <div class="series-info">
+                        <div class="series-info-item">
+                            <label>${i18n.t('recurring.time_label')}</label>
+                            <span>${sanitizeHTML(series.scheduled_time)} ${i18n.t('recurring.time_suffix')}</span>
+                        </div>
+                        <div class="series-info-item">
+                            <label>${i18n.t('recurring.period_label')}</label>
+                            <span>${formatDate(series.start_date)} - ${formatDate(series.end_date)}</span>
+                        </div>
+                        <div class="series-info-item">
+                            <label>${i18n.t('recurring.total_bookings')}</label>
+                            <span>${series.total_bookings || 0}</span>
+                        </div>
+                        <div class="series-info-item">
+                            <label>${i18n.t('recurring.remaining_bookings')}</label>
+                            <span>${series.remaining_bookings || 0}</span>
+                        </div>
+                    </div>
+
+                    ${series.status === 'active' ? `
+                        <div class="series-actions">
+                            ${isPendingApproval ? `
+                                <button class="btn-approve" data-action="approve-series" data-id="${series.id}">
+                                    ${i18n.t('recurring.approve_button')}
+                                </button>
+                                <button class="btn-reject" data-action="open-reject-modal" data-id="${series.id}">
+                                    ${i18n.t('recurring.reject_button')}
+                                </button>
+                            ` : ''}
+                            <button class="btn-cancel-series" data-action="open-cancel-modal" data-id="${series.id}">
+                                ${i18n.t('recurring.cancel_button')}
+                            </button>
+                            <button class="btn-view-bookings" data-action="toggle-bookings" data-id="${series.id}">
+                                ${i18n.t('recurring.view_bookings')}
+                            </button>
+                        </div>
+                    ` : `
+                        <div class="series-actions">
+                            <button class="btn-view-bookings" data-action="toggle-bookings" data-id="${series.id}">
+                                ${i18n.t('recurring.view_bookings')}
+                            </button>
+                        </div>
+                    `}
+
+                    <div class="bookings-detail" id="bookings-detail-${series.id}">
+                        <p style="color: #666; font-size: 0.9rem;">${i18n.t('recurring.loading')}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getRecurrenceLabel(series) {
+            const dayNames = getDayNames();
+            if (series.recurrence_type === 'weekly' && series.day_of_week != null) {
+                return `${i18n.t('recurring.weekly')} (${dayNames[series.day_of_week]})`;
+            } else if (series.recurrence_type === 'interval' && series.interval_days) {
+                return i18n.t('recurring.every_n_days').replace('{days}', series.interval_days);
+            }
+            return series.recurrence_type || i18n.t('recurring.unknown');
+        }
+
+        function getStatusBadge(series, isPendingApproval) {
+            if (isPendingApproval) {
+                return `<span class="status-badge pending-approval">${i18n.t('recurring.pending_approval')}</span>`;
+            }
+            const badges = {
+                active: `<span class="status-badge active">${i18n.t('recurring.status_active')}</span>`,
+                cancelled: `<span class="status-badge cancelled">${i18n.t('recurring.status_cancelled')}</span>`,
+                completed: `<span class="status-badge completed">${i18n.t('recurring.status_completed')}</span>`
+            };
+            return badges[series.status] || '';
+        }
+
+        function getEmptyMessage() {
+            const messages = {
+                active: i18n.t('recurring.no_active_series'),
+                pending: i18n.t('recurring.no_pending_series'),
+                cancelled: i18n.t('recurring.no_cancelled_series'),
+                all: i18n.t('recurring.no_series_at_all')
+            };
+            return messages[currentFilter] || i18n.t('recurring.no_series_at_all');
+        }
+
+        function getEmptyDescription() {
+            const descriptions = {
+                active: i18n.t('recurring.empty_active_desc'),
+                pending: i18n.t('recurring.empty_pending_desc'),
+                cancelled: i18n.t('recurring.empty_cancelled_desc'),
+                all: i18n.t('recurring.empty_all_desc')
+            };
+            return descriptions[currentFilter] || '';
+        }
+
+        async function toggleBookingsDetail(seriesId) {
+            const detail = document.getElementById(`bookings-detail-${seriesId}`);
+            if (!detail) return;
+
+            if (detail.classList.contains('visible')) {
+                detail.classList.remove('visible');
+                return;
+            }
+
+            detail.classList.add('visible');
+            detail.innerHTML = `<p style="color: #666; font-size: 0.9rem;">${i18n.t('recurring.loading')}</p>`;
+
+            try {
+                const series = await api.getRecurringSeries(seriesId);
+                const bookings = series.bookings || [];
+
+                if (bookings.length === 0) {
+                    detail.innerHTML = `<p style="color: #666;">${i18n.t('recurring.no_bookings_in_series')}</p>`;
+                    return;
+                }
+
+                // Sort by date
+                bookings.sort((a, b) => a.date.localeCompare(b.date));
+
+                detail.innerHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>${i18n.t('recurring.date_label')}</th>
+                                <th>${i18n.t('recurring.time_label')}</th>
+                                <th>${i18n.t('recurring.status_label')}</th>
+                                <th>${i18n.t('recurring.approval_label')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${bookings.map(b => `
+                                <tr>
+                                    <td>${formatDate(b.date)}</td>
+                                    <td>${sanitizeHTML(b.scheduled_time)} ${i18n.t('recurring.time_suffix')}</td>
+                                    <td>${getBookingStatusLabel(b.status)}</td>
+                                    <td>${getApprovalLabel(b.approval_status)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                console.error('Failed to load series detail:', error);
+                detail.innerHTML = `<p style="color: #dc3545;">${i18n.t('recurring.load_detail_error')}</p>`;
+            }
+        }
+
+        function getBookingStatusLabel(status) {
+            const labels = {
+                scheduled: `<span style="color: var(--color-primary, #82b965); font-weight: 600;">${i18n.t('recurring.status_scheduled')}</span>`,
+                completed: `<span style="color: #6c757d;">${i18n.t('recurring.status_completed')}</span>`,
+                cancelled: `<span style="color: #dc3545;">${i18n.t('recurring.status_cancelled')}</span>`
+            };
+            return labels[status] || sanitizeHTML(status);
+        }
+
+        function getApprovalLabel(status) {
+            const labels = {
+                pending: `<span style="color: #856404; font-weight: 600;">${i18n.t('recurring.approval_pending')}</span>`,
+                approved: `<span style="color: #155724;">${i18n.t('recurring.approval_approved')}</span>`,
+                rejected: `<span style="color: #721c24;">${i18n.t('recurring.approval_rejected')}</span>`
+            };
+            return labels[status] || sanitizeHTML(status || '-');
+        }
+
+        function formatDateTime(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('de-DE', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const datePart = dateStr.split('T')[0];
+            const [year, month, day] = datePart.split('-');
+            return `${day}.${month}.${year}`;
+        }
+
+        // Cancel modal
+        function openCancelModal(seriesId) {
+            cancellingSeriesId = seriesId;
+            document.getElementById('cancel-reason').value = '';
+            document.getElementById('cancel-modal').style.display = 'flex';
+        }
+
+        function closeCancelModal() {
+            cancellingSeriesId = null;
+            document.getElementById('cancel-modal').style.display = 'none';
+        }
+
+        async function confirmCancel() {
+            const reason = document.getElementById('cancel-reason').value.trim();
+            if (!reason) {
+                showAlert('error', i18n.t('recurring.cancel_reason_required'));
+                return;
+            }
+
+            try {
+                const result = await api.adminCancelRecurringSeries(cancellingSeriesId, reason);
+                closeCancelModal();
+                showAlert('success', i18n.t('recurring.admin_cancel_success').replace('{count}', result.cancelled_count));
+                await loadSeries();
+            } catch (error) {
+                console.error('Failed to cancel series:', error);
+                showAlert('error', error.message || i18n.t('recurring.admin_cancel_error'));
+            }
+        }
+
+        // Approve series
+        async function approveSeries(seriesId) {
+            if (!confirm(i18n.t('recurring.approve_confirm'))) return;
+
+            try {
+                const result = await api.adminApproveRecurringSeries(seriesId);
+                showAlert('success', i18n.t('recurring.approve_success').replace('{count}', result.approved_count));
+                await loadSeries();
+            } catch (error) {
+                console.error('Failed to approve series:', error);
+                showAlert('error', error.message || i18n.t('recurring.approve_error'));
+            }
+        }
+
+        // Reject modal
+        function openRejectModal(seriesId) {
+            rejectingSeriesId = seriesId;
+            document.getElementById('reject-reason').value = '';
+            document.getElementById('reject-modal').style.display = 'flex';
+        }
+
+        function closeRejectModal() {
+            rejectingSeriesId = null;
+            document.getElementById('reject-modal').style.display = 'none';
+        }
+
+        async function confirmReject() {
+            const reason = document.getElementById('reject-reason').value.trim();
+            if (!reason) {
+                showAlert('error', i18n.t('recurring.reject_reason_required'));
+                return;
+            }
+
+            try {
+                const result = await api.adminRejectRecurringSeries(rejectingSeriesId, reason);
+                closeRejectModal();
+                showAlert('success', i18n.t('recurring.reject_success').replace('{count}', result.rejected_count));
+                await loadSeries();
+            } catch (error) {
+                console.error('Failed to reject series:', error);
+                showAlert('error', error.message || i18n.t('recurring.reject_error'));
+            }
+        }
+
+        function showAlert(type, message) {
+            const container = document.getElementById('alert-container');
+            container.innerHTML = `<div class="alert alert-${type}">${sanitizeHTML(message)}</div>`;
+            setTimeout(() => container.innerHTML = '', 5000);
+        }
+    </script>
+</body>
+</html>

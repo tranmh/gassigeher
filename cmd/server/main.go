@@ -525,6 +525,13 @@ func main() {
 	protected.HandleFunc("/bookings/{id}/notes", bookingHandler.AddNotes).Methods("PUT")
 	protected.HandleFunc("/bookings/calendar/{year}/{month}", bookingHandler.GetCalendarData).Methods("GET")
 
+	// Recurring bookings (authenticated users)
+	protected.HandleFunc("/bookings/recurring/preview", bookingHandler.PreviewRecurringBooking).Methods("POST")
+	protected.HandleFunc("/bookings/recurring", bookingHandler.GetMyRecurringSeries).Methods("GET")
+	protected.HandleFunc("/bookings/recurring", bookingHandler.CreateRecurringBooking).Methods("POST")
+	protected.HandleFunc("/bookings/recurring/{id}", bookingHandler.GetRecurringSeries).Methods("GET")
+	protected.HandleFunc("/bookings/recurring/{id}/cancel", bookingHandler.CancelRecurringSeries).Methods("PUT")
+
 	// Blocked dates (read-only for authenticated users)
 	protected.HandleFunc("/blocked-dates", blockedDateHandler.ListBlockedDates).Methods("GET")
 
@@ -678,6 +685,12 @@ func main() {
 	admin.HandleFunc("/bookings/pending-approvals", bookingHandler.GetPendingApprovals).Methods("GET")
 	admin.HandleFunc("/bookings/{id}/approve", bookingHandler.ApprovePendingBooking).Methods("PUT")
 	admin.HandleFunc("/bookings/{id}/reject", bookingHandler.RejectPendingBooking).Methods("PUT")
+
+	// Recurring booking management (admin only)
+	admin.HandleFunc("/admin/bookings/recurring", bookingHandler.AdminListRecurringSeries).Methods("GET")
+	admin.HandleFunc("/admin/bookings/recurring/{id}/cancel", bookingHandler.AdminCancelRecurringSeries).Methods("PUT")
+	admin.HandleFunc("/admin/bookings/recurring/{id}/approve", bookingHandler.AdminApproveRecurringSeries).Methods("PUT")
+	admin.HandleFunc("/admin/bookings/recurring/{id}/reject", bookingHandler.AdminRejectRecurringSeries).Methods("PUT")
 
 	// DONE: Phase 4 - Super Admin routes (authenticated + admin + super admin)
 	superAdmin := admin.PathPrefix("").Subrouter()
@@ -936,12 +949,12 @@ func main() {
 	wrappedRouter := middleware.WrapWithVersionRedirect(router)
 
 	srv := &http.Server{
-		Addr:         ":" + port,
-		Handler:      wrappedRouter,
-		ReadTimeout:  60 * time.Second,  // Increased from 15s for file uploads
-		WriteTimeout: 60 * time.Second,  // Increased from 15s for file uploads
-		IdleTimeout:  120 * time.Second, // Increased from 60s for keep-alive connections
-		MaxHeaderBytes: 1 << 20,         // 1MB max header size (DoS protection)
+		Addr:           ":" + port,
+		Handler:        wrappedRouter,
+		ReadTimeout:    60 * time.Second,  // Increased from 15s for file uploads
+		WriteTimeout:   60 * time.Second,  // Increased from 15s for file uploads
+		IdleTimeout:    120 * time.Second, // Increased from 60s for keep-alive connections
+		MaxHeaderBytes: 1 << 20,           // 1MB max header size (DoS protection)
 	}
 
 	// Channel to listen for shutdown signals

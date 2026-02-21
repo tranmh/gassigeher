@@ -372,6 +372,48 @@ class API {
         return this.request('GET', `/bookings/calendar/${year}/${month}`);
     }
 
+    // RECURRING BOOKING ENDPOINTS
+
+    async previewRecurringBooking(data) {
+        return this.request('POST', '/bookings/recurring/preview', data);
+    }
+
+    async createRecurringBooking(data) {
+        return this.request('POST', '/bookings/recurring', data);
+    }
+
+    async getMyRecurringSeries() {
+        return this.request('GET', '/bookings/recurring');
+    }
+
+    async getRecurringSeries(id) {
+        return this.request('GET', `/bookings/recurring/${id}`);
+    }
+
+    async cancelRecurringSeries(id, reason = null) {
+        return this.request('PUT', `/bookings/recurring/${id}/cancel`, { reason });
+    }
+
+    // ADMIN RECURRING BOOKING ENDPOINTS
+
+    async adminListRecurringSeries(filters = {}) {
+        const params = new URLSearchParams(filters);
+        const endpoint = `/admin/bookings/recurring${params.toString() ? '?' + params.toString() : ''}`;
+        return this.request('GET', endpoint);
+    }
+
+    async adminCancelRecurringSeries(id, reason) {
+        return this.request('PUT', `/admin/bookings/recurring/${id}/cancel`, { reason });
+    }
+
+    async adminApproveRecurringSeries(id) {
+        return this.request('PUT', `/admin/bookings/recurring/${id}/approve`);
+    }
+
+    async adminRejectRecurringSeries(id, reason) {
+        return this.request('PUT', `/admin/bookings/recurring/${id}/reject`, { reason });
+    }
+
     // BLOCKED DATES ENDPOINTS
 
     async getBlockedDates() {

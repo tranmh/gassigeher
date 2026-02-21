@@ -693,3 +693,80 @@ describe('API class - Walk Report Endpoints', () => {
     }));
   });
 });
+
+describe('API class - Recurring Booking Endpoints', () => {
+  beforeEach(() => {
+    fetchMock.mockResolvedValue(mockResponse({}));
+  });
+
+  test('previewRecurringBooking should POST preview data', async () => {
+    const data = { dog_id: 1, recurrence_type: 'weekly', day_of_week: 2, scheduled_time: '09:00', start_date: '2026-03-01', weeks: 4 };
+    await window.api.previewRecurringBooking(data);
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/bookings/recurring/preview', expect.objectContaining({
+      method: 'POST',
+    }));
+  });
+
+  test('createRecurringBooking should POST booking data', async () => {
+    const data = { dog_id: 1, recurrence_type: 'weekly', day_of_week: 2, scheduled_time: '09:00', start_date: '2026-03-01', weeks: 4, selected_dates: ['2026-03-03'] };
+    await window.api.createRecurringBooking(data);
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/bookings/recurring', expect.objectContaining({
+      method: 'POST',
+    }));
+  });
+
+  test('getMyRecurringSeries should GET user series', async () => {
+    await window.api.getMyRecurringSeries();
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/bookings/recurring', expect.anything());
+  });
+
+  test('getRecurringSeries should GET specific series', async () => {
+    await window.api.getRecurringSeries(7);
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/bookings/recurring/7', expect.anything());
+  });
+
+  test('cancelRecurringSeries should PUT cancel with reason', async () => {
+    await window.api.cancelRecurringSeries(7, 'No longer needed');
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/bookings/recurring/7/cancel', expect.objectContaining({
+      method: 'PUT',
+    }));
+  });
+
+  test('cancelRecurringSeries should PUT cancel without reason', async () => {
+    await window.api.cancelRecurringSeries(7);
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/bookings/recurring/7/cancel', expect.objectContaining({
+      method: 'PUT',
+    }));
+  });
+
+  test('adminListRecurringSeries should GET with filters', async () => {
+    await window.api.adminListRecurringSeries({ status: 'active', dog_id: '3' });
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/bookings/recurring?status=active&dog_id=3', expect.anything());
+  });
+
+  test('adminListRecurringSeries should GET without filters', async () => {
+    await window.api.adminListRecurringSeries();
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/bookings/recurring', expect.anything());
+  });
+
+  test('adminCancelRecurringSeries should PUT cancel', async () => {
+    await window.api.adminCancelRecurringSeries(5, 'Admin reason');
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/bookings/recurring/5/cancel', expect.objectContaining({
+      method: 'PUT',
+    }));
+  });
+
+  test('adminApproveRecurringSeries should PUT approve', async () => {
+    await window.api.adminApproveRecurringSeries(5);
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/bookings/recurring/5/approve', expect.objectContaining({
+      method: 'PUT',
+    }));
+  });
+
+  test('adminRejectRecurringSeries should PUT reject with reason', async () => {
+    await window.api.adminRejectRecurringSeries(5, 'Not suitable');
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/bookings/recurring/5/reject', expect.objectContaining({
+      method: 'PUT',
+    }));
+  });
+});

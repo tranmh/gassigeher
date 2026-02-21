@@ -61,6 +61,14 @@
                 </div>
             </div>
 
+            <!-- Recurring Bookings -->
+            <div class="card" id="recurring-bookings-card" style="display: none;">
+                <h2 data-i18n="recurring.my_series">Meine wiederkehrenden Buchungen</h2>
+                <div id="recurring-bookings">
+                    <p data-i18n="common.loading">Laden...</p>
+                </div>
+            </div>
+
             <!-- Past Bookings -->
             <div class="card">
                 <h2 data-i18n="dashboard.walk_history">Spaziergangshistorie</h2>
@@ -201,7 +209,8 @@
             'cancel-booking': function(e, id) { e.preventDefault(); cancelBooking(parseInt(id)); },
             'open-walk-report-modal': function(e, id) { e.preventDefault(); openWalkReportModal(parseInt(id)); },
             'view-walk-report': function(e, id) { e.preventDefault(); viewWalkReport(parseInt(id)); },
-            'delete-report-photo': function(e, id, el) { e.preventDefault(); deleteReportPhoto(parseInt(el.dataset.reportId), parseInt(el.dataset.photoId)); }
+            'delete-report-photo': function(e, id, el) { e.preventDefault(); deleteReportPhoto(parseInt(el.dataset.reportId), parseInt(el.dataset.photoId)); },
+            'cancel-recurring-series': function(e, id) { e.preventDefault(); cancelRecurringSeries(parseInt(id)); }
         });
 
         // Register change handlers
@@ -238,6 +247,7 @@
                 showAdminLinkIfAdmin(currentUser);
 
                 loadUpcomingBookings();
+                loadRecurringBookings();
                 loadPastBookings();
                 loadWhatsAppButton();
             } catch (error) {
@@ -415,6 +425,68 @@
                 }).join('');
             } catch (error) {
                 document.getElementById('past-bookings').innerHTML = `<p class="alert alert-error">${sanitizeHTML(error.message)}</p>`;
+            }
+        }
+
+        // Recurring Bookings
+        async function loadRecurringBookings() {
+            try {
+                const seriesList = (await api.getMyRecurringSeries()) || [];
+                const container = document.getElementById('recurring-bookings');
+                const card = document.getElementById('recurring-bookings-card');
+
+                // Only show active series
+                const activeSeries = seriesList.filter(s => s.status === 'active');
+
+                if (activeSeries.length === 0) {
+                    card.style.display = 'none';
+                    return;
+                }
+
+                card.style.display = '';
+                const dayNames = [
+                    i18n.t('recurring.sunday'), i18n.t('recurring.monday'), i18n.t('recurring.tuesday'),
+                    i18n.t('recurring.wednesday'), i18n.t('recurring.thursday'), i18n.t('recurring.friday'),
+                    i18n.t('recurring.saturday')
+                ];
+
+                container.innerHTML = activeSeries.map(series => {
+                    const dogName = series.dog ? sanitizeHTML(series.dog.name) : i18n.t('recurring.unknown');
+                    const pattern = series.recurrence_type === 'weekly'
+                        ? i18n.t('recurring.every_weekday').replace('{day}', dayNames[series.day_of_week || 0])
+                        : i18n.t('recurring.every_n_days').replace('{days}', series.interval_days);
+                    const endDate = new Date(series.end_date + 'T00:00:00').toLocaleDateString('de-DE');
+
+                    return `
+                    <div class="card" style="margin-bottom: 15px; padding: 20px; border-left: 4px solid #82b965;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+                            <div>
+                                <h4 style="margin: 0 0 5px 0;">${dogName}</h4>
+                                <p style="margin: 0; color: #666;">
+                                    🔁 ${sanitizeHTML(pattern)} ${i18n.t('recurring.time_at')} ${sanitizeHTML(series.scheduled_time)} ${i18n.t('recurring.time_suffix')}<br>
+                                    📅 ${i18n.t('recurring.until')} ${endDate}<br>
+                                    📊 ${series.remaining_bookings} ${i18n.t('recurring.dates_remaining')}
+                                </p>
+                            </div>
+                            <button class="btn btn-danger btn-sm" data-action="cancel-recurring-series" data-id="${series.id}">${i18n.t('recurring.cancel_series')}</button>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (error) {
+                console.error('Failed to load recurring bookings:', error);
+                document.getElementById('recurring-bookings-card').style.display = 'none';
+            }
+        }
+
+        async function cancelRecurringSeries(id) {
+            if (!confirm(i18n.t('recurring.cancel_series_confirm'))) return;
+            try {
+                const result = await api.cancelRecurringSeries(id);
+                showAlert('success', i18n.t('recurring.cancel_success').replace('{count}', result.cancelled_count || 0));
+                loadRecurringBookings();
+                loadUpcomingBookings();
+            } catch (error) {
+                showAlert('error', error.message || i18n.t('recurring.cancel_error'));
             }
         }
 

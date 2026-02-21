@@ -68,8 +68,8 @@ func TestSettingsRepository_GetAll(t *testing.T) {
 			t.Fatalf("GetAll() failed: %v", err)
 		}
 
-		if len(settings) != 13 {
-			t.Errorf("Expected 13 settings, got %d", len(settings))
+		if len(settings) != 15 {
+			t.Errorf("Expected 15 settings, got %d", len(settings))
 		}
 
 		// Verify all expected settings are present

@@ -8,7 +8,7 @@ type Booking struct {
 	TenantID                int        `json:"tenant_id,omitempty"` // SaaS: Tenant this booking belongs to
 	UserID                  int        `json:"user_id"`
 	DogID                   int        `json:"dog_id"`
-	Date                    string     `json:"date"` // YYYY-MM-DD format
+	Date                    string     `json:"date"`           // YYYY-MM-DD format
 	ScheduledTime           string     `json:"scheduled_time"` // HH:MM format
 	Status                  string     `json:"status"`
 	CompletedAt             *time.Time `json:"completed_at,omitempty"`
@@ -25,6 +25,9 @@ type Booking struct {
 	ApprovedAt       *time.Time `json:"approved_at,omitempty"`
 	RejectionReason  *string    `json:"rejection_reason,omitempty"`
 
+	// Recurring booking link
+	RecurrenceID *int `json:"recurrence_id,omitempty"`
+
 	// Joined data for responses
 	User *User `json:"user,omitempty"`
 	Dog  *Dog  `json:"dog,omitempty"`
@@ -33,7 +36,7 @@ type Booking struct {
 // CreateBookingRequest represents a request to create a booking
 type CreateBookingRequest struct {
 	DogID         int    `json:"dog_id"`
-	Date          string `json:"date"` // YYYY-MM-DD
+	Date          string `json:"date"`           // YYYY-MM-DD
 	ScheduledTime string `json:"scheduled_time"` // HH:MM
 }
 
@@ -93,10 +96,10 @@ type BookingFilterRequest struct {
 
 // CalendarDay represents a day in the calendar with bookings
 type CalendarDay struct {
-	Date     string     `json:"date"`
-	Bookings []*Booking `json:"bookings"`
-	IsBlocked bool      `json:"is_blocked"`
-	BlockedReason *string `json:"blocked_reason,omitempty"`
+	Date          string     `json:"date"`
+	Bookings      []*Booking `json:"bookings"`
+	IsBlocked     bool       `json:"is_blocked"`
+	BlockedReason *string    `json:"blocked_reason,omitempty"`
 }
 
 // CalendarResponse represents a month view of the calendar

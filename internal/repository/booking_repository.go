@@ -50,8 +50,8 @@ func NewBookingRepository(db DBExecutor) *BookingRepository {
 // SaaS: Now includes tenant_id for multi-tenancy
 func (r *BookingRepository) Create(booking *models.Booking) error {
 	query := `
-		INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, requires_approval, approval_status, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, requires_approval, approval_status, recurrence_id, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	now := time.Now()
@@ -78,6 +78,7 @@ func (r *BookingRepository) Create(booking *models.Booking) error {
 		booking.Status,
 		r.db.BoolValue(booking.RequiresApproval),
 		booking.ApprovalStatus,
+		booking.RecurrenceID,
 		now,
 		now,
 	)
@@ -1007,4 +1008,188 @@ func (r *BookingRepository) FindUpcomingByUser(userID int, tenantID int) ([]*mod
 	}
 
 	return bookings, nil
+}
+
+// CancelFutureByRecurrenceID cancels all future scheduled bookings in a recurring series
+// Returns the count of cancelled bookings
+func (r *BookingRepository) CancelFutureByRecurrenceID(recurrenceID, tenantID int, reason string) (int, error) {
+	currentDate := getBerlinTime().Format("2006-01-02")
+
+	query := `
+		UPDATE bookings
+		SET status = 'cancelled', admin_cancellation_reason = ?, updated_at = ?
+		WHERE recurrence_id = ? AND tenant_id = ? AND status = 'scheduled' AND date >= ?
+	`
+
+	result, err := r.db.Exec(query, reason, time.Now(), recurrenceID, tenantID, currentDate)
+	if err != nil {
+		return 0, fmt.Errorf("failed to cancel future bookings by recurrence: %w", err)
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	return int(affected), nil
+}
+
+// CancelFutureByDogID cancels all future scheduled bookings for a dog
+// Returns the affected bookings with user info for notification emails
+func (r *BookingRepository) CancelFutureByDogID(dogID, tenantID int, reason string) ([]*models.Booking, error) {
+	currentDate := getBerlinTime().Format("2006-01-02")
+
+	// First, get the bookings that will be cancelled (with user info for email notifications)
+	selectQuery := `
+		SELECT b.id, b.tenant_id, b.user_id, b.dog_id, b.date, b.scheduled_time, b.recurrence_id,
+		       u.email, u.first_name, u.last_name
+		FROM bookings b
+		LEFT JOIN users u ON b.user_id = u.id
+		WHERE b.dog_id = ? AND b.tenant_id = ? AND b.status = 'scheduled' AND b.date >= ?
+	`
+
+	rows, err := r.db.Query(selectQuery, dogID, tenantID, currentDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query future bookings for dog: %w", err)
+	}
+	defer rows.Close()
+
+	var cancelledBookings []*models.Booking
+	for rows.Next() {
+		b := &models.Booking{}
+		var recurrenceID sql.NullInt64
+		var email, firstName, lastName sql.NullString
+
+		err := rows.Scan(
+			&b.ID, &b.TenantID, &b.UserID, &b.DogID, &b.Date, &b.ScheduledTime, &recurrenceID,
+			&email, &firstName, &lastName,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan booking: %w", err)
+		}
+
+		if recurrenceID.Valid {
+			rid := int(recurrenceID.Int64)
+			b.RecurrenceID = &rid
+		}
+
+		b.User = &models.User{ID: b.UserID}
+		if email.Valid {
+			b.User.Email = &email.String
+		}
+		if firstName.Valid {
+			b.User.FirstName = firstName.String
+		}
+		if lastName.Valid {
+			b.User.LastName = lastName.String
+		}
+
+		b.Date = normalizeDate(b.Date)
+		cancelledBookings = append(cancelledBookings, b)
+	}
+
+	// Now cancel all the bookings
+	updateQuery := `
+		UPDATE bookings
+		SET status = 'cancelled', admin_cancellation_reason = ?, updated_at = ?
+		WHERE dog_id = ? AND tenant_id = ? AND status = 'scheduled' AND date >= ?
+	`
+
+	_, err = r.db.Exec(updateQuery, reason, time.Now(), dogID, tenantID, currentDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to cancel future bookings for dog: %w", err)
+	}
+
+	return cancelledBookings, nil
+}
+
+// FindByRecurrenceID finds all bookings belonging to a recurring series
+func (r *BookingRepository) FindByRecurrenceID(recurrenceID, tenantID int) ([]*models.Booking, error) {
+	query := `
+		SELECT id, tenant_id, user_id, dog_id, date, scheduled_time, status,
+		       completed_at, user_notes, admin_cancellation_reason,
+		       requires_approval, approval_status, recurrence_id,
+		       created_at, updated_at
+		FROM bookings
+		WHERE recurrence_id = ? AND tenant_id = ?
+		ORDER BY date ASC, scheduled_time ASC
+	`
+
+	rows, err := r.db.Query(query, recurrenceID, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find bookings by recurrence: %w", err)
+	}
+	defer rows.Close()
+
+	var bookings []*models.Booking
+	for rows.Next() {
+		b := &models.Booking{}
+		var recID sql.NullInt64
+		err := rows.Scan(
+			&b.ID, &b.TenantID, &b.UserID, &b.DogID, &b.Date, &b.ScheduledTime, &b.Status,
+			&b.CompletedAt, &b.UserNotes, &b.AdminCancellationReason,
+			&b.RequiresApproval, &b.ApprovalStatus, &recID,
+			&b.CreatedAt, &b.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan booking: %w", err)
+		}
+		if recID.Valid {
+			rid := int(recID.Int64)
+			b.RecurrenceID = &rid
+		}
+		b.Date = normalizeDate(b.Date)
+		bookings = append(bookings, b)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating bookings by recurrence: %w", err)
+	}
+
+	return bookings, nil
+}
+
+// ApproveByRecurrenceID approves all pending bookings in a recurring series
+func (r *BookingRepository) ApproveByRecurrenceID(recurrenceID, tenantID, adminID int) (int, error) {
+	query := `
+		UPDATE bookings
+		SET approval_status = 'approved', approved_by = ?, approved_at = ?, updated_at = ?
+		WHERE recurrence_id = ? AND tenant_id = ? AND approval_status = 'pending' AND status = 'scheduled'
+	`
+
+	now := time.Now()
+	result, err := r.db.Exec(query, adminID, now, now, recurrenceID, tenantID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to approve bookings by recurrence: %w", err)
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	return int(affected), nil
+}
+
+// RejectByRecurrenceID rejects all pending bookings in a recurring series
+func (r *BookingRepository) RejectByRecurrenceID(recurrenceID, tenantID, adminID int, reason string) (int, error) {
+	query := `
+		UPDATE bookings
+		SET approval_status = 'rejected', status = 'cancelled', rejection_reason = ?,
+		    approved_by = ?, approved_at = ?, updated_at = ?
+		WHERE recurrence_id = ? AND tenant_id = ? AND approval_status = 'pending' AND status = 'scheduled'
+	`
+
+	now := time.Now()
+	result, err := r.db.Exec(query, reason, adminID, now, now, recurrenceID, tenantID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to reject bookings by recurrence: %w", err)
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	return int(affected), nil
 }
