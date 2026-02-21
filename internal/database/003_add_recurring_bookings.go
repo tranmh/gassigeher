@@ -16,8 +16,8 @@ CREATE TABLE IF NOT EXISTS recurring_booking_series (
   day_of_week INTEGER CHECK(day_of_week >= 0 AND day_of_week <= 6),
   interval_days INTEGER CHECK(interval_days > 0),
   scheduled_time TEXT NOT NULL,
-  start_date TEXT NOT NULL,
-  end_date TEXT NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
   status TEXT DEFAULT 'active' CHECK(status IN ('active', 'cancelled', 'completed')),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

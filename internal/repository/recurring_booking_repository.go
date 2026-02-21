@@ -55,56 +55,6 @@ func (r *RecurringBookingRepository) Create(series *models.RecurringBookingSerie
 	return nil
 }
 
-// FindByID finds a recurring booking series by ID
-func (r *RecurringBookingRepository) FindByID(id int) (*models.RecurringBookingSeries, error) {
-	query := `
-		SELECT id, tenant_id, user_id, dog_id, recurrence_type, day_of_week, interval_days,
-		       scheduled_time, start_date, end_date, status, created_at, updated_at
-		FROM recurring_booking_series
-		WHERE id = ?
-	`
-
-	series := &models.RecurringBookingSeries{}
-	var dayOfWeek, intervalDays sql.NullInt64
-
-	err := r.db.QueryRow(query, id).Scan(
-		&series.ID,
-		&series.TenantID,
-		&series.UserID,
-		&series.DogID,
-		&series.RecurrenceType,
-		&dayOfWeek,
-		&intervalDays,
-		&series.ScheduledTime,
-		&series.StartDate,
-		&series.EndDate,
-		&series.Status,
-		&series.CreatedAt,
-		&series.UpdatedAt,
-	)
-
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to find recurring booking series: %w", err)
-	}
-
-	if dayOfWeek.Valid {
-		dow := int(dayOfWeek.Int64)
-		series.DayOfWeek = &dow
-	}
-	if intervalDays.Valid {
-		id := int(intervalDays.Int64)
-		series.IntervalDays = &id
-	}
-
-	series.StartDate = normalizeDate(series.StartDate)
-	series.EndDate = normalizeDate(series.EndDate)
-
-	return series, nil
-}
-
 // FindByIDAndTenant finds a recurring booking series by ID with tenant isolation
 func (r *RecurringBookingRepository) FindByIDAndTenant(id int, tenantID int) (*models.RecurringBookingSeries, error) {
 	query := `
@@ -168,7 +118,8 @@ func (r *RecurringBookingRepository) FindByUserID(userID, tenantID int) ([]*mode
 }
 
 // FindAll finds all recurring series for a tenant with optional filters
-func (r *RecurringBookingRepository) FindAll(filter *models.RecurringBookingFilterRequest) ([]*models.RecurringBookingSeries, error) {
+// tenantID is mandatory for tenant isolation (use 0 for Simple-Mode)
+func (r *RecurringBookingRepository) FindAll(tenantID int, filter *models.RecurringBookingFilterRequest) ([]*models.RecurringBookingSeries, error) {
 	query := `
 		SELECT rbs.id, rbs.tenant_id, rbs.user_id, rbs.dog_id, rbs.recurrence_type,
 		       rbs.day_of_week, rbs.interval_days, rbs.scheduled_time, rbs.start_date,
@@ -176,15 +127,11 @@ func (r *RecurringBookingRepository) FindAll(filter *models.RecurringBookingFilt
 		       d.name, d.breed, d.photo_thumbnail
 		FROM recurring_booking_series rbs
 		LEFT JOIN dogs d ON rbs.dog_id = d.id AND d.tenant_id = rbs.tenant_id
-		WHERE 1=1
+		WHERE rbs.tenant_id = ?
 	`
-	args := []interface{}{}
+	args := []interface{}{tenantID}
 
 	if filter != nil {
-		if filter.TenantID != nil {
-			query += " AND rbs.tenant_id = ?"
-			args = append(args, *filter.TenantID)
-		}
 		if filter.UserID != nil {
 			query += " AND rbs.user_id = ?"
 			args = append(args, *filter.UserID)

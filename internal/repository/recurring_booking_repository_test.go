@@ -69,7 +69,8 @@ func TestRecurringBookingRepository_Create_Interval(t *testing.T) {
 	}
 }
 
-func TestRecurringBookingRepository_FindByID(t *testing.T) {
+// Bug #2: Tests now use FindByIDAndTenant (FindByID without tenant removed for tenant safety)
+func TestRecurringBookingRepository_CreateAndFindByIDAndTenant(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
@@ -91,12 +92,12 @@ func TestRecurringBookingRepository_FindByID(t *testing.T) {
 		t.Fatalf("Create() error: %v", err)
 	}
 
-	found, err := repo.FindByID(series.ID)
+	found, err := repo.FindByIDAndTenant(series.ID, 0)
 	if err != nil {
-		t.Fatalf("FindByID() error: %v", err)
+		t.Fatalf("FindByIDAndTenant() error: %v", err)
 	}
 	if found == nil {
-		t.Fatal("FindByID() returned nil")
+		t.Fatal("FindByIDAndTenant() returned nil")
 	}
 
 	if found.UserID != 1 {
@@ -125,15 +126,15 @@ func TestRecurringBookingRepository_FindByID(t *testing.T) {
 	}
 }
 
-func TestRecurringBookingRepository_FindByID_NotFound(t *testing.T) {
+func TestRecurringBookingRepository_FindByIDAndTenant_NotFound(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
 	repo := NewRecurringBookingRepository(db)
 
-	found, err := repo.FindByID(99999)
-	if err != nil {
-		t.Fatalf("FindByID() error: %v", err)
+	found, err := repo.FindByIDAndTenant(99999, 0)
+	if err != ErrNotFound {
+		t.Errorf("Expected ErrNotFound, got: %v", err)
 	}
 	if found != nil {
 		t.Error("Expected nil for non-existent ID")
@@ -287,9 +288,9 @@ func TestRecurringBookingRepository_Cancel(t *testing.T) {
 	}
 
 	// Verify status changed
-	found, err := repo.FindByID(series.ID)
+	found, err := repo.FindByIDAndTenant(series.ID, 0)
 	if err != nil {
-		t.Fatalf("FindByID() error: %v", err)
+		t.Fatalf("FindByIDAndTenant() error: %v", err)
 	}
 	if found.Status != "cancelled" {
 		t.Errorf("Expected status 'cancelled', got %q", found.Status)
@@ -337,9 +338,9 @@ func TestRecurringBookingRepository_Cancel_WrongTenant(t *testing.T) {
 	}
 
 	// Verify series is still active
-	found, err := repo.FindByID(series.ID)
+	found, err := repo.FindByIDAndTenant(series.ID, 0)
 	if err != nil {
-		t.Fatalf("FindByID() error: %v", err)
+		t.Fatalf("FindByIDAndTenant() error: %v", err)
 	}
 	if found.Status != "active" {
 		t.Errorf("Expected status 'active' (unchanged), got %q", found.Status)
@@ -373,9 +374,9 @@ func TestRecurringBookingRepository_MarkCompleted(t *testing.T) {
 		t.Fatalf("MarkCompleted() error: %v", err)
 	}
 
-	found, err := repo.FindByID(series.ID)
+	found, err := repo.FindByIDAndTenant(series.ID, 0)
 	if err != nil {
-		t.Fatalf("FindByID() error: %v", err)
+		t.Fatalf("FindByIDAndTenant() error: %v", err)
 	}
 	if found.Status != "completed" {
 		t.Errorf("Expected status 'completed', got %q", found.Status)
@@ -537,9 +538,8 @@ func TestRecurringBookingRepository_FindAll(t *testing.T) {
 		}
 	}
 
-	// Find all with no filter
-	tenantID := 0
-	all, err := repo.FindAll(&models.RecurringBookingFilterRequest{TenantID: &tenantID})
+	// Find all with no filter — tenantID is now a mandatory parameter
+	all, err := repo.FindAll(0, nil)
 	if err != nil {
 		t.Fatalf("FindAll() error: %v", err)
 	}
@@ -549,9 +549,8 @@ func TestRecurringBookingRepository_FindAll(t *testing.T) {
 
 	// Filter by status = active
 	activeStatus := "active"
-	active, err := repo.FindAll(&models.RecurringBookingFilterRequest{
-		TenantID: &tenantID,
-		Status:   &activeStatus,
+	active, err := repo.FindAll(0, &models.RecurringBookingFilterRequest{
+		Status: &activeStatus,
 	})
 	if err != nil {
 		t.Fatalf("FindAll(active) error: %v", err)
@@ -562,9 +561,8 @@ func TestRecurringBookingRepository_FindAll(t *testing.T) {
 
 	// Filter by user_id
 	userID := 1
-	byUser, err := repo.FindAll(&models.RecurringBookingFilterRequest{
-		TenantID: &tenantID,
-		UserID:   &userID,
+	byUser, err := repo.FindAll(0, &models.RecurringBookingFilterRequest{
+		UserID: &userID,
 	})
 	if err != nil {
 		t.Fatalf("FindAll(user_id=1) error: %v", err)
@@ -575,9 +573,8 @@ func TestRecurringBookingRepository_FindAll(t *testing.T) {
 
 	// Filter by dog_id
 	dogID := 2
-	byDog, err := repo.FindAll(&models.RecurringBookingFilterRequest{
-		TenantID: &tenantID,
-		DogID:    &dogID,
+	byDog, err := repo.FindAll(0, &models.RecurringBookingFilterRequest{
+		DogID: &dogID,
 	})
 	if err != nil {
 		t.Fatalf("FindAll(dog_id=2) error: %v", err)
@@ -847,5 +844,92 @@ func TestBookingRepository_RejectByRecurrenceID(t *testing.T) {
 		if b.Status != "cancelled" {
 			t.Errorf("Expected status 'cancelled', got %q", b.Status)
 		}
+	}
+}
+
+// Bug #2: FindByID without tenant_id should not exist — use FindByIDAndTenant instead
+// This test verifies that FindByID is no longer exposed (compile-time check via test usage)
+// and that FindByIDAndTenant enforces tenant isolation
+func TestRecurringBookingRepository_FindByIDAndTenant_TenantIsolation(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewRecurringBookingRepository(db)
+
+	dayOfWeek := 1
+	series := &models.RecurringBookingSeries{
+		TenantID:       0,
+		UserID:         1,
+		DogID:          1,
+		RecurrenceType: "weekly",
+		DayOfWeek:      &dayOfWeek,
+		ScheduledTime:  "09:00",
+		StartDate:      "2026-03-01",
+		EndDate:        "2026-04-01",
+	}
+	if err := repo.Create(series); err != nil {
+		t.Fatalf("Create() error: %v", err)
+	}
+
+	// Should find with correct tenant
+	found, err := repo.FindByIDAndTenant(series.ID, 0)
+	if err != nil {
+		t.Fatalf("FindByIDAndTenant(correct tenant) error: %v", err)
+	}
+	if found == nil {
+		t.Fatal("Expected to find series with correct tenant_id=0")
+	}
+
+	// Should NOT find with wrong tenant — tenant isolation enforced
+	found, err = repo.FindByIDAndTenant(series.ID, 999)
+	if err != ErrNotFound {
+		t.Errorf("Expected ErrNotFound for wrong tenant, got: %v", err)
+	}
+	if found != nil {
+		t.Error("Expected nil for wrong tenant")
+	}
+}
+
+// Bug #3: FindAll must require tenant_id — calling with nil filter should error or return empty
+func TestRecurringBookingRepository_FindAll_RequiresTenantID(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewRecurringBookingRepository(db)
+
+	dayOfWeek := 1
+	series := &models.RecurringBookingSeries{
+		TenantID:       0,
+		UserID:         1,
+		DogID:          1,
+		RecurrenceType: "weekly",
+		DayOfWeek:      &dayOfWeek,
+		ScheduledTime:  "09:00",
+		StartDate:      "2026-03-01",
+		EndDate:        "2026-04-01",
+	}
+	if err := repo.Create(series); err != nil {
+		t.Fatalf("Create() error: %v", err)
+	}
+
+	// Calling FindAll with mandatory tenantID parameter should work
+	tenantID := 0
+	results, err := repo.FindAll(tenantID, &models.RecurringBookingFilterRequest{
+		Status: nil,
+	})
+	if err != nil {
+		t.Fatalf("FindAll(tenantID=0) error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Errorf("Expected 1 result for tenant 0, got %d", len(results))
+	}
+
+	// Wrong tenant should return 0 results
+	results, err = repo.FindAll(999, nil)
+	if err != nil {
+		t.Fatalf("FindAll(tenantID=999) error: %v", err)
+	}
+	if len(results) != 0 {
+		t.Errorf("Expected 0 results for tenant 999, got %d", len(results))
 	}
 }

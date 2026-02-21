@@ -1893,3 +1893,120 @@ func TestBookingRepository_CountDailyBookingsForDog(t *testing.T) {
 		}
 	})
 }
+
+// Bug #4: FindByID and FindAll should include recurrence_id in SELECT/Scan
+func TestBookingRepository_FindByID_IncludesRecurrenceID(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewBookingRepository(db)
+
+	// Create a recurring series first
+	recurrenceID := 42
+	_, err := db.Exec(`
+		INSERT INTO recurring_booking_series (id, tenant_id, user_id, dog_id, recurrence_type, day_of_week, scheduled_time, start_date, end_date, status)
+		VALUES (?, 0, 1, 1, 'weekly', 1, '09:00', '2026-03-01', '2026-04-01', 'active')
+	`, recurrenceID)
+	if err != nil {
+		t.Fatalf("Failed to create recurring series: %v", err)
+	}
+
+	// Create booking with recurrence_id
+	booking := &models.Booking{
+		TenantID:      0,
+		UserID:        1,
+		DogID:         1,
+		Date:          "2026-03-02",
+		ScheduledTime: "09:00",
+		RecurrenceID:  &recurrenceID,
+	}
+	if err := repo.Create(booking); err != nil {
+		t.Fatalf("Create() error: %v", err)
+	}
+
+	// FindByID should return recurrence_id
+	found, err := repo.FindByID(booking.ID)
+	if err != nil {
+		t.Fatalf("FindByID() error: %v", err)
+	}
+	if found.RecurrenceID == nil {
+		t.Fatal("Expected RecurrenceID to be non-nil, got nil")
+	}
+	if *found.RecurrenceID != recurrenceID {
+		t.Errorf("Expected RecurrenceID %d, got %d", recurrenceID, *found.RecurrenceID)
+	}
+}
+
+func TestBookingRepository_FindAll_IncludesRecurrenceID(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewBookingRepository(db)
+
+	// Create a recurring series
+	recurrenceID := 42
+	_, err := db.Exec(`
+		INSERT INTO recurring_booking_series (id, tenant_id, user_id, dog_id, recurrence_type, day_of_week, scheduled_time, start_date, end_date, status)
+		VALUES (?, 0, 1, 1, 'weekly', 1, '09:00', '2026-03-01', '2026-04-01', 'active')
+	`, recurrenceID)
+	if err != nil {
+		t.Fatalf("Failed to create recurring series: %v", err)
+	}
+
+	// Create booking with recurrence_id
+	booking := &models.Booking{
+		TenantID:      0,
+		UserID:        1,
+		DogID:         1,
+		Date:          "2026-03-02",
+		ScheduledTime: "09:00",
+		RecurrenceID:  &recurrenceID,
+	}
+	if err := repo.Create(booking); err != nil {
+		t.Fatalf("Create() error: %v", err)
+	}
+
+	// Create booking WITHOUT recurrence_id
+	normalBooking := &models.Booking{
+		TenantID:      0,
+		UserID:        1,
+		DogID:         2,
+		Date:          "2026-03-03",
+		ScheduledTime: "10:00",
+	}
+	if err := repo.Create(normalBooking); err != nil {
+		t.Fatalf("Create() error: %v", err)
+	}
+
+	// FindAll should return recurrence_id for the recurring booking
+	tenantID := 0
+	bookings, err := repo.FindAll(&models.BookingFilterRequest{TenantID: &tenantID})
+	if err != nil {
+		t.Fatalf("FindAll() error: %v", err)
+	}
+
+	var foundRecurring, foundNormal bool
+	for _, b := range bookings {
+		if b.ID == booking.ID {
+			foundRecurring = true
+			if b.RecurrenceID == nil {
+				t.Error("Expected recurring booking to have RecurrenceID, got nil")
+			} else if *b.RecurrenceID != recurrenceID {
+				t.Errorf("Expected RecurrenceID %d, got %d", recurrenceID, *b.RecurrenceID)
+			}
+		}
+		if b.ID == normalBooking.ID {
+			foundNormal = true
+			if b.RecurrenceID != nil {
+				t.Errorf("Expected normal booking to have nil RecurrenceID, got %d", *b.RecurrenceID)
+			}
+		}
+	}
+
+	if !foundRecurring {
+		t.Error("Recurring booking not found in FindAll results")
+	}
+	if !foundNormal {
+		t.Error("Normal booking not found in FindAll results")
+	}
+}

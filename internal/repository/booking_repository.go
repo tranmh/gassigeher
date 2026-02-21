@@ -99,13 +99,15 @@ func (r *BookingRepository) Create(booking *models.Booking) error {
 func (r *BookingRepository) FindByID(id int) (*models.Booking, error) {
 	query := `
 		SELECT id, tenant_id, user_id, dog_id, date, scheduled_time, status,
-		       completed_at, user_notes, admin_cancellation_reason, created_at, updated_at
+		       completed_at, user_notes, admin_cancellation_reason, recurrence_id,
+		       created_at, updated_at
 		FROM bookings
 		WHERE id = ?
 	`
 
 	booking := &models.Booking{}
 	var tenantID sql.NullInt64
+	var recurrenceID sql.NullInt64
 	err := r.db.QueryRow(query, id).Scan(
 		&booking.ID,
 		&tenantID,
@@ -117,6 +119,7 @@ func (r *BookingRepository) FindByID(id int) (*models.Booking, error) {
 		&booking.CompletedAt,
 		&booking.UserNotes,
 		&booking.AdminCancellationReason,
+		&recurrenceID,
 		&booking.CreatedAt,
 		&booking.UpdatedAt,
 	)
@@ -131,6 +134,10 @@ func (r *BookingRepository) FindByID(id int) (*models.Booking, error) {
 
 	if tenantID.Valid {
 		booking.TenantID = int(tenantID.Int64)
+	}
+	if recurrenceID.Valid {
+		rid := int(recurrenceID.Int64)
+		booking.RecurrenceID = &rid
 	}
 	booking.Date = normalizeDate(booking.Date)
 	return booking, nil
@@ -159,7 +166,8 @@ func (r *BookingRepository) FindByIDAndTenant(id int, tenantID int) (*models.Boo
 func (r *BookingRepository) FindAll(filter *models.BookingFilterRequest) ([]*models.Booking, error) {
 	query := `
 		SELECT id, tenant_id, user_id, dog_id, date, scheduled_time, status,
-		       completed_at, user_notes, admin_cancellation_reason, created_at, updated_at
+		       completed_at, user_notes, admin_cancellation_reason, recurrence_id,
+		       created_at, updated_at
 		FROM bookings
 		WHERE 1=1
 	`
@@ -221,6 +229,7 @@ func (r *BookingRepository) FindAll(filter *models.BookingFilterRequest) ([]*mod
 	for rows.Next() {
 		booking := &models.Booking{}
 		var tenantID sql.NullInt64
+		var recurrenceID sql.NullInt64
 		err := rows.Scan(
 			&booking.ID,
 			&tenantID,
@@ -232,6 +241,7 @@ func (r *BookingRepository) FindAll(filter *models.BookingFilterRequest) ([]*mod
 			&booking.CompletedAt,
 			&booking.UserNotes,
 			&booking.AdminCancellationReason,
+			&recurrenceID,
 			&booking.CreatedAt,
 			&booking.UpdatedAt,
 		)
@@ -240,6 +250,10 @@ func (r *BookingRepository) FindAll(filter *models.BookingFilterRequest) ([]*mod
 		}
 		if tenantID.Valid {
 			booking.TenantID = int(tenantID.Int64)
+		}
+		if recurrenceID.Valid {
+			rid := int(recurrenceID.Int64)
+			booking.RecurrenceID = &rid
 		}
 		booking.Date = normalizeDate(booking.Date)
 		bookings = append(bookings, booking)
@@ -1108,7 +1122,7 @@ func (r *BookingRepository) FindByRecurrenceID(recurrenceID, tenantID int) ([]*m
 	query := `
 		SELECT id, tenant_id, user_id, dog_id, date, scheduled_time, status,
 		       completed_at, user_notes, admin_cancellation_reason,
-		       requires_approval, approval_status, recurrence_id,
+		       requires_approval, approval_status, rejection_reason, recurrence_id,
 		       created_at, updated_at
 		FROM bookings
 		WHERE recurrence_id = ? AND tenant_id = ?
@@ -1128,7 +1142,7 @@ func (r *BookingRepository) FindByRecurrenceID(recurrenceID, tenantID int) ([]*m
 		err := rows.Scan(
 			&b.ID, &b.TenantID, &b.UserID, &b.DogID, &b.Date, &b.ScheduledTime, &b.Status,
 			&b.CompletedAt, &b.UserNotes, &b.AdminCancellationReason,
-			&b.RequiresApproval, &b.ApprovalStatus, &recID,
+			&b.RequiresApproval, &b.ApprovalStatus, &b.RejectionReason, &recID,
 			&b.CreatedAt, &b.UpdatedAt,
 		)
 		if err != nil {

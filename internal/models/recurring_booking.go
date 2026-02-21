@@ -27,8 +27,9 @@ type RecurringBookingSeries struct {
 	Bookings []*Booking `json:"bookings,omitempty"`
 
 	// Computed fields for responses
-	TotalBookings     int `json:"total_bookings,omitempty"`
-	RemainingBookings int `json:"remaining_bookings,omitempty"`
+	TotalBookings      int     `json:"total_bookings,omitempty"`
+	RemainingBookings  int     `json:"remaining_bookings,omitempty"`
+	CancellationReason *string `json:"cancellation_reason,omitempty"`
 }
 
 // CreateRecurringBookingRequest represents a request to create a recurring booking series
@@ -73,11 +74,11 @@ type RecurringBookingPreviewResponse struct {
 }
 
 // RecurringBookingFilterRequest represents filters for listing recurring series
+// Note: tenant_id is passed as a mandatory parameter to FindAll(), not as a filter field
 type RecurringBookingFilterRequest struct {
-	TenantID *int    `json:"tenant_id,omitempty"`
-	UserID   *int    `json:"user_id,omitempty"`
-	DogID    *int    `json:"dog_id,omitempty"`
-	Status   *string `json:"status,omitempty"`
+	UserID *int    `json:"user_id,omitempty"`
+	DogID  *int    `json:"dog_id,omitempty"`
+	Status *string `json:"status,omitempty"`
 }
 
 // Validate validates the create recurring booking request
@@ -184,7 +185,7 @@ func (r *CreateRecurringBookingRequest) ComputeEndDate() string {
 		return ""
 	}
 	startDate, _ := time.Parse("2006-01-02", r.StartDate)
-	endDate := startDate.AddDate(0, 0, *r.Weeks*7)
+	endDate := startDate.AddDate(0, 0, *r.Weeks*7-1)
 	return endDate.Format("2006-01-02")
 }
 

@@ -45,7 +45,7 @@ func (h *BookingHandler) PreviewRecurringBooking(w http.ResponseWriter, r *http.
 		endDate = *req.EndDate
 	} else if req.Weeks != nil {
 		startDate, _ := time.Parse("2006-01-02", req.StartDate)
-		endDate = startDate.AddDate(0, 0, *req.Weeks*7).Format("2006-01-02")
+		endDate = startDate.AddDate(0, 0, *req.Weeks*7-1).Format("2006-01-02")
 	}
 
 	// Check max weeks setting
@@ -663,9 +663,7 @@ func (h *BookingHandler) AdminListRecurringSeries(w http.ResponseWriter, r *http
 	}
 
 	// Parse filters
-	filter := &models.RecurringBookingFilterRequest{
-		TenantID: &tenantID,
-	}
+	filter := &models.RecurringBookingFilterRequest{}
 
 	if status := r.URL.Query().Get("status"); status != "" {
 		filter.Status = &status
@@ -681,7 +679,7 @@ func (h *BookingHandler) AdminListRecurringSeries(w http.ResponseWriter, r *http
 		}
 	}
 
-	seriesList, err := h.recurringBookingRepo.FindAll(filter)
+	seriesList, err := h.recurringBookingRepo.FindAll(tenantID, filter)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to fetch recurring series")
 		return
@@ -700,6 +698,20 @@ func (h *BookingHandler) AdminListRecurringSeries(w http.ResponseWriter, r *http
 				}
 			}
 			s.RemainingBookings = remaining
+
+			// Extract cancellation reason from bookings for cancelled/rejected series
+			if s.Status == "cancelled" {
+				for _, b := range bookings {
+					if b.AdminCancellationReason != nil && *b.AdminCancellationReason != "" {
+						s.CancellationReason = b.AdminCancellationReason
+						break
+					}
+					if b.RejectionReason != nil && *b.RejectionReason != "" {
+						s.CancellationReason = b.RejectionReason
+						break
+					}
+				}
+			}
 		}
 
 		// Attach user info

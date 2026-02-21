@@ -133,6 +133,13 @@ func main() {
 		log.Fatalf("Failed to seed database: %v", err)
 	}
 
+	// Ensure default booking time rules exist for Simple-Mode (tenant_id=0)
+	// This prevents "Zeit ist außerhalb der erlaubten Buchungszeiten" errors
+	// when rules were accidentally deleted after initial migration
+	if err := database.EnsureDefaultBookingRules(db.SqlDB(), dialect.Name()); err != nil {
+		log.Printf("Warning: Failed to ensure default booking rules: %v", err)
+	}
+
 	// Sync admin password from .env.secrets if it changed
 	adminPasswordService := services.NewAdminPasswordService(db, cfg)
 	if err := adminPasswordService.SyncPasswordFromEnv(); err != nil {

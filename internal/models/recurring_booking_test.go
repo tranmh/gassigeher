@@ -397,7 +397,7 @@ func TestCreateRecurringBookingRequest_ComputeEndDate(t *testing.T) {
 				StartDate: "2026-03-01",
 				Weeks:     intPtr(4),
 			},
-			expected: "2026-03-29",
+			expected: "2026-03-28",
 		},
 		{
 			name: "Computed from weeks (8 weeks)",
@@ -405,7 +405,7 @@ func TestCreateRecurringBookingRequest_ComputeEndDate(t *testing.T) {
 				StartDate: "2026-01-01",
 				Weeks:     intPtr(8),
 			},
-			expected: "2026-02-26",
+			expected: "2026-02-25",
 		},
 		{
 			name: "Computed from weeks (1 week)",
@@ -413,7 +413,7 @@ func TestCreateRecurringBookingRequest_ComputeEndDate(t *testing.T) {
 				StartDate: "2026-06-15",
 				Weeks:     intPtr(1),
 			},
-			expected: "2026-06-22",
+			expected: "2026-06-21",
 		},
 	}
 
@@ -594,5 +594,70 @@ func TestGenerateRecurringDates_Errors(t *testing.T) {
 	_, err = GenerateRecurringDates("weekly", intPtr(1), nil, "2026-03-01", "bad-date")
 	if err == nil {
 		t.Error("Expected error for invalid end date")
+	}
+}
+
+// Bug #1: Test off-by-one in ComputeEndDate — "4 weeks" should produce 4 occurrences, not 5
+func TestComputeEndDate_WeeksProducesCorrectOccurrences(t *testing.T) {
+	intPtr := func(v int) *int { return &v }
+
+	tests := []struct {
+		name      string
+		startDate string
+		dayOfWeek int
+		weeks     int
+		wantCount int
+	}{
+		{
+			name:      "4 weeks weekly Monday from Monday → 4 Mondays",
+			startDate: "2026-02-23", // Monday
+			dayOfWeek: 1,            // Monday
+			weeks:     4,
+			wantCount: 4,
+		},
+		{
+			name:      "1 week weekly Wednesday from Wednesday → 1 Wednesday",
+			startDate: "2026-03-04", // Wednesday
+			dayOfWeek: 3,            // Wednesday
+			weeks:     1,
+			wantCount: 1,
+		},
+		{
+			name:      "2 weeks weekly Friday from Friday → 2 Fridays",
+			startDate: "2026-03-06", // Friday
+			dayOfWeek: 5,            // Friday
+			weeks:     2,
+			wantCount: 2,
+		},
+		{
+			name:      "8 weeks weekly Tuesday from Tuesday → 8 Tuesdays",
+			startDate: "2026-03-03", // Tuesday
+			dayOfWeek: 2,            // Tuesday
+			weeks:     8,
+			wantCount: 8,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &CreateRecurringBookingRequest{
+				DogID:          1,
+				RecurrenceType: "weekly",
+				DayOfWeek:      intPtr(tt.dayOfWeek),
+				ScheduledTime:  "15:00",
+				StartDate:      tt.startDate,
+				Weeks:          intPtr(tt.weeks),
+			}
+
+			endDate := req.ComputeEndDate()
+			dates, err := GenerateRecurringDates("weekly", req.DayOfWeek, nil, req.StartDate, endDate)
+			if err != nil {
+				t.Fatalf("GenerateRecurringDates() error: %v", err)
+			}
+
+			if len(dates) != tt.wantCount {
+				t.Errorf("Expected %d occurrences, got %d: %v", tt.wantCount, len(dates), dates)
+			}
+		})
 	}
 }

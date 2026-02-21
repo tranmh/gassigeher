@@ -117,6 +117,67 @@ func EnsureDefaultTenant(db *sql.DB, dbType string) error {
 	return nil
 }
 
+// EnsureDefaultBookingRules ensures booking_time_rules exist for the default tenant (id=0).
+// This prevents the "Zeit ist außerhalb der erlaubten Buchungszeiten" error in Simple-Mode
+// when rules were accidentally deleted or the migration's INSERT OR IGNORE was skipped.
+// Called on every startup to guarantee rules always exist.
+func EnsureDefaultBookingRules(db *sql.DB, dbType string) error {
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM booking_time_rules WHERE tenant_id = 0").Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to check default booking rules: %w", err)
+	}
+
+	if count > 0 {
+		return nil // Rules already exist
+	}
+
+	log.Println("No booking time rules found for default tenant (id=0), creating defaults...")
+
+	type rule struct {
+		dayType   string
+		name      string
+		startTime string
+		endTime   string
+		isBlocked bool
+	}
+
+	defaults := []rule{
+		{"weekday", "Vormittag", "08:30", "12:00", false},
+		{"weekday", "Mittagspause", "12:00", "14:00", true},
+		{"weekday", "Nachmittag", "14:00", "17:00", false},
+		{"weekday", "Fütterungszeit", "17:00", "18:00", true},
+		{"weekday", "Abend", "18:00", "19:00", false},
+		{"weekend", "Vormittag", "09:00", "12:00", false},
+		{"weekend", "Nachmittag", "14:00", "17:00", false},
+		{"holiday", "Vormittag", "10:00", "12:00", false},
+		{"holiday", "Nachmittag", "14:00", "16:00", false},
+	}
+
+	for _, r := range defaults {
+		blocked := 0
+		if r.isBlocked {
+			blocked = 1
+		}
+
+		var query string
+		if dbType == "postgres" {
+			query = `INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked)
+				VALUES (0, $1, $2, $3, $4, $5)`
+		} else {
+			query = `INSERT INTO booking_time_rules (tenant_id, day_type, rule_name, start_time, end_time, is_blocked)
+				VALUES (0, ?, ?, ?, ?, ?)`
+		}
+
+		if _, err := db.Exec(query, r.dayType, r.name, r.startTime, r.endTime, blocked); err != nil {
+			return fmt.Errorf("failed to create default booking rule %s/%s: %w", r.dayType, r.name, err)
+		}
+	}
+
+	log.Println("✓ Created default booking time rules for Simple-Mode (tenant_id=0)")
+	return nil
+}
+
 // SeedDatabase generates initial seed data for first-time installations
 // Only runs if users table is empty
 // Set SKIP_SEED=true to skip (useful for E2E tests that manage their own data)
