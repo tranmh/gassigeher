@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -147,10 +148,17 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Assign default color (green = ID 1) to new user
-	// Green users start with only the green color
+	// Assign default color to new user (configurable via system_settings)
 	if h.userColorRepo != nil {
-		if err := h.userColorRepo.SetUserColors(tenantID, user.ID, []int{1}, user.ID); err != nil {
+		defaultColorID := 1 // Fallback: color category ID 1
+		if h.settingsRepo != nil {
+			if colorSetting, err := h.settingsRepo.Get(tenantID, "default_color_for_new_users"); err == nil && colorSetting != nil && colorSetting.Value != "" {
+				if parsed, err := strconv.Atoi(colorSetting.Value); err == nil && parsed > 0 {
+					defaultColorID = parsed
+				}
+			}
+		}
+		if err := h.userColorRepo.SetUserColors(tenantID, user.ID, []int{defaultColorID}, user.ID); err != nil {
 			// Log but don't fail registration
 			log.Printf("Warning: Failed to assign default color to user %d: %v", user.ID, err)
 		}

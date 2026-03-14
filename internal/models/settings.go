@@ -88,6 +88,12 @@ var settingConstraints = map[string]SettingConstraint{
 		Max:      20,
 		Required: true,
 	},
+	"default_color_for_new_users": {
+		Type:     "integer",
+		Min:      1,
+		Max:      1000,
+		Required: true,
+	},
 }
 
 // ValidateSetting validates a setting value based on its key

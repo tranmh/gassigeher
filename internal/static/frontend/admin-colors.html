@@ -136,6 +136,20 @@
                 </form>
             </div>
 
+            <!-- Default Color for New Users -->
+            <div class="card" style="margin-bottom: 20px;">
+                <h3 style="margin-top: 0;">Standardfarbe für neue Benutzer</h3>
+                <p style="font-size: 0.9rem; color: #666; margin-bottom: 12px;">
+                    Diese Farbe wird neuen Benutzern automatisch bei der Registrierung zugewiesen.
+                </p>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <select id="default-color-select" style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid var(--border-light);">
+                        <option value="">Wird geladen...</option>
+                    </select>
+                    <button class="btn" data-action="save-default-color">Speichern</button>
+                </div>
+            </div>
+
             <!-- Colors List -->
             <div id="colors-list" class="color-grid"></div>
         </div>
@@ -226,11 +240,13 @@
             'show-add-color-form': function(e) { e.preventDefault(); showAddColorForm(); },
             'hide-color-form': function(e) { e.preventDefault(); hideForm(); },
             'edit-color': function(e, id) { e.preventDefault(); editColor(parseInt(id)); },
-            'delete-color': function(e, id) { e.preventDefault(); deleteColor(parseInt(id)); }
+            'delete-color': function(e, id) { e.preventDefault(); deleteColor(parseInt(id)); },
+            'save-default-color': function(e) { e.preventDefault(); saveDefaultColor(); }
         });
     </script>
     <script>
         let currentColors = [];
+        let currentDefaultColorID = '1';
         const MIN_COLORS = 3;
         const MAX_COLORS = 15;
 
@@ -264,6 +280,7 @@
             await ImpersonationBanner.init();
 
             loadColors();
+            loadDefaultColor();
 
             document.getElementById('color-form').addEventListener('submit', handleFormSubmit);
 
@@ -336,6 +353,7 @@
                 const response = await api.getColors();
                 currentColors = response.colors || [];
                 renderColors();
+                updateDefaultColorDropdown();
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Laden der Farben');
             }
@@ -479,6 +497,40 @@
                 loadColors();
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Löschen. Möglicherweise sind noch Hunde dieser Farbe zugeordnet.');
+            }
+        }
+
+        async function loadDefaultColor() {
+            try {
+                const settings = await api.getSettings();
+                currentDefaultColorID = settings['default_color_for_new_users'] || '1';
+                updateDefaultColorDropdown();
+            } catch (error) {
+                console.error('Failed to load default color setting:', error);
+            }
+        }
+
+        function updateDefaultColorDropdown() {
+            const select = document.getElementById('default-color-select');
+            if (currentColors.length === 0) return;
+            select.innerHTML = currentColors.map(color =>
+                `<option value="${color.id}" ${String(color.id) === String(currentDefaultColorID) ? 'selected' : ''}>
+                    ${getPatternIcon(color.pattern_icon)} ${sanitizeHTML(color.name)}
+                </option>`
+            ).join('');
+        }
+
+        async function saveDefaultColor() {
+            const select = document.getElementById('default-color-select');
+            const value = select.value;
+            if (!value) return;
+            try {
+                await api.updateSetting('default_color_for_new_users', value);
+                currentDefaultColorID = value;
+                const color = currentColors.find(c => String(c.id) === String(value));
+                showAlert('success', `Standardfarbe für neue Benutzer auf "${color ? color.name : value}" gesetzt`);
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Speichern der Standardfarbe');
             }
         }
 

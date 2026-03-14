@@ -18,16 +18,18 @@ import (
 
 // ImportHandler handles data import requests
 type ImportHandler struct {
-	db        *database.DB
-	dogRepo   *repository.DogRepository
-	colorRepo *repository.ColorCategoryRepository
+	db           *database.DB
+	dogRepo      *repository.DogRepository
+	colorRepo    *repository.ColorCategoryRepository
+	settingsRepo *repository.SettingsRepository
 }
 
 // NewImportHandler creates a new import handler
 func NewImportHandler(db *database.DB) *ImportHandler {
 	return &ImportHandler{
-		db:        db,
-		dogRepo:   repository.NewDogRepository(db),
+		db:           db,
+		settingsRepo: repository.NewSettingsRepository(db),
+		dogRepo:      repository.NewDogRepository(db),
 		colorRepo: repository.NewColorCategoryRepository(db),
 	}
 }
@@ -289,9 +291,14 @@ func (h *ImportHandler) ExecuteImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get default color category
+	// Get default color category (configurable via system_settings)
+	defaultID := 1 // Fallback: color category ID 1
+	if colorSetting, err := h.settingsRepo.Get(tenantID, "default_color_for_new_users"); err == nil && colorSetting != nil && colorSetting.Value != "" {
+		if parsed, err := strconv.Atoi(colorSetting.Value); err == nil && parsed > 0 {
+			defaultID = parsed
+		}
+	}
 	var defaultColorID *int
-	defaultID := 1 // Green is default
 	defaultColorID = &defaultID
 	colors, _ := h.colorRepo.FindAll(tenantID)
 	colorMap := make(map[string]int)
