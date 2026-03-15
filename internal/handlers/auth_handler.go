@@ -23,6 +23,7 @@ type AuthHandler struct {
 	userRepo          *repository.UserRepository
 	userColorRepo     *repository.UserColorRepository
 	settingsRepo      *repository.SettingsRepository
+	consentRepo       *repository.ConsentRepository
 	authService       *services.AuthService
 	emailService      *services.EmailService
 	bruteForceService *services.BruteForceService
@@ -41,6 +42,7 @@ func NewAuthHandler(db *database.DB, cfg *config.Config) *AuthHandler {
 		userRepo:          repository.NewUserRepository(db),
 		userColorRepo:     repository.NewUserColorRepository(db),
 		settingsRepo:      repository.NewSettingsRepository(db),
+		consentRepo:       repository.NewConsentRepository(db),
 		authService:       services.NewAuthService(cfg.JWTSecret, cfg.JWTExpirationHours),
 		emailService:      emailService,
 		bruteForceService: services.NewBruteForceService(),
@@ -146,6 +148,15 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	if err := h.userRepo.Create(user); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to create user")
 		return
+	}
+
+	// Record terms and privacy consent in consents table (GDPR audit trail)
+	if h.consentRepo != nil {
+		ipAddress := getConsentClientIP(r)
+		userAgent := r.UserAgent()
+		if err := h.consentRepo.RecordConsent(user.ID, tenantID, ipAddress, userAgent); err != nil {
+			log.Printf("Warning: Failed to record consent for user %d: %v", user.ID, err)
+		}
 	}
 
 	// Assign default color to new user (configurable via system_settings)

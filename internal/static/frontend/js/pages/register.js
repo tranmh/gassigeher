@@ -120,6 +120,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             password: document.getElementById('password').value,
             confirm_password: document.getElementById('confirm-password').value,
             accept_terms: document.getElementById('accept-terms').checked,
+            accept_privacy: document.getElementById('accept-privacy').checked,
             registration_password: document.getElementById('registration-password').value.trim().toUpperCase(),
         };
 
@@ -174,6 +175,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (!data.accept_terms) {
             showError('terms', 'Du musst die AGB akzeptieren');
+            hasError = true;
+        }
+
+        if (!data.accept_privacy) {
+            showError('privacy', 'Du musst die Datenschutzerklärung akzeptieren');
             hasError = true;
         }
 

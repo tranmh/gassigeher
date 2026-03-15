@@ -64,6 +64,26 @@ func TestAuthHandler_Register(t *testing.T) {
 		if response["message"] == nil {
 			t.Error("Expected message in response")
 		}
+
+		// Verify consent records were created in the consents table
+		consentRepo := repository.NewConsentRepository(db)
+		// Find the newly created user
+		userRepo := repository.NewUserRepository(db)
+		user, err := userRepo.FindByEmail("newuser@example.com", 0)
+		if err != nil || user == nil {
+			t.Fatal("Expected user to be created")
+		}
+
+		status, err := consentRepo.GetConsentStatus(user.ID, 0)
+		if err != nil {
+			t.Fatalf("Failed to get consent status: %v", err)
+		}
+		if !status.TermsAccepted {
+			t.Error("Expected terms consent to be recorded after registration")
+		}
+		if !status.PrivacyAccepted {
+			t.Error("Expected privacy consent to be recorded after registration")
+		}
 	})
 
 	t.Run("missing required fields", func(t *testing.T) {

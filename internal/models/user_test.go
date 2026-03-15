@@ -257,6 +257,21 @@ func TestRegisterRequest_Validate(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "Privacy not accepted",
+			req: RegisterRequest{
+				FirstName:            "John",
+				LastName:             "Doe",
+				Email:                "john@example.com",
+				Phone:                "0123 456789",
+				Password:             "securePass123",
+				ConfirmPassword:      "securePass123",
+				AcceptTerms:          true,
+				AcceptPrivacy:        false,
+				RegistrationPassword: "ABC12345",
+			},
+			wantErr: true,
+		},
+		{
 			name: "Empty registration password",
 			req: RegisterRequest{
 				FirstName:            "John",
