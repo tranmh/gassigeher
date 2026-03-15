@@ -1,6 +1,6 @@
 /**
  * Calendar Component - Shared calendar logic for user and admin pages
- * Displays a 14-day availability calendar for dogs with booking capabilities
+ * Displays a weekly availability calendar for dogs with booking capabilities
  */
 
 class CalendarComponent {
@@ -12,8 +12,10 @@ class CalendarComponent {
             availabilityFilterId: 'availability-filter',
             accessFilterId: 'access-filter',
             alertContainerId: 'alert-container',
+            navContainerId: 'calendar-nav',
+            printHeaderId: 'calendar-print-header',
             isAdmin: false,
-            onQuickBook: null, // Callback for booking action
+            onQuickBook: null,
             ...options
         };
 
@@ -23,6 +25,10 @@ class CalendarComponent {
         this.allColors = [];
         this.userColors = [];
         this.currentView = 'grid';
+        this.weekOffset = 0; // 0 = current week, -1 = last week, +1 = next week
+        this.currentUserId = null;
+
+        this._boundKeyHandler = this._handleKeydown.bind(this);
     }
 
     /**
@@ -31,6 +37,14 @@ class CalendarComponent {
     async init() {
         await this.loadColors();
         await this.loadCalendar();
+        this._bindKeyboard();
+    }
+
+    /**
+     * Destroy event listeners
+     */
+    destroy() {
+        document.removeEventListener('keydown', this._boundKeyHandler);
     }
 
     /**
@@ -38,6 +52,13 @@ class CalendarComponent {
      */
     setUserColors(colors) {
         this.userColors = colors || [];
+    }
+
+    /**
+     * Set current user ID (for "my booking" highlights)
+     */
+    setCurrentUserId(userId) {
+        this.currentUserId = userId;
     }
 
     /**
@@ -81,23 +102,22 @@ class CalendarComponent {
             }
             this.allDogs = await api.getDogs(params);
 
-            // Fetch bookings for next 14 days
-            const today = new Date();
-            const twoWeeksLater = new Date();
-            twoWeeksLater.setDate(today.getDate() + 14);
-
-            const startDate = today.toISOString().split('T')[0];
-            const endDate = twoWeeksLater.toISOString().split('T')[0];
+            // Fetch bookings for the displayed week
+            const dates = this.getWeekDates();
+            const startDate = this._formatISO(dates[0]);
+            const endDate = this._formatISO(dates[6]);
 
             this.bookings = await api.getBookings({
                 date_from: startDate,
                 date_to: endDate,
-                calendar_view: 'true'
+                calendar_view: 'true',
+                include_user: 'true'
             });
 
             // Fetch blocked dates
             this.blockedDates = await api.getBlockedDates();
 
+            this.updateNavigation();
             this.renderCalendar();
             this.renderMobileView();
         } catch (error) {
@@ -106,6 +126,156 @@ class CalendarComponent {
         }
     }
 
+    // ========================
+    // Week Navigation
+    // ========================
+
+    /**
+     * Get the 7 dates (Mon-Sun) for the current weekOffset
+     */
+    getWeekDates() {
+        const today = new Date();
+        const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ...
+        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const monday = new Date(today);
+        monday.setDate(today.getDate() + mondayOffset + (this.weekOffset * 7));
+        // Reset time
+        monday.setHours(0, 0, 0, 0);
+
+        const days = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(monday);
+            d.setDate(monday.getDate() + i);
+            days.push(d);
+        }
+        return days;
+    }
+
+    /**
+     * Navigate to previous/next week
+     */
+    navigateWeek(direction) {
+        this.weekOffset += direction;
+        this.loadCalendar();
+    }
+
+    /**
+     * Go to the current week
+     */
+    goToToday() {
+        this.weekOffset = 0;
+        this.loadCalendar();
+    }
+
+    /**
+     * Jump to a specific date's week
+     */
+    goToDate(dateStr) {
+        if (!dateStr) return;
+        const target = new Date(dateStr + 'T00:00:00');
+        if (isNaN(target.getTime())) return;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Find Monday of today's week
+        const todayDow = today.getDay();
+        const todayMondayOffset = todayDow === 0 ? -6 : 1 - todayDow;
+        const todayMonday = new Date(today);
+        todayMonday.setDate(today.getDate() + todayMondayOffset);
+
+        // Find Monday of target week
+        const targetDow = target.getDay();
+        const targetMondayOffset = targetDow === 0 ? -6 : 1 - targetDow;
+        const targetMonday = new Date(target);
+        targetMonday.setDate(target.getDate() + targetMondayOffset);
+
+        // Calculate week offset
+        const diffMs = targetMonday.getTime() - todayMonday.getTime();
+        this.weekOffset = Math.round(diffMs / (7 * 24 * 60 * 60 * 1000));
+        this.loadCalendar();
+    }
+
+    /**
+     * Get ISO week number
+     */
+    getISOWeekNumber(date) {
+        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    }
+
+    /**
+     * Get week label string e.g. "KW 12 | 16.03. - 22.03.2026"
+     */
+    getWeekLabel() {
+        const dates = this.getWeekDates();
+        const monday = dates[0];
+        const sunday = dates[6];
+        const kw = this.getISOWeekNumber(monday);
+        const monStr = this.formatDate(monday);
+        const sunDay = String(sunday.getDate()).padStart(2, '0');
+        const sunMonth = String(sunday.getMonth() + 1).padStart(2, '0');
+        const sunYear = sunday.getFullYear();
+        return `KW ${kw} | ${monStr}. - ${sunDay}.${sunMonth}.${sunYear}`;
+    }
+
+    /**
+     * Update the navigation bar display
+     */
+    updateNavigation() {
+        const navContainer = document.getElementById(this.options.navContainerId);
+        if (!navContainer) return;
+
+        const weekLabel = navContainer.querySelector('.week-label');
+        if (weekLabel) {
+            weekLabel.textContent = this.getWeekLabel();
+        }
+
+        // Update print header
+        const printHeader = document.getElementById(this.options.printHeaderId);
+        if (printHeader) {
+            const dateRange = printHeader.querySelector('.print-date-range');
+            if (dateRange) {
+                dateRange.textContent = this.getWeekLabel();
+            }
+        }
+    }
+
+    /**
+     * Print the calendar
+     */
+    printCalendar() {
+        window.print();
+    }
+
+    // ========================
+    // Keyboard Navigation
+    // ========================
+
+    _bindKeyboard() {
+        document.addEventListener('keydown', this._boundKeyHandler);
+    }
+
+    _handleKeydown(e) {
+        // Only handle arrow keys when not in an input
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+
+        if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            this.navigateWeek(-1);
+        } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            this.navigateWeek(1);
+        }
+    }
+
+    // ========================
+    // Rendering
+    // ========================
+
     /**
      * Render the desktop calendar grid
      */
@@ -113,7 +283,9 @@ class CalendarComponent {
         const grid = document.getElementById(this.options.gridContainerId);
         if (!grid) return;
 
-        const dates = this.getNext14Days();
+        const dates = this.getWeekDates();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
         // Build grid HTML
         let html = '';
@@ -123,9 +295,12 @@ class CalendarComponent {
         dates.forEach(date => {
             const dayName = this.getDayName(date);
             const dateStr = this.formatDate(date);
-            const isToday = date.toDateString() === new Date().toDateString();
+            const isToday = date.toDateString() === today.toDateString();
+            const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+            const classes = ['calendar-header'];
+            if (isWeekend) classes.push('weekend');
             const todayStyle = isToday ? ' style="border: 3px solid var(--accent-orange); box-shadow: 0 0 12px rgba(255, 140, 66, 0.4);"' : '';
-            html += `<div class="calendar-header"${todayStyle}>
+            html += `<div class="${classes.join(' ')}"${todayStyle}>
                 <div style="font-size: 1rem;">${dayName}</div>
                 <div class="date-display" style="color: rgba(255,255,255,0.9);">${dateStr}</div>
                 ${isToday ? '<div style="font-size: 0.7rem; margin-top: 4px; color: #fff; background: #f59e0b; padding: 2px 6px; border-radius: 3px; font-weight: 700;">HEUTE</div>' : ''}
@@ -141,9 +316,11 @@ class CalendarComponent {
             html += `<div class="calendar-cell dog-name" data-dog-id="${dog.id}">${this.getCalendarDogCell(dog, dogColor)}</div>`;
 
             dates.forEach(date => {
-                const dateStr = date.toISOString().split('T')[0];
+                const dateStr = this._formatISO(date);
                 const cellData = this.getCellData(dog.id, dateStr);
-                html += this.renderCell(dog, dateStr, cellData);
+                const isPast = date < today;
+                const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                html += this.renderCell(dog, dateStr, cellData, isPast, isWeekend);
             });
         });
 
@@ -157,7 +334,9 @@ class CalendarComponent {
         const mobileContainer = document.getElementById(this.options.mobileContainerId);
         if (!mobileContainer) return;
 
-        const dates = this.getNext14Days();
+        const dates = this.getWeekDates();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         let html = '';
 
         // Filter dogs with valid names
@@ -171,10 +350,11 @@ class CalendarComponent {
                 <h3>${safeDogName} ${colorBadge}</h3>`;
 
             dates.forEach(date => {
-                const dateStr = date.toISOString().split('T')[0];
+                const dateStr = this._formatISO(date);
                 const cellData = this.getCellData(dog.id, dateStr);
                 const dayName = this.getDayName(date);
                 const dateDisplay = this.formatDate(date);
+                const isPast = date < today;
 
                 if (!cellData.isDogAvailable) {
                     html += `<div class="day-slot unavailable">
@@ -194,13 +374,40 @@ class CalendarComponent {
                         <div style="color: #999;">${blockMessage}</div>
                     </div>`;
                 } else {
-                    const bookedTimes = cellData.dogBookings.map(b => b.scheduled_time);
-                    const hasBookings = bookedTimes.length > 0;
+                    const hasBookings = cellData.dogBookings.length > 0;
+                    const hasMyBooking = cellData.dogBookings.some(b => b.user_id === this.currentUserId);
+                    const myBookingClass = hasMyBooking ? ' my-booking' : '';
 
-                    if (hasBookings) {
-                        html += `<div class="day-slot available" data-action="quick-book" data-id="${dog.id}" data-value="${dateStr}">
+                    if (isPast) {
+                        // Past dates - show status but no booking action
+                        if (hasBookings) {
+                            const bookingLines = cellData.dogBookings.map(b => {
+                                const name = this._formatBookerName(b);
+                                const isMe = b.user_id === this.currentUserId;
+                                const badge = isMe ? ' <span class="my-booking-badge">Du</span>' : '';
+                                const status = b.status === 'completed' ? ' <span class="booking-completed">✓</span>' : '';
+                                return `${b.scheduled_time} ${name}${badge}${status}`;
+                            }).join(', ');
+                            html += `<div class="day-slot unavailable${myBookingClass}">
+                                <div><strong>${dayName} ${dateDisplay}</strong></div>
+                                <div style="color: #856404;">${bookingLines}</div>
+                            </div>`;
+                        } else {
+                            html += `<div class="day-slot unavailable">
+                                <div><strong>${dayName} ${dateDisplay}</strong></div>
+                                <div style="color: #999;">-</div>
+                            </div>`;
+                        }
+                    } else if (hasBookings) {
+                        const bookingLines = cellData.dogBookings.map(b => {
+                            const name = this._formatBookerName(b);
+                            const isMe = b.user_id === this.currentUserId;
+                            const badge = isMe ? ' <span class="my-booking-badge">Du</span>' : '';
+                            return `${b.scheduled_time} ${name}${badge}`;
+                        }).join(', ');
+                        html += `<div class="day-slot available${myBookingClass}" data-action="quick-book" data-id="${dog.id}" data-value="${dateStr}">
                             <div><strong>${dayName} ${dateDisplay}</strong></div>
-                            <div style="color: #856404;">Gebucht: ${bookedTimes.join(', ')}</div>
+                            <div style="color: #856404;">${bookingLines}</div>
                             <div style="color: var(--color-primary, #82b965); font-size: 0.8rem;">+ Weitere Zeiten</div>
                         </div>`;
                     } else {
@@ -241,20 +448,6 @@ class CalendarComponent {
     }
 
     /**
-     * Get next 14 days from today
-     */
-    getNext14Days() {
-        const days = [];
-        const today = new Date();
-        for (let i = 0; i < 14; i++) {
-            const date = new Date(today);
-            date.setDate(today.getDate() + i);
-            days.push(date);
-        }
-        return days;
-    }
-
-    /**
      * Get short day name in German
      */
     getDayName(date) {
@@ -275,11 +468,34 @@ class CalendarComponent {
      * Format date in German format (DD.MM.YYYY)
      */
     formatDateGerman(dateStr) {
-        const date = new Date(dateStr);
+        const date = new Date(dateStr + 'T00:00:00');
         const day = String(date.getDate()).padStart(2, '0');
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const year = date.getFullYear();
         return `${day}.${month}.${year}`;
+    }
+
+    /**
+     * Format ISO date string YYYY-MM-DD from Date object
+     */
+    _formatISO(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    /**
+     * Format booker name as "Max M."
+     */
+    _formatBookerName(booking) {
+        if (!booking.user) return '';
+        const first = booking.user.first_name || '';
+        const last = booking.user.last_name || '';
+        if (!first && !last) return '';
+        const lastInitial = last ? ` ${last.charAt(0)}.` : '';
+        const safeName = typeof sanitizeHTML === 'function' ? sanitizeHTML(first + lastInitial) : first + lastInitial;
+        return safeName;
     }
 
     /**
@@ -323,11 +539,13 @@ class CalendarComponent {
     /**
      * Render a single calendar cell
      */
-    renderCell(dog, date, data) {
+    renderCell(dog, date, data, isPast, isWeekend) {
         const safeDogName = typeof sanitizeHTML === 'function' ? sanitizeHTML(dog.name) : dog.name;
+        const weekendClass = isWeekend ? ' weekend' : '';
+        const pastClass = isPast ? ' past' : '';
 
         if (!data.isDogAvailable) {
-            return `<div class="calendar-cell unavailable">
+            return `<div class="calendar-cell unavailable${weekendClass}">
                 <span style="font-size: 1.5rem;">❌</span>
                 <div style="font-size: 0.7rem; margin-top: 4px;">Hund nicht verfügbar</div>
             </div>`;
@@ -337,7 +555,7 @@ class CalendarComponent {
         if (!data.canAccess) {
             const dogColor = this.getColorForDog(dog);
             const colorName = dogColor ? dogColor.name : 'unbekannte';
-            return `<div class="calendar-cell unavailable">
+            return `<div class="calendar-cell unavailable${weekendClass}">
                 <span style="font-size: 1.5rem;">🔒</span>
                 <div style="font-size: 0.7rem; margin-top: 4px;">Farbe ${colorName} erforderlich</div>
             </div>`;
@@ -345,77 +563,90 @@ class CalendarComponent {
 
         if (data.isBlocked) {
             const blockMessage = data.isGloballyBlocked ? 'Datum gesperrt' : 'Hund gesperrt';
-            return `<div class="calendar-cell unavailable">
+            return `<div class="calendar-cell unavailable${weekendClass}">
                 <span style="font-size: 1.5rem;">🚫</span>
                 <div style="font-size: 0.7rem; margin-top: 4px;">${blockMessage}</div>
             </div>`;
         }
 
-        const bookedTimes = data.dogBookings.map(b => b.scheduled_time);
+        const bookedTimes = data.dogBookings;
         const hasBookings = bookedTimes.length > 0;
+        const hasMyBooking = bookedTimes.some(b => b.user_id === this.currentUserId);
+
+        if (isPast) {
+            // Past cells: show info but no booking action
+            if (hasBookings) {
+                let content = '';
+                bookedTimes.forEach(b => {
+                    const isMe = b.user_id === this.currentUserId;
+                    const myClass = isMe ? ' my-booking' : '';
+                    const badge = isMe ? '<span class="my-booking-badge">Du</span>' : '';
+                    const statusIcon = b.status === 'completed' ? ' <span class="booking-completed">✓</span>' : '';
+                    const bookerName = this._formatBookerName(b);
+                    content += `<div class="walk-type booked${myClass}">⏰ ${b.scheduled_time}${statusIcon}${badge}</div>`;
+                    if (bookerName) {
+                        content += `<div class="booker-name">${bookerName}</div>`;
+                    }
+                });
+                return `<div class="calendar-cell booked${pastClass}${weekendClass}">
+                    ${content}
+                </div>`;
+            }
+            return `<div class="calendar-cell${pastClass}${weekendClass}" style="color: #ccc;">
+                <div style="font-size: 0.7rem;">-</div>
+            </div>`;
+        }
 
         if (hasBookings) {
             let content = '';
-            bookedTimes.forEach(time => {
-                content += `<div class="walk-type booked">⏰ ${time}</div>`;
+            bookedTimes.forEach(b => {
+                const isMe = b.user_id === this.currentUserId;
+                const myClass = isMe ? ' my-booking' : '';
+                const badge = isMe ? '<span class="my-booking-badge">Du</span>' : '';
+                const bookerName = this._formatBookerName(b);
+                content += `<div class="walk-type booked${myClass}">⏰ ${b.scheduled_time}${badge}</div>`;
+                if (bookerName) {
+                    content += `<div class="booker-name">${bookerName}</div>`;
+                }
             });
             content += '<div class="walk-type available">+ Weitere Zeiten</div>';
 
-            return `<div class="calendar-cell booked" data-action="quick-book" data-id="${dog.id}" data-value="${date}" title="Klicken zum Buchen: ${safeDogName} am ${this.formatDateGerman(date)}">
+            return `<div class="calendar-cell booked${weekendClass}" data-action="quick-book" data-id="${dog.id}" data-value="${date}" title="Klicken zum Buchen: ${safeDogName} am ${this.formatDateGerman(date)}">
                 ${content}
             </div>`;
         }
 
         // Fully available
-        return `<div class="calendar-cell available" data-action="quick-book" data-id="${dog.id}" data-value="${date}" title="Klicken zum Buchen: ${safeDogName} am ${this.formatDateGerman(date)}">
+        return `<div class="calendar-cell available${weekendClass}" data-action="quick-book" data-id="${dog.id}" data-value="${date}" title="Klicken zum Buchen: ${safeDogName} am ${this.formatDateGerman(date)}">
             <div class="walk-type available">✅ Verfügbar</div>
             <div style="font-size: 0.7rem; color: var(--text-gray);">Alle Zeiten frei</div>
         </div>`;
     }
 
-    /**
-     * Check if user can access a dog based on color
-     */
+    // ========================
+    // Access & Color Helpers
+    // ========================
+
     canUserAccessDog(dogColorId) {
-        if (!dogColorId) return true; // Dogs without color are accessible to all
+        if (!dogColorId) return true;
         return this.userColors.some(c => c.id === dogColorId);
     }
 
-    /**
-     * Get color object for a dog
-     */
     getColorForDog(dog) {
         if (dog.color) return dog.color;
         return this.allColors.find(c => c.id === dog.color_id);
     }
 
-    /**
-     * Get pattern icon character
-     */
     getPatternIcon(pattern) {
         const icons = {
-            'circle': '●',
-            'triangle': '▲',
-            'square': '■',
-            'diamond': '◆',
-            'pentagon': '⬠',
-            'hexagon': '⬡',
-            'star': '★',
-            'heart': '♥',
-            'cross': '✚',
-            'spade': '♠',
-            'club': '♣',
-            'moon': '☽',
-            'sun': '☀',
-            'ring': '○',
-            'target': '◎'
+            'circle': '●', 'triangle': '▲', 'square': '■', 'diamond': '◆',
+            'pentagon': '⬠', 'hexagon': '⬡', 'star': '★', 'heart': '♥',
+            'cross': '✚', 'spade': '♠', 'club': '♣', 'moon': '☽',
+            'sun': '☀', 'ring': '○', 'target': '◎'
         };
         return icons[pattern] || '●';
     }
 
-    /**
-     * Get color badge HTML
-     */
     getColorBadgeHtml(color) {
         if (!color) return '';
         return `<span style="
@@ -432,14 +663,10 @@ class CalendarComponent {
         ">${this.getPatternIcon(color.pattern_icon)} ${color.name}</span>`;
     }
 
-    /**
-     * Get calendar dog cell HTML (for the first column)
-     */
     getCalendarDogCell(dog, dogColor) {
         const safeDogName = typeof sanitizeHTML === 'function' ? sanitizeHTML(dog.name) : dog.name;
         const colorBadge = dogColor ? this.getColorBadgeHtml(dogColor) : '';
 
-        // Use dog photo helper if available
         const photoHtml = typeof getCalendarDogCell === 'function'
             ? getCalendarDogCell(dog)
             : `<div style="width: 40px; height: 40px; background: #ddd; border-radius: 50%; display: flex; align-items: center; justify-content: center;">🐕</div>`;
@@ -455,14 +682,14 @@ class CalendarComponent {
         `;
     }
 
-    /**
-     * Handle quick book action
-     */
+    // ========================
+    // Actions
+    // ========================
+
     quickBook(dogId, date) {
         const dog = this.allDogs.find(d => d.id === dogId);
         if (!dog) return;
 
-        // Check if user has access to this dog's color (only for non-admin)
         if (!this.options.isAdmin && !this.canUserAccessDog(dog.color_id)) {
             const dogColor = this.getColorForDog(dog);
             const colorName = dogColor ? dogColor.name : 'erforderliche';
@@ -470,20 +697,15 @@ class CalendarComponent {
             return;
         }
 
-        // Use callback if provided
         if (this.options.onQuickBook) {
             this.options.onQuickBook(dog, date);
             return;
         }
 
-        // Default behavior: redirect to dogs page with pre-filled booking
         localStorage.setItem('pendingBooking', JSON.stringify({ dogId, date }));
         window.location.href = '/dogs.html';
     }
 
-    /**
-     * Switch view between grid and list
-     */
     switchView(view) {
         this.currentView = view;
         const gridView = document.getElementById('grid-view');
@@ -505,9 +727,6 @@ class CalendarComponent {
         }
     }
 
-    /**
-     * Show alert message
-     */
     showAlert(type, message) {
         const container = document.getElementById(this.options.alertContainerId);
         if (container) {

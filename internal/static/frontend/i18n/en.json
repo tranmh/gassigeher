@@ -199,7 +199,18 @@
     "blocked_date": "Blocked Date",
     "dog_blocked": "Dog Blocked",
     "date_blocked": "Date Blocked",
-    "no_bookings_this_day": "No bookings on this day"
+    "no_bookings_this_day": "No bookings on this day",
+    "this_week": "This Week",
+    "prev_week": "Previous Week",
+    "next_week": "Next Week",
+    "print": "Print",
+    "jump_to_date": "Jump to Date",
+    "week_number": "CW",
+    "my_booking": "You",
+    "no_dogs": "No dogs found",
+    "booked_by": "Booked by",
+    "all_times_available": "All times available",
+    "more_times": "More times"
   },
   "dashboard": {
     "title": "Dashboard",

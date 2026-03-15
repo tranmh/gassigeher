@@ -266,6 +266,117 @@ func (r *BookingRepository) FindAll(filter *models.BookingFilterRequest) ([]*mod
 	return bookings, nil
 }
 
+// FindAllWithUserNames finds all bookings with optional filters, including user first and last name
+// Used by calendar view to show who booked each slot
+// SaaS: Includes tenant filtering same as FindAll
+func (r *BookingRepository) FindAllWithUserNames(filter *models.BookingFilterRequest) ([]*models.Booking, error) {
+	query := `
+		SELECT b.id, b.tenant_id, b.user_id, b.dog_id, b.date, b.scheduled_time, b.status,
+		       b.completed_at, b.user_notes, b.admin_cancellation_reason, b.recurrence_id,
+		       b.created_at, b.updated_at,
+		       u.first_name, u.last_name
+		FROM bookings b
+		LEFT JOIN users u ON b.user_id = u.id AND u.tenant_id = b.tenant_id
+		WHERE 1=1
+	`
+	args := []interface{}{}
+
+	if filter != nil {
+		if filter.TenantID != nil {
+			query += " AND b.tenant_id = ?"
+			args = append(args, *filter.TenantID)
+		}
+		if filter.UserID != nil {
+			query += " AND b.user_id = ?"
+			args = append(args, *filter.UserID)
+		}
+		if filter.DogID != nil {
+			query += " AND b.dog_id = ?"
+			args = append(args, *filter.DogID)
+		}
+		if filter.DateFrom != nil {
+			query += " AND b.date >= ?"
+			args = append(args, *filter.DateFrom)
+		}
+		if filter.DateTo != nil {
+			query += " AND b.date <= ?"
+			args = append(args, *filter.DateTo)
+		}
+		if filter.Status != nil {
+			query += " AND b.status = ?"
+			args = append(args, *filter.Status)
+		}
+		if filter.Year != nil && filter.Month != nil {
+			startDate := fmt.Sprintf("%d-%02d-01", *filter.Year, *filter.Month)
+			nextMonth := time.Date(*filter.Year, time.Month(*filter.Month+1), 1, 0, 0, 0, 0, time.UTC)
+			endDate := nextMonth.Add(-24 * time.Hour).Format("2006-01-02")
+			query += " AND b.date >= ? AND b.date <= ?"
+			args = append(args, startDate, endDate)
+		}
+	}
+
+	query += " ORDER BY b.date DESC, b.scheduled_time DESC"
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query bookings with user names: %w", err)
+	}
+	defer rows.Close()
+
+	bookings := []*models.Booking{}
+	for rows.Next() {
+		booking := &models.Booking{}
+		var tenantID sql.NullInt64
+		var recurrenceID sql.NullInt64
+		var userFirstName, userLastName sql.NullString
+		err := rows.Scan(
+			&booking.ID,
+			&tenantID,
+			&booking.UserID,
+			&booking.DogID,
+			&booking.Date,
+			&booking.ScheduledTime,
+			&booking.Status,
+			&booking.CompletedAt,
+			&booking.UserNotes,
+			&booking.AdminCancellationReason,
+			&recurrenceID,
+			&booking.CreatedAt,
+			&booking.UpdatedAt,
+			&userFirstName,
+			&userLastName,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan booking: %w", err)
+		}
+		if tenantID.Valid {
+			booking.TenantID = int(tenantID.Int64)
+		}
+		if recurrenceID.Valid {
+			rid := int(recurrenceID.Int64)
+			booking.RecurrenceID = &rid
+		}
+		booking.Date = normalizeDate(booking.Date)
+
+		// Populate user details (privacy: only first/last name)
+		booking.User = &models.User{}
+		if userFirstName.Valid {
+			booking.User.FirstName = userFirstName.String
+		}
+		if userLastName.Valid {
+			booking.User.LastName = userLastName.String
+		}
+
+		bookings = append(bookings, booking)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating bookings: %w", err)
+	}
+
+	return bookings, nil
+}
+
 // Cancel cancels a booking
 // SaaS: Filters by tenant_id for tenant isolation
 func (r *BookingRepository) Cancel(id int, tenantID int, reason *string) error {

@@ -334,8 +334,15 @@ func (h *BookingHandler) ListBookings(w http.ResponseWriter, r *http.Request) {
 		filter.UserID = &uid
 	}
 
-	// Get bookings
-	bookings, err := h.bookingRepo.FindAll(filter)
+	// Get bookings - include user names if requested (for calendar view)
+	includeUser := r.URL.Query().Get("include_user") == "true" && isCalendarView
+	var bookings []*models.Booking
+	var err error
+	if includeUser {
+		bookings, err = h.bookingRepo.FindAllWithUserNames(filter)
+	} else {
+		bookings, err = h.bookingRepo.FindAll(filter)
+	}
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to get bookings")
 		return

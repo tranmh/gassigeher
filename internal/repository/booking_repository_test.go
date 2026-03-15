@@ -2010,3 +2010,170 @@ func TestBookingRepository_FindAll_IncludesRecurrenceID(t *testing.T) {
 		t.Error("Normal booking not found in FindAll results")
 	}
 }
+
+func TestBookingRepository_FindAllWithUserNames(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewBookingRepository(db)
+
+	t.Run("returns bookings with user first and last name", func(t *testing.T) {
+		// User 1 is pre-seeded as "Test" "User"
+		futureDate := testutil.GetFutureDate(1)
+		testutil.SeedTestBooking(t, db, 1, 1, futureDate, "09:00", "scheduled")
+
+		tenantID := 0
+		filter := &models.BookingFilterRequest{
+			TenantID: &tenantID,
+			DateFrom: &futureDate,
+		}
+		bookings, err := repo.FindAllWithUserNames(filter)
+		if err != nil {
+			t.Fatalf("FindAllWithUserNames failed: %v", err)
+		}
+		if len(bookings) == 0 {
+			t.Fatal("Expected at least 1 booking")
+		}
+
+		// Find our booking
+		var found *models.Booking
+		for _, b := range bookings {
+			if b.DogID == 1 && b.Date == futureDate {
+				found = b
+				break
+			}
+		}
+		if found == nil {
+			t.Fatal("Expected to find the seeded booking")
+		}
+		if found.User == nil {
+			t.Fatal("Expected User to be populated")
+		}
+		if found.User.FirstName != "Test" {
+			t.Errorf("Expected FirstName 'Test', got '%s'", found.User.FirstName)
+		}
+		if found.User.LastName != "User" {
+			t.Errorf("Expected LastName 'User', got '%s'", found.User.LastName)
+		}
+	})
+
+	t.Run("handles deleted users gracefully", func(t *testing.T) {
+		// Create a user, book, then delete the user
+		userID := testutil.SeedTestUser(t, db, "deleteme@test.com", "Delete Me", "green")
+		futureDate := testutil.GetFutureDate(2)
+		testutil.SeedTestBooking(t, db, userID, 1, futureDate, "10:00", "scheduled")
+
+		// Simulate user deletion (anonymize)
+		_, err := db.Exec(`UPDATE users SET first_name = 'Deleted', last_name = 'User', email = NULL, is_deleted = 1 WHERE id = ?`, userID)
+		if err != nil {
+			t.Fatalf("Failed to delete user: %v", err)
+		}
+
+		tenantID := 0
+		filter := &models.BookingFilterRequest{
+			TenantID: &tenantID,
+			DateFrom: &futureDate,
+		}
+		bookings, err := repo.FindAllWithUserNames(filter)
+		if err != nil {
+			t.Fatalf("FindAllWithUserNames failed: %v", err)
+		}
+
+		var found *models.Booking
+		for _, b := range bookings {
+			if b.UserID == userID {
+				found = b
+				break
+			}
+		}
+		if found == nil {
+			t.Fatal("Expected to find the booking for deleted user")
+		}
+		if found.User == nil {
+			t.Fatal("Expected User to be populated even for deleted user")
+		}
+		if found.User.FirstName != "Deleted" {
+			t.Errorf("Expected FirstName 'Deleted', got '%s'", found.User.FirstName)
+		}
+	})
+
+	t.Run("applies all filters same as FindAll", func(t *testing.T) {
+		futureDate3 := testutil.GetFutureDate(3)
+		futureDate4 := testutil.GetFutureDate(4)
+		testutil.SeedTestBooking(t, db, 1, 2, futureDate3, "14:00", "scheduled")
+		testutil.SeedTestBooking(t, db, 2, 2, futureDate4, "15:00", "cancelled")
+
+		tenantID := 0
+		dogID := 2
+		status := "scheduled"
+		filter := &models.BookingFilterRequest{
+			TenantID: &tenantID,
+			DogID:    &dogID,
+			DateFrom: &futureDate3,
+			DateTo:   &futureDate4,
+			Status:   &status,
+		}
+		bookings, err := repo.FindAllWithUserNames(filter)
+		if err != nil {
+			t.Fatalf("FindAllWithUserNames with filters failed: %v", err)
+		}
+
+		// Should only find the scheduled booking for dog 2, not the cancelled one
+		for _, b := range bookings {
+			if b.Status == "cancelled" {
+				t.Error("Should not return cancelled bookings when filtering by scheduled status")
+			}
+			if b.DogID != 2 {
+				t.Errorf("Should only return bookings for dog 2, got dog %d", b.DogID)
+			}
+		}
+	})
+
+	t.Run("returns empty user fields for orphaned booking", func(t *testing.T) {
+		// Create a temporary user, create booking, then hard-delete the user to simulate orphan
+		futureDate5 := testutil.GetFutureDate(5)
+		now := testutil.NowTime()
+		_, err := db.Exec(`INSERT INTO users (id, tenant_id, first_name, last_name, email, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at) VALUES (99999, 0, 'Temp', 'User', 'temp99999@test.com', 'hash', 1, 1, ?, ?, ?)`, now, now, now)
+		if err != nil {
+			t.Fatalf("Failed to insert temp user: %v", err)
+		}
+		_, err = db.Exec(`INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at) VALUES (0, 99999, 1, ?, '11:00', 'scheduled', ?)`, futureDate5, now)
+		if err != nil {
+			t.Fatalf("Failed to insert orphaned booking: %v", err)
+		}
+		// Hard-delete the user to create an orphaned booking (disable FK temporarily)
+		db.Exec(`PRAGMA foreign_keys = OFF`)
+		_, err = db.Exec(`DELETE FROM users WHERE id = 99999`)
+		if err != nil {
+			t.Fatalf("Failed to delete temp user: %v", err)
+		}
+		db.Exec(`PRAGMA foreign_keys = ON`)
+
+		tenantID := 0
+		filter := &models.BookingFilterRequest{
+			TenantID: &tenantID,
+			DateFrom: &futureDate5,
+			DateTo:   &futureDate5,
+		}
+		bookings, err := repo.FindAllWithUserNames(filter)
+		if err != nil {
+			t.Fatalf("FindAllWithUserNames failed: %v", err)
+		}
+
+		var found *models.Booking
+		for _, b := range bookings {
+			if b.UserID == 99999 {
+				found = b
+				break
+			}
+		}
+		if found == nil {
+			t.Fatal("Expected to find the orphaned booking")
+		}
+		if found.User == nil {
+			t.Fatal("Expected User to be populated (empty) for orphaned booking")
+		}
+		// LEFT JOIN should produce empty strings for non-existent user
+		if found.User.FirstName != "" {
+			t.Errorf("Expected empty FirstName for orphaned booking, got '%s'", found.User.FirstName)
+		}
+	})
+}

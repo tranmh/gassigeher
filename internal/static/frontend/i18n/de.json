@@ -215,7 +215,18 @@
     "blocked_date": "Gesperrter Tag",
     "dog_blocked": "Hund gesperrt",
     "date_blocked": "Datum gesperrt",
-    "no_bookings_this_day": "Keine Buchungen an diesem Tag"
+    "no_bookings_this_day": "Keine Buchungen an diesem Tag",
+    "this_week": "Diese Woche",
+    "prev_week": "Vorherige Woche",
+    "next_week": "Nächste Woche",
+    "print": "Drucken",
+    "jump_to_date": "Zu Datum springen",
+    "week_number": "KW",
+    "my_booking": "Du",
+    "no_dogs": "Keine Hunde gefunden",
+    "booked_by": "Gebucht von",
+    "all_times_available": "Alle Zeiten frei",
+    "more_times": "Weitere Zeiten"
   },
   "dashboard": {
     "title": "Dashboard",
