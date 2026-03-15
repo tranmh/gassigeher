@@ -552,6 +552,14 @@ class API {
         return this.request('GET', `/colors/${id}/stats`);
     }
 
+    async getColorDogs(id) {
+        return this.request('GET', `/colors/${id}/dogs`);
+    }
+
+    async getColorUsers(id) {
+        return this.request('GET', `/colors/${id}/users`);
+    }
+
     // COLOR REQUEST ENDPOINTS (user creates, admin approves/denies)
 
     async createColorRequest(colorId) {

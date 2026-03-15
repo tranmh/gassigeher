@@ -479,6 +479,16 @@ describe('API class - Color Endpoints', () => {
     await window.api.getColorStats(2);
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/colors/2/stats', expect.anything());
   });
+
+  test('getColorDogs should GET /colors/:id/dogs', async () => {
+    await window.api.getColorDogs(3);
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/colors/3/dogs', expect.anything());
+  });
+
+  test('getColorUsers should GET /colors/:id/users', async () => {
+    await window.api.getColorUsers(5);
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/colors/5/users', expect.anything());
+  });
 });
 
 describe('API class - Settings Endpoints', () => {

@@ -298,3 +298,53 @@ func (h *ColorCategoryHandler) GetColorStats(w http.ResponseWriter, r *http.Requ
 		"user_count": userCount,
 	})
 }
+
+// GetColorDogs returns the dogs assigned to a color
+func (h *ColorCategoryHandler) GetColorDogs(w http.ResponseWriter, r *http.Request) {
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid color ID")
+		return
+	}
+
+	dogs, err := h.colorRepo.FindDogsWithColor(tenantID, id)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to get dogs")
+		return
+	}
+
+	if dogs == nil {
+		dogs = []map[string]interface{}{}
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{"dogs": dogs})
+}
+
+// GetColorUsers returns the users who have a color
+func (h *ColorCategoryHandler) GetColorUsers(w http.ResponseWriter, r *http.Request) {
+	tenantID, _ := r.Context().Value(middleware.TenantIDKey).(int)
+
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid color ID")
+		return
+	}
+
+	users, err := h.colorRepo.FindUsersWithColor(tenantID, id)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to get users")
+		return
+	}
+
+	if users == nil {
+		users = []map[string]interface{}{}
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{"users": users})
+}

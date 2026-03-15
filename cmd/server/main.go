@@ -712,6 +712,8 @@ func main() {
 	superAdmin.HandleFunc("/colors/{id}", colorCategoryHandler.UpdateColor).Methods("PUT")
 	superAdmin.HandleFunc("/colors/{id}", colorCategoryHandler.DeleteColor).Methods("DELETE")
 	superAdmin.HandleFunc("/colors/{id}/stats", colorCategoryHandler.GetColorStats).Methods("GET")
+	superAdmin.HandleFunc("/colors/{id}/dogs", colorCategoryHandler.GetColorDogs).Methods("GET")
+	superAdmin.HandleFunc("/colors/{id}/users", colorCategoryHandler.GetColorUsers).Methods("GET")
 	// NOTE: EndImpersonation is on 'protected' router (not superAdmin) because when
 	// impersonating a regular user, the token has is_super_admin=false
 	protected.HandleFunc("/end-impersonation", userHandler.EndImpersonation).Methods("POST")

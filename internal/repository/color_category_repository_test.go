@@ -265,3 +265,176 @@ func TestColorCategoryRepository_CountDogsWithColor(t *testing.T) {
 		}
 	})
 }
+
+// TestColorCategoryRepository_FindDogsWithColor tests finding dogs by color
+func TestColorCategoryRepository_FindDogsWithColor(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewColorCategoryRepository(db)
+
+	t.Run("color with no dogs", func(t *testing.T) {
+		colorID := testutil.SeedTestColorCategory(t, db, "empty-dogs", "#aaaaaa", 80)
+
+		dogs, err := repo.FindDogsWithColor(0, colorID) // tenantID = 0
+		if err != nil {
+			t.Fatalf("FindDogsWithColor() failed: %v", err)
+		}
+
+		if len(dogs) != 0 {
+			t.Errorf("Expected 0 dogs, got %d", len(dogs))
+		}
+	})
+
+	t.Run("color with dogs returns correct data", func(t *testing.T) {
+		colorID := testutil.SeedTestColorCategory(t, db, "dogs-detail", "#bbbbbb", 81)
+
+		now := testutil.Now()
+		_, _ = db.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at)
+			VALUES (0, ?, ?, ?, ?, ?, 1, ?)`, "Bello", "Schäferhund", "large", 5, colorID, now)
+		_, _ = db.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at)
+			VALUES (0, ?, ?, ?, ?, ?, 0, ?)`, "Luna", "Dackel", "small", 3, colorID, now)
+
+		dogs, err := repo.FindDogsWithColor(0, colorID) // tenantID = 0
+		if err != nil {
+			t.Fatalf("FindDogsWithColor() failed: %v", err)
+		}
+
+		if len(dogs) != 2 {
+			t.Fatalf("Expected 2 dogs, got %d", len(dogs))
+		}
+
+		// Ordered by name ASC: Bello, Luna
+		if dogs[0]["name"] != "Bello" {
+			t.Errorf("Expected first dog 'Bello', got %v", dogs[0]["name"])
+		}
+		if dogs[0]["breed"] != "Schäferhund" {
+			t.Errorf("Expected breed 'Schäferhund', got %v", dogs[0]["breed"])
+		}
+		if dogs[0]["is_available"] != true {
+			t.Errorf("Expected first dog available, got %v", dogs[0]["is_available"])
+		}
+
+		if dogs[1]["name"] != "Luna" {
+			t.Errorf("Expected second dog 'Luna', got %v", dogs[1]["name"])
+		}
+		if dogs[1]["is_available"] != false {
+			t.Errorf("Expected second dog unavailable, got %v", dogs[1]["is_available"])
+		}
+	})
+
+	t.Run("does not return dogs from other tenant", func(t *testing.T) {
+		colorID := testutil.SeedTestColorCategory(t, db, "tenant-iso-dogs", "#cccccc", 82)
+
+		now := testutil.Now()
+		// Dog in tenant 0
+		_, _ = db.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at)
+			VALUES (0, ?, ?, ?, ?, ?, 1, ?)`, "MyDog", "Mix", "medium", 2, colorID, now)
+		// Dog in tenant 999 (different tenant)
+		_, _ = db.Exec(`INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at)
+			VALUES (999, ?, ?, ?, ?, ?, 1, ?)`, "OtherDog", "Lab", "large", 4, colorID, now)
+
+		dogs, err := repo.FindDogsWithColor(0, colorID) // tenantID = 0
+		if err != nil {
+			t.Fatalf("FindDogsWithColor() failed: %v", err)
+		}
+
+		if len(dogs) != 1 {
+			t.Errorf("Expected 1 dog (tenant isolation), got %d", len(dogs))
+		}
+	})
+}
+
+// TestColorCategoryRepository_FindUsersWithColor tests finding users by color
+func TestColorCategoryRepository_FindUsersWithColor(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewColorCategoryRepository(db)
+
+	t.Run("color with no users", func(t *testing.T) {
+		colorID := testutil.SeedTestColorCategory(t, db, "empty-users", "#dddddd", 90)
+
+		users, err := repo.FindUsersWithColor(0, colorID) // tenantID = 0
+		if err != nil {
+			t.Fatalf("FindUsersWithColor() failed: %v", err)
+		}
+
+		if len(users) != 0 {
+			t.Errorf("Expected 0 users, got %d", len(users))
+		}
+	})
+
+	t.Run("color with users returns correct data", func(t *testing.T) {
+		colorID := testutil.SeedTestColorCategory(t, db, "users-detail", "#eeeeee", 91)
+
+		userID1 := testutil.SeedTestUserWithoutColors(t, db, "alice@example.com", "Alice Müller", "green")
+		userID2 := testutil.SeedTestUserWithoutColors(t, db, "bob@example.com", "Bob Schmidt", "green")
+		testutil.SeedTestUserColor(t, db, userID1, colorID)
+		testutil.SeedTestUserColor(t, db, userID2, colorID)
+
+		users, err := repo.FindUsersWithColor(0, colorID) // tenantID = 0
+		if err != nil {
+			t.Fatalf("FindUsersWithColor() failed: %v", err)
+		}
+
+		if len(users) != 2 {
+			t.Fatalf("Expected 2 users, got %d", len(users))
+		}
+
+		// Ordered by last_name ASC: Müller, Schmidt
+		if users[0]["first_name"] != "Alice" {
+			t.Errorf("Expected first user 'Alice', got %v", users[0]["first_name"])
+		}
+		if users[0]["last_name"] != "Müller" {
+			t.Errorf("Expected last_name 'Müller', got %v", users[0]["last_name"])
+		}
+		if users[0]["email"] != "alice@example.com" {
+			t.Errorf("Expected email 'alice@example.com', got %v", users[0]["email"])
+		}
+
+		if users[1]["first_name"] != "Bob" {
+			t.Errorf("Expected second user 'Bob', got %v", users[1]["first_name"])
+		}
+	})
+
+	t.Run("excludes deleted users", func(t *testing.T) {
+		colorID := testutil.SeedTestColorCategory(t, db, "excl-deleted", "#f0f0f0", 92)
+
+		userID := testutil.SeedTestUserWithoutColors(t, db, "deleted@example.com", "Deleted User", "green")
+		testutil.SeedTestUserColor(t, db, userID, colorID)
+
+		// Mark user as deleted
+		_, err := db.Exec(`UPDATE users SET is_deleted = 1 WHERE id = ?`, userID)
+		if err != nil {
+			t.Fatalf("Failed to mark user as deleted: %v", err)
+		}
+
+		users, err := repo.FindUsersWithColor(0, colorID) // tenantID = 0
+		if err != nil {
+			t.Fatalf("FindUsersWithColor() failed: %v", err)
+		}
+
+		if len(users) != 0 {
+			t.Errorf("Expected 0 users (deleted excluded), got %d", len(users))
+		}
+	})
+
+	t.Run("excludes inactive users", func(t *testing.T) {
+		colorID := testutil.SeedTestColorCategory(t, db, "excl-inactive", "#f1f1f1", 93)
+
+		userID := testutil.SeedTestUserWithoutColors(t, db, "inactive@example.com", "Inactive User", "green")
+		testutil.SeedTestUserColor(t, db, userID, colorID)
+
+		// Mark user as inactive
+		_, err := db.Exec(`UPDATE users SET is_active = 0 WHERE id = ?`, userID)
+		if err != nil {
+			t.Fatalf("Failed to mark user as inactive: %v", err)
+		}
+
+		users, err := repo.FindUsersWithColor(0, colorID) // tenantID = 0
+		if err != nil {
+			t.Fatalf("FindUsersWithColor() failed: %v", err)
+		}
+
+		if len(users) != 0 {
+			t.Errorf("Expected 0 users (inactive excluded), got %d", len(users))
+		}
+	})
+}

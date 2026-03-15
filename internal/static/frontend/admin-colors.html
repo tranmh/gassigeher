@@ -156,6 +156,18 @@
         </div>
     </main>
 
+    <!-- Detail Overlay -->
+    <div id="color-detail-overlay" class="color-overlay hidden">
+        <div class="color-overlay-backdrop" data-action="close-overlay"></div>
+        <div class="color-overlay-panel">
+            <div class="color-overlay-header">
+                <h3 id="overlay-title">Details</h3>
+                <button class="color-overlay-close" data-action="close-overlay">&times;</button>
+            </div>
+            <div id="overlay-content" class="color-overlay-body"></div>
+        </div>
+    </div>
+
     <style>
         .color-grid {
             display: grid;
@@ -225,6 +237,110 @@
             flex: 1;
             padding: 8px;
         }
+        .color-stat-clickable {
+            cursor: pointer;
+            border-radius: 4px;
+            padding: 6px 10px;
+            transition: background 0.15s;
+        }
+        .color-stat-clickable:hover {
+            background: #e0e0e0;
+        }
+        .color-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .color-overlay.hidden {
+            display: none;
+        }
+        .color-overlay-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+        }
+        .color-overlay-panel {
+            position: relative;
+            background: var(--card-bg, #fff);
+            border-radius: var(--border-radius, 6px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .color-overlay-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-light, #eee);
+        }
+        .color-overlay-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+        .color-overlay-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+            padding: 0 4px;
+            line-height: 1;
+        }
+        .color-overlay-close:hover {
+            color: #333;
+        }
+        .color-overlay-body {
+            padding: 16px 20px;
+            overflow-y: auto;
+        }
+        .overlay-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .overlay-list li {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-light, #eee);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .overlay-list li:last-child {
+            border-bottom: none;
+        }
+        .overlay-list .item-name {
+            font-weight: 500;
+        }
+        .overlay-list .item-detail {
+            font-size: 0.85rem;
+            color: #666;
+        }
+        .overlay-empty {
+            text-align: center;
+            color: #999;
+            padding: 20px 0;
+        }
+        .availability-badge {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+        .availability-badge.available {
+            background: #d4edda;
+            color: #155724;
+        }
+        .availability-badge.unavailable {
+            background: #f8d7da;
+            color: #721c24;
+        }
     </style>
 
     <script src="/js/logo-banner.js"></script>
@@ -242,7 +358,10 @@
             'hide-color-form': function(e) { e.preventDefault(); hideForm(); },
             'edit-color': function(e, id) { e.preventDefault(); editColor(parseInt(id)); },
             'delete-color': function(e, id) { e.preventDefault(); deleteColor(parseInt(id)); },
-            'save-default-color': function(e) { e.preventDefault(); saveDefaultColor(); }
+            'save-default-color': function(e) { e.preventDefault(); saveDefaultColor(); },
+            'show-color-dogs': function(e, id) { e.preventDefault(); showColorDogs(parseInt(id)); },
+            'show-color-users': function(e, id) { e.preventDefault(); showColorUsers(parseInt(id)); },
+            'close-overlay': function(e) { e.preventDefault(); closeOverlay(); }
         });
     </script>
     <script>
@@ -382,11 +501,11 @@
                         </div>
                     </div>
                     <div class="color-stats">
-                        <div class="color-stat">
+                        <div class="color-stat color-stat-clickable" data-action="show-color-dogs" data-id="${color.id}">
                             <div class="color-stat-value" id="dog-count-${color.id}">-</div>
                             <div class="color-stat-label">Hunde</div>
                         </div>
-                        <div class="color-stat">
+                        <div class="color-stat color-stat-clickable" data-action="show-color-users" data-id="${color.id}">
                             <div class="color-stat-value" id="user-count-${color.id}">-</div>
                             <div class="color-stat-label">Benutzer</div>
                         </div>
@@ -533,6 +652,78 @@
                 showAlert('error', error.message || 'Fehler beim Speichern der Standardfarbe');
             }
         }
+
+        async function showColorDogs(colorId) {
+            const color = currentColors.find(c => c.id === colorId);
+            document.getElementById('overlay-title').textContent = `Hunde mit Farbe "${color ? color.name : ''}"`;
+            document.getElementById('overlay-content').innerHTML = '<p style="text-align:center;">Laden...</p>';
+            document.getElementById('color-detail-overlay').classList.remove('hidden');
+
+            try {
+                const response = await api.getColorDogs(colorId);
+                const dogs = response.dogs || [];
+                if (dogs.length === 0) {
+                    document.getElementById('overlay-content').innerHTML = '<p class="overlay-empty">Keine Hunde mit dieser Farbe</p>';
+                    return;
+                }
+                document.getElementById('overlay-content').innerHTML = `
+                    <ul class="overlay-list">
+                        ${dogs.map(dog => `
+                            <li>
+                                <div>
+                                    <div class="item-name">${sanitizeHTML(dog.name)}</div>
+                                    <div class="item-detail">${sanitizeHTML(dog.breed)}</div>
+                                </div>
+                                <span class="availability-badge ${dog.is_available ? 'available' : 'unavailable'}">
+                                    ${dog.is_available ? 'Verfügbar' : 'Nicht verfügbar'}
+                                </span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                `;
+            } catch (error) {
+                document.getElementById('overlay-content').innerHTML = `<p class="overlay-empty">Fehler beim Laden: ${sanitizeHTML(error.message)}</p>`;
+            }
+        }
+
+        async function showColorUsers(colorId) {
+            const color = currentColors.find(c => c.id === colorId);
+            document.getElementById('overlay-title').textContent = `Benutzer mit Farbe "${color ? color.name : ''}"`;
+            document.getElementById('overlay-content').innerHTML = '<p style="text-align:center;">Laden...</p>';
+            document.getElementById('color-detail-overlay').classList.remove('hidden');
+
+            try {
+                const response = await api.getColorUsers(colorId);
+                const users = response.users || [];
+                if (users.length === 0) {
+                    document.getElementById('overlay-content').innerHTML = '<p class="overlay-empty">Keine Benutzer mit dieser Farbe</p>';
+                    return;
+                }
+                document.getElementById('overlay-content').innerHTML = `
+                    <ul class="overlay-list">
+                        ${users.map(user => `
+                            <li>
+                                <div>
+                                    <div class="item-name">${sanitizeHTML(user.first_name)} ${sanitizeHTML(user.last_name)}</div>
+                                    ${user.email ? `<div class="item-detail">${sanitizeHTML(user.email)}</div>` : ''}
+                                </div>
+                            </li>
+                        `).join('')}
+                    </ul>
+                `;
+            } catch (error) {
+                document.getElementById('overlay-content').innerHTML = `<p class="overlay-empty">Fehler beim Laden: ${sanitizeHTML(error.message)}</p>`;
+            }
+        }
+
+        function closeOverlay() {
+            document.getElementById('color-detail-overlay').classList.add('hidden');
+        }
+
+        // Close overlay on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeOverlay();
+        });
 
         function showAlert(type, message) {
             const container = document.getElementById('alert-container');

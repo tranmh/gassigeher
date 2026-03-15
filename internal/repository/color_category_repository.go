@@ -250,6 +250,79 @@ func (r *ColorCategoryRepository) CountUsersWithColor(tenantID int, colorID int)
 	return count, nil
 }
 
+// FindDogsWithColor returns dogs assigned to a color within a tenant
+func (r *ColorCategoryRepository) FindDogsWithColor(tenantID int, colorID int) ([]map[string]interface{}, error) {
+	query := `
+		SELECT id, name, breed, is_available
+		FROM dogs
+		WHERE color_id = ? AND tenant_id = ?
+		ORDER BY name ASC
+	`
+
+	rows, err := r.db.Query(query, colorID, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dogs with color: %w", err)
+	}
+	defer rows.Close()
+
+	var dogs []map[string]interface{}
+	for rows.Next() {
+		var id int
+		var name, breed string
+		var isAvailable bool
+		if err := rows.Scan(&id, &name, &breed, &isAvailable); err != nil {
+			return nil, fmt.Errorf("failed to scan dog: %w", err)
+		}
+		dogs = append(dogs, map[string]interface{}{
+			"id":           id,
+			"name":         name,
+			"breed":        breed,
+			"is_available": isAvailable,
+		})
+	}
+
+	return dogs, nil
+}
+
+// FindUsersWithColor returns active, non-deleted users who have a color within a tenant
+func (r *ColorCategoryRepository) FindUsersWithColor(tenantID int, colorID int) ([]map[string]interface{}, error) {
+	query := `
+		SELECT u.id, u.first_name, u.last_name, u.email
+		FROM user_colors uc
+		INNER JOIN users u ON u.id = uc.user_id AND u.tenant_id = uc.tenant_id
+		WHERE uc.color_id = ? AND uc.tenant_id = ?
+		AND u.is_deleted = ? AND u.is_active = ?
+		ORDER BY u.last_name ASC, u.first_name ASC
+	`
+
+	rows, err := r.db.Query(query, colorID, tenantID, r.db.BoolValue(false), r.db.BoolValue(true))
+	if err != nil {
+		return nil, fmt.Errorf("failed to find users with color: %w", err)
+	}
+	defer rows.Close()
+
+	var users []map[string]interface{}
+	for rows.Next() {
+		var id int
+		var firstName, lastName string
+		var email *string
+		if err := rows.Scan(&id, &firstName, &lastName, &email); err != nil {
+			return nil, fmt.Errorf("failed to scan user: %w", err)
+		}
+		u := map[string]interface{}{
+			"id":         id,
+			"first_name": firstName,
+			"last_name":  lastName,
+		}
+		if email != nil {
+			u["email"] = *email
+		}
+		users = append(users, u)
+	}
+
+	return users, nil
+}
+
 // GetNextSortOrder returns the next available sort order for a tenant
 func (r *ColorCategoryRepository) GetNextSortOrder(tenantID int) (int, error) {
 	query := `SELECT COALESCE(MAX(sort_order), 0) + 1 FROM color_categories WHERE tenant_id = ?`
