@@ -279,8 +279,8 @@
             // Initialize impersonation banner (shows if impersonating)
             await ImpersonationBanner.init();
 
-            loadColors();
-            loadDefaultColor();
+            await Promise.all([loadColors(), loadDefaultColor()]);
+            updateDefaultColorDropdown();
 
             document.getElementById('color-form').addEventListener('submit', handleFormSubmit);
 
@@ -353,7 +353,6 @@
                 const response = await api.getColors();
                 currentColors = response.colors || [];
                 renderColors();
-                updateDefaultColorDropdown();
             } catch (error) {
                 showAlert('error', error.message || 'Fehler beim Laden der Farben');
             }
@@ -502,9 +501,9 @@
 
         async function loadDefaultColor() {
             try {
-                const settings = await api.getSettings();
-                currentDefaultColorID = settings['default_color_for_new_users'] || '1';
-                updateDefaultColorDropdown();
+                const settingsArray = await api.getSettings();
+                const setting = settingsArray.find(s => s.key === 'default_color_for_new_users');
+                currentDefaultColorID = (setting && setting.value) || '1';
             } catch (error) {
                 console.error('Failed to load default color setting:', error);
             }
