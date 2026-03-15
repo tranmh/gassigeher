@@ -232,12 +232,17 @@ func (r *ColorCategoryRepository) CountDogsWithColor(tenantID int, colorID int) 
 	return count, nil
 }
 
-// CountUsersWithColor returns the number of users who have a color within a tenant
+// CountUsersWithColor returns the number of active, non-deleted users who have a color within a tenant
 func (r *ColorCategoryRepository) CountUsersWithColor(tenantID int, colorID int) (int, error) {
-	query := `SELECT COUNT(*) FROM user_colors WHERE color_id = ? AND tenant_id = ?`
+	query := `
+		SELECT COUNT(*) FROM user_colors uc
+		INNER JOIN users u ON u.id = uc.user_id AND u.tenant_id = uc.tenant_id
+		WHERE uc.color_id = ? AND uc.tenant_id = ?
+		AND u.is_deleted = ? AND u.is_active = ?
+	`
 
 	var count int
-	err := r.db.QueryRow(query, colorID, tenantID).Scan(&count)
+	err := r.db.QueryRow(query, colorID, tenantID, r.db.BoolValue(false), r.db.BoolValue(true)).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count users with color: %w", err)
 	}
