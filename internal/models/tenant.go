@@ -47,9 +47,14 @@ type TenantSettings struct {
 	Description     *string   `json:"description,omitempty"`     // Longer description for hero section
 	FooterText      *string   `json:"footer_text,omitempty"`
 	WebsiteURL      *string   `json:"website_url,omitempty"`
-	DonationURL     *string   `json:"donation_url,omitempty"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	DonationURL         *string   `json:"donation_url,omitempty"`
+	OrganizationName    *string   `json:"organization_name,omitempty"`    // Legal org name for privacy/terms pages
+	OrganizationAddress *string   `json:"organization_address,omitempty"` // Postal address for privacy/terms pages
+	OrganizationEmail   *string   `json:"organization_email,omitempty"`   // Contact email for privacy/terms pages
+	OrganizationPhone   *string   `json:"organization_phone,omitempty"`   // Contact phone for privacy/terms pages
+	PrivacyOfficerEmail *string   `json:"privacy_officer_email,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 // TenantRegistrationRequest represents the tenant registration payload

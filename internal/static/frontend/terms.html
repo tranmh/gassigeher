@@ -6,6 +6,7 @@
     <title>Allgemeine Geschäftsbedingungen - Gassigeher</title>
     <link rel="stylesheet" href="/assets/css/main.css">
     <script src="/js/theme-loader.js"></script>
+    <script src="/js/branding.js"></script>
 </head>
 <body>
     <header>
@@ -26,7 +27,7 @@
 
             <div class="card">
                 <h2>1. Geltungsbereich</h2>
-                <p>Diese Allgemeinen Geschäftsbedingungen gelten für die Nutzung der Gassigeher-Plattform.</p>
+                <p>Diese Allgemeinen Geschäftsbedingungen gelten für die Nutzung der <span id="platform-name">Gassigeher</span>-Plattform.</p>
 
                 <h2>2. Registrierung und Nutzerkonto</h2>
                 <p>Zur Nutzung der Plattform ist eine Registrierung erforderlich. Du musst wahrheitsgemäße Angaben machen und dein Konto vertraulich behandeln.</p>
@@ -60,10 +61,25 @@
 
     <footer>
         <div class="container">
-            <p>&copy; 2025 Gassigeher. Alle Rechte vorbehalten.</p>
+            <p>&copy; <script>document.write(new Date().getFullYear())</script> Gassigeher. Alle Rechte vorbehalten.</p>
         </div>
     </footer>
 
     <script src="/js/logo-banner.js"></script>
+    <script>
+        async function loadTermsBranding() {
+            var branding = window.branding || (window.loadBrandingData ? await window.loadBrandingData() : null);
+            if (!branding || !branding.tenant_name) return;
+
+            var el = document.getElementById('platform-name');
+            if (el) el.textContent = branding.tenant_name;
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadTermsBranding);
+        } else {
+            loadTermsBranding();
+        }
+    </script>
 </body>
 </html>

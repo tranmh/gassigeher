@@ -452,6 +452,10 @@ class API {
         return this.request('PUT', '/admin/tenant/branding', branding);
     }
 
+    async updateTenant(data) {
+        return this.request('PUT', '/admin/tenant', data);
+    }
+
     async exportTenantData() {
         return this.request('GET', '/admin/tenant/export');
     }

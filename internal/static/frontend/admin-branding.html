@@ -6,6 +6,7 @@
     <title>Branding - Gassigeher Admin</title>
     <link rel="stylesheet" href="/assets/css/main.css">
     <script src="/js/theme-loader.js"></script>
+    <script src="/js/branding.js"></script>
     <script src="/js/favicon-loader.js"></script>
 </head>
 <body>
@@ -57,10 +58,24 @@
         <div class="container-narrow">
             <h1>Branding & Erscheinungsbild</h1>
             <p style="color: var(--text-gray); margin-bottom: 30px;">
-                Passe das Erscheinungsbild deiner Gassigeher-Seite an.
+                Passe das Erscheinungsbild deiner Seite an.
             </p>
 
             <div id="alert-container"></div>
+
+            <!-- Display Name -->
+            <div class="card">
+                <h2>Anzeigename</h2>
+                <p style="font-size: 0.85rem; color: #666; margin-bottom: 20px;">
+                    Dieser Name wird im Logo, Seitentitel und Footer auf allen Seiten angezeigt.
+                </p>
+
+                <div class="form-group">
+                    <label for="tenant-display-name">Name des Tierheims</label>
+                    <input type="text" id="tenant-display-name" maxlength="255"
+                           placeholder="z.B. Tierheim Göppingen">
+                </div>
+            </div>
 
             <!-- Logo & Favicon -->
             <div class="card">
@@ -191,6 +206,56 @@
                 </div>
             </div>
 
+            <!-- Organization Identity -->
+            <div class="card" style="margin-top: 30px;">
+                <h2>Organisation / Impressum</h2>
+                <p style="font-size: 0.85rem; color: #666; margin-bottom: 20px;">
+                    Diese Daten werden in der Datenschutzerklärung und den AGB angezeigt.
+                </p>
+
+                <div class="form-group">
+                    <label for="organization-name">Organisationsname</label>
+                    <input type="text" id="organization-name" maxlength="255"
+                           placeholder="z.B. Tierschutzverein Musterstadt e.V.">
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        Offizieller Name der Organisation (für Impressum/Datenschutz)
+                    </p>
+                </div>
+
+                <div class="form-group">
+                    <label for="organization-address">Adresse</label>
+                    <textarea id="organization-address" rows="2" maxlength="500"
+                              placeholder="z.B. Musterstraße 1, 73033 Göppingen"></textarea>
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        Vollständige Postadresse
+                    </p>
+                </div>
+
+                <div class="form-group">
+                    <label for="organization-email">Kontakt-E-Mail</label>
+                    <input type="email" id="organization-email"
+                           placeholder="z.B. info@tierheim-musterstadt.de">
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        Allgemeine Kontakt-E-Mail-Adresse
+                    </p>
+                </div>
+
+                <div class="form-group">
+                    <label for="organization-phone">Telefon</label>
+                    <input type="tel" id="organization-phone"
+                           placeholder="z.B. 07161 12345">
+                </div>
+
+                <div class="form-group">
+                    <label for="privacy-officer-email">Datenschutzbeauftragter E-Mail</label>
+                    <input type="email" id="privacy-officer-email"
+                           placeholder="z.B. datenschutz@tierheim-musterstadt.de">
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                        Wird in der Datenschutzerklärung angezeigt (falls abweichend von Kontakt-E-Mail)
+                    </p>
+                </div>
+            </div>
+
             <!-- Theme Selection -->
             <div class="card" style="margin-top: 30px;">
                 <h2>Farbschema</h2>
@@ -295,7 +360,7 @@
     <footer>
         <div class="container">
             <p>&copy; 2025 Gassigeher Admin. | <a href="/terms.html">AGB</a> | <a href="/privacy.html">Datenschutz</a></p>
-            <p style="margin-top: 8px;">
+            <p data-no-branding style="margin-top: 8px;">
                 <a href="https://gassigeher.org" target="_blank" rel="noopener" style="color: var(--text-gray); text-decoration: none; font-size: 0.85rem;">
                     Powered by Gassigeher
                 </a>
@@ -360,6 +425,9 @@
                 const branding = await api.getBranding();
                 if (!branding) return;
 
+                // Populate display name from tenant_name
+                document.getElementById('tenant-display-name').value = branding.tenant_name || '';
+
                 // Populate form fields
                 document.getElementById('welcome-message').value = branding.welcome_message || '';
                 document.getElementById('tagline').value = branding.tagline || '';
@@ -391,6 +459,13 @@
                     document.getElementById('color-text-picker').value = branding.color_text;
                 }
 
+                // Organization fields
+                document.getElementById('organization-name').value = branding.organization_name || '';
+                document.getElementById('organization-address').value = branding.organization_address || '';
+                document.getElementById('organization-email').value = branding.organization_email || '';
+                document.getElementById('organization-phone').value = branding.organization_phone || '';
+                document.getElementById('privacy-officer-email').value = branding.privacy_officer_email || '';
+
                 updatePreview();
             } catch (error) {
                 console.error('Error loading branding:', error);
@@ -412,12 +487,27 @@
                 color_secondary: document.getElementById('color-secondary').value || null,
                 color_accent: document.getElementById('color-accent').value || null,
                 color_background: document.getElementById('color-background').value || null,
-                color_text: document.getElementById('color-text').value || null
+                color_text: document.getElementById('color-text').value || null,
+                organization_name: document.getElementById('organization-name').value || null,
+                organization_address: document.getElementById('organization-address').value || null,
+                organization_email: document.getElementById('organization-email').value || null,
+                organization_phone: document.getElementById('organization-phone').value || null,
+                privacy_officer_email: document.getElementById('privacy-officer-email').value || null
             };
 
             try {
+                // Save display name via tenant API (separate from branding settings)
+                const displayName = document.getElementById('tenant-display-name').value.trim();
+                if (displayName) {
+                    await api.updateTenant({ name: displayName });
+                }
+
                 await api.updateBranding(branding);
                 showAlert('Branding-Einstellungen gespeichert! Die Änderungen werden auf allen Seiten sichtbar.', 'success');
+                // Invalidate branding cache so other pages pick up changes
+                if (typeof window.invalidateBrandingCache === 'function') {
+                    window.invalidateBrandingCache();
+                }
                 // Reload theme CSS to apply changes immediately
                 if (typeof window.reloadThemeCSS === 'function') {
                     window.reloadThemeCSS();

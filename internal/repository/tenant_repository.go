@@ -414,9 +414,11 @@ func (r *TenantRepository) CreateSettings(settings *models.TenantSettings) error
 		INSERT INTO tenant_settings (
 			tenant_id, theme_preset, color_primary, color_secondary,
 			color_accent, color_background, color_text,
-			logo_url, favicon_url, welcome_message, footer_text,
-			website_url, donation_url
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			logo_url, favicon_url, welcome_message, tagline, description,
+			footer_text, website_url, donation_url,
+			organization_name, organization_address, organization_email,
+			organization_phone, privacy_officer_email
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	id, err := r.db.InsertReturningID(
@@ -431,9 +433,16 @@ func (r *TenantRepository) CreateSettings(settings *models.TenantSettings) error
 		settings.LogoURL,
 		settings.FaviconURL,
 		settings.WelcomeMessage,
+		settings.Tagline,
+		settings.Description,
 		settings.FooterText,
 		settings.WebsiteURL,
 		settings.DonationURL,
+		settings.OrganizationName,
+		settings.OrganizationAddress,
+		settings.OrganizationEmail,
+		settings.OrganizationPhone,
+		settings.PrivacyOfficerEmail,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create tenant settings: %w", err)
@@ -451,9 +460,11 @@ func (r *TenantRepository) CreateSettingsTx(tx *sql.Tx, settings *models.TenantS
 		INSERT INTO tenant_settings (
 			tenant_id, theme_preset, color_primary, color_secondary,
 			color_accent, color_background, color_text,
-			logo_url, favicon_url, welcome_message, footer_text,
-			website_url, donation_url
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			logo_url, favicon_url, welcome_message, tagline, description,
+			footer_text, website_url, donation_url,
+			organization_name, organization_address, organization_email,
+			organization_phone, privacy_officer_email
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	// Rebind query for PostgreSQL (? -> $1, $2, ...)
@@ -471,9 +482,16 @@ func (r *TenantRepository) CreateSettingsTx(tx *sql.Tx, settings *models.TenantS
 		settings.LogoURL,
 		settings.FaviconURL,
 		settings.WelcomeMessage,
+		settings.Tagline,
+		settings.Description,
 		settings.FooterText,
 		settings.WebsiteURL,
 		settings.DonationURL,
+		settings.OrganizationName,
+		settings.OrganizationAddress,
+		settings.OrganizationEmail,
+		settings.OrganizationPhone,
+		settings.PrivacyOfficerEmail,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create tenant settings: %w", err)
@@ -488,7 +506,10 @@ func (r *TenantRepository) GetSettings(tenantID int) (*models.TenantSettings, er
 		SELECT id, tenant_id, theme_preset, color_primary, color_secondary,
 		       color_accent, color_background, color_text,
 		       logo_url, favicon_url, welcome_message, tagline, description,
-		       footer_text, website_url, donation_url, created_at, updated_at
+		       footer_text, website_url, donation_url,
+		       organization_name, organization_address, organization_email,
+		       organization_phone, privacy_officer_email,
+		       created_at, updated_at
 		FROM tenant_settings
 		WHERE tenant_id = ?
 	`
@@ -511,6 +532,11 @@ func (r *TenantRepository) GetSettings(tenantID int) (*models.TenantSettings, er
 		&settings.FooterText,
 		&settings.WebsiteURL,
 		&settings.DonationURL,
+		&settings.OrganizationName,
+		&settings.OrganizationAddress,
+		&settings.OrganizationEmail,
+		&settings.OrganizationPhone,
+		&settings.PrivacyOfficerEmail,
 		&settings.CreatedAt,
 		&settings.UpdatedAt,
 	)
@@ -542,6 +568,11 @@ func (r *TenantRepository) UpdateSettings(settings *models.TenantSettings) error
 			footer_text = ?,
 			website_url = ?,
 			donation_url = ?,
+			organization_name = ?,
+			organization_address = ?,
+			organization_email = ?,
+			organization_phone = ?,
+			privacy_officer_email = ?,
 			updated_at = ?
 		WHERE tenant_id = ?
 	`
@@ -563,6 +594,11 @@ func (r *TenantRepository) UpdateSettings(settings *models.TenantSettings) error
 		settings.FooterText,
 		settings.WebsiteURL,
 		settings.DonationURL,
+		settings.OrganizationName,
+		settings.OrganizationAddress,
+		settings.OrganizationEmail,
+		settings.OrganizationPhone,
+		settings.PrivacyOfficerEmail,
 		now,
 		settings.TenantID,
 	)

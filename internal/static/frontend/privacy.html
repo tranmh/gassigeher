@@ -6,6 +6,7 @@
     <title>Datenschutzerklärung - Gassigeher</title>
     <link rel="stylesheet" href="/assets/css/main.css">
     <script src="/js/theme-loader.js"></script>
+    <script src="/js/branding.js"></script>
 </head>
 <body>
     <header>
@@ -27,9 +28,9 @@
 
             <div class="card">
                 <h2>1. Verantwortliche Stelle</h2>
-                <p><strong>Gassigeher</strong><br>
-                [Ihre Adresse]<br>
-                E-Mail: datenschutz@gassigeher.example.com</p>
+                <p id="org-responsible"><strong id="org-name-display">Gassigeher</strong><br>
+                <span id="org-address-display">Bitte im Admin-Bereich unter Branding konfigurieren</span><br>
+                <span id="org-email-display"></span></p>
             </div>
 
             <div class="card">
@@ -177,10 +178,10 @@
                 <h3>9.1 Recht auf Vergessenwerden</h3>
                 <p>Bei Kontolöschung werden alle personenbezogenen Daten gelöscht:</p>
                 <ul>
-                    <li>✅ Name, E-Mail, Telefon: Vollständig gelöscht</li>
-                    <li>✅ Passwort: Vollständig gelöscht</li>
-                    <li>✅ Profilfoto: Vollständig gelöscht</li>
-                    <li>⚠️ Spaziergangshistorie: Anonymisiert aufbewahrt</li>
+                    <li>Name, E-Mail, Telefon: Vollständig gelöscht</li>
+                    <li>Passwort: Vollständig gelöscht</li>
+                    <li>Profilfoto: Vollständig gelöscht</li>
+                    <li>Spaziergangshistorie: Anonymisiert aufbewahrt</li>
                 </ul>
 
                 <h3>9.2 Berechtigtes Interesse</h3>
@@ -195,11 +196,11 @@
 
             <div class="card" style="background: #f9f9f9; border-left: 4px solid var(--color-primary, #82b965);">
                 <h2>10. Kontakt</h2>
-                <p><strong>Datenschutzbeauftragter:</strong><br>
-                E-Mail: datenschutz@gassigeher.example.com</p>
+                <p id="contact-privacy"><strong>Datenschutzbeauftragter:</strong><br>
+                <span id="contact-privacy-email">Bitte im Admin-Bereich unter Branding konfigurieren.</span></p>
 
-                <p><strong>Allgemeine Anfragen:</strong><br>
-                E-Mail: info@gassigeher.example.com</p>
+                <p id="contact-general"><strong>Allgemeine Anfragen:</strong><br>
+                <span id="contact-general-email">Bitte im Admin-Bereich unter Branding konfigurieren.</span></p>
             </div>
 
             <p class="text-center mt-3">
@@ -210,10 +211,73 @@
 
     <footer>
         <div class="container">
-            <p>&copy; 2025 Gassigeher. Alle Rechte vorbehalten. | <a href="/terms.html">AGB</a> | <a href="/privacy.html">Datenschutz</a></p>
+            <p>&copy; <script>document.write(new Date().getFullYear())</script> Gassigeher. Alle Rechte vorbehalten. | <a href="/terms.html">AGB</a> | <a href="/privacy.html">Datenschutz</a></p>
         </div>
     </footer>
 
     <script src="/js/logo-banner.js"></script>
+    <script>
+        function escapeHtml(str) {
+            var div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        async function loadPrivacyBranding() {
+            var branding = window.branding || (window.loadBrandingData ? await window.loadBrandingData() : null);
+            if (!branding) return;
+
+            var orgName = branding.organization_name || branding.tenant_name || '';
+            var orgAddress = branding.organization_address || '';
+            var orgEmail = branding.organization_email || '';
+            var orgPhone = branding.organization_phone || '';
+            var privacyEmail = branding.privacy_officer_email || orgEmail || '';
+
+            // Section 1: Verantwortliche Stelle
+            var nameEl = document.getElementById('org-name-display');
+            if (nameEl && orgName) {
+                nameEl.textContent = orgName;
+            }
+
+            var addressEl = document.getElementById('org-address-display');
+            if (addressEl) {
+                if (orgAddress) {
+                    addressEl.innerHTML = escapeHtml(orgAddress).replace(/\n/g, '<br>') + '<br>';
+                }
+            }
+
+            var emailEl = document.getElementById('org-email-display');
+            if (emailEl) {
+                if (orgEmail) {
+                    emailEl.innerHTML = 'E-Mail: ' + escapeHtml(orgEmail);
+                }
+            }
+
+            // Section 10: Kontakt
+            var privacyEmailEl = document.getElementById('contact-privacy-email');
+            if (privacyEmailEl) {
+                if (privacyEmail) {
+                    privacyEmailEl.textContent = 'E-Mail: ' + privacyEmail;
+                } else {
+                    privacyEmailEl.textContent = 'Bitte im Admin-Bereich unter Branding konfigurieren.';
+                }
+            }
+
+            var generalEmailEl = document.getElementById('contact-general-email');
+            if (generalEmailEl) {
+                if (orgEmail) {
+                    generalEmailEl.textContent = 'E-Mail: ' + orgEmail;
+                } else {
+                    generalEmailEl.textContent = 'Bitte im Admin-Bereich unter Branding konfigurieren.';
+                }
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadPrivacyBranding);
+        } else {
+            loadPrivacyBranding();
+        }
+    </script>
 </body>
 </html>

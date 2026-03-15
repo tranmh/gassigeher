@@ -481,22 +481,27 @@ func (h *TenantHandler) UpdateTenant(w http.ResponseWriter, r *http.Request) {
 
 // BrandingResponse represents the branding information for a tenant
 type BrandingResponse struct {
-	TenantName      string  `json:"tenant_name"`
-	TenantSlug      string  `json:"tenant_slug"`
-	WelcomeMessage  *string `json:"welcome_message,omitempty"`
-	Tagline         *string `json:"tagline,omitempty"`
-	Description     *string `json:"description,omitempty"`
-	FooterText      *string `json:"footer_text,omitempty"`
-	WebsiteURL      *string `json:"website_url,omitempty"`
-	DonationURL     *string `json:"donation_url,omitempty"`
-	LogoURL         *string `json:"logo_url,omitempty"`
-	FaviconURL      *string `json:"favicon_url,omitempty"`
-	ThemePreset     string  `json:"theme_preset"`
-	ColorPrimary    *string `json:"color_primary,omitempty"`
-	ColorSecondary  *string `json:"color_secondary,omitempty"`
-	ColorAccent     *string `json:"color_accent,omitempty"`
-	ColorBackground *string `json:"color_background,omitempty"`
-	ColorText       *string `json:"color_text,omitempty"`
+	TenantName          string  `json:"tenant_name"`
+	TenantSlug          string  `json:"tenant_slug"`
+	WelcomeMessage      *string `json:"welcome_message,omitempty"`
+	Tagline             *string `json:"tagline,omitempty"`
+	Description         *string `json:"description,omitempty"`
+	FooterText          *string `json:"footer_text,omitempty"`
+	WebsiteURL          *string `json:"website_url,omitempty"`
+	DonationURL         *string `json:"donation_url,omitempty"`
+	LogoURL             *string `json:"logo_url,omitempty"`
+	FaviconURL          *string `json:"favicon_url,omitempty"`
+	ThemePreset         string  `json:"theme_preset"`
+	ColorPrimary        *string `json:"color_primary,omitempty"`
+	ColorSecondary      *string `json:"color_secondary,omitempty"`
+	ColorAccent         *string `json:"color_accent,omitempty"`
+	ColorBackground     *string `json:"color_background,omitempty"`
+	ColorText           *string `json:"color_text,omitempty"`
+	OrganizationName    *string `json:"organization_name,omitempty"`
+	OrganizationAddress *string `json:"organization_address,omitempty"`
+	OrganizationEmail   *string `json:"organization_email,omitempty"`
+	OrganizationPhone   *string `json:"organization_phone,omitempty"`
+	PrivacyOfficerEmail *string `json:"privacy_officer_email,omitempty"`
 }
 
 // GetBranding returns the branding information for the current tenant (public endpoint)
@@ -549,6 +554,11 @@ func (h *TenantHandler) GetBranding(w http.ResponseWriter, r *http.Request) {
 		response.ColorAccent = settings.ColorAccent
 		response.ColorBackground = settings.ColorBackground
 		response.ColorText = settings.ColorText
+		response.OrganizationName = settings.OrganizationName
+		response.OrganizationAddress = settings.OrganizationAddress
+		response.OrganizationEmail = settings.OrganizationEmail
+		response.OrganizationPhone = settings.OrganizationPhone
+		response.PrivacyOfficerEmail = settings.PrivacyOfficerEmail
 	}
 
 	respondJSON(w, http.StatusOK, response)
@@ -556,18 +566,23 @@ func (h *TenantHandler) GetBranding(w http.ResponseWriter, r *http.Request) {
 
 // UpdateBrandingRequest represents a request to update tenant branding
 type UpdateBrandingRequest struct {
-	WelcomeMessage  *string `json:"welcome_message"`
-	Tagline         *string `json:"tagline"`
-	Description     *string `json:"description"`
-	FooterText      *string `json:"footer_text"`
-	WebsiteURL      *string `json:"website_url"`
-	DonationURL     *string `json:"donation_url"`
-	ThemePreset     string  `json:"theme_preset"`
-	ColorPrimary    *string `json:"color_primary"`
-	ColorSecondary  *string `json:"color_secondary"`
-	ColorAccent     *string `json:"color_accent"`
-	ColorBackground *string `json:"color_background"`
-	ColorText       *string `json:"color_text"`
+	WelcomeMessage      *string `json:"welcome_message"`
+	Tagline             *string `json:"tagline"`
+	Description         *string `json:"description"`
+	FooterText          *string `json:"footer_text"`
+	WebsiteURL          *string `json:"website_url"`
+	DonationURL         *string `json:"donation_url"`
+	ThemePreset         string  `json:"theme_preset"`
+	ColorPrimary        *string `json:"color_primary"`
+	ColorSecondary      *string `json:"color_secondary"`
+	ColorAccent         *string `json:"color_accent"`
+	ColorBackground     *string `json:"color_background"`
+	ColorText           *string `json:"color_text"`
+	OrganizationName    *string `json:"organization_name"`
+	OrganizationAddress *string `json:"organization_address"`
+	OrganizationEmail   *string `json:"organization_email"`
+	OrganizationPhone   *string `json:"organization_phone"`
+	PrivacyOfficerEmail *string `json:"privacy_officer_email"`
 }
 
 // UpdateBranding updates the branding settings for the current tenant (admin only)
@@ -641,6 +656,11 @@ func (h *TenantHandler) UpdateBranding(w http.ResponseWriter, r *http.Request) {
 	settings.ColorAccent = req.ColorAccent
 	settings.ColorBackground = req.ColorBackground
 	settings.ColorText = req.ColorText
+	settings.OrganizationName = req.OrganizationName
+	settings.OrganizationAddress = req.OrganizationAddress
+	settings.OrganizationEmail = req.OrganizationEmail
+	settings.OrganizationPhone = req.OrganizationPhone
+	settings.PrivacyOfficerEmail = req.PrivacyOfficerEmail
 
 	// Save settings
 	if err := h.tenantRepo.UpdateSettings(settings); err != nil {

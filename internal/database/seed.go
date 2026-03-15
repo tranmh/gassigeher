@@ -85,10 +85,10 @@ func EnsureDefaultTenant(db *sql.DB, dbType string) error {
 	var query string
 	if dbType == "postgres" {
 		query = `INSERT INTO tenants (id, slug, name, contact_email, status, created_at, updated_at)
-			VALUES (0, 'default', 'Default Tenant', 'default@localhost', 'active', $1, $2)`
+			VALUES (0, 'default', 'Mein Tierheim', 'default@localhost', 'active', $1, $2)`
 	} else {
 		query = `INSERT INTO tenants (id, slug, name, contact_email, status, created_at, updated_at)
-			VALUES (0, 'default', 'Default Tenant', 'default@localhost', 'active', ?, ?)`
+			VALUES (0, 'default', 'Mein Tierheim', 'default@localhost', 'active', ?, ?)`
 	}
 
 	_, err = db.Exec(query, now, now)
