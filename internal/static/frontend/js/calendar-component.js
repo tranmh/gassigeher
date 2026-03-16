@@ -667,8 +667,8 @@ class CalendarComponent {
         const safeDogName = typeof sanitizeHTML === 'function' ? sanitizeHTML(dog.name) : dog.name;
         const colorBadge = dogColor ? this.getColorBadgeHtml(dogColor) : '';
 
-        const photoHtml = typeof getCalendarDogCell === 'function'
-            ? getCalendarDogCell(dog)
+        const photoHtml = typeof getDogPhotoHtml === 'function'
+            ? getDogPhotoHtml(dog, true, 'calendar-dog-photo', true, false)
             : `<div style="width: 40px; height: 40px; background: #ddd; border-radius: 50%; display: flex; align-items: center; justify-content: center;">🐕</div>`;
 
         return `

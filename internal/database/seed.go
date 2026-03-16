@@ -305,10 +305,273 @@ func seedSimpleMode(db *sql.DB, cfg SeedConfig) error {
 
 	log.Println("✓ Super Admin created (ID: 1) - Local shelter administrator")
 
+	// Seed color categories, test users, dogs, and bookings
+	if err := seedSimpleModeData(db, cfg.DBType, now); err != nil {
+		log.Printf("Warning: failed to seed sample data: %v", err)
+	}
+
 	// Print setup complete message
 	printSimpleModeSetup(cfg.SuperAdminEmail, password)
 
 	log.Println("✓ Seed data generation completed successfully (Simple Mode)")
+	return nil
+}
+
+// seedSimpleModeData creates color categories, test users, dogs, and bookings for Simple-Mode
+func seedSimpleModeData(db *sql.DB, dbType string, now time.Time) error {
+	// --- Color Categories (already created by migration, just look them up) ---
+	colorNames := []string{"Gruen", "Gelb", "Orange", "Hellblau", "Dunkelblau"}
+	colorIDs := make(map[string]int64)
+
+	for _, name := range colorNames {
+		var id int64
+		err := db.QueryRow("SELECT id FROM color_categories WHERE tenant_id = 0 AND name = ?", name).Scan(&id)
+		if err != nil {
+			return fmt.Errorf("color category %s not found (expected from migration): %w", name, err)
+		}
+		colorIDs[name] = id
+	}
+
+	// Update pattern_icon for accessibility (migration doesn't set these)
+	patternIcons := map[string]string{
+		"Gruen": "circle", "Gelb": "star", "Orange": "triangle",
+		"Hellblau": "hexagon", "Dunkelblau": "diamond",
+	}
+	for name, icon := range patternIcons {
+		db.Exec("UPDATE color_categories SET pattern_icon = ? WHERE tenant_id = 0 AND name = ?", icon, name)
+	}
+	log.Println("✓ Found 5 color categories from migration, updated pattern icons")
+
+	// Assign all colors to Super Admin (ID=1)
+	for _, name := range colorNames {
+		var ucInsert string
+		if dbType == "postgres" {
+			ucInsert = `INSERT INTO user_colors (tenant_id, user_id, color_id, granted_by, granted_at) VALUES (0, $1, $2, $3, $4)`
+		} else {
+			ucInsert = `INSERT INTO user_colors (tenant_id, user_id, color_id, granted_by, granted_at) VALUES (0, ?, ?, ?, ?)`
+		}
+		if _, err := db.Exec(ucInsert, 1, colorIDs[name], 1, now); err != nil {
+			log.Printf("Warning: failed to assign color %s to admin: %v", name, err)
+		}
+	}
+	log.Println("✓ Assigned all colors to Super Admin")
+
+	// --- Test Users ---
+	testPassword := "Test1234!"
+	hashedTestPw, err := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash test password: %w", err)
+	}
+
+	type testUserDef struct {
+		firstName string
+		lastName  string
+		email     string
+		colors    []string // color names to assign
+	}
+	testUsers := []testUserDef{
+		{"Anna", "Mueller", "anna.mueller@example.com", []string{"Gruen"}},
+		{"Bernd", "Schmidt", "bernd.schmidt@example.com", []string{"Gruen", "Gelb", "Orange"}},
+		{"Clara", "Weber", "clara.weber@example.com", []string{"Gruen", "Gelb", "Orange", "Hellblau", "Dunkelblau"}},
+	}
+
+	var userInsert string
+	if dbType == "postgres" {
+		userInsert = `INSERT INTO users (
+			tenant_id, first_name, last_name, email, password_hash,
+			is_admin, is_super_admin, is_central_admin, is_verified, is_active,
+			terms_accepted_at, last_activity_at, created_at, updated_at
+		) VALUES (0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`
+	} else {
+		userInsert = `INSERT INTO users (
+			tenant_id, first_name, last_name, email, password_hash,
+			is_admin, is_super_admin, is_central_admin, is_verified, is_active,
+			terms_accepted_at, last_activity_at, created_at, updated_at
+		) VALUES (0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	}
+
+	userIDs := []int64{1} // Start with admin (ID=1)
+	for _, u := range testUsers {
+		var userID int64
+		if dbType == "postgres" {
+			err := db.QueryRow(userInsert,
+				u.firstName, u.lastName, u.email, string(hashedTestPw),
+				false, false, false, true, true, now, now, now, now).Scan(&userID)
+			if err != nil {
+				return fmt.Errorf("failed to create user %s: %w", u.email, err)
+			}
+		} else {
+			result, err := db.Exec(userInsert,
+				u.firstName, u.lastName, u.email, string(hashedTestPw),
+				false, false, false, true, true, now, now, now, now)
+			if err != nil {
+				return fmt.Errorf("failed to create user %s: %w", u.email, err)
+			}
+			userID, _ = result.LastInsertId()
+		}
+		userIDs = append(userIDs, userID)
+
+		// Assign colors to user
+		for _, colorName := range u.colors {
+			var ucInsert string
+			if dbType == "postgres" {
+				ucInsert = `INSERT INTO user_colors (tenant_id, user_id, color_id, granted_by, granted_at) VALUES (0, $1, $2, $3, $4)`
+			} else {
+				ucInsert = `INSERT INTO user_colors (tenant_id, user_id, color_id, granted_by, granted_at) VALUES (0, ?, ?, ?, ?)`
+			}
+			if _, err := db.Exec(ucInsert, userID, colorIDs[colorName], 1, now); err != nil {
+				log.Printf("Warning: failed to assign color %s to user %d: %v", colorName, userID, err)
+			}
+		}
+	}
+	log.Printf("✓ Created 3 test users (password: %s)", testPassword)
+
+	// Reset PostgreSQL sequences
+	if dbType == "postgres" {
+		db.Exec("SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 1) FROM users))")
+	}
+
+	// --- Dogs ---
+	type dogDef struct {
+		name       string
+		breed      string
+		size       string
+		age        int
+		colorName  string
+		isFeatured bool
+	}
+	dogs := []dogDef{
+		{"Bella", "Labrador Retriever", "large", 3, "Gruen", true},
+		{"Max", "Golden Retriever", "large", 5, "Gruen", true},
+		{"Luna", "Border Collie", "medium", 4, "Gelb", false},
+		{"Rocky", "Deutscher Schaeferhund", "large", 6, "Orange", false},
+		{"Thor", "Rottweiler", "large", 4, "Dunkelblau", false},
+	}
+
+	var dogInsert string
+	if dbType == "postgres" {
+		dogInsert = `INSERT INTO dogs (
+			tenant_id, name, breed, size, age, color_id,
+			is_available, is_featured, default_morning_time, default_evening_time
+		) VALUES (0, $1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`
+	} else {
+		dogInsert = `INSERT INTO dogs (
+			tenant_id, name, breed, size, age, color_id,
+			is_available, is_featured, default_morning_time, default_evening_time
+		) VALUES (0, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	}
+
+	dogIDs := make([]int64, 0, len(dogs))
+	for _, d := range dogs {
+		colorID := colorIDs[d.colorName]
+		var dogID int64
+		if dbType == "postgres" {
+			err := db.QueryRow(dogInsert,
+				d.name, d.breed, d.size, d.age, colorID,
+				true, d.isFeatured, "09:00", "17:00").Scan(&dogID)
+			if err != nil {
+				return fmt.Errorf("failed to create dog %s: %w", d.name, err)
+			}
+		} else {
+			result, err := db.Exec(dogInsert,
+				d.name, d.breed, d.size, d.age, colorID,
+				true, d.isFeatured, "09:00", "17:00")
+			if err != nil {
+				return fmt.Errorf("failed to create dog %s: %w", d.name, err)
+			}
+			dogID, _ = result.LastInsertId()
+		}
+		dogIDs = append(dogIDs, dogID)
+	}
+	log.Println("✓ Created 5 dogs (Bella, Max, Luna, Rocky, Thor)")
+
+	// Reset PostgreSQL sequences
+	if dbType == "postgres" {
+		db.Exec("SELECT setval('dogs_id_seq', (SELECT COALESCE(MAX(id), 1) FROM dogs))")
+	}
+
+	// --- Bookings ---
+	times := []string{"09:00", "10:00", "14:00", "15:00", "16:00"}
+
+	var bookingInsert string
+	if dbType == "postgres" {
+		bookingInsert = `INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at, updated_at)
+			VALUES (0, $1, $2, $3, $4, $5, $6, $7)`
+	} else {
+		bookingInsert = `INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at, updated_at)
+			VALUES (0, ?, ?, ?, ?, ?, ?, ?)`
+	}
+
+	bookingCount := 0
+	// 3 past bookings (completed)
+	for i := 0; i < 3; i++ {
+		date := now.AddDate(0, 0, -(i + 1))
+		_, err := db.Exec(bookingInsert,
+			userIDs[i%len(userIDs)], dogIDs[i%len(dogIDs)],
+			date.Format("2006-01-02"), times[i%len(times)],
+			"completed", now, now)
+		if err != nil {
+			log.Printf("Warning: failed to create past booking: %v", err)
+		} else {
+			bookingCount++
+		}
+	}
+	// 3 future bookings (scheduled)
+	for i := 0; i < 3; i++ {
+		date := now.AddDate(0, 0, i+1)
+		_, err := db.Exec(bookingInsert,
+			userIDs[(i+1)%len(userIDs)], dogIDs[(i+1)%len(dogIDs)],
+			date.Format("2006-01-02"), times[(i+2)%len(times)],
+			"scheduled", now, now)
+		if err != nil {
+			log.Printf("Warning: failed to create future booking: %v", err)
+		} else {
+			bookingCount++
+		}
+	}
+	log.Printf("✓ Created %d bookings (3 past, 3 future)", bookingCount)
+
+	// --- Branding: Tierheim Göppingen ---
+	db.Exec("UPDATE tenants SET name = 'Tierheim Göppingen' WHERE id = 0")
+
+	var brandingUpdate string
+	if dbType == "postgres" {
+		brandingUpdate = `UPDATE tenant_settings SET
+			welcome_message = $1, tagline = $2, description = $3,
+			footer_text = $4, website_url = $5, donation_url = $6,
+			organization_name = $7, organization_address = $8,
+			organization_email = $9, organization_phone = $10,
+			privacy_officer_email = $11, updated_at = $12
+			WHERE tenant_id = 0`
+	} else {
+		brandingUpdate = `UPDATE tenant_settings SET
+			welcome_message = ?, tagline = ?, description = ?,
+			footer_text = ?, website_url = ?, donation_url = ?,
+			organization_name = ?, organization_address = ?,
+			organization_email = ?, organization_phone = ?,
+			privacy_officer_email = ?, updated_at = ?
+			WHERE tenant_id = 0`
+	}
+	_, err = db.Exec(brandingUpdate,
+		"Willkommen beim Gassigeher-Team Tierheim Göppingen",
+		"Deine Plattform für Spaziergänge mit unseren Tierheimhunden",
+		"Registriere dich, um unsere Hunde beim Spazierengehen zu begleiten. Gemeinsam schenken wir ihnen Bewegung, Freude und ein Stück Normalität.",
+		"Ein Projekt des Tierschutzverein Göppingen u.U. e.V.",
+		"https://www.tierheim-goeppingen.de/",
+		"https://www.tierheim-goeppingen.de/spenden/",
+		"Tierschutzverein Göppingen u.U. e.V.",
+		"Beim Ödegarten 1, 73035 Göppingen",
+		"info@tierheim-goeppingen.de",
+		"07161 / 78969",
+		"info@tierheim-goeppingen.de",
+		now,
+	)
+	if err != nil {
+		log.Printf("Warning: failed to set branding: %v", err)
+	} else {
+		log.Println("✓ Set branding for Tierheim Göppingen")
+	}
+
 	return nil
 }
 
