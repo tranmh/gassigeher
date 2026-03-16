@@ -168,7 +168,10 @@ nav {
   .nav-overlay {
     display: none;
     position: fixed;
-    @include absolute-fill;
+    top: 0;
+    left: $nav-mobile-width;
+    right: 0;
+    bottom: 0;
     background: rgba(0, 0, 0, 0.5);
     z-index: $z-index-nav-overlay;
 
