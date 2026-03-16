@@ -569,6 +569,91 @@ func TestCheckAndFlagInactiveTenants_FlagsCorrectColumn(t *testing.T) {
 	// This test will pass once the fix is applied
 }
 
+// TestCheckAndFlagInactiveTenants_SQLiteTimestampScan verifies that
+// CheckAndFlagInactiveTenants correctly scans MAX(created_at) and
+// MAX(last_activity_at) as strings on SQLite, then parses them.
+// Regression test for: "unsupported Scan, storing driver.Value type string into type *time.Time"
+func TestCheckAndFlagInactiveTenants_SQLiteTimestampScan(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+	db := testutil.SetupTestDB(t)
+
+	// Use default tenant (id=0, status='active') which is already set up by SetupTestDB.
+	// Ensure it's active for this test.
+	_, _ = db.Exec(`UPDATE tenants SET status = 'active' WHERE id = 0`)
+
+	// Seed a user and dog via testutil (tenant_id=0)
+	userID := testutil.SeedTestUser(t, db, "scan-test@example.com", "Test User", "green")
+	dogID := testutil.SeedTestDog(t, db, "Bello", "Labrador", "green")
+
+	// Create a booking so MAX(created_at) returns a string value on SQLite
+	testutil.SeedTestBooking(t, db, userID, dogID, "2026-03-16", "10:00", "completed")
+
+	// This is the actual regression test — CheckAndFlagInactiveTenants
+	// used to fail with "unsupported Scan, storing driver.Value type string into type *time.Time"
+	// because it scanned MAX(created_at) directly into *time.Time instead of *string
+	checker := NewTenantActivityChecker(db, 30)
+	err := checker.CheckAndFlagInactiveTenants()
+	if err != nil {
+		t.Errorf("CheckAndFlagInactiveTenants failed: %v", err)
+	}
+}
+
+// TestCheckAndFlagInactiveTenants_SQLiteNullTimestamp verifies that
+// NULL values from MAX() on empty tables don't cause scan errors.
+func TestCheckAndFlagInactiveTenants_SQLiteNullTimestamp(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+	db := testutil.SetupTestDB(t)
+
+	// Create a separate active tenant with no bookings or users
+	now := time.Now().Format("2006-01-02 15:04:05")
+	_, err := db.Exec(`
+		INSERT INTO tenants (id, slug, name, status, contact_email, created_at, updated_at)
+		VALUES (98, 'empty-tenant', 'Empty Tenant', 'active', 'empty@example.com', ?, ?)
+	`, now, now)
+	if err != nil {
+		t.Fatalf("Failed to create test tenant: %v", err)
+	}
+
+	// No users or bookings for tenant 98 — MAX() will return NULL
+	checker := NewTenantActivityChecker(db, 30)
+	err = checker.CheckAndFlagInactiveTenants()
+	if err != nil {
+		t.Errorf("CheckAndFlagInactiveTenants failed with NULL timestamps: %v", err)
+	}
+}
+
+// TestCheckAndFlagInactiveTenants_LegacyTimestampFormat verifies that
+// legacy Go timestamp format with monotonic clock suffix is handled correctly.
+func TestCheckAndFlagInactiveTenants_LegacyTimestampFormat(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+	db := testutil.SetupTestDB(t)
+
+	// Use default tenant (id=0)
+	_, _ = db.Exec(`UPDATE tenants SET status = 'active' WHERE id = 0`)
+
+	// Seed a user normally first, then update last_activity_at to a legacy format
+	userID := testutil.SeedTestUser(t, db, "legacy@example.com", "Legacy User", "green")
+
+	// Overwrite last_activity_at with a legacy Go timestamp format (monotonic clock suffix)
+	legacyTimestamp := "2025-12-24 14:30:00.123456789 +0100 CET m=+123.456"
+	_, err := db.Exec(`UPDATE users SET last_activity_at = ? WHERE id = ?`, legacyTimestamp, userID)
+	if err != nil {
+		t.Fatalf("Failed to update user with legacy timestamp: %v", err)
+	}
+
+	checker := NewTenantActivityChecker(db, 30)
+	err = checker.CheckAndFlagInactiveTenants()
+	if err != nil {
+		t.Errorf("CheckAndFlagInactiveTenants failed with legacy timestamps: %v", err)
+	}
+}
+
 // BUG 4 RED PHASE: rows.Err() should be checked after iteration
 func TestCheckAndFlagInactiveTenants_ShouldCheckRowsErr(t *testing.T) {
 	// After iterating through rows with rows.Next(), we must check rows.Err()

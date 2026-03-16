@@ -112,53 +112,72 @@ func (c *TenantActivityChecker) CheckAndFlagInactiveTenants() error {
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
 
-	var inactiveCount int
-	var flaggedCount int
-	cutoffDate := time.Now().AddDate(0, 0, -c.inactivityDays)
-
-	// Collect tenants to flag (avoid holding row lock while updating)
+	// Collect all tenants first to avoid holding rows open during per-tenant queries.
+	// SQLite with MaxOpenConns=1 deadlocks if QueryRow is called while rows are open.
 	type tenantInfo struct {
 		id   int
 		slug string
 		name string
 	}
-	var tenantsToFlag []tenantInfo
+	var allTenants []tenantInfo
 
 	for rows.Next() {
-		var tenantID int
-		var slug, name string
-
-		if err := rows.Scan(&tenantID, &slug, &name); err != nil {
+		var t tenantInfo
+		if err := rows.Scan(&t.id, &t.slug, &t.name); err != nil {
 			log.Printf("Error scanning tenant: %v", err)
 			continue
 		}
+		allTenants = append(allTenants, t)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("error iterating tenant rows: %w", err)
+	}
+	rows.Close()
 
+	var inactiveCount int
+	var flaggedCount int
+	cutoffDate := time.Now().AddDate(0, 0, -c.inactivityDays)
+	var tenantsToFlag []tenantInfo
+
+	for _, tenant := range allTenants {
 		// Check last booking date for this tenant
-		// BUG FIX: Check and log database errors instead of ignoring them
-		var lastBooking *time.Time
+		// Scan as *string to handle SQLite returning timestamps as strings
+		var lastBookingStr *string
 		bookingQuery := c.db.Rebind(`
 			SELECT MAX(created_at)
 			FROM bookings
 			WHERE tenant_id = ?
 		`)
-		if err := c.db.QueryRow(bookingQuery, tenantID).Scan(&lastBooking); err != nil && err != sql.ErrNoRows {
-			log.Printf("Error querying bookings for tenant %d: %v", tenantID, err)
+		if err := c.db.QueryRow(bookingQuery, tenant.id).Scan(&lastBookingStr); err != nil && err != sql.ErrNoRows {
+			log.Printf("Error querying bookings for tenant %d: %v", tenant.id, err)
 			continue // Skip this tenant due to database error
+		}
+		var lastBooking *time.Time
+		if lastBookingStr != nil {
+			if t, err := parseTimestampString(*lastBookingStr); err == nil {
+				lastBooking = &t
+			}
 		}
 
 		// Check last user activity for this tenant
-		// BUG FIX: Check and log database errors instead of ignoring them
-		var lastActivity *time.Time
+		// Scan as *string to handle SQLite returning timestamps as strings
+		var lastActivityStr *string
 		activityQuery := c.db.Rebind(`
 			SELECT MAX(last_activity_at)
 			FROM users
 			WHERE tenant_id = ? AND is_active = ?
 		`)
-		if err := c.db.QueryRow(activityQuery, tenantID, c.db.BoolValue(true)).Scan(&lastActivity); err != nil && err != sql.ErrNoRows {
-			log.Printf("Error querying user activity for tenant %d: %v", tenantID, err)
+		if err := c.db.QueryRow(activityQuery, tenant.id, c.db.BoolValue(true)).Scan(&lastActivityStr); err != nil && err != sql.ErrNoRows {
+			log.Printf("Error querying user activity for tenant %d: %v", tenant.id, err)
 			continue // Skip this tenant due to database error
+		}
+		var lastActivity *time.Time
+		if lastActivityStr != nil {
+			if t, err := parseTimestampString(*lastActivityStr); err == nil {
+				lastActivity = &t
+			}
 		}
 
 		// Determine the most recent activity
@@ -180,15 +199,10 @@ func (c *TenantActivityChecker) CheckAndFlagInactiveTenants() error {
 
 		if isInactive {
 			inactiveCount++
-			tenantsToFlag = append(tenantsToFlag, tenantInfo{id: tenantID, slug: slug, name: name})
+			tenantsToFlag = append(tenantsToFlag, tenant)
 			log.Printf("Tenant '%s' (ID: %d) identified as inactive - last activity: %v",
-				slug, tenantID, mostRecentActivity)
+				tenant.slug, tenant.id, mostRecentActivity)
 		}
-	}
-
-	// Check for errors during row iteration
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("error iterating tenant rows: %w", err)
 	}
 
 	// Flag inactive tenants in the database
