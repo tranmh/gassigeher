@@ -219,9 +219,6 @@ describe('BookingErrors.renderError - XSS VULNERABILITY TESTS', () => {
 
         // Should NOT contain unescaped img tag with onerror
         expect(html).not.toMatch(/<img src=x onerror=alert\("XSS"\)>/);
-
-        console.log('Message XSS check - html contains raw img:',
-            html.includes('<img src=x onerror=alert("XSS")>'));
     });
 
     test('XSS: should escape HTML in solution', () => {
@@ -235,9 +232,6 @@ describe('BookingErrors.renderError - XSS VULNERABILITY TESTS', () => {
         const html = BookingErrors.renderError(maliciousError);
 
         expect(html).not.toMatch(/<svg onload=alert\("XSS"\)>/);
-
-        console.log('Solution XSS check - html contains raw svg:',
-            html.includes('<svg onload=alert("XSS")>'));
     });
 
     test('XSS: should escape HTML in action text', () => {
@@ -253,9 +247,6 @@ describe('BookingErrors.renderError - XSS VULNERABILITY TESTS', () => {
         };
 
         const html = BookingErrors.renderError(maliciousError);
-
-        console.log('Action text XSS check - html contains raw script:',
-            html.includes('<script>alert("action XSS")</script>'));
     });
 
     test('XSS: should escape HTML in action href (javascript: protocol)', () => {
@@ -272,9 +263,6 @@ describe('BookingErrors.renderError - XSS VULNERABILITY TESTS', () => {
 
         const html = BookingErrors.renderError(maliciousError);
 
-        // Should not allow javascript: protocol in href
-        console.log('Action href XSS check - html contains javascript:protocol:',
-            html.includes('javascript:alert("XSS")'));
     });
 });
 

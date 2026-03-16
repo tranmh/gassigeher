@@ -243,6 +243,16 @@ describe('branding.js - SessionStorage Caching', () => {
 });
 
 describe('branding.js - Error Handling', () => {
+  let warnSpy;
+
+  beforeEach(() => {
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
   test('returns null when API returns error', async () => {
     global.fetch = jest.fn(() =>
       Promise.resolve({ ok: false, status: 500 })

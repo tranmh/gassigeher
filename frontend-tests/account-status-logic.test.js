@@ -162,8 +162,6 @@ describe('calculateDaysAgo', () => {
     test('EDGE CASE: should handle future dates (negative days)', () => {
         const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
         const result = calculateDaysAgo(tomorrow);
-        // Currently returns -1, which could cause display issues
-        console.log('Future date days ago:', result);
         expect(result).toBeLessThan(0);
     });
 });
@@ -256,10 +254,7 @@ describe('calculateProgressPercent - BUG DETECTION', () => {
 
     // BUG DETECTION: Division by zero
     test('CRITICAL BUG: should handle zero autoDeactivationDays (division by zero)', () => {
-        // This would cause Infinity or NaN
         const result = calculateProgressPercent(100, 0);
-        console.log('Division by zero result:', result);
-
         // Check if it's a sane value or Infinity/NaN
         expect(isFinite(result)).toBe(true);
         expect(isNaN(result)).toBe(false);

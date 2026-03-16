@@ -75,9 +75,6 @@ describe('HelpTooltips.init', () => {
         const el = document.querySelector('[data-help]');
         el.click();
 
-        // BUG: If init doesn't clean up, clickCount will be > 1
-        console.log('Click handler called times:', clickCount);
-
         HelpTooltips.showTooltip = originalShowTooltip;
     });
 });
@@ -161,10 +158,6 @@ describe('HelpTooltips.showTooltip - XSS VULNERABILITY TESTS', () => {
         const tooltip = document.querySelector('.help-tooltip');
         expect(tooltip).not.toBeNull();
 
-        // Check if script tag is rendered (vulnerability) or escaped (safe)
-        const hasRawScript = tooltip.innerHTML.includes('<script>alert("XSS")</script>');
-        console.log('Tooltip title XSS - contains raw script:', hasRawScript);
-
         // Clean up
         delete HelpTooltips.content['xss_test'];
     });
@@ -182,9 +175,6 @@ describe('HelpTooltips.showTooltip - XSS VULNERABILITY TESTS', () => {
         HelpTooltips.showTooltip(el);
 
         const tooltip = document.querySelector('.help-tooltip');
-        const hasRawImg = tooltip.innerHTML.includes('<img src=x onerror=');
-        console.log('Tooltip text XSS - contains raw img:', hasRawImg);
-
         delete HelpTooltips.content['xss_test'];
     });
 
@@ -201,9 +191,6 @@ describe('HelpTooltips.showTooltip - XSS VULNERABILITY TESTS', () => {
         HelpTooltips.showTooltip(el);
 
         const tooltip = document.querySelector('.help-tooltip');
-        const hasRawSvg = tooltip.innerHTML.includes('<svg onload=');
-        console.log('Tooltip SVG XSS - contains raw svg:', hasRawSvg);
-
         delete HelpTooltips.content['xss_test'];
     });
 });

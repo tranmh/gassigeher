@@ -482,6 +482,7 @@ describe('FAQ/Help Page Bug Fixes', () => {
         };
 
         test('should NOT contain javascript: protocol in links', () => {
+            const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
             // This is what should be caught during sanitization
             const hasJsProtocol = maliciousFAQ.answer.includes('javascript:');
 
@@ -491,6 +492,7 @@ describe('FAQ/Help Page Bug Fixes', () => {
 
             // In production, answers should be sanitized server-side
             expect(hasJsProtocol).toBe(true); // This shows the vulnerability
+            warnSpy.mockRestore();
         });
 
         test('should sanitize FAQ answers with allowlisted tags', () => {
