@@ -1,7 +1,6 @@
 package cron
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"strings"
@@ -101,79 +100,54 @@ type TenantActivity struct {
 func (c *TenantActivityChecker) CheckAndFlagInactiveTenants() error {
 	log.Println("Starting tenant activity check...")
 
-	// Get all active tenants
-	query := `
-		SELECT id, slug, name
-		FROM tenants
-		WHERE status = 'active'
-	`
+	// Use a single query with subqueries to avoid SQLite deadlock.
+	// SQLite with MaxOpenConns=1 deadlocks if QueryRow is called while rows are open,
+	// and even after rows.Close() the connection may not be immediately reusable.
+	isActiveTrue := c.db.BoolValue(true)
+	query := c.db.Rebind(`
+		SELECT
+			t.id,
+			t.slug,
+			t.name,
+			(SELECT MAX(created_at) FROM bookings WHERE tenant_id = t.id) as last_booking,
+			(SELECT MAX(last_activity_at) FROM users WHERE tenant_id = t.id AND is_active = ?) as last_activity
+		FROM tenants t
+		WHERE t.status = 'active'
+	`)
 
-	rows, err := c.db.Query(query)
+	rows, err := c.db.Query(query, isActiveTrue)
 	if err != nil {
 		return err
 	}
+	defer rows.Close()
 
-	// Collect all tenants first to avoid holding rows open during per-tenant queries.
-	// SQLite with MaxOpenConns=1 deadlocks if QueryRow is called while rows are open.
 	type tenantInfo struct {
 		id   int
 		slug string
 		name string
 	}
-	var allTenants []tenantInfo
+
+	cutoffDate := time.Now().AddDate(0, 0, -c.inactivityDays)
+	var inactiveCount int
+	var tenantsToFlag []tenantInfo
 
 	for rows.Next() {
-		var t tenantInfo
-		if err := rows.Scan(&t.id, &t.slug, &t.name); err != nil {
+		var id int
+		var slug, name string
+		var lastBookingStr, lastActivityStr *string
+
+		if err := rows.Scan(&id, &slug, &name, &lastBookingStr, &lastActivityStr); err != nil {
 			log.Printf("Error scanning tenant: %v", err)
 			continue
 		}
-		allTenants = append(allTenants, t)
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return fmt.Errorf("error iterating tenant rows: %w", err)
-	}
-	rows.Close()
 
-	var inactiveCount int
-	var flaggedCount int
-	cutoffDate := time.Now().AddDate(0, 0, -c.inactivityDays)
-	var tenantsToFlag []tenantInfo
-
-	for _, tenant := range allTenants {
-		// Check last booking date for this tenant
-		// Scan as *string to handle SQLite returning timestamps as strings
-		var lastBookingStr *string
-		bookingQuery := c.db.Rebind(`
-			SELECT MAX(created_at)
-			FROM bookings
-			WHERE tenant_id = ?
-		`)
-		if err := c.db.QueryRow(bookingQuery, tenant.id).Scan(&lastBookingStr); err != nil && err != sql.ErrNoRows {
-			log.Printf("Error querying bookings for tenant %d: %v", tenant.id, err)
-			continue // Skip this tenant due to database error
-		}
-		var lastBooking *time.Time
+		// Parse timestamps from strings (SQLite returns strings, not time.Time)
+		var lastBooking, lastActivity *time.Time
 		if lastBookingStr != nil {
 			if t, err := parseTimestampString(*lastBookingStr); err == nil {
 				lastBooking = &t
 			}
 		}
-
-		// Check last user activity for this tenant
-		// Scan as *string to handle SQLite returning timestamps as strings
-		var lastActivityStr *string
-		activityQuery := c.db.Rebind(`
-			SELECT MAX(last_activity_at)
-			FROM users
-			WHERE tenant_id = ? AND is_active = ?
-		`)
-		if err := c.db.QueryRow(activityQuery, tenant.id, c.db.BoolValue(true)).Scan(&lastActivityStr); err != nil && err != sql.ErrNoRows {
-			log.Printf("Error querying user activity for tenant %d: %v", tenant.id, err)
-			continue // Skip this tenant due to database error
-		}
-		var lastActivity *time.Time
 		if lastActivityStr != nil {
 			if t, err := parseTimestampString(*lastActivityStr); err == nil {
 				lastActivity = &t
@@ -194,25 +168,27 @@ func (c *TenantActivityChecker) CheckAndFlagInactiveTenants() error {
 			mostRecentActivity = lastActivity
 		}
 
-		// Check if tenant is inactive
 		isInactive := mostRecentActivity == nil || mostRecentActivity.Before(cutoffDate)
-
 		if isInactive {
 			inactiveCount++
-			tenantsToFlag = append(tenantsToFlag, tenant)
+			tenantsToFlag = append(tenantsToFlag, tenantInfo{id, slug, name})
 			log.Printf("Tenant '%s' (ID: %d) identified as inactive - last activity: %v",
-				tenant.slug, tenant.id, mostRecentActivity)
+				slug, id, mostRecentActivity)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("error iterating tenant rows: %w", err)
+	}
+	rows.Close()
 
 	// Flag inactive tenants in the database
-	// BUG FIX: Update inactivity_flagged_at (not just updated_at)
 	flagQuery := c.db.Rebind(`
 		UPDATE tenants
 		SET inactivity_flagged_at = ?
 		WHERE id = ? AND status = 'active'
 	`)
 	now := time.Now()
+	var flaggedCount int
 
 	for _, tenant := range tenantsToFlag {
 		_, err := c.db.Exec(flagQuery, now, tenant.id)

@@ -599,24 +599,24 @@ func (s *DemoSeedService) seedDemoBookings(tenantID int, userIDs map[string]int,
 		// Past completed walks with notes
 		{"green", 0, fiveDaysAgo, "09:00", "completed", "Max war heute sehr gut gelaunt! Wir sind die lange Runde gelaufen. Er hat brav auf andere Hunde reagiert."},
 		{"orange", 3, fiveDaysAgo, "14:00", "completed", "Rocky war anfangs etwas aufgeregt, hat sich aber schnell beruhigt. Leckerlis haben gut geholfen."},
-		{"blue", 7, fourDaysAgo, "10:00", "completed", "Thor hat heute viel Energie gehabt. Wir mussten mehrere Pausen machen, damit ich mithalten konnte!"},
+		{"admin", 7, fourDaysAgo, "10:00", "completed", "Thor hat heute viel Energie gehabt. Wir mussten mehrere Pausen machen, damit ich mithalten konnte!"},
 		{"green", 1, fourDaysAgo, "15:00", "completed", "Luna ist so ein Schatz! Sie wollte unbedingt zum Teich, aber ich habe sie erfolgreich abgelenkt."},
 		{"orange", 2, threeDaysAgo, "09:30", "completed", "Bello hat heute seinen guten Tag. Er hat sogar ein bisschen gerannt, obwohl er sonst lieber gemütlich geht."},
-		{"blue", 4, threeDaysAgo, "11:00", "completed", "Mia hat wie immer versucht, jeder Spur zu folgen. Zum Glück war sie an der Leine!"},
+		{"admin", 4, threeDaysAgo, "11:00", "completed", "Mia hat wie immer versucht, jeder Spur zu folgen. Zum Glück war sie an der Leine!"},
 		{"green", 5, twoDaysAgo, "14:00", "completed", "Bruno hatte richtig Spass heute. Wir haben Ball gespielt im eingezäunten Bereich."},
 		{"orange", 6, twoDaysAgo, "16:00", "completed", "Lotte ist so süss! Musste sie zweimal über den Baumstamm heben. Sie hat sich gefreut."},
-		{"blue", 0, yesterday, "09:00", "completed", "Max ist wirklich ein Traumhund. Perfektes Verhalten, hat sogar ein Kind begrüsst ohne zu springen."},
+		{"admin", 0, yesterday, "09:00", "completed", "Max ist wirklich ein Traumhund. Perfektes Verhalten, hat sogar ein Kind begrüsst ohne zu springen."},
 		{"green", 3, yesterday, "15:00", "completed", "Rocky macht Fortschritte! Er hat heute einen anderen Hund gesehen und ist ruhig geblieben."},
 
 		// Future scheduled walks
 		{"green", 0, tomorrow, "09:00", "scheduled", ""},         // Anna + Max
-		{"orange", 1, tomorrow, "14:00", "scheduled", ""},        // Bernd + Luna
-		{"blue", 2, tomorrow, "11:00", "scheduled", ""},          // Clara + Bello
+		{"yellow", 1, tomorrow, "14:00", "scheduled", ""},        // Bernd + Luna
+		{"admin", 2, tomorrow, "11:00", "scheduled", ""},         // Admin + Bello
 		{"green", 4, dayAfter, "10:00", "scheduled", ""},         // Anna + Mia
-		{"orange", 5, dayAfter, "15:00", "scheduled", ""},        // Bernd + Bruno
-		{"blue", 7, threeDaysFromNow, "09:30", "scheduled", ""},  // Clara + Thor
+		{"yellow", 5, dayAfter, "15:00", "scheduled", ""},        // Bernd + Bruno
+		{"admin", 7, threeDaysFromNow, "09:30", "scheduled", ""}, // Admin + Thor
 		{"green", 6, threeDaysFromNow, "14:00", "scheduled", ""}, // Anna + Lotte
-		{"orange", 0, fourDaysFromNow, "10:00", "scheduled", ""}, // Bernd + Max
+		{"orange", 3, fourDaysFromNow, "10:00", "scheduled", ""}, // Clara + Rocky
 	}
 
 	completedCount := 0
