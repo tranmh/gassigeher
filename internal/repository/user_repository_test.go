@@ -1163,3 +1163,55 @@ func TestUserRepository_FindByEmail_CentralAdmin(t *testing.T) {
 		}
 	})
 }
+
+func TestUserRepository_Activate_UpdatesLastActivity(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := NewUserRepository(db)
+
+	t.Run("activate updates last_activity_at to now", func(t *testing.T) {
+		// Create user with last_activity_at 400 days ago
+		now := time.Now()
+		oldActivity := now.AddDate(0, 0, -400)
+		email := "reactivate@example.com"
+
+		result, err := db.Exec(`
+			INSERT INTO users (tenant_id, email, first_name, last_name, password_hash,
+			                   is_active, is_verified, terms_accepted_at, last_activity_at, created_at)
+			VALUES (0, ?, 'Inactive', 'User', 'hash', 0, 1, ?, ?, ?)
+		`, email, now, oldActivity, now)
+		if err != nil {
+			t.Fatalf("Failed to seed user: %v", err)
+		}
+		userID64, _ := result.LastInsertId()
+		userID := int(userID64)
+
+		// Activate the user
+		err = repo.Activate(userID)
+		if err != nil {
+			t.Fatalf("Activate() failed: %v", err)
+		}
+
+		// Check last_activity_at was updated
+		var lastActivity time.Time
+		err = db.QueryRow("SELECT last_activity_at FROM users WHERE id = ?", userID).Scan(&lastActivity)
+		if err != nil {
+			t.Fatalf("Failed to query last_activity_at: %v", err)
+		}
+
+		// last_activity_at should be recent (within last minute), not 400 days old
+		if time.Since(lastActivity) > time.Minute {
+			t.Errorf("Expected last_activity_at to be recent, but it was %v ago", time.Since(lastActivity))
+		}
+
+		// User should NOT appear in FindInactiveUsers after activation
+		inactiveUsers, err := repo.FindInactiveUsers(0, 365)
+		if err != nil {
+			t.Fatalf("FindInactiveUsers() failed: %v", err)
+		}
+		for _, u := range inactiveUsers {
+			if u.ID == userID {
+				t.Error("Reactivated user should not appear in FindInactiveUsers")
+			}
+		}
+	})
+}

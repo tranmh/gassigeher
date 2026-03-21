@@ -579,12 +579,13 @@ func (r *UserRepository) Activate(userID int) error {
 			reactivated_at = ?,
 			deactivated_at = NULL,
 			deactivation_reason = NULL,
+			last_activity_at = ?,
 			updated_at = ?
 		WHERE id = ?
 	`
 
 	now := time.Now()
-	_, err := r.db.Exec(query, r.db.BoolValue(true), now, now, userID)
+	_, err := r.db.Exec(query, r.db.BoolValue(true), now, now, now, userID)
 	if err != nil {
 		return fmt.Errorf("failed to activate user: %w", err)
 	}
