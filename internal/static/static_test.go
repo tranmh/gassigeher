@@ -67,7 +67,6 @@ func TestFrontendFS_ContainsAdminPages(t *testing.T) {
 		"admin-users.html",
 		"admin-settings.html",
 		"admin-blocked-dates.html",
-		"admin-experience-requests.html",
 		"admin-reactivation-requests.html",
 	}
 

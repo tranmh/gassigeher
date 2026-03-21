@@ -129,7 +129,7 @@ func main() {
 	tables := []string{
 		"users", "dogs", "bookings", "blocked_dates",
 		"color_categories", "user_colors", "color_requests",
-		"experience_requests", "reactivation_requests",
+		"reactivation_requests",
 		"system_settings", "booking_time_rules", "custom_holidays",
 	}
 

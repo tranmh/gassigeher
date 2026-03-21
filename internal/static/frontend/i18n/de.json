@@ -134,9 +134,6 @@
     "size_small": "Klein",
     "size_medium": "Mittel",
     "size_large": "Groß",
-    "category_green": "Grün (Anfänger)",
-    "category_orange": "Orange (Erfahren)",
-    "category_blue": "Blau (Nur feste Gassigeher)",
     "external_link": "Externer Link",
     "external_link_hint": "Link zur Hundeseite auf der Tierheim-Website",
     "more_about_me": "mehr über mich",
@@ -242,12 +239,10 @@
     "bookings": "Buchungsverwaltung",
     "blocked_dates": "Gesperrte Tage",
     "settings": "Einstellungen",
-    "experience_requests": "Level-Anfragen",
     "booking_times": "Buchungszeiten",
     "booking_approvals": "Genehmigungen",
     "manage_bookings": "Buchungen verwalten",
     "manage_blocked_dates": "Gesperrte Tage verwalten",
-    "manage_experience_requests": "Level-Anfragen verwalten",
     "manage_booking_times": "Buchungszeiten verwalten",
     "manage_booking_approvals": "Buchungs-Genehmigungen verwalten",
     "all_bookings": "Alle Buchungen",
@@ -283,12 +278,7 @@
     "change_password": "Passwort ändern",
     "current_level": "Aktuelles Level",
     "request_promotion": "Level-Beförderung beantragen",
-    "request_blue": "Blau Level beantragen",
-    "request_orange": "Orange Level beantragen",
     "promotion_description": "Beantrage ein höheres Erfahrungslevel, um Zugang zu anspruchsvolleren Hunden zu erhalten.",
-    "level_green_desc": "Grün: Für Anfänger",
-    "level_orange_desc": "Orange: Für Erfahrene",
-    "level_blue_desc": "Blau: Nur für feste Gassigeher",
     "request_submitted": "Antrag eingereicht",
     "request_pending": "Dein Antrag wird geprüft",
     "request_approved": "Genehmigt",
@@ -378,7 +368,6 @@
     "inactive_users": "Inaktive Benutzer",
     "available_dogs": "Verfügbare Hunde",
     "unavailable_dogs": "Nicht verfügbare Hunde",
-    "pending_experience_requests": "Level-Anfragen",
     "pending_color_requests": "Farben-Anfragen",
     "pending_reactivation_requests": "Reaktivierungsanfragen",
     "recent_activity": "Letzte Aktivitäten",
@@ -662,21 +651,9 @@
     "nav_label": "Wiederkehrende"
   },
   "help_tooltips": {
-    "experience_green": {
-      "title": "Grün - Anfänger",
-      "text": "Geeignet für ruhige, gut erzogene Hunde. Ideal für neue Gassigeher ohne Vorerfahrung."
-    },
-    "experience_orange": {
-      "title": "Orange - Erfahren",
-      "text": "Für Hunde mit etwas mehr Temperament. Erfordert Erfahrung im Umgang mit Hunden."
-    },
-    "experience_blue": {
-      "title": "Blau - Experte",
-      "text": "Für anspruchsvolle Hunde mit besonderen Bedürfnissen. Nur für sehr erfahrene Gassigeher."
-    },
     "experience_locked": {
-      "title": "Gesperrte Stufe",
-      "text": "Dieser Hund erfordert eine höhere Erfahrungsstufe. Du kannst eine Höherstufung beantragen."
+      "title": "Gesperrter Hund",
+      "text": "Dieser Hund erfordert eine Farbe, die du noch nicht hast. Du kannst die benötigte Farbe über dein Profil beantragen."
     },
     "booking_advance_days": {
       "title": "Vorlaufzeit",

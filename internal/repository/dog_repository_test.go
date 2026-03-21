@@ -386,10 +386,15 @@ func TestDogRepository_FindAll(t *testing.T) {
 	})
 
 	t.Run("filter with multiple criteria", func(t *testing.T) {
-		category := "blue"
+		// Get the color_id for the "blue" dog (2nd by sort_order)
+		var blueColorID int
+		err := db.QueryRow(`SELECT id FROM color_categories WHERE tenant_id = 0 ORDER BY sort_order ASC LIMIT 1 OFFSET 1`).Scan(&blueColorID)
+		if err != nil {
+			t.Fatalf("Failed to get blue color_id: %v", err)
+		}
 		available := true
 		filter := &models.DogFilterRequest{
-			Category:  &category,
+			ColorID:   &blueColorID,
 			Available: &available,
 		}
 
@@ -399,7 +404,7 @@ func TestDogRepository_FindAll(t *testing.T) {
 		}
 
 		if len(dogs) != 1 {
-			t.Errorf("Expected 1 blue available dog, got %d", len(dogs))
+			t.Errorf("Expected 1 dog with color_id %d available, got %d", blueColorID, len(dogs))
 		}
 
 		if len(dogs) > 0 {

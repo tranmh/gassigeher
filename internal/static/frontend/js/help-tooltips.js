@@ -25,21 +25,9 @@ const HelpTooltips = {
     // Tooltip content keyed by data-help value
     content: {
         // Experience levels
-        'experience_green': {
-            title: 'Grün - Anfänger',
-            text: 'Geeignet für ruhige, gut erzogene Hunde. Ideal für neue Gassigeher ohne Vorerfahrung.'
-        },
-        'experience_orange': {
-            title: 'Orange - Erfahren',
-            text: 'Für Hunde mit etwas mehr Temperament. Erfordert Erfahrung im Umgang mit Hunden.'
-        },
-        'experience_blue': {
-            title: 'Blau - Experte',
-            text: 'Für anspruchsvolle Hunde mit besonderen Bedürfnissen. Nur für sehr erfahrene Gassigeher.'
-        },
         'experience_locked': {
-            title: 'Gesperrte Stufe',
-            text: 'Dieser Hund erfordert eine höhere Erfahrungsstufe. Du kannst eine Höherstufung beantragen, nachdem du genügend Spaziergänge absolviert hast.'
+            title: 'Gesperrter Hund',
+            text: 'Dieser Hund erfordert eine Farbe, die du noch nicht hast. Du kannst die benötigte Farbe über dein Profil beantragen.'
         },
 
         // Booking

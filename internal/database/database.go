@@ -460,6 +460,8 @@ CREATE INDEX IF NOT EXISTS idx_users_last_activity ON users(last_activity_at, is
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 `
 
+// DEPRECATED: createDogsTable is no longer used. The actual schema is in 001_schema.go.
+// Kept for reference only. Categories are now dynamic via color_categories table.
 const createDogsTable = `
 CREATE TABLE IF NOT EXISTS dogs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -467,7 +469,7 @@ CREATE TABLE IF NOT EXISTS dogs (
   breed TEXT NOT NULL,
   size TEXT CHECK(size IN ('small', 'medium', 'large')),
   age INTEGER,
-  category TEXT CHECK(category IN ('green', 'blue', 'orange')),
+  color_id INTEGER REFERENCES color_categories(id),
   photo TEXT,
   special_needs TEXT,
   pickup_location TEXT,
@@ -483,7 +485,7 @@ CREATE TABLE IF NOT EXISTS dogs (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_dogs_available ON dogs(is_available, category);
+CREATE INDEX IF NOT EXISTS idx_dogs_available ON dogs(is_available);
 `
 
 const createBookingsTable = `

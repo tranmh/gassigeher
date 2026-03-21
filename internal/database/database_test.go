@@ -36,7 +36,7 @@ func TestFreshDatabaseMigration(t *testing.T) {
 
 	// Verify all tables exist
 	tables := []string{
-		"users", "dogs", "bookings", "blocked_dates", "experience_requests",
+		"users", "dogs", "bookings", "blocked_dates",
 		"system_settings", "reactivation_requests", "booking_time_rules",
 		"custom_holidays", "feiertage_cache", "walk_reports", "walk_report_photos",
 		"color_categories", "user_colors", "color_requests",

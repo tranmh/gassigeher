@@ -270,7 +270,6 @@ func main() {
 	bookingHandler := handlers.NewBookingHandler(db, cfg)
 	blockedDateHandler := handlers.NewBlockedDateHandler(db, cfg)
 	settingsHandler := handlers.NewSettingsHandler(db, cfg)
-	experienceHandler := handlers.NewExperienceRequestHandler(db, cfg)
 	reactivationHandler := handlers.NewReactivationRequestHandler(db, cfg)
 	dashboardHandler := handlers.NewDashboardHandler(db, cfg)
 	healthHandler := handlers.NewHealthHandler(db)
@@ -542,10 +541,6 @@ func main() {
 	// Blocked dates (read-only for authenticated users)
 	protected.HandleFunc("/blocked-dates", blockedDateHandler.ListBlockedDates).Methods("GET")
 
-	// Experience requests (authenticated users)
-	protected.HandleFunc("/experience-requests", experienceHandler.CreateRequest).Methods("POST")
-	protected.HandleFunc("/experience-requests", experienceHandler.ListRequests).Methods("GET")
-
 	// Color requests (authenticated users)
 	protected.HandleFunc("/color-requests", colorRequestHandler.CreateRequest).Methods("POST")
 	protected.HandleFunc("/color-requests", colorRequestHandler.ListRequests).Methods("GET")
@@ -608,10 +603,6 @@ func main() {
 	admin.HandleFunc("/settings/favicon", settingsHandler.UploadFavicon).Methods("POST")
 	admin.HandleFunc("/settings/favicon", settingsHandler.ResetFavicon).Methods("DELETE")
 	admin.HandleFunc("/settings/{key}", settingsHandler.UpdateSetting).Methods("PUT")
-
-	// Experience requests management (admin only)
-	admin.HandleFunc("/experience-requests/{id}/approve", experienceHandler.ApproveRequest).Methods("PUT")
-	admin.HandleFunc("/experience-requests/{id}/deny", experienceHandler.DenyRequest).Methods("PUT")
 
 	// Color requests management (admin only)
 	admin.HandleFunc("/color-requests/{id}/approve", colorRequestHandler.ApproveRequest).Methods("PUT")

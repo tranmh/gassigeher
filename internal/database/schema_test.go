@@ -142,7 +142,6 @@ func TestMigrationCreatesAllTablesAtomically(t *testing.T) {
 		"bookings",
 		"blocked_dates",
 		"color_categories",
-		"experience_requests",
 		"reactivation_requests",
 		"system_settings",
 		"booking_time_rules",

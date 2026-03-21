@@ -57,7 +57,7 @@ describe('HelpTooltips.init', () => {
 
     // BUG DETECTION: Multiple init calls add duplicate event listeners
     test('POTENTIAL BUG: Multiple init calls should not add duplicate listeners', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Test</span>';
 
         let clickCount = 0;
         const originalShowTooltip = HelpTooltips.showTooltip;
@@ -81,7 +81,7 @@ describe('HelpTooltips.init', () => {
 
 describe('HelpTooltips.addHelpIcons', () => {
     test('should add help icons to elements with data-help', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Grün</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Grün</span>';
 
         HelpTooltips.init({ showIcon: true });
 
@@ -91,7 +91,7 @@ describe('HelpTooltips.addHelpIcons', () => {
     });
 
     test('should not add duplicate icons', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Grün</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Grün</span>';
 
         HelpTooltips.init({ showIcon: true });
         HelpTooltips.addHelpIcons(); // Call again
@@ -101,7 +101,7 @@ describe('HelpTooltips.addHelpIcons', () => {
     });
 
     test('should skip elements that already have help-icon class', () => {
-        document.body.innerHTML = '<span class="help-icon" data-help="experience_green">?</span>';
+        document.body.innerHTML = '<span class="help-icon" data-help="experience_locked">?</span>';
 
         HelpTooltips.init({ showIcon: true });
 
@@ -110,7 +110,7 @@ describe('HelpTooltips.addHelpIcons', () => {
     });
 
     test('should set proper ARIA attributes for accessibility', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Grün</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Grün</span>';
 
         HelpTooltips.init({ showIcon: true });
 
@@ -121,16 +121,16 @@ describe('HelpTooltips.addHelpIcons', () => {
     });
 
     test('should copy data-help attribute to icon', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Grün</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Grün</span>';
 
         HelpTooltips.init({ showIcon: true });
 
         const icon = document.querySelector('.help-icon');
-        expect(icon.getAttribute('data-help')).toBe('experience_green');
+        expect(icon.getAttribute('data-help')).toBe('experience_locked');
     });
 
     test('should not add icons when showIcon is false', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Grün</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Grün</span>';
 
         HelpTooltips.init({ showIcon: false });
 
@@ -197,7 +197,7 @@ describe('HelpTooltips.showTooltip - XSS VULNERABILITY TESTS', () => {
 
 describe('HelpTooltips.showTooltip', () => {
     test('should create tooltip element', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Test</span>';
         HelpTooltips.init({ showIcon: false });
 
         const el = document.querySelector('[data-help]');
@@ -208,15 +208,15 @@ describe('HelpTooltips.showTooltip', () => {
     });
 
     test('should display correct content for key', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Test</span>';
         HelpTooltips.init({ showIcon: false });
 
         const el = document.querySelector('[data-help]');
         HelpTooltips.showTooltip(el);
 
         const tooltip = document.querySelector('.help-tooltip');
-        expect(tooltip.textContent).toContain('Grün');
-        expect(tooltip.textContent).toContain('Anfänger');
+        expect(tooltip.textContent).toContain('Gesperrt');
+        expect(tooltip.textContent).toContain('Farbe');
     });
 
     test('should warn for unknown content key', () => {
@@ -251,7 +251,7 @@ describe('HelpTooltips.showTooltip', () => {
     });
 
     test('should store reference to active tooltip', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Test</span>';
         HelpTooltips.init({ showIcon: false });
 
         const el = document.querySelector('[data-help]');
@@ -265,7 +265,7 @@ describe('HelpTooltips.showTooltip', () => {
 
 describe('HelpTooltips.hideTooltip', () => {
     test('should remove tooltip from DOM', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Test</span>';
         HelpTooltips.init({ showIcon: false });
 
         const el = document.querySelector('[data-help]');
@@ -279,7 +279,7 @@ describe('HelpTooltips.hideTooltip', () => {
     });
 
     test('should clear activeTooltip reference', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Test</span>';
         HelpTooltips.init({ showIcon: false });
 
         const el = document.querySelector('[data-help]');
@@ -296,7 +296,7 @@ describe('HelpTooltips.hideTooltip', () => {
 
 describe('HelpTooltips.toggleTooltip', () => {
     test('should show tooltip when none is active', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Test</span>';
         HelpTooltips.init({ showIcon: false });
 
         const el = document.querySelector('[data-help]');
@@ -306,7 +306,7 @@ describe('HelpTooltips.toggleTooltip', () => {
     });
 
     test('should hide tooltip when clicking same element', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Test</span>';
         HelpTooltips.init({ showIcon: false });
 
         const el = document.querySelector('[data-help]');
@@ -318,19 +318,19 @@ describe('HelpTooltips.toggleTooltip', () => {
 
     test('should switch tooltip when clicking different element', () => {
         document.body.innerHTML = `
-            <span data-help="experience_green">Green</span>
-            <span data-help="experience_blue">Blue</span>
+            <span data-help="experience_locked">Locked</span>
+            <span data-help="booking_advance_days">Advance</span>
         `;
         HelpTooltips.init({ showIcon: false });
 
-        const greenEl = document.querySelector('[data-help="experience_green"]');
-        const blueEl = document.querySelector('[data-help="experience_blue"]');
+        const lockedEl = document.querySelector('[data-help="experience_locked"]');
+        const advanceEl = document.querySelector('[data-help="booking_advance_days"]');
 
-        HelpTooltips.toggleTooltip(greenEl);
-        expect(document.querySelector('.help-tooltip').textContent).toContain('Grün');
+        HelpTooltips.toggleTooltip(lockedEl);
+        expect(document.querySelector('.help-tooltip').textContent).toContain('Gesperrt');
 
-        HelpTooltips.toggleTooltip(blueEl);
-        expect(document.querySelector('.help-tooltip').textContent).toContain('Blau');
+        HelpTooltips.toggleTooltip(advanceEl);
+        expect(document.querySelector('.help-tooltip').textContent).toContain('Vorlaufzeit');
 
         // Only one tooltip should exist
         expect(document.querySelectorAll('.help-tooltip').length).toBe(1);
@@ -339,7 +339,7 @@ describe('HelpTooltips.toggleTooltip', () => {
 
 describe('HelpTooltips.positionTooltip', () => {
     test('should position tooltip relative to target', () => {
-        document.body.innerHTML = '<span data-help="experience_green" style="position: absolute; top: 100px; left: 100px;">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked" style="position: absolute; top: 100px; left: 100px;">Test</span>';
         HelpTooltips.init({ showIcon: false, position: 'top' });
 
         const el = document.querySelector('[data-help]');
@@ -352,7 +352,7 @@ describe('HelpTooltips.positionTooltip', () => {
     });
 
     test('should handle position: bottom', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Test</span>';
         HelpTooltips.init({ showIcon: false, position: 'bottom' });
 
         const el = document.querySelector('[data-help]');
@@ -363,7 +363,7 @@ describe('HelpTooltips.positionTooltip', () => {
     });
 
     test('should handle position: left', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Test</span>';
         HelpTooltips.init({ showIcon: false, position: 'left' });
 
         const el = document.querySelector('[data-help]');
@@ -374,7 +374,7 @@ describe('HelpTooltips.positionTooltip', () => {
     });
 
     test('should handle position: right', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Test</span>';
         HelpTooltips.init({ showIcon: false, position: 'right' });
 
         const el = document.querySelector('[data-help]');
@@ -387,7 +387,7 @@ describe('HelpTooltips.positionTooltip', () => {
 
 describe('Event handling', () => {
     test('should close tooltip on Escape key', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Test</span>';
         HelpTooltips.init({ showIcon: false });
 
         const el = document.querySelector('[data-help]');
@@ -400,7 +400,7 @@ describe('Event handling', () => {
 
     test('should close tooltip on click outside', () => {
         document.body.innerHTML = `
-            <span data-help="experience_green">Test</span>
+            <span data-help="experience_locked">Test</span>
             <div id="outside">Outside</div>
         `;
         HelpTooltips.init({ showIcon: false });
@@ -415,7 +415,7 @@ describe('Event handling', () => {
     });
 
     test('should not close when clicking on tooltip', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Test</span>';
         HelpTooltips.init({ showIcon: false });
 
         const el = document.querySelector('[data-help]');
@@ -428,7 +428,7 @@ describe('Event handling', () => {
     });
 
     test('should handle Enter key on help icon', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Test</span>';
         HelpTooltips.init({ showIcon: true });
 
         const icon = document.querySelector('.help-icon');
@@ -438,7 +438,7 @@ describe('Event handling', () => {
     });
 
     test('should handle Space key on help icon', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Test</span>';
         HelpTooltips.init({ showIcon: true });
 
         const icon = document.querySelector('.help-icon');
@@ -450,7 +450,7 @@ describe('Event handling', () => {
 
 describe('HelpTooltips hover trigger', () => {
     test('should show tooltip on mouseenter', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Test</span>';
         HelpTooltips.init({ showIcon: false, trigger: 'hover' });
 
         const el = document.querySelector('[data-help]');
@@ -460,7 +460,7 @@ describe('HelpTooltips hover trigger', () => {
     });
 
     test('should hide tooltip on mouseleave', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Test</span>';
         HelpTooltips.init({ showIcon: false, trigger: 'hover' });
 
         const el = document.querySelector('[data-help]');
@@ -471,7 +471,7 @@ describe('HelpTooltips hover trigger', () => {
     });
 
     test('should show tooltip on focus (accessibility)', () => {
-        document.body.innerHTML = '<span data-help="experience_green" tabindex="0">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked" tabindex="0">Test</span>';
         HelpTooltips.init({ showIcon: false, trigger: 'hover' });
 
         const el = document.querySelector('[data-help]');
@@ -481,7 +481,7 @@ describe('HelpTooltips hover trigger', () => {
     });
 
     test('should hide tooltip on blur', () => {
-        document.body.innerHTML = '<span data-help="experience_green" tabindex="0">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked" tabindex="0">Test</span>';
         HelpTooltips.init({ showIcon: false, trigger: 'hover' });
 
         const el = document.querySelector('[data-help]');
@@ -501,17 +501,17 @@ describe('HelpTooltips.updateContent', () => {
         });
 
         expect(HelpTooltips.content['custom_key']).toBeDefined();
-        expect(HelpTooltips.content['experience_green']).toBeDefined();
+        expect(HelpTooltips.content['experience_locked']).toBeDefined();
     });
 
     test('should override existing keys', () => {
         HelpTooltips.init();
 
         HelpTooltips.updateContent({
-            'experience_green': { title: 'Modified', text: 'Modified text' }
+            'experience_locked': { title: 'Modified', text: 'Modified text' }
         });
 
-        expect(HelpTooltips.content['experience_green'].title).toBe('Modified');
+        expect(HelpTooltips.content['experience_locked'].title).toBe('Modified');
     });
 });
 
@@ -553,9 +553,6 @@ describe('HelpTooltips.loadFromI18n', () => {
 
 describe('Content coverage', () => {
     const expectedKeys = [
-        'experience_green',
-        'experience_orange',
-        'experience_blue',
         'experience_locked',
         'booking_advance_days',
         'booking_cancellation',
@@ -606,7 +603,7 @@ describe('Edge cases', () => {
     });
 
     test('should handle rapid toggle calls', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Test</span>';
         HelpTooltips.init({ showIcon: false });
 
         const el = document.querySelector('[data-help]');
@@ -621,7 +618,7 @@ describe('Edge cases', () => {
     });
 
     test('should handle element removed from DOM during show', () => {
-        document.body.innerHTML = '<span data-help="experience_green">Test</span>';
+        document.body.innerHTML = '<span data-help="experience_locked">Test</span>';
         HelpTooltips.init({ showIcon: false });
 
         const el = document.querySelector('[data-help]');

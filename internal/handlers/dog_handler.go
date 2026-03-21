@@ -260,38 +260,30 @@ func (h *DogHandler) CreateDog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate color_id is provided (new color system)
-	// Category is now legacy - if color_id is provided, category validation is skipped
-	if req.ColorID == nil && req.Category == "" {
-		respondError(w, http.StatusBadRequest, "Color is required")
-		return
-	}
-
-	// If only legacy category is provided, validate it and resolve to color_id
-	if req.ColorID == nil && req.Category != "" {
-		if req.Category != "green" && req.Category != "blue" && req.Category != "orange" {
-			respondError(w, http.StatusBadRequest, "Category must be green, blue, or orange")
+	// Validate color_id is provided (new color system requires it)
+	if req.ColorID == nil {
+		// If legacy category is provided, try to resolve it to a color_id
+		if req.Category != "" {
+			color, err := h.colorRepo.FindByLegacyCategory(tenantID, req.Category)
+			if err != nil {
+				log.Printf("ERROR: Failed to resolve legacy category %s: %v", req.Category, err)
+				respondError(w, http.StatusInternalServerError, "Failed to resolve color category")
+				return
+			}
+			if color != nil {
+				req.ColorID = &color.ID
+			} else {
+				respondError(w, http.StatusBadRequest, "Color is required (color_id)")
+				return
+			}
+		} else {
+			respondError(w, http.StatusBadRequest, "Color is required (color_id)")
 			return
-		}
-
-		// Resolve legacy category to color_id
-		color, err := h.colorRepo.FindByLegacyCategory(tenantID, req.Category)
-		if err != nil {
-			log.Printf("ERROR: Failed to resolve legacy category %s: %v", req.Category, err)
-			respondError(w, http.StatusInternalServerError, "Failed to resolve color category")
-			return
-		}
-		if color != nil {
-			req.ColorID = &color.ID
 		}
 	}
 
-	// Set default category for database CHECK constraint (legacy field)
-	// When using new color system, category is not sent but DB requires valid value
+	// Category is a legacy field - no longer stored in DB, kept for backward compat in the model
 	category := req.Category
-	if category == "" {
-		category = "green" // Default to satisfy CHECK constraint
-	}
 
 	// Create dog with sanitized values
 	dog := &models.Dog{

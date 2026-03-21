@@ -229,39 +229,6 @@ func TestEmailTemplates_DashboardLinks(t *testing.T) {
 	})
 }
 
-// TestEmailTemplates_ProfileLink verifies experience level denied email contains profile link
-func TestEmailTemplates_ProfileLink(t *testing.T) {
-	baseURL := "https://gassigeher.example.com"
-
-	t.Run("SendExperienceLevelDenied template has profile link and button", func(t *testing.T) {
-		tmpl := `
-<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"></head>
-<body>
-    <p>Sie können weiterhin Hunde Ihres aktuellen Levels buchen und jederzeit einen neuen Antrag in Ihrem <a href="{{.BaseURL}}/profile.html" style="color: #82b965; text-decoration: underline;">Profil</a> stellen.</p>
-
-    <p style="text-align: center; margin-top: 20px;">
-        <a href="{{.BaseURL}}/profile.html" style="display: inline-block; padding: 12px 30px; background-color: #82b965; color: white; text-decoration: none; border-radius: 6px;">Zum Profil</a>
-    </p>
-</body>
-</html>
-`
-		data := map[string]interface{}{
-			"Name":    "Test User",
-			"Level":   "Blau",
-			"BaseURL": baseURL,
-			"Message": "",
-		}
-
-		result := renderTemplateInterface(t, tmpl, data)
-
-		assertContains(t, result, baseURL+"/profile.html", "experience denied should contain profile link")
-		assertContains(t, result, `>Profil</a>`, "experience denied should have profile text link")
-		assertContains(t, result, `>Zum Profil</a>`, "experience denied should have profile button")
-	})
-}
-
 // TestEmailTemplates_LoginLink verifies account deactivated email contains login link
 func TestEmailTemplates_LoginLink(t *testing.T) {
 	baseURL := "https://gassigeher.example.com"
@@ -419,7 +386,6 @@ func TestEmailTemplates_AllEmailsHaveActionableLinks(t *testing.T) {
 		{"SendAdminCancellation", "/dashboard.html", "Neuen Termin buchen"},
 		{"SendBookingMoved", "/dashboard.html", "Buchung ansehen"},
 		{"SendBookingRejected", "/dashboard.html", "Anderen Termin buchen"},
-		{"SendExperienceLevelDenied", "/profile.html", "Profil"},
 		{"SendAccountDeactivated", "/login.html", "Anmeldeseite"},
 	}
 

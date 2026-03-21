@@ -102,10 +102,11 @@ func (r *ColorCategoryRepository) FindByName(tenantID int, name string) (*models
 }
 
 // legacyCategoryToColorNames maps legacy category names (green/blue/orange) to German color names
-// This supports both uppercase and lowercase variations found in the database
+// This supports both uppercase and lowercase variations found in the database.
+// ASCII-safe names come first (matching migration seed data: Gruen, Dunkelblau, Orange).
 var legacyCategoryToColorNames = map[string][]string{
-	"green":  {"Grün", "Gruen", "grün", "gruen"},
-	"blue":   {"Blau", "blau", "Dunkelblau", "dunkelblau"},
+	"green":  {"Gruen", "gruen", "Grün", "grün"},
+	"blue":   {"Dunkelblau", "dunkelblau", "Blau", "blau"},
 	"orange": {"Orange", "orange"},
 }
 

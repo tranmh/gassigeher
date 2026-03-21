@@ -120,9 +120,6 @@ func (h *AuditHandler) GetAuditLogActions(w http.ResponseWriter, r *http.Request
 		{"value": models.AuditActionSettingsChanged, "label": "Einstellungen geändert"},
 		{"value": models.AuditActionThemeChanged, "label": "Theme geändert"},
 		{"value": models.AuditActionDataExported, "label": "Daten exportiert"},
-		{"value": models.AuditActionExperienceRequested, "label": "Erfahrung angefragt"},
-		{"value": models.AuditActionExperienceApproved, "label": "Erfahrung genehmigt"},
-		{"value": models.AuditActionExperienceDenied, "label": "Erfahrung abgelehnt"},
 		{"value": models.AuditActionColorRequested, "label": "Farbe angefragt"},
 		{"value": models.AuditActionColorApproved, "label": "Farbe genehmigt"},
 		{"value": models.AuditActionColorDenied, "label": "Farbe abgelehnt"},
@@ -140,7 +137,6 @@ func (h *AuditHandler) GetAuditLogEntityTypes(w http.ResponseWriter, r *http.Req
 		{"value": models.EntityTypeDog, "label": "Hund"},
 		{"value": models.EntityTypeSettings, "label": "Einstellungen"},
 		{"value": models.EntityTypeTenant, "label": "Tierheim"},
-		{"value": models.EntityTypeExperienceRequest, "label": "Erfahrungsanfrage"},
 		{"value": models.EntityTypeColorRequest, "label": "Farbanfrage"},
 		{"value": models.EntityTypeTheme, "label": "Theme"},
 	}

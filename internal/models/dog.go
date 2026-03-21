@@ -16,8 +16,9 @@ const (
 // ValidDogSizes contains valid dog size values
 var ValidDogSizes = []string{"small", "medium", "large"}
 
-// ValidDogCategories contains valid legacy dog categories
-var ValidDogCategories = []string{"green", "orange", "blue"}
+// ValidDogCategories is deprecated - categories are now dynamic via color_categories table.
+// Kept for backward compatibility but no longer used for validation.
+var ValidDogCategories = []string{}
 
 // timeFormatRegex validates HH:MM format
 var timeFormatRegex = regexp.MustCompile(`^([01]?[0-9]|2[0-3]):[0-5][0-9]$`)
@@ -116,15 +117,10 @@ func isValidDogSize(size string) bool {
 	return false
 }
 
-// isValidDogCategory checks if the category is valid
+// isValidDogCategory is deprecated - categories are now dynamic via color_categories table.
+// Always returns true since validation is done via color_id against the database.
 func isValidDogCategory(category string) bool {
-	category = strings.ToLower(strings.TrimSpace(category))
-	for _, valid := range ValidDogCategories {
-		if category == valid {
-			return true
-		}
-	}
-	return false
+	return strings.TrimSpace(category) != ""
 }
 
 // isValidDogTimeFormat checks if the time is in HH:MM format (for dog.go)
@@ -160,10 +156,8 @@ func (r *CreateDogRequest) Validate() error {
 		return errors.New("Alter muss zwischen 0 und 30 Jahren liegen")
 	}
 
-	// Category validation (legacy field)
-	if r.Category != "" && !isValidDogCategory(r.Category) {
-		return errors.New("Kategorie muss 'green', 'orange' oder 'blue' sein")
-	}
+	// Category validation (legacy field - now accepts any non-empty string)
+	// Actual color validation is done via color_id against the color_categories table
 
 	// External link URL validation
 	if r.ExternalLink != nil && *r.ExternalLink != "" {
@@ -239,10 +233,8 @@ func (r *UpdateDogRequest) Validate() error {
 		return errors.New("Alter muss zwischen 0 und 30 Jahren liegen")
 	}
 
-	// Category validation (if provided)
-	if r.Category != nil && *r.Category != "" && !isValidDogCategory(*r.Category) {
-		return errors.New("Kategorie muss 'green', 'orange' oder 'blue' sein")
-	}
+	// Category validation (legacy field - now accepts any non-empty string)
+	// Actual color validation is done via color_id against the color_categories table
 
 	// External link URL validation
 	if r.ExternalLink != nil && *r.ExternalLink != "" {

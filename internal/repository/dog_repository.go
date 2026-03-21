@@ -269,22 +269,15 @@ func (r *DogRepository) FindAll(filter *models.DogFilterRequest, tenantID int) (
 		}
 
 		// Category filter maps to color_id via color name lookup using subquery
-		// BUG #7 FIX: Validate category against whitelist to prevent invalid inputs
+		// Uses legacyCategoryToColorNames from color_category_repository.go for consistency
 		if filter.Category != nil && *filter.Category != "" {
-			// Map English category names to German color names (whitelist)
-			categoryToColorName := map[string]string{
-				"green":  "gruen",
-				"orange": "orange",
-				"blue":   "dunkelblau",
-			}
-			colorName, ok := categoryToColorName[*filter.Category]
+			colorNames, ok := legacyCategoryToColorNames[*filter.Category]
 			if !ok {
-				// Invalid category - reject (defense in depth)
 				return nil, fmt.Errorf("invalid category: %s (allowed: green, orange, blue)", *filter.Category)
 			}
-			// Use subquery to find color_id by name for the same tenant
+			// Use first name variant — SQL uses LOWER() so case doesn't matter
 			query += " AND color_id IN (SELECT id FROM color_categories WHERE tenant_id = dogs.tenant_id AND LOWER(name) = LOWER(?))"
-			args = append(args, colorName)
+			args = append(args, colorNames[0])
 		}
 
 		// Direct color_id filter (new color system)

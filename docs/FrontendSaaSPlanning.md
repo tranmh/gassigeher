@@ -436,7 +436,7 @@ Häufige Fragen zu Preisen
 
 2. **Hundeverwaltung**
    - Hundeprofile mit Fotos
-   - Farbkategorien (Grün/Orange/Blau)
+   - Dynamische Farbkategorien (vom Admin konfigurierbar)
    - Verfügbarkeitsstatus
    - Featured Dogs auf der Startseite
    - Externe Links (Vermittlungsseite)

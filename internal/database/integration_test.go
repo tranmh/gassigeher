@@ -66,7 +66,7 @@ func TestInitializeWithConfig_PostgreSQL(t *testing.T) {
 	defer db.Close()
 
 	// Clean database first
-	tables := []string{"bookings", "blocked_dates", "experience_requests",
+	tables := []string{"bookings", "blocked_dates",
 		"reactivation_requests", "dogs", "users", "system_settings", "schema_migrations"}
 	for _, table := range tables {
 		db.Exec("DROP TABLE IF EXISTS " + table + " CASCADE")

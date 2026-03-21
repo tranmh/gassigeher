@@ -91,13 +91,11 @@ const FAQ_DATA = [
     {
         id: 11,
         category: 'shared',
-        question: 'Was sind Farbkategorien / Erfahrungsstufen?',
-        answer: 'Farbkategorien helfen sicherzustellen, dass anspruchsvolle Hunde nur von erfahrenen Freiwilligen geführt werden:<br><br>' +
-            '<strong style="color: #82b965;">🟢 Grün (Anfänger)</strong>: Für ruhige, gut erzogene Hunde. Ideal für neue Gassigeher.<br>' +
-            '<strong style="color: #f5a623;">🟠 Orange (Fortgeschritten)</strong>: Für Hunde mit etwas mehr Temperament oder besonderen Bedürfnissen.<br>' +
-            '<strong style="color: #4a90e2;">🔵 Blau (Experte)</strong>: Für anspruchsvolle Hunde, die Erfahrung und Hundeverständnis erfordern.<br><br>' +
-            'Neue Nutzer starten mit Grün und können höhere Stufen beantragen.',
-        keywords: ['farbe', 'kategorie', 'erfahrung', 'stufe', 'grün', 'orange', 'blau', 'level', 'anfänger', 'experte']
+        question: 'Was sind Farbkategorien?',
+        answer: 'Jeder Hund ist einer Farbkategorie zugeordnet. Die Farben und ihre Bedeutung werden von Ihrem Tierheim individuell festgelegt.<br><br>' +
+            'Neue Nutzer starten mit einer Standardfarbe. Um weitere Hunde ausführen zu dürfen, können Sie zusätzliche Farben über Ihr Profil beantragen. ' +
+            'Ein Administrator prüft Ihren Antrag und schaltet die Farbe bei Genehmigung frei.',
+        keywords: ['farbe', 'kategorie', 'farbkategorie', 'stufe', 'level', 'zugang', 'beantragen', 'freischalten']
     },
 
     // ============================================

@@ -254,7 +254,7 @@ func (s *EmailService) SendWelcomeEmail(to, name string) error {
 
             <div class="feature">
                 <strong>🐶 Hunde durchsuchen</strong><br>
-                Sehen Sie sich alle verfügbaren Hunde an und filtern Sie nach Größe, Rasse und Erfahrungslevel.
+                Sehen Sie sich alle verfügbaren Hunde an und filtern Sie nach Größe, Rasse und Farbkategorie.
             </div>
 
             <div class="feature">
@@ -263,13 +263,8 @@ func (s *EmailService) SendWelcomeEmail(to, name string) error {
             </div>
 
             <div class="feature">
-                <strong>⭐ Erfahrungslevel</strong><br>
-                Sie starten als "Grün" (Anfänger). Sie können höhere Levels beantragen, um Zugang zu anspruchsvolleren Hunden zu erhalten:
-                <ul>
-                    <li><strong>Grün:</strong> Alle Anfänger (Standard)</li>
-                    <li><strong>Blau:</strong> Erfahrene Gassigeher</li>
-                    <li><strong>Orange:</strong> Nur erfahrene Gassigeher</li>
-                </ul>
+                <strong>🎨 Farbsystem</strong><br>
+                Jedem Hund ist eine Farbe zugeordnet. Sie starten mit einer Standardfarbe und können weitere Farben beantragen, um mehr Hunde ausführen zu dürfen.
             </div>
 
             <p>Bei Fragen oder Problemen wenden Sie sich bitte an unseren Support.</p>
@@ -970,94 +965,6 @@ func (s *EmailService) SendBookingRejected(to, name, dogName, date, scheduledTim
 	return s.SendEmail(to, subject, body.String())
 }
 
-// SendExperienceLevelApproved sends an email when experience level request is approved
-func (s *EmailService) SendExperienceLevelApproved(to, name, level string, message *string) error {
-	levelLabel := "Blau"
-	if level == "orange" {
-		levelLabel = "Orange"
-	}
-
-	subject := fmt.Sprintf("Ihr Antrag auf %s Level wurde genehmigt", levelLabel)
-
-	tmpl := `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #26272b; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background-color: #28a745; color: white; padding: 20px; text-align: center; border-radius: 6px 6px 0 0; }
-        .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 6px 6px; }
-        .success-box { background-color: #d4edda; padding: 20px; margin: 20px 0; border-radius: 6px; border-left: 4px solid #28a745; }
-        .message-box { background-color: white; padding: 15px; margin: 20px 0; border-radius: 6px; border-left: 4px solid #17a2b8; }
-        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>✅ Glückwunsch!</h1>
-        </div>
-        <div class="content">
-            <p>Hallo {{.Name}},</p>
-            <p>Ihr Antrag auf <strong>{{.Level}} Level</strong> wurde genehmigt!</p>
-
-            <div class="success-box">
-                <h3 style="margin-top: 0;">Sie haben jetzt Zugang zu:</h3>
-                <p style="margin: 5px 0;">
-                    {{if eq .Level "Blau"}}
-                    ✓ Grüne Hunde (Anfänger)<br>
-                    ✓ Blaue Hunde (Erfahrene)
-                    {{else}}
-                    ✓ Grüne Hunde (Anfänger)<br>
-                    ✓ Blaue Hunde (Erfahrene)<br>
-                    ✓ Orange Hunde (Nur Erfahrene)
-                    {{end}}
-                </p>
-            </div>
-
-            {{if .Message}}
-            <div class="message-box">
-                <strong>Nachricht vom Administrator:</strong><br>
-                {{.Message}}
-            </div>
-            {{end}}
-
-            <p>Sie können jetzt sofort Hunde Ihres neuen Levels buchen!</p>
-
-            <p style="text-align: center; margin-top: 30px;">
-                <a href="{{.BaseURL}}/dogs.html" style="display: inline-block; padding: 12px 30px; background-color: #82b965; color: white; text-decoration: none; border-radius: 6px;">Hunde anzeigen</a>
-            </p>
-        </div>
-        <div class="footer">
-            <p>© 2025 Gassigeher. Alle Rechte vorbehalten.</p>
-        </div>
-    </div>
-</body>
-</html>
-`
-
-	t := template.Must(template.New("approved").Parse(tmpl))
-	var body bytes.Buffer
-	data := map[string]interface{}{
-		"Name":    name,
-		"Level":   levelLabel,
-		"BaseURL": s.baseURL,
-		"Message": func() string {
-			if message != nil {
-				return *message
-			}
-			return ""
-		}(),
-	}
-	if err := t.Execute(&body, data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
-	}
-
-	return s.SendEmail(to, subject, body.String())
-}
-
 // SendNewUserRegistrationNotification sends an email to admin when a new user registers
 func (s *EmailService) SendNewUserRegistrationNotification(adminEmail, userName, userEmail, userPhone string) error {
 	subject := "Neue Registrierung - " + userName
@@ -1129,86 +1036,6 @@ func (s *EmailService) SendNewUserRegistrationNotification(adminEmail, userName,
 	}
 
 	return s.SendEmail(adminEmail, subject, body.String())
-}
-
-// SendExperienceLevelDenied sends an email when experience level request is denied
-func (s *EmailService) SendExperienceLevelDenied(to, name, level string, message *string) error {
-	levelLabel := "Blau"
-	if level == "orange" {
-		levelLabel = "Orange"
-	}
-
-	subject := fmt.Sprintf("Ihr Antrag auf %s Level", levelLabel)
-
-	tmpl := `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #26272b; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background-color: #ffc107; color: #26272b; padding: 20px; text-align: center; border-radius: 6px 6px 0 0; }
-        .content { background-color: #f9f9f9; padding: 30px; border-radius: 0 0 6px 6px; }
-        .info-box { background-color: #fff3cd; padding: 20px; margin: 20px 0; border-radius: 6px; border-left: 4px solid #ffc107; }
-        .message-box { background-color: white; padding: 15px; margin: 20px 0; border-radius: 6px; border-left: 4px solid #17a2b8; }
-        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Ihr Antrag auf {{.Level}} Level</h1>
-        </div>
-        <div class="content">
-            <p>Hallo {{.Name}},</p>
-            <p>Vielen Dank für Ihren Antrag auf <strong>{{.Level}} Level</strong>.</p>
-
-            <div class="info-box">
-                <p style="margin: 0;">
-                    Leider können wir Ihren Antrag derzeit nicht genehmigen. Sammeln Sie weiterhin Erfahrung und versuchen Sie es später erneut!
-                </p>
-            </div>
-
-            {{if .Message}}
-            <div class="message-box">
-                <strong>Nachricht vom Administrator:</strong><br>
-                {{.Message}}
-            </div>
-            {{end}}
-
-            <p>Sie können weiterhin Hunde Ihres aktuellen Levels buchen und jederzeit einen neuen Antrag in Ihrem <a href="{{.BaseURL}}/profile.html" style="color: #82b965; text-decoration: underline;">Profil</a> stellen.</p>
-
-            <p style="text-align: center; margin-top: 20px;">
-                <a href="{{.BaseURL}}/profile.html" style="display: inline-block; padding: 12px 30px; background-color: #82b965; color: white; text-decoration: none; border-radius: 6px;">Zum Profil</a>
-            </p>
-        </div>
-        <div class="footer">
-            <p>© 2025 Gassigeher. Alle Rechte vorbehalten.</p>
-        </div>
-    </div>
-</body>
-</html>
-`
-
-	t := template.Must(template.New("denied").Parse(tmpl))
-	var body bytes.Buffer
-	data := map[string]interface{}{
-		"Name":    name,
-		"Level":   levelLabel,
-		"BaseURL": s.baseURL,
-		"Message": func() string {
-			if message != nil {
-				return *message
-			}
-			return ""
-		}(),
-	}
-	if err := t.Execute(&body, data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
-	}
-
-	return s.SendEmail(to, subject, body.String())
 }
 
 // SendTenantWelcomeEmail sends a welcome email when a new tenant is created (SaaS)

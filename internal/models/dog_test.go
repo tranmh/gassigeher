@@ -30,7 +30,8 @@ func TestIsValidDogSize(t *testing.T) {
 }
 
 func TestIsValidDogCategory(t *testing.T) {
-	validCategories := []string{"green", "orange", "blue", "GREEN", "Orange", "BLUE", " green ", " orange ", " blue "}
+	// isValidDogCategory now accepts any non-empty string (categories are dynamic)
+	validCategories := []string{"green", "orange", "blue", "custom-color", "Anfänger", "123"}
 	for _, cat := range validCategories {
 		t.Run(cat, func(t *testing.T) {
 			if !isValidDogCategory(cat) {
@@ -39,9 +40,10 @@ func TestIsValidDogCategory(t *testing.T) {
 		})
 	}
 
-	invalidCategories := []string{"", "red", "yellow", "purple", "level1", "beginner", "123"}
+	// Only empty/whitespace strings are invalid
+	invalidCategories := []string{"", " ", "  "}
 	for _, cat := range invalidCategories {
-		t.Run(cat, func(t *testing.T) {
+		t.Run("empty_"+cat, func(t *testing.T) {
 			if isValidDogCategory(cat) {
 				t.Errorf("isValidDogCategory(%q) = true, want false", cat)
 			}
@@ -191,16 +193,18 @@ func TestCreateDogRequest_Validate(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid category", func(t *testing.T) {
+	t.Run("any category accepted", func(t *testing.T) {
+		// Categories are now dynamic - any non-empty string is valid at model level
+		// Actual validation happens via color_id against the database
 		req := CreateDogRequest{
 			Name:     "Max",
 			Breed:    "Labrador",
 			Size:     "medium",
 			Age:      5,
-			Category: "red",
+			Category: "custom-color",
 		}
-		if err := req.Validate(); err == nil {
-			t.Error("Validate() expected error for invalid category")
+		if err := req.Validate(); err != nil {
+			t.Errorf("Validate() unexpected error for custom category: %v", err)
 		}
 	})
 
@@ -463,11 +467,12 @@ func TestUpdateDogRequest_Validate(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid category", func(t *testing.T) {
-		cat := "red"
+	t.Run("any category accepted", func(t *testing.T) {
+		// Categories are now dynamic - any non-empty string is valid at model level
+		cat := "custom-color"
 		req := UpdateDogRequest{Category: &cat}
-		if err := req.Validate(); err == nil {
-			t.Error("Validate() expected error for invalid category")
+		if err := req.Validate(); err != nil {
+			t.Errorf("Validate() unexpected error for custom category: %v", err)
 		}
 	})
 
@@ -586,13 +591,8 @@ func TestValidDogSizesConstant(t *testing.T) {
 }
 
 func TestValidDogCategoriesConstant(t *testing.T) {
-	expected := []string{"green", "orange", "blue"}
-	if len(ValidDogCategories) != len(expected) {
-		t.Errorf("ValidDogCategories length = %d, want %d", len(ValidDogCategories), len(expected))
-	}
-	for i, c := range expected {
-		if ValidDogCategories[i] != c {
-			t.Errorf("ValidDogCategories[%d] = %s, want %s", i, ValidDogCategories[i], c)
-		}
+	// ValidDogCategories is now empty - categories are dynamic via color_categories table
+	if len(ValidDogCategories) != 0 {
+		t.Errorf("ValidDogCategories length = %d, want 0 (deprecated)", len(ValidDogCategories))
 	}
 }

@@ -187,7 +187,6 @@ class DBHelper {
   async resetDatabase() {
     const tables = [
       'bookings',
-      'experience_requests',
       'reactivation_requests',
       'blocked_dates',
       'dogs',

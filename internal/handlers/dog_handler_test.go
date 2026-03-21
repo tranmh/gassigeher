@@ -1256,7 +1256,7 @@ func TestDogHandler_CreateDog_InputLengthValidation(t *testing.T) {
 
 	t.Run("rejects name longer than 100 characters", func(t *testing.T) {
 		longName := strings.Repeat("A", 101) // 101 characters
-		reqBody := fmt.Sprintf(`{"name":"%s","breed":"Labrador","size":"medium","age":3,"category":"green"}`, longName)
+		reqBody := fmt.Sprintf(`{"name":"%s","breed":"Labrador","size":"medium","age":3,"color_id":1}`, longName)
 		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
 		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
@@ -1272,7 +1272,7 @@ func TestDogHandler_CreateDog_InputLengthValidation(t *testing.T) {
 
 	t.Run("accepts name exactly 100 characters", func(t *testing.T) {
 		exactName := strings.Repeat("A", 100) // Exactly 100 characters
-		reqBody := fmt.Sprintf(`{"name":"%s","breed":"Labrador","size":"medium","age":3,"category":"green"}`, exactName)
+		reqBody := fmt.Sprintf(`{"name":"%s","breed":"Labrador","size":"medium","age":3,"color_id":1}`, exactName)
 		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
 		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
@@ -1288,7 +1288,7 @@ func TestDogHandler_CreateDog_InputLengthValidation(t *testing.T) {
 
 	t.Run("rejects breed longer than 100 characters", func(t *testing.T) {
 		longBreed := strings.Repeat("B", 101)
-		reqBody := fmt.Sprintf(`{"name":"TestDog","breed":"%s","size":"medium","age":3,"category":"green"}`, longBreed)
+		reqBody := fmt.Sprintf(`{"name":"TestDog","breed":"%s","size":"medium","age":3,"color_id":1}`, longBreed)
 		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
 		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
@@ -1304,7 +1304,7 @@ func TestDogHandler_CreateDog_InputLengthValidation(t *testing.T) {
 
 	t.Run("rejects special_needs longer than 1000 characters", func(t *testing.T) {
 		longNeeds := strings.Repeat("N", 1001)
-		reqBody := fmt.Sprintf(`{"name":"TestDog","breed":"Lab","size":"medium","age":3,"category":"green","special_needs":"%s"}`, longNeeds)
+		reqBody := fmt.Sprintf(`{"name":"TestDog","breed":"Lab","size":"medium","age":3,"color_id":1,"special_needs":"%s"}`, longNeeds)
 		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
 		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
@@ -1320,7 +1320,7 @@ func TestDogHandler_CreateDog_InputLengthValidation(t *testing.T) {
 
 	t.Run("rejects pickup_location longer than 500 characters", func(t *testing.T) {
 		longLocation := strings.Repeat("L", 501)
-		reqBody := fmt.Sprintf(`{"name":"TestDog","breed":"Lab","size":"medium","age":3,"category":"green","pickup_location":"%s"}`, longLocation)
+		reqBody := fmt.Sprintf(`{"name":"TestDog","breed":"Lab","size":"medium","age":3,"color_id":1,"pickup_location":"%s"}`, longLocation)
 		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
 		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
@@ -1386,7 +1386,7 @@ func TestDogHandler_CreateDog_XSSSanitization(t *testing.T) {
 	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "blue")
 
 	t.Run("strips HTML script tags from name", func(t *testing.T) {
-		reqBody := `{"name":"<script>alert('XSS')</script>Bella","breed":"Labrador","size":"medium","age":3,"category":"green"}`
+		reqBody := `{"name":"<script>alert('XSS')</script>Bella","breed":"Labrador","size":"medium","age":3,"color_id":1}`
 		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
 		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
@@ -1412,7 +1412,7 @@ func TestDogHandler_CreateDog_XSSSanitization(t *testing.T) {
 	})
 
 	t.Run("strips HTML tags from breed", func(t *testing.T) {
-		reqBody := `{"name":"TestDog","breed":"<img src=x onerror=alert('XSS')>Labrador","size":"medium","age":3,"category":"green"}`
+		reqBody := `{"name":"TestDog","breed":"<img src=x onerror=alert('XSS')>Labrador","size":"medium","age":3,"color_id":1}`
 		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
 		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)
@@ -1435,7 +1435,7 @@ func TestDogHandler_CreateDog_XSSSanitization(t *testing.T) {
 	})
 
 	t.Run("strips HTML from special_needs", func(t *testing.T) {
-		reqBody := `{"name":"TestDog","breed":"Lab","size":"medium","age":3,"category":"green","special_needs":"<b>Bold</b> and <script>evil()</script>"}`
+		reqBody := `{"name":"TestDog","breed":"Lab","size":"medium","age":3,"color_id":1,"special_needs":"<b>Bold</b> and <script>evil()</script>"}`
 		req := httptest.NewRequest("POST", "/api/dogs", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
 		ctx := contextWithTenantAndUser(req.Context(), 1, adminID)

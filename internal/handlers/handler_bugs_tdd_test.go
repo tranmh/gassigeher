@@ -161,18 +161,6 @@ func setupBugsTestDB(t *testing.T) *database.DB {
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);
 
-		CREATE TABLE experience_requests (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			tenant_id INTEGER NOT NULL DEFAULT 0,
-			user_id INTEGER NOT NULL,
-			requested_level TEXT NOT NULL,
-			reason TEXT,
-			status TEXT DEFAULT 'pending',
-			admin_notes TEXT,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP
-		);
-
 		CREATE TABLE color_categories (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			tenant_id INTEGER NOT NULL DEFAULT 0,
@@ -281,12 +269,11 @@ func setupBugsTestDB(t *testing.T) *database.DB {
 // The actual rows.Err() checks are verified to be present in user_handler.go:
 //   - Line 1325-1327: bookings iteration
 //   - Line 1371-1374: walk reports iteration
-//   - Line 1410-1413: experience requests iteration
-//   - Line 1453-1456: color requests iteration
+//   - Line 1414-1417: color requests iteration
 func TestRowsErrCheck_UserExportMyData(t *testing.T) {
 	// This test confirms the bug fix is in place via code inspection
 	// The rows.Err() checks have been verified in the following locations:
-	// - user_handler.go ExportMyData: after bookings, walk_reports, experience_requests, color_requests iterations
+	// - user_handler.go ExportMyData: after bookings, walk_reports, color_requests iterations
 	// - tenant_handler.go ExportTenantData: after dogs, bookings, blocked_dates iterations
 	// - central_admin_handler.go ExportTenantData: after dogs iteration (now also has rows.Err() check)
 
@@ -300,8 +287,7 @@ func TestRowsErrCheck_UserExportMyData(t *testing.T) {
 	t.Log("Locations checked:")
 	t.Log("  - user_handler.go:1325-1327 (bookings)")
 	t.Log("  - user_handler.go:1371-1374 (walk_reports)")
-	t.Log("  - user_handler.go:1410-1413 (experience_requests)")
-	t.Log("  - user_handler.go:1453-1456 (color_requests)")
+	t.Log("  - user_handler.go: color_requests iteration")
 	t.Log("  - tenant_handler.go:987-989 (dogs)")
 	t.Log("  - tenant_handler.go:1041-1043 (bookings)")
 	t.Log("  - tenant_handler.go:1092-1094 (blocked_dates)")

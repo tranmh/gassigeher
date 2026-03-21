@@ -177,7 +177,6 @@ var allTables = []string{
 	"user_colors",
 	"bookings",
 	"blocked_dates",
-	"experience_requests",
 	"reactivation_requests",
 	"dogs",
 	// SaaS tables
@@ -222,7 +221,6 @@ var dataTables = []string{
 	"user_colors",
 	"bookings",
 	"blocked_dates",
-	"experience_requests",
 	"reactivation_requests",
 	"consents",
 	"audit_logs",
@@ -415,24 +413,32 @@ func SeedTestUser(t *testing.T, db *database.DB, email, name, level string) int 
 	userID, _ := result.LastInsertId()
 
 	// Assign colors based on level parameter for the color system
-	// Query color IDs from database by name (case-insensitive) for tenant 1
-	colorNamesByLevel := map[string][]string{
-		"green":  {"gruen"},                                        // only gruen
-		"orange": {"gruen", "gelb", "orange"},                      // gruen, gelb, orange
-		"blue":   {"gruen", "gelb", "orange", "hellblau", "dunkelblau"}, // all main colors
+	// Level maps to number of colors assigned (1=beginner, 3=intermediate, 5=advanced)
+	// Colors are looked up by sort_order from the color_categories table
+	colorCountByLevel := map[string]int{
+		"green":  1, // beginner: lowest sort_order color only
+		"orange": 3, // intermediate: first 3 colors by sort_order
+		"blue":   5, // advanced: first 5 colors by sort_order
 	}
-	colorNames, ok := colorNamesByLevel[level]
+	colorCount, ok := colorCountByLevel[level]
 	if !ok {
-		colorNames = colorNamesByLevel["green"] // default to green
+		colorCount = 1 // default to beginner (1 color)
 	}
 
-	for _, colorName := range colorNames {
-		var colorID int
-		err := db.QueryRow(`SELECT id FROM color_categories WHERE tenant_id = 0 AND LOWER(name) = LOWER(?)`, colorName).Scan(&colorID)
-		if err != nil {
-			// Color might not exist in test DB - that's ok for some tests
-			continue
+	// Query color IDs from database ordered by sort_order for tenant 0
+	// Collect IDs first, then insert (avoids SQLite deadlock from open rows + exec)
+	rows, err := db.Query(`SELECT id FROM color_categories WHERE tenant_id = 0 ORDER BY sort_order ASC LIMIT ?`, colorCount)
+	var colorIDs []int
+	if err == nil {
+		for rows.Next() {
+			var colorID int
+			if rows.Scan(&colorID) == nil {
+				colorIDs = append(colorIDs, colorID)
+			}
 		}
+		rows.Close()
+	}
+	for _, colorID := range colorIDs {
 		_, _ = db.Exec(`INSERT INTO user_colors (tenant_id, user_id, color_id) VALUES (0, ?, ?)`, userID, colorID)
 	}
 
@@ -508,22 +514,23 @@ func splitName(name string) []string {
 func SeedTestDog(t *testing.T, db *database.DB, name, breed, category string) int {
 	now := time.Now()
 
-	// Map category to color name for the color system
-	colorNameByCategory := map[string]string{
-		"green":  "gruen",     // green dogs
-		"orange": "orange",    // orange dogs
-		"blue":   "dunkelblau", // blue dogs
+	// Map legacy category to sort_order position for color lookup
+	// green=1st color, orange=3rd color, blue=2nd color by sort_order
+	colorPosition := map[string]int{
+		"green":  1, // 1st color by sort_order (beginner)
+		"blue":   2, // 2nd color by sort_order (intermediate)
+		"orange": 3, // 3rd color by sort_order (advanced)
 	}
-	colorName, ok := colorNameByCategory[category]
+	pos, ok := colorPosition[category]
 	if !ok {
-		colorName = "gruen" // default to green
+		pos = 1 // default to first color
 	}
 
-	// Query color ID from database
+	// Query color ID from database by sort_order position
 	var colorID int
-	err := db.QueryRow(`SELECT id FROM color_categories WHERE tenant_id = 0 AND LOWER(name) = LOWER(?)`, colorName).Scan(&colorID)
+	err := db.QueryRow(`SELECT id FROM color_categories WHERE tenant_id = 0 ORDER BY sort_order ASC LIMIT 1 OFFSET ?`, pos-1).Scan(&colorID)
 	if err != nil {
-		t.Fatalf("Failed to find color %s for dog: %v", colorName, err)
+		t.Fatalf("Failed to find color at position %d for dog: %v", pos, err)
 	}
 
 	result, err := db.Exec(`
@@ -587,21 +594,6 @@ func SeedTestBlockedDateForDog(t *testing.T, db *database.DB, date, reason strin
 	return int(id)
 }
 
-// DONE: SeedTestExperienceRequest creates a test experience request and returns the ID
-func SeedTestExperienceRequest(t *testing.T, db *database.DB, userID int, requestedLevel, status string) int {
-	now := time.Now()
-	result, err := db.Exec(`
-		INSERT INTO experience_requests (tenant_id, user_id, requested_level, status, created_at)
-		VALUES (0, ?, ?, ?, ?)
-	`, userID, requestedLevel, status, now)
-
-	if err != nil {
-		t.Fatalf("Failed to seed test experience request: %v", err)
-	}
-
-	id, _ := result.LastInsertId()
-	return int(id)
-}
 
 // SeedTestWalkReport creates a test walk report and returns the ID
 func SeedTestWalkReport(t *testing.T, db *database.DB, bookingID int, behaviorRating int, energyLevel, notes string) int {
@@ -823,12 +815,14 @@ func seedBenchmarkDB(b *testing.B, db *database.DB) {
 	// Create subscription for tenant
 	_, _ = db.Exec(`INSERT INTO tenant_subscriptions (tenant_id, plan_id, status, created_at, updated_at) VALUES (0, 1, 'active', ?, ?)`, now, now)
 
-	// Seed color categories for tenant_id=0
-	_, _ = db.Exec(`INSERT OR IGNORE INTO color_categories (id, tenant_id, name, hex_code, description, experience_level, display_order, created_at, updated_at) VALUES
-		(1, 0, 'gruen', '#22c55e', 'Anfänger-Hunde', 1, 1, ?, ?),
-		(2, 0, 'dunkelblau', '#3b82f6', 'Fortgeschrittene Hunde', 2, 2, ?, ?),
-		(3, 0, 'orange', '#f97316', 'Erfahrene Gassigeher', 3, 3, ?, ?)
-	`, now, now, now, now, now, now)
+	// Seed color categories for tenant_id=0 (matches migration schema: name, hex_code, sort_order)
+	_, _ = db.Exec(`INSERT OR IGNORE INTO color_categories (id, tenant_id, name, hex_code, sort_order, created_at, updated_at) VALUES
+		(1, 0, 'Gruen', '#22c55e', 1, ?, ?),
+		(2, 0, 'Gelb', '#eab308', 2, ?, ?),
+		(3, 0, 'Orange', '#f97316', 3, ?, ?),
+		(4, 0, 'Hellblau', '#38bdf8', 4, ?, ?),
+		(5, 0, 'Dunkelblau', '#3b82f6', 5, ?, ?)
+	`, now, now, now, now, now, now, now, now, now, now)
 }
 
 // TestConfig returns a config suitable for testing

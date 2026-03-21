@@ -1378,10 +1378,8 @@ func stringContains(s, substr string) bool {
 	return false
 }
 
-// TestBookingHandler_ColorBasedPermission tests that booking permission uses the NEW color system
-// not the OLD experience_level/category system.
-// BUG: Currently backend uses CanUserAccessDog(experience_level, category) instead of
-// CanUserAccessDogByColor(userColorIDs, dogColorID)
+// TestBookingHandler_ColorBasedPermission tests that booking permission uses the color-based system
+// via CanUserAccessDogByColor(userColorIDs, dogColorID).
 func TestBookingHandler_ColorBasedPermission(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	cfg := &config.Config{
@@ -1392,8 +1390,8 @@ func TestBookingHandler_ColorBasedPermission(t *testing.T) {
 
 	tomorrow := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
 
-	t.Run("user with color can book dog with same color (regardless of experience_level)", func(t *testing.T) {
-		// Create a user with experience_level="green" (lowest in old system)
+	t.Run("user with color can book dog with same color", func(t *testing.T) {
+		// Create a user
 		userID := testutil.SeedTestUser(t, db, "color-test@example.com", "Color Test", "green")
 		db.Exec("UPDATE users SET is_verified = 1, is_active = 1 WHERE id = ?", userID)
 
@@ -1427,15 +1425,14 @@ func TestBookingHandler_ColorBasedPermission(t *testing.T) {
 		rec := httptest.NewRecorder()
 		handler.CreateBooking(rec, req)
 
-		// THIS TEST SHOULD PASS after fix, but currently FAILS because backend uses old system
 		if rec.Code != http.StatusCreated {
-			t.Errorf("BUG: User with matching color should be able to book. Got status %d, body: %s",
+			t.Errorf("User with matching color should be able to book. Got status %d, body: %s",
 				rec.Code, rec.Body.String())
 		}
 	})
 
-	t.Run("user without color cannot book dog (even with high experience_level)", func(t *testing.T) {
-		// Create a user with experience_level="blue" (highest in old system)
+	t.Run("user without color cannot book dog", func(t *testing.T) {
+		// Create a user without the dog's required color
 		userID := testutil.SeedTestUser(t, db, "no-color@example.com", "No Color", "blue")
 		db.Exec("UPDATE users SET is_verified = 1, is_active = 1 WHERE id = ?", userID)
 

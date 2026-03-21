@@ -856,7 +856,6 @@ func TestUserHandler_AdminCreateUser(t *testing.T) {
 			"first_name":       "New",
 			"last_name":        "User",
 			"email":            "newuser@example.com",
-			"experience_level": "green",
 			"is_admin":         false,
 		}
 		body, _ := json.Marshal(reqBody)
@@ -901,7 +900,6 @@ func TestUserHandler_AdminCreateUser(t *testing.T) {
 			"first_name":       "Admin",
 			"last_name":        "Attempt",
 			"email":            "adminattempt@example.com",
-			"experience_level": "blue",
 			"is_admin":         true,
 		}
 		body, _ := json.Marshal(reqBody)
@@ -923,7 +921,6 @@ func TestUserHandler_AdminCreateUser(t *testing.T) {
 			"first_name":       "New",
 			"last_name":        "Admin",
 			"email":            "newadmin@example.com",
-			"experience_level": "orange", // Should be overridden to blue for admin
 			"is_admin":         true,
 		}
 		body, _ := json.Marshal(reqBody)
@@ -956,7 +953,6 @@ func TestUserHandler_AdminCreateUser(t *testing.T) {
 			"first_name":       "Duplicate",
 			"last_name":        "Email",
 			"email":            "existing@example.com",
-			"experience_level": "green",
 		}
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/api/users", bytes.NewReader(body))
@@ -977,7 +973,6 @@ func TestUserHandler_AdminCreateUser(t *testing.T) {
 			"first_name":       "",
 			"last_name":        "User",
 			"email":            "nofirst@example.com",
-			"experience_level": "green",
 		}
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/api/users", bytes.NewReader(body))
@@ -1028,7 +1023,6 @@ func TestUserHandler_AdminCreateUser(t *testing.T) {
 			"last_name":        "Phone",
 			"email":            "badphone@example.com",
 			"phone":            "123",
-			"experience_level": "green",
 		}
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/api/users", bytes.NewReader(body))
@@ -1051,7 +1045,6 @@ func TestUserHandler_AdminCreateUser(t *testing.T) {
 			"first_name":       "Should",
 			"last_name":        "Fail",
 			"email":            "shouldfail@example.com",
-			"experience_level": "green",
 		}
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/api/users", bytes.NewReader(body))
@@ -1091,7 +1084,6 @@ func TestUserHandler_AdminCreateUser(t *testing.T) {
 			"first_name":       "Color",
 			"last_name":        "User",
 			"email":            "coloruser@example.com",
-			"experience_level": "green",
 			"is_admin":         false,
 			"color_ids":        []int{colorID1, colorID2},
 		}

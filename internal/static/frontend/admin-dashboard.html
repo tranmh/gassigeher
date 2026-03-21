@@ -128,7 +128,7 @@
 
                 <a href="/admin-color-requests.html" class="stat-tile-link" title="Alle Farb-Anfragen anzeigen">
                     <div class="card" style="text-align: center; padding: 25px;">
-                        <h2 style="margin: 0 0 10px 0; font-size: 2.5rem; color: #17a2b8;" id="stat-experience-reqs">-</h2>
+                        <h2 style="margin: 0 0 10px 0; font-size: 2.5rem; color: #17a2b8;" id="stat-color-reqs">-</h2>
                         <p style="margin: 0; font-size: 0.9rem; color: #666;" data-i18n="admin_dashboard.pending_color_requests">Farben-Anfragen</p>
                     </div>
                 </a>
@@ -250,7 +250,7 @@
                 document.getElementById('stat-inactive-users').textContent = stats.inactive_users;
                 document.getElementById('stat-available-dogs').textContent = stats.available_dogs;
                 document.getElementById('stat-unavailable-dogs').textContent = stats.unavailable_dogs;
-                document.getElementById('stat-experience-reqs').textContent = stats.pending_experience_requests;
+                document.getElementById('stat-color-reqs').textContent = stats.pending_color_requests;
                 document.getElementById('stat-reactivation-reqs').textContent = stats.pending_reactivation_requests;
             } catch (error) {
                 console.error('Failed to load stats:', error);

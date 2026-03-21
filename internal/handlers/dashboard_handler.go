@@ -99,7 +99,7 @@ func (h *DashboardHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	// Get pending color requests
 	pendingColorReqs, err := h.colorRequestRepo.FindAllPending(tenantID)
 	if err == nil {
-		stats.PendingExperienceReqs = len(pendingColorReqs)
+		stats.PendingColorRequests = len(pendingColorReqs)
 	}
 
 	// Get pending reactivation requests

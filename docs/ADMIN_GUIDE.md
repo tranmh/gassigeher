@@ -641,12 +641,12 @@ Definieren Sie Farben basierend auf den Anforderungen Ihres Tierheims. Typische 
 - Kleine bis mittelgroße Hunde
 - Hunde ohne besondere Anforderungen
 
-**Mittlere Farbe** (z.B. Blau):
+**Mittlere Farbe:**
 - Energiegeladene Hunde
 - Große Hunde
 - Hunde mit leichten besonderen Bedürfnissen
 
-**Fortgeschrittene Farbe** (z.B. Orange):
+**Fortgeschrittene Farbe:**
 - Sehr große oder kräftige Hunde
 - Hunde mit Verhaltensproblemen
 - Hunde, die besondere Erfahrung erfordern

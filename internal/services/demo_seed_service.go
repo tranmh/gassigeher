@@ -791,7 +791,6 @@ func (s *DemoSeedService) deleteAllTenantData(tenantID int) error {
 		"blocked_dates",
 		"user_colors",
 		"color_requests",
-		"experience_requests",
 		"reactivation_requests",
 		"dogs",
 		"users",

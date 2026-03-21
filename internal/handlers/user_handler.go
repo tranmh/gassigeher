@@ -1356,47 +1356,6 @@ func (h *UserHandler) ExportMyData(w http.ResponseWriter, r *http.Request) {
 	}
 	export["walk_reports"] = walkReports
 
-	// Get user's experience requests
-	var experienceRequests []map[string]interface{}
-	rows, err = h.db.Query(h.db.Rebind(`
-		SELECT id, requested_level, reason, status, admin_notes, created_at, updated_at
-		FROM experience_requests
-		WHERE user_id = ? AND tenant_id = ?
-		ORDER BY created_at DESC`), userID, tenantID)
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var req struct {
-				ID             int
-				RequestedLevel string
-				Reason         string
-				Status         string
-				AdminNotes     *string
-				CreatedAt      time.Time
-				UpdatedAt      *time.Time
-			}
-			if err := rows.Scan(&req.ID, &req.RequestedLevel, &req.Reason, &req.Status,
-				&req.AdminNotes, &req.CreatedAt, &req.UpdatedAt); err == nil {
-				experienceRequests = append(experienceRequests, map[string]interface{}{
-					"id":              req.ID,
-					"requested_level": req.RequestedLevel,
-					"reason":          req.Reason,
-					"status":          req.Status,
-					"admin_notes":     req.AdminNotes,
-					"created_at":      req.CreatedAt,
-					"updated_at":      req.UpdatedAt,
-				})
-			}
-		}
-		// BUG FIX: Check for errors during iteration - MUST fail export for GDPR compliance
-		if err := rows.Err(); err != nil {
-			log.Printf("ERROR: Failed to iterate experience requests for user %d: %v", userID, err)
-			respondError(w, http.StatusInternalServerError, "Fehler beim Laden der Erfahrungsanfragen")
-			return
-		}
-	}
-	export["experience_requests"] = experienceRequests
-
 	// Get user's color requests
 	var colorRequests []map[string]interface{}
 	rows, err = h.db.Query(h.db.Rebind(`

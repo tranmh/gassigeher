@@ -52,11 +52,6 @@ const (
 	AuditActionDataExported = "data.exported"
 	AuditActionDataImported = "data.imported"
 
-	// Experience request actions
-	AuditActionExperienceRequested = "experience.requested"
-	AuditActionExperienceApproved  = "experience.approved"
-	AuditActionExperienceDenied    = "experience.denied"
-
 	// Color request actions
 	AuditActionColorRequested = "color.requested"
 	AuditActionColorApproved  = "color.approved"
@@ -76,8 +71,7 @@ const (
 	EntityTypeDog               = "dog"
 	EntityTypeSettings          = "settings"
 	EntityTypeTenant            = "tenant"
-	EntityTypeExperienceRequest = "experience_request"
-	EntityTypeColorRequest      = "color_request"
+	EntityTypeColorRequest = "color_request"
 	EntityTypeTheme             = "theme"
 )
 

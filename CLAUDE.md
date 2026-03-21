@@ -228,7 +228,7 @@ Response (JSON)
 **Color-Based Access Control:**
 - Users have assigned colors, dogs have required colors
 - Users can only book dogs whose color they possess
-- Colors are customizable per tenant (not fixed to green/blue/orange)
+- Colors are fully dynamic and customizable per tenant (admin defines names, hex codes, sort order)
 - ALL users (including Admins) must have the dog's color to book
 - Frontend shows locked dogs with 🔒 icon
 
@@ -914,8 +914,7 @@ ${dog.photo ? `<img src="/uploads/${dog.photo}" ...>` : 'fallback'}
 
 **Placeholder Strategy:**
 - Dogs without photos show SVG placeholders
-- Category-specific colors: green, blue, orange
-- Files: `frontend/assets/images/placeholders/dog-placeholder-{category}.svg`
+- Placeholder colors match each dog's assigned color category
 - Fallback: `dog-placeholder.svg` (generic)
 
 **Upload UI (admin-dogs.html):**
