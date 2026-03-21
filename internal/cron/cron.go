@@ -35,6 +35,7 @@ type CronService struct {
 	emailService           *services.EmailService
 	demoSeedService        *services.DemoSeedService
 	tenantActivityChecker  *TenantActivityChecker
+	saasMode               bool
 	stopChan               chan bool
 	stopOnce               sync.Once
 }
@@ -51,10 +52,19 @@ func NewCronService(db *database.DB, cfg *config.Config) *CronService {
 		}
 	}
 
-	// Only create demo seed service if config is provided (requires valid config for domain info)
+	// Determine if running in SaaS mode
+	saasMode := cfg != nil && cfg.BaseDomain != ""
+
+	// Only create demo seed service in SaaS mode
 	var demoSeedService *services.DemoSeedService
-	if cfg != nil {
+	if saasMode {
 		demoSeedService = services.NewDemoSeedService(db, cfg)
+	}
+
+	// Only create tenant activity checker in SaaS mode
+	var tenantActivityChecker *TenantActivityChecker
+	if saasMode {
+		tenantActivityChecker = NewTenantActivityChecker(db, 30) // Default 30 days inactivity
 	}
 
 	return &CronService{
@@ -66,7 +76,8 @@ func NewCronService(db *database.DB, cfg *config.Config) *CronService {
 		demoStateRepo:         repository.NewDemoTenantRepository(db),
 		emailService:          emailService,
 		demoSeedService:       demoSeedService,
-		tenantActivityChecker: NewTenantActivityChecker(db, 30), // Default 30 days inactivity
+		tenantActivityChecker: tenantActivityChecker,
+		saasMode:              saasMode,
 		stopChan:              make(chan bool),
 	}
 }
@@ -84,12 +95,15 @@ func (s *CronService) Start() {
 	// Run booking reminder job every 15 minutes
 	go s.runPeriodically("Send booking reminders", 15*time.Minute, s.sendBookingReminders)
 
-	// Run demo reset job daily at midnight (Europe/Berlin time)
-	go s.runDaily("Demo tenant reset", 0, 0, s.resetDemoTenant)
+	// SaaS-Mode only: demo reset and tenant activity check
+	if s.saasMode {
+		// Run demo reset job daily at midnight (Europe/Berlin time)
+		go s.runDaily("Demo tenant reset", 0, 0, s.resetDemoTenant)
 
-	// Run tenant activity check daily at 4am (Europe/Berlin time)
-	// This flags inactive tenants for admin review
-	go s.runDaily("Check tenant activity", 4, 0, s.checkTenantActivity)
+		// Run tenant activity check daily at 4am (Europe/Berlin time)
+		// This flags inactive tenants for admin review
+		go s.runDaily("Check tenant activity", 4, 0, s.checkTenantActivity)
+	}
 }
 
 // checkTenantActivity checks all tenants for inactivity

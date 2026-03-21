@@ -173,11 +173,13 @@ func main() {
 	// Initialize business metrics collection
 	middleware.InitBusinessMetrics(db)
 
-	// Demo tenant: Ensure demo tenant exists with sample data
-	demoSeedService := services.NewDemoSeedService(db, cfg)
-	if err := demoSeedService.EnsureDemoTenant(); err != nil {
-		log.Printf("Warning: Failed to ensure demo tenant: %v", err)
-		// Don't exit - demo is optional
+	// Demo tenant: Ensure demo tenant exists with sample data (SaaS-Mode only)
+	if cfg.BaseDomain != "" {
+		demoSeedService := services.NewDemoSeedService(db, cfg)
+		if err := demoSeedService.EnsureDemoTenant(); err != nil {
+			log.Printf("Warning: Failed to ensure demo tenant: %v", err)
+			// Don't exit - demo is optional
+		}
 	}
 
 	// Local development: Handle tenant reset commands (only in local dev mode)
