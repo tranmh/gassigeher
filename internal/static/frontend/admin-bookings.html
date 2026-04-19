@@ -93,6 +93,12 @@
                         </select>
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
+                        <label data-i18n="bookings.filter_dog">Hund</label>
+                        <select id="filter-dog-id">
+                            <option value="" data-i18n="dogs.all_dogs">Alle Hunde</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
                         <label data-i18n="bookings.date">Datum ab</label>
                         <input type="date" id="filter-date-from">
                     </div>
@@ -169,12 +175,29 @@
             // Initialize impersonation banner (shows if impersonating)
             await ImpersonationBanner.init();
 
+            await loadDogsForFilter();
             loadBookings();
             loadPendingApprovals();
 
             // Refresh pending approvals every 30 seconds
             setInterval(loadPendingApprovals, 30000);
         });
+
+        async function loadDogsForFilter() {
+            try {
+                const allDogs = await api.getDogs();
+                const dogSelect = document.getElementById('filter-dog-id');
+                allDogs.forEach(dog => {
+                    dogs[dog.id] = dog;
+                    const option = document.createElement('option');
+                    option.value = dog.id;
+                    option.textContent = dog.name;
+                    dogSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Failed to load dogs for filter:', error);
+            }
+        }
 
         async function loadBookings() {
             try {
@@ -186,6 +209,7 @@
                 const userIds = [...new Set(bookings.map(b => b.user_id))];
 
                 await Promise.all(dogIds.map(async (id) => {
+                    if (dogs[id]) return;
                     try {
                         dogs[id] = await api.getDog(id);
                     } catch (error) {
@@ -202,10 +226,12 @@
         function getFilters() {
             const filters = {};
             const status = document.getElementById('filter-status').value;
+            const dogId = document.getElementById('filter-dog-id').value;
             const dateFrom = document.getElementById('filter-date-from').value;
             const dateTo = document.getElementById('filter-date-to').value;
 
             if (status) filters.status = status;
+            if (dogId) filters.dog_id = dogId;
             if (dateFrom) filters.date_from = dateFrom;
             if (dateTo) filters.date_to = dateTo;
 
@@ -218,6 +244,7 @@
 
         function resetFilters() {
             document.getElementById('filter-status').value = '';
+            document.getElementById('filter-dog-id').value = '';
             document.getElementById('filter-date-from').value = '';
             document.getElementById('filter-date-to').value = '';
             loadBookings();

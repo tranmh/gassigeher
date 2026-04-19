@@ -430,6 +430,98 @@ func TestBookingHandler_ListBookings(t *testing.T) {
 	})
 }
 
+// TestBookingHandler_ListBookings_FilterByDogID locks in that admins can narrow the
+// bookings list by passing ?dog_id=<id>. The UI at /admin-bookings.html relies on
+// this to power its "filter by dog" dropdown.
+func TestBookingHandler_ListBookings_FilterByDogID(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewBookingHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admin-dog-filter@example.com", "Admin", "blue")
+	dogAID := testutil.SeedTestDog(t, db, "Bella", "Labrador", "green")
+	dogBID := testutil.SeedTestDog(t, db, "Rex", "Shepherd", "green")
+
+	date1 := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
+	date2 := time.Now().AddDate(0, 0, 2).Format("2006-01-02")
+	date3 := time.Now().AddDate(0, 0, 3).Format("2006-01-02")
+
+	testutil.SeedTestBooking(t, db, adminID, dogAID, date1, "09:00", "scheduled")
+	testutil.SeedTestBooking(t, db, adminID, dogAID, date2, "10:00", "scheduled")
+	testutil.SeedTestBooking(t, db, adminID, dogBID, date3, "11:00", "scheduled")
+
+	t.Run("admin without filter sees all bookings", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/bookings", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin-dog-filter@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ListBookings(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+
+		var bookings []map[string]interface{}
+		if err := json.Unmarshal(rec.Body.Bytes(), &bookings); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
+		if len(bookings) != 3 {
+			t.Errorf("Expected 3 bookings without filter, got %d", len(bookings))
+		}
+	})
+
+	t.Run("admin with ?dog_id= sees only that dog's bookings", func(t *testing.T) {
+		url := fmt.Sprintf("/api/bookings?dog_id=%d", dogBID)
+		req := httptest.NewRequest("GET", url, nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin-dog-filter@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ListBookings(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+
+		var bookings []map[string]interface{}
+		if err := json.Unmarshal(rec.Body.Bytes(), &bookings); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
+		if len(bookings) != 1 {
+			t.Fatalf("Expected exactly 1 booking for dogB, got %d", len(bookings))
+		}
+		gotDogID, _ := bookings[0]["dog_id"].(float64)
+		if int(gotDogID) != dogBID {
+			t.Errorf("Expected booking dog_id=%d, got %v", dogBID, bookings[0]["dog_id"])
+		}
+	})
+
+	t.Run("admin with ?dog_id= for dog with no bookings sees empty list", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/api/bookings?dog_id=99999", nil)
+		ctx := contextWithUser(req.Context(), adminID, "admin-dog-filter@example.com", true)
+		req = req.WithContext(ctx)
+
+		rec := httptest.NewRecorder()
+		handler.ListBookings(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+
+		var bookings []map[string]interface{}
+		if err := json.Unmarshal(rec.Body.Bytes(), &bookings); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
+		if len(bookings) != 0 {
+			t.Errorf("Expected 0 bookings for unknown dog, got %d", len(bookings))
+		}
+	})
+}
+
 // TestBookingHandler_ListBookings_AdminReceivesUserNames verifies that when an admin
 // lists bookings, each booking's JSON payload includes the booker's first_name and
 // last_name under the `user` field — so the admin UI can display the real name
