@@ -50,8 +50,8 @@ func NewBookingRepository(db DBExecutor) *BookingRepository {
 // SaaS: Now includes tenant_id for multi-tenancy
 func (r *BookingRepository) Create(booking *models.Booking) error {
 	query := `
-		INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, requires_approval, approval_status, recurrence_id, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, requires_approval, approval_status, recurrence_id, created_by_admin, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	now := time.Now()
@@ -79,6 +79,7 @@ func (r *BookingRepository) Create(booking *models.Booking) error {
 		r.db.BoolValue(booking.RequiresApproval),
 		booking.ApprovalStatus,
 		booking.RecurrenceID,
+		booking.CreatedByAdmin,
 		now,
 		now,
 	)
@@ -100,6 +101,7 @@ func (r *BookingRepository) FindByID(id int) (*models.Booking, error) {
 	query := `
 		SELECT id, tenant_id, user_id, dog_id, date, scheduled_time, status,
 		       completed_at, user_notes, admin_cancellation_reason, recurrence_id,
+		       created_by_admin,
 		       created_at, updated_at
 		FROM bookings
 		WHERE id = ?
@@ -108,6 +110,7 @@ func (r *BookingRepository) FindByID(id int) (*models.Booking, error) {
 	booking := &models.Booking{}
 	var tenantID sql.NullInt64
 	var recurrenceID sql.NullInt64
+	var createdByAdmin sql.NullInt64
 	err := r.db.QueryRow(query, id).Scan(
 		&booking.ID,
 		&tenantID,
@@ -120,6 +123,7 @@ func (r *BookingRepository) FindByID(id int) (*models.Booking, error) {
 		&booking.UserNotes,
 		&booking.AdminCancellationReason,
 		&recurrenceID,
+		&createdByAdmin,
 		&booking.CreatedAt,
 		&booking.UpdatedAt,
 	)
@@ -138,6 +142,10 @@ func (r *BookingRepository) FindByID(id int) (*models.Booking, error) {
 	if recurrenceID.Valid {
 		rid := int(recurrenceID.Int64)
 		booking.RecurrenceID = &rid
+	}
+	if createdByAdmin.Valid {
+		cid := int(createdByAdmin.Int64)
+		booking.CreatedByAdmin = &cid
 	}
 	booking.Date = normalizeDate(booking.Date)
 	return booking, nil

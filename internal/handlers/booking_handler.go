@@ -278,6 +278,117 @@ func (h *BookingHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusCreated, booking)
 }
 
+// AdminCreateBooking creates a booking on behalf of another user. This is the
+// documentation pathway for spontaneous walks: an admin records that a walker
+// is about to walk (or has just walked) a dog. Policy checks that apply to
+// self-service bookings (color, past-date, advance limit, blocked dates, time
+// rules, daily limit, period availability, approval workflow) are intentionally
+// skipped. Hard integrity checks (user/dog exist, user active, dog available,
+// no exact double-booking) still apply. The creating admin's ID is recorded
+// in created_by_admin for audit.
+func (h *BookingHandler) AdminCreateBooking(w http.ResponseWriter, r *http.Request) {
+	adminID, ok := r.Context().Value(middleware.UserIDKey).(int)
+	if !ok {
+		respondError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	// Defence-in-depth: RequireAdmin middleware already gates this route,
+	// but verify again in the handler in case of misconfiguration.
+	isAdmin, _ := r.Context().Value(middleware.IsAdminKey).(bool)
+	if !isAdmin {
+		respondError(w, http.StatusForbidden, "Admin privileges required")
+		return
+	}
+	tenantID, ok := r.Context().Value(middleware.TenantIDKey).(int)
+	if !ok {
+		respondError(w, http.StatusInternalServerError, "Request validation failed")
+		return
+	}
+
+	var req models.AdminCreateBookingRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+	if err := req.Validate(); err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Target user must exist in this tenant and not be deleted or deactivated
+	targetUser, err := h.userRepo.FindByIDAndTenant(req.UserID, tenantID)
+	if err != nil {
+		if isNotFoundOrTenantError(err) {
+			respondError(w, http.StatusNotFound, "User not found")
+			return
+		}
+		respondError(w, http.StatusInternalServerError, "Failed to get user")
+		return
+	}
+	if targetUser.IsDeleted {
+		respondError(w, http.StatusBadRequest, "User account is deleted")
+		return
+	}
+	if !targetUser.IsActive {
+		respondError(w, http.StatusBadRequest, "User account is deactivated")
+		return
+	}
+
+	// Dog must exist in this tenant and be available
+	dog, err := h.dogRepo.FindByIDAndTenant(req.DogID, tenantID)
+	if err != nil {
+		if isNotFoundOrTenantError(err) {
+			respondError(w, http.StatusNotFound, "Dog not found")
+			return
+		}
+		respondError(w, http.StatusInternalServerError, "Failed to get dog")
+		return
+	}
+	if !dog.IsAvailable {
+		respondError(w, http.StatusBadRequest, "Dog is currently unavailable")
+		return
+	}
+
+	// Hard integrity: refuse exact double-booking for the same slot
+	alreadyBooked, err := h.bookingRepo.CheckDoubleBooking(tenantID, req.DogID, req.Date, req.ScheduledTime)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to check double booking")
+		return
+	}
+	if alreadyBooked {
+		respondError(w, http.StatusConflict, "This dog is already booked for this time")
+		return
+	}
+
+	booking := &models.Booking{
+		TenantID:         tenantID,
+		UserID:           req.UserID,
+		DogID:            req.DogID,
+		Date:             req.Date,
+		ScheduledTime:    req.ScheduledTime,
+		RequiresApproval: false,
+		ApprovalStatus:   "approved",
+		CreatedByAdmin:   &adminID,
+	}
+
+	if err := h.bookingRepo.Create(booking); err != nil {
+		if isUniqueConstraintError(err.Error()) {
+			respondError(w, http.StatusConflict, "This dog is already booked for this time")
+			return
+		}
+		respondError(w, http.StatusInternalServerError, "Failed to create booking")
+		return
+	}
+
+	h.userRepo.UpdateLastActivity(req.UserID)
+
+	if targetUser.Email != nil && h.emailService != nil {
+		go h.emailService.SendBookingConfirmation(*targetUser.Email, targetUser.FirstName, dog.Name, booking.Date, booking.ScheduledTime)
+	}
+
+	respondJSON(w, http.StatusCreated, booking)
+}
+
 // ListBookings lists bookings
 func (h *BookingHandler) ListBookings(w http.ResponseWriter, r *http.Request) {
 	// Get user ID and admin status from context

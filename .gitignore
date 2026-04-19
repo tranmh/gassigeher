@@ -57,3 +57,7 @@ testdata/rapid/
 internal/static/frontend/assets/css/main.css
 internal/static/frontend/assets/css/main.css.map
 thgp
+
+# Local docker-compose bind-mount data (postgres, minio, caddy, prometheus secrets, etc.)
+# These end up root-owned by container processes and must not be committed.
+data/

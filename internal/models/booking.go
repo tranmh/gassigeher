@@ -25,6 +25,9 @@ type Booking struct {
 	ApprovedAt       *time.Time `json:"approved_at,omitempty"`
 	RejectionReason  *string    `json:"rejection_reason,omitempty"`
 
+	// Admin-on-behalf audit: set when an admin created the booking for another user
+	CreatedByAdmin *int `json:"created_by_admin,omitempty"`
+
 	// Recurring booking link
 	RecurrenceID *int `json:"recurrence_id,omitempty"`
 
@@ -38,6 +41,46 @@ type CreateBookingRequest struct {
 	DogID         int    `json:"dog_id"`
 	Date          string `json:"date"`           // YYYY-MM-DD
 	ScheduledTime string `json:"scheduled_time"` // HH:MM
+}
+
+// AdminCreateBookingRequest represents an admin request to create a booking on behalf of another user
+type AdminCreateBookingRequest struct {
+	UserID        int    `json:"user_id"`        // Target user the booking is recorded for
+	DogID         int    `json:"dog_id"`
+	Date          string `json:"date"`           // YYYY-MM-DD
+	ScheduledTime string `json:"scheduled_time"` // HH:MM
+}
+
+// Validate validates the admin-create booking request.
+// Policy checks (color, advance-days, past-date, blocked-dates, time rules) are
+// intentionally skipped here and in the handler; this is a documentation pathway
+// for admins recording spontaneous walks.
+func (r *AdminCreateBookingRequest) Validate() error {
+	if r.UserID <= 0 {
+		return &ValidationError{Field: "user_id", Message: "User ID is required"}
+	}
+
+	if r.DogID <= 0 {
+		return &ValidationError{Field: "dog_id", Message: "Dog ID is required"}
+	}
+
+	if r.Date == "" {
+		return &ValidationError{Field: "date", Message: "Date is required"}
+	}
+
+	if _, err := time.Parse("2006-01-02", r.Date); err != nil {
+		return &ValidationError{Field: "date", Message: "Date must be in YYYY-MM-DD format"}
+	}
+
+	if r.ScheduledTime == "" {
+		return &ValidationError{Field: "scheduled_time", Message: "Scheduled time is required"}
+	}
+
+	if _, err := time.Parse("15:04", r.ScheduledTime); err != nil {
+		return &ValidationError{Field: "scheduled_time", Message: "Scheduled time must be in HH:MM format"}
+	}
+
+	return nil
 }
 
 // CancelBookingRequest represents a request to cancel a booking

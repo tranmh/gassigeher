@@ -596,6 +596,7 @@ func main() {
 
 	// Booking management (admin only)
 	admin.HandleFunc("/bookings/{id}/move", bookingHandler.MoveBooking).Methods("PUT")
+	admin.HandleFunc("/admin/bookings", bookingHandler.AdminCreateBooking).Methods("POST")
 
 	// System settings (admin only)
 	admin.HandleFunc("/settings", settingsHandler.GetAllSettings).Methods("GET")

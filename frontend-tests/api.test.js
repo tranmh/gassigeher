@@ -418,6 +418,31 @@ describe('API class - Booking Endpoints', () => {
     }));
   });
 
+  test('adminCreateBooking should POST to /admin/bookings with on-behalf payload', async () => {
+    await window.api.adminCreateBooking({
+      user_id: 42,
+      dog_id: 7,
+      date: '2026-04-19',
+      scheduled_time: '15:30',
+    });
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/bookings', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: 42,
+        dog_id: 7,
+        date: '2026-04-19',
+        scheduled_time: '15:30',
+      }),
+    }));
+  });
+
+  test('adminCreateBooking surfaces server errors', async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ error: 'This dog is already booked for this time' }, false, 409));
+    await expect(window.api.adminCreateBooking({
+      user_id: 1, dog_id: 1, date: '2026-04-19', scheduled_time: '10:00',
+    })).rejects.toThrow(/already booked/);
+  });
+
   test('moveBooking should PUT new date and time', async () => {
     await window.api.moveBooking(10, '2025-02-01', '10:00', 'Rescheduled');
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/bookings/10/move', expect.objectContaining({

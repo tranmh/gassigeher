@@ -1940,3 +1940,222 @@ func TestBookingHandler_MoveBookingDailyLimit(t *testing.T) {
 		}
 	})
 }
+
+// TestBookingHandler_AdminCreateBooking verifies the admin-on-behalf booking endpoint.
+// This is the spontaneous-walk documentation feature: admin creates a booking for a
+// named walker, bypassing policy checks (color, past-date, advance limit, blocked dates,
+// time rules) but keeping hard integrity checks (user/dog exist, not deleted, no
+// exact double-booking).
+func TestBookingHandler_AdminCreateBooking(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{JWTSecret: "test-secret"}
+	handler := NewBookingHandler(db, cfg)
+
+	adminID := testutil.SeedTestUser(t, db, "admincreate-admin@example.com", "Admin", "orange")
+	// Walker has only green (first color); dog-orange requires the 3rd color ⇒ color mismatch
+	walkerID := testutil.SeedTestUser(t, db, "admincreate-walker@example.com", "Walker", "green")
+	dogOrangeID := testutil.SeedTestDog(t, db, "AdminCreateDogOrange", "Husky", "orange")
+	dogGreenID := testutil.SeedTestDog(t, db, "AdminCreateDogGreen", "Lab", "green")
+
+	post := func(t *testing.T, payload map[string]interface{}, callerID int, isAdmin bool) *httptest.ResponseRecorder {
+		t.Helper()
+		body, _ := json.Marshal(payload)
+		req := httptest.NewRequest("POST", "/api/v1/admin/bookings", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := contextWithUser(req.Context(), callerID, "admincreate-admin@example.com", isAdmin)
+		req = req.WithContext(ctx)
+		rec := httptest.NewRecorder()
+		handler.AdminCreateBooking(rec, req)
+		return rec
+	}
+
+	t.Run("admin can create booking for another user", func(t *testing.T) {
+		rec := post(t, map[string]interface{}{
+			"user_id":        walkerID,
+			"dog_id":         dogGreenID,
+			"date":           "2026-06-01",
+			"scheduled_time": "10:00",
+		}, adminID, true)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("expected 201, got %d. body=%s", rec.Code, rec.Body.String())
+		}
+		var b models.Booking
+		if err := json.Unmarshal(rec.Body.Bytes(), &b); err != nil {
+			t.Fatalf("unmarshal: %v", err)
+		}
+		if b.UserID != walkerID {
+			t.Errorf("expected UserID=%d, got %d", walkerID, b.UserID)
+		}
+		if b.DogID != dogGreenID {
+			t.Errorf("expected DogID=%d, got %d", dogGreenID, b.DogID)
+		}
+		if b.ApprovalStatus != "approved" {
+			t.Errorf("expected approval_status=approved, got %q", b.ApprovalStatus)
+		}
+		if b.CreatedByAdmin == nil || *b.CreatedByAdmin != adminID {
+			got := 0
+			if b.CreatedByAdmin != nil {
+				got = *b.CreatedByAdmin
+			}
+			t.Errorf("expected created_by_admin=%d, got %d", adminID, got)
+		}
+	})
+
+	t.Run("non-admin caller is forbidden", func(t *testing.T) {
+		rec := post(t, map[string]interface{}{
+			"user_id":        walkerID,
+			"dog_id":         dogGreenID,
+			"date":           "2026-06-02",
+			"scheduled_time": "10:00",
+		}, walkerID, false)
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("expected 403, got %d. body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("skips color check", func(t *testing.T) {
+		// Walker only has green; dog requires orange. Regular CreateBooking would reject (403 color).
+		rec := post(t, map[string]interface{}{
+			"user_id":        walkerID,
+			"dog_id":         dogOrangeID,
+			"date":           "2026-06-03",
+			"scheduled_time": "10:00",
+		}, adminID, true)
+		if rec.Code != http.StatusCreated {
+			t.Errorf("expected 201 (color check skipped for admin-create), got %d. body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("allows past date and past time", func(t *testing.T) {
+		rec := post(t, map[string]interface{}{
+			"user_id":        walkerID,
+			"dog_id":         dogGreenID,
+			"date":           "2020-01-15",
+			"scheduled_time": "08:00",
+		}, adminID, true)
+		if rec.Code != http.StatusCreated {
+			t.Errorf("expected 201 (past-date allowed for admin documentation), got %d. body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("allows date beyond advance-days limit", func(t *testing.T) {
+		// Default advance_days is 14; 90 days out should normally fail
+		farFuture := time.Now().AddDate(0, 0, 90).Format("2006-01-02")
+		rec := post(t, map[string]interface{}{
+			"user_id":        walkerID,
+			"dog_id":         dogGreenID,
+			"date":           farFuture,
+			"scheduled_time": "10:00",
+		}, adminID, true)
+		if rec.Code != http.StatusCreated {
+			t.Errorf("expected 201 (advance limit skipped for admin), got %d. body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("allows blocked date", func(t *testing.T) {
+		blocked := "2026-12-25"
+		testutil.SeedTestBlockedDate(t, db, blocked, "Christmas", adminID)
+		rec := post(t, map[string]interface{}{
+			"user_id":        walkerID,
+			"dog_id":         dogGreenID,
+			"date":           blocked,
+			"scheduled_time": "10:00",
+		}, adminID, true)
+		if rec.Code != http.StatusCreated {
+			t.Errorf("expected 201 (blocked date skipped for admin), got %d. body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("unknown user → 404", func(t *testing.T) {
+		rec := post(t, map[string]interface{}{
+			"user_id":        999999,
+			"dog_id":         dogGreenID,
+			"date":           "2026-06-04",
+			"scheduled_time": "10:00",
+		}, adminID, true)
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("expected 404, got %d. body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("inactive user → 400", func(t *testing.T) {
+		inactiveID := testutil.SeedTestUser(t, db, "admincreate-inactive@example.com", "Inactive Walker", "green")
+		if _, err := db.Exec("UPDATE users SET is_active = ? WHERE id = ?", db.BoolValue(false), inactiveID); err != nil {
+			t.Fatalf("deactivate user: %v", err)
+		}
+		rec := post(t, map[string]interface{}{
+			"user_id":        inactiveID,
+			"dog_id":         dogGreenID,
+			"date":           "2026-06-05",
+			"scheduled_time": "10:00",
+		}, adminID, true)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d. body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("unknown dog → 404", func(t *testing.T) {
+		rec := post(t, map[string]interface{}{
+			"user_id":        walkerID,
+			"dog_id":         999999,
+			"date":           "2026-06-06",
+			"scheduled_time": "10:00",
+		}, adminID, true)
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("expected 404, got %d. body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("unavailable dog → 400", func(t *testing.T) {
+		unavailID := testutil.SeedTestDog(t, db, "UnavailableDog", "Bulldog", "green")
+		if _, err := db.Exec("UPDATE dogs SET is_available = ? WHERE id = ?", db.BoolValue(false), unavailID); err != nil {
+			t.Fatalf("mark unavailable: %v", err)
+		}
+		rec := post(t, map[string]interface{}{
+			"user_id":        walkerID,
+			"dog_id":         unavailID,
+			"date":           "2026-06-07",
+			"scheduled_time": "10:00",
+		}, adminID, true)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d. body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("double-booking → 409", func(t *testing.T) {
+		testutil.SeedTestBooking(t, db, walkerID, dogGreenID, "2026-07-01", "10:00", "scheduled")
+		rec := post(t, map[string]interface{}{
+			"user_id":        walkerID,
+			"dog_id":         dogGreenID,
+			"date":           "2026-07-01",
+			"scheduled_time": "10:00",
+		}, adminID, true)
+		if rec.Code != http.StatusConflict {
+			t.Errorf("expected 409, got %d. body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("invalid request (missing user_id) → 400", func(t *testing.T) {
+		rec := post(t, map[string]interface{}{
+			"dog_id":         dogGreenID,
+			"date":           "2026-06-08",
+			"scheduled_time": "10:00",
+		}, adminID, true)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d. body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("invalid date format → 400", func(t *testing.T) {
+		rec := post(t, map[string]interface{}{
+			"user_id":        walkerID,
+			"dog_id":         dogGreenID,
+			"date":           "01-06-2026",
+			"scheduled_time": "10:00",
+		}, adminID, true)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d. body=%s", rec.Code, rec.Body.String())
+		}
+	})
+}

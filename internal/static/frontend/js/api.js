@@ -364,6 +364,15 @@ class API {
         });
     }
 
+    async adminCreateBooking({ user_id, dog_id, date, scheduled_time }) {
+        return this.request('POST', '/admin/bookings', {
+            user_id,
+            dog_id,
+            date,
+            scheduled_time
+        });
+    }
+
     async addBookingNotes(id, notes) {
         return this.request('PUT', `/bookings/${id}/notes`, { notes });
     }

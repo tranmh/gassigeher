@@ -59,6 +59,10 @@
 
             <div id="alert-container"></div>
 
+            <div style="margin-bottom: 20px;">
+                <button class="btn" data-action="open-admin-create-booking" data-i18n="bookings.admin_create">Neue Buchung</button>
+            </div>
+
             <!-- Pending Approvals Section -->
             <section class="card" id="pending-approvals-section" style="display: none;">
                 <h2>Genehmigungsanfragen <span id="pending-count" class="badge" style="background: var(--color-primary, #82b965); color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.9rem;">0</span></h2>
@@ -118,6 +122,44 @@
         </div>
     </main>
 
+    <!-- Admin Create Booking Modal -->
+    <div id="admin-create-booking-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 data-i18n="bookings.admin_create_title">Buchung für Gassigeher erstellen</h3>
+                <button class="modal-close" data-action="close-admin-create-booking">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="admin-create-booking-form">
+                    <div class="form-group">
+                        <label for="acb-user" data-i18n="bookings.select_user">Gassigeher</label>
+                        <select id="acb-user" required>
+                            <option value="">—</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="acb-dog" data-i18n="bookings.select_dog">Hund</label>
+                        <select id="acb-dog" required>
+                            <option value="">—</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="acb-date" data-i18n="bookings.date">Datum</label>
+                        <input type="date" id="acb-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="acb-time" data-i18n="bookings.time">Uhrzeit</label>
+                        <input type="time" id="acb-time" required>
+                    </div>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button type="button" class="btn btn-secondary" data-action="close-admin-create-booking" data-i18n="common.cancel">Abbrechen</button>
+                        <button type="submit" class="btn" data-i18n="common.save">Speichern</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script src="/js/logo-banner.js"></script>
     <script src="/js/nav-menu.js"></script>
     <script src="/js/i18n.js"></script>
@@ -138,7 +180,9 @@
             'move-booking': function(e, id) { e.preventDefault(); moveBooking(parseInt(id)); },
             'cancel-booking': function(e, id) { e.preventDefault(); cancelBooking(parseInt(id)); },
             'approve-booking': function(e, id) { e.preventDefault(); approveBooking(parseInt(id)); },
-            'reject-booking': function(e, id) { e.preventDefault(); rejectBooking(parseInt(id)); }
+            'reject-booking': function(e, id) { e.preventDefault(); rejectBooking(parseInt(id)); },
+            'open-admin-create-booking': function(e) { e.preventDefault(); openAdminCreateBookingModal(); },
+            'close-admin-create-booking': function(e) { e.preventDefault(); closeAdminCreateBookingModal(); }
         });
 
         document.addEventListener('DOMContentLoaded', async () => {
@@ -411,6 +455,77 @@
             container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
             setTimeout(() => container.innerHTML = '', 5000);
         }
+
+        async function openAdminCreateBookingModal() {
+            const userSelect = document.getElementById('acb-user');
+            const dogSelect = document.getElementById('acb-dog');
+
+            userSelect.innerHTML = '<option value="">—</option>';
+            dogSelect.innerHTML = '<option value="">—</option>';
+
+            try {
+                const [allUsers, allDogs] = await Promise.all([
+                    api.getUsers(true),
+                    api.getDogs()
+                ]);
+                (allUsers || []).forEach(u => {
+                    const opt = document.createElement('option');
+                    opt.value = u.id;
+                    const name = `${u.first_name || ''} ${u.last_name || ''}`.trim() || `#${u.id}`;
+                    opt.textContent = name;
+                    userSelect.appendChild(opt);
+                });
+                (allDogs || []).forEach(d => {
+                    const opt = document.createElement('option');
+                    opt.value = d.id;
+                    opt.textContent = d.name;
+                    dogSelect.appendChild(opt);
+                });
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Laden der Auswahl');
+                return;
+            }
+
+            document.getElementById('admin-create-booking-modal').style.display = 'flex';
+        }
+
+        function closeAdminCreateBookingModal() {
+            document.getElementById('admin-create-booking-modal').style.display = 'none';
+            const form = document.getElementById('admin-create-booking-form');
+            if (form) form.reset();
+        }
+
+        async function submitAdminCreateBooking(e) {
+            e.preventDefault();
+            const userId = parseInt(document.getElementById('acb-user').value, 10);
+            const dogId = parseInt(document.getElementById('acb-dog').value, 10);
+            const date = document.getElementById('acb-date').value;
+            const time = document.getElementById('acb-time').value;
+
+            if (!userId || !dogId || !date || !time) {
+                showAlert('error', 'Bitte alle Felder ausfüllen');
+                return;
+            }
+
+            try {
+                await api.adminCreateBooking({
+                    user_id: userId,
+                    dog_id: dogId,
+                    date: date,
+                    scheduled_time: time
+                });
+                closeAdminCreateBookingModal();
+                showAlert('success', 'Buchung erstellt');
+                loadBookings();
+            } catch (error) {
+                showAlert('error', error.message || 'Fehler beim Erstellen der Buchung');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('admin-create-booking-form');
+            if (form) form.addEventListener('submit', submitAdminCreateBooking);
+        });
     </script>
 </body>
 </html>

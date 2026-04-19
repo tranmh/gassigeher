@@ -290,6 +290,68 @@ func TestBookingRepository_FindByID(t *testing.T) {
 	})
 }
 
+// TestBookingRepository_CreatedByAdminRoundtrip verifies that the created_by_admin
+// column is persisted by Create and read back by FindByID. This guards against
+// silent data loss where the handler would return a correctly-populated response
+// body (echoing the in-memory struct) even if the column were dropped on INSERT.
+//
+// Uses dialect-aware testutil.SeedTest* helpers (not the local setupTestDB) so
+// the test runs on both SQLite and PostgreSQL.
+func TestBookingRepository_CreatedByAdminRoundtrip(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+
+	walkerID := testutil.SeedTestUser(t, db, "roundtrip-walker@example.com", "Walker", "green")
+	adminID := testutil.SeedTestUser(t, db, "roundtrip-admin@example.com", "Admin", "orange")
+	dogAID := testutil.SeedTestDog(t, db, "RoundtripDogA", "Labrador", "green")
+	dogBID := testutil.SeedTestDog(t, db, "RoundtripDogB", "Husky", "green")
+
+	repo := NewBookingRepository(db)
+
+	t.Run("self-created booking has nil created_by_admin", func(t *testing.T) {
+		booking := &models.Booking{
+			UserID:        walkerID,
+			DogID:         dogAID,
+			Date:          "2025-12-10",
+			ScheduledTime: "09:00",
+		}
+		if err := repo.Create(booking); err != nil {
+			t.Fatalf("Create() failed: %v", err)
+		}
+
+		found, err := repo.FindByID(booking.ID)
+		if err != nil {
+			t.Fatalf("FindByID() failed: %v", err)
+		}
+		if found.CreatedByAdmin != nil {
+			t.Errorf("expected CreatedByAdmin=nil for self-created booking, got %d", *found.CreatedByAdmin)
+		}
+	})
+
+	t.Run("admin-created booking persists and returns admin id", func(t *testing.T) {
+		booking := &models.Booking{
+			UserID:         walkerID,
+			DogID:          dogBID,
+			Date:           "2025-12-11",
+			ScheduledTime:  "10:00",
+			CreatedByAdmin: &adminID,
+		}
+		if err := repo.Create(booking); err != nil {
+			t.Fatalf("Create() failed: %v", err)
+		}
+
+		found, err := repo.FindByID(booking.ID)
+		if err != nil {
+			t.Fatalf("FindByID() failed: %v", err)
+		}
+		if found.CreatedByAdmin == nil {
+			t.Fatalf("expected CreatedByAdmin=%d, got nil", adminID)
+		}
+		if *found.CreatedByAdmin != adminID {
+			t.Errorf("expected CreatedByAdmin=%d, got %d", adminID, *found.CreatedByAdmin)
+		}
+	})
+}
+
 // DONE: TestBookingRepository_FindAll tests listing bookings with filters
 func TestBookingRepository_FindAll(t *testing.T) {
 	db := setupTestDB(t)
