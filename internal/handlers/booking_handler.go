@@ -334,8 +334,9 @@ func (h *BookingHandler) ListBookings(w http.ResponseWriter, r *http.Request) {
 		filter.UserID = &uid
 	}
 
-	// Get bookings - include user names if requested (for calendar view)
-	includeUser := r.URL.Query().Get("include_user") == "true" && isCalendarView
+	// Get bookings - include user names for admins (to identify bookers in admin UI)
+	// or when explicitly requested for calendar availability view.
+	includeUser := isAdmin || (r.URL.Query().Get("include_user") == "true" && isCalendarView)
 	var bookings []*models.Booking
 	var err error
 	if includeUser {

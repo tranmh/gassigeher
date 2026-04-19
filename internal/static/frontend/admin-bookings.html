@@ -234,6 +234,8 @@
             container.innerHTML = bookings.map(booking => {
                 const dog = dogs[booking.dog_id] || { name: `Hund #${booking.dog_id}` };
                 const safeDogName = sanitizeHTML(dog.name);
+                const fullName = booking.user ? `${booking.user.first_name || ''} ${booking.user.last_name || ''}`.trim() : '';
+                const safeUserName = fullName ? sanitizeHTML(fullName) : `User #${booking.user_id}`;
                 const safeCancellationReason = booking.admin_cancellation_reason ? sanitizeHTML(booking.admin_cancellation_reason) : '';
                 const safeUserNotes = booking.user_notes ? sanitizeHTML(booking.user_notes) : '';
                 const statusClass = booking.status === 'cancelled' ? 'alert-error' : (booking.status === 'completed' ? 'alert-success' : 'alert-info');
@@ -247,7 +249,7 @@
                                     <span class="alert ${statusClass}" style="padding: 4px 12px; font-size: 0.8rem; margin: 0;">${getStatusLabel(booking.status)}</span>
                                 </div>
                                 <p style="margin: 5px 0; color: #666;">
-                                    <strong>Benutzer:</strong> User #${booking.user_id}
+                                    <strong>Benutzer:</strong> ${safeUserName}
                                 </p>
                                 <p style="margin: 5px 0;">
                                     📅 ${booking.date} - ${booking.scheduled_time} Uhr
@@ -330,11 +332,13 @@
 
                 pendingBookings.forEach(booking => {
                     const safeDogName = booking.dog_name ? sanitizeHTML(booking.dog_name) : `Hund #${booking.dog_id}`;
+                    const fullName = booking.user ? `${booking.user.first_name || ''} ${booking.user.last_name || ''}`.trim() : '';
+                    const safeUserName = fullName ? sanitizeHTML(fullName) : `User #${booking.user_id}`;
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${booking.date}</td>
                         <td>${booking.scheduled_time}</td>
-                        <td>User #${booking.user_id}</td>
+                        <td>${safeUserName}</td>
                         <td>${safeDogName}</td>
                         <td>
                             <button class="btn btn-sm" data-action="approve-booking" data-id="${booking.id}">&#10003; Genehmigen</button>

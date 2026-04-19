@@ -268,7 +268,7 @@ func SetupTestDBFast(t *testing.T) *database.DB {
 	}
 
 	// Truncate all data tables and reset to clean state
-	truncateAndResetData(t, sharedRawDB, sharedDialect)
+	truncateAndResetData(t, sharedDB)
 
 	// Don't close the shared connection in cleanup - it's reused
 	return sharedDB
@@ -314,8 +314,10 @@ func initSharedDB(t *testing.T, dbType string) {
 	sharedDBInited = true
 }
 
-// truncateAndResetData truncates all data tables and inserts base test data
-func truncateAndResetData(t *testing.T, db *sql.DB, dialect database.Dialect) {
+// truncateAndResetData truncates all data tables and inserts base test data.
+// Uses *database.DB (not raw *sql.DB) so that ? placeholders are rebound to $N
+// for PostgreSQL automatically.
+func truncateAndResetData(t *testing.T, db *database.DB) {
 	now := time.Now().Format("2006-01-02 15:04:05")
 
 	// Disable FK checks for truncation (PostgreSQL only)
@@ -348,8 +350,14 @@ func truncateAndResetData(t *testing.T, db *sql.DB, dialect database.Dialect) {
 		t.Fatalf("Failed to create test subscription: %v", err)
 	}
 
-	// 3. Color categories for tenant_id=0 are already seeded in schema 001_schema.go
-	// No need to insert them here
+	// 3. Color categories for tenant_id=0: the schema migration seeds them on first run,
+	// but TRUNCATE above wipes them for shared-connection PostgreSQL tests, so re-insert.
+	_, _ = db.Exec(`INSERT INTO color_categories (id, tenant_id, name, hex_code, sort_order) VALUES
+		(1, 0, 'Gruen', '#22c55e', 1),
+		(2, 0, 'Gelb', '#eab308', 2),
+		(3, 0, 'Orange', '#f97316', 3),
+		(4, 0, 'Hellblau', '#38bdf8', 4),
+		(5, 0, 'Dunkelblau', '#3b82f6', 5)`)
 
 	// 4. Default system settings (all 13 settings expected by tests) - use tenant_id=0
 	// Note: "key" is a reserved word, use double quotes for SQLite/PostgreSQL compatibility
@@ -401,16 +409,14 @@ func SeedTestUser(t *testing.T, db *database.DB, email, name, level string) int 
 		}
 	}
 
-	result, err := db.Exec(`
+	userID, err := db.InsertReturningID(`
 		INSERT INTO users (tenant_id, email, first_name, last_name, phone, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
-		VALUES (0, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?)
-	`, email, firstName, lastName, "+49 123 456789", "test_hash", now, now, now)
+		VALUES (0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, email, firstName, lastName, "+49 123 456789", "test_hash", db.BoolValue(true), db.BoolValue(true), now, now, now)
 
 	if err != nil {
 		t.Fatalf("Failed to seed test user: %v", err)
 	}
-
-	userID, _ := result.LastInsertId()
 
 	// Assign colors based on level parameter for the color system
 	// Level maps to number of colors assigned (1=beginner, 3=intermediate, 5=advanced)
@@ -461,17 +467,16 @@ func SeedTestUserWithoutColors(t *testing.T, db *database.DB, email, name, level
 		}
 	}
 
-	result, err := db.Exec(`
+	userID, err := db.InsertReturningID(`
 		INSERT INTO users (tenant_id, email, first_name, last_name, phone, password_hash, is_verified, is_active, terms_accepted_at, last_activity_at, created_at)
-		VALUES (0, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?)
-	`, email, firstName, lastName, "+49 123 456789", "test_hash", now, now, now)
+		VALUES (0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, email, firstName, lastName, "+49 123 456789", "test_hash", db.BoolValue(true), db.BoolValue(true), now, now, now)
 
 	if err != nil {
 		t.Fatalf("Failed to seed test user without colors: %v", err)
 	}
 
-	id, _ := result.LastInsertId()
-	return int(id)
+	return int(userID)
 }
 
 // splitName splits a name into first and last name parts
@@ -533,23 +538,22 @@ func SeedTestDog(t *testing.T, db *database.DB, name, breed, category string) in
 		t.Fatalf("Failed to find color at position %d for dog: %v", pos, err)
 	}
 
-	result, err := db.Exec(`
+	id, err := db.InsertReturningID(`
 		INSERT INTO dogs (tenant_id, name, breed, size, age, color_id, is_available, created_at)
-		VALUES (0, ?, ?, ?, ?, ?, 1, ?)
-	`, name, breed, "medium", 5, colorID, now)
+		VALUES (0, ?, ?, ?, ?, ?, ?, ?)
+	`, name, breed, "medium", 5, colorID, db.BoolValue(true), now)
 
 	if err != nil {
 		t.Fatalf("Failed to seed test dog: %v", err)
 	}
 
-	id, _ := result.LastInsertId()
 	return int(id)
 }
 
 // DONE: SeedTestBooking creates a test booking and returns the ID
 func SeedTestBooking(t *testing.T, db *database.DB, userID, dogID int, date, scheduledTime, status string) int {
 	now := time.Now()
-	result, err := db.Exec(`
+	id, err := db.InsertReturningID(`
 		INSERT INTO bookings (tenant_id, user_id, dog_id, date, scheduled_time, status, created_at)
 		VALUES (0, ?, ?, ?, ?, ?, ?)
 	`, userID, dogID, date, scheduledTime, status, now)
@@ -558,7 +562,6 @@ func SeedTestBooking(t *testing.T, db *database.DB, userID, dogID int, date, sch
 		t.Fatalf("Failed to seed test booking: %v", err)
 	}
 
-	id, _ := result.LastInsertId()
 	return int(id)
 }
 

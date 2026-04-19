@@ -430,6 +430,99 @@ func TestBookingHandler_ListBookings(t *testing.T) {
 	})
 }
 
+// TestBookingHandler_ListBookings_AdminReceivesUserNames verifies that when an admin
+// lists bookings, each booking's JSON payload includes the booker's first_name and
+// last_name under the `user` field — so the admin UI can display the real name
+// instead of "User #<id>".
+func TestBookingHandler_ListBookings_AdminReceivesUserNames(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewBookingHandler(db, cfg)
+
+	// Walker user whose name should surface in the admin view.
+	walkerID := testutil.SeedTestUser(t, db, "anna@example.com", "Anna Schmidt", "green")
+	dogID := testutil.SeedTestDog(t, db, "Bella", "Labrador", "green")
+	date := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
+	testutil.SeedTestBooking(t, db, walkerID, dogID, date, "09:00", "scheduled")
+
+	// Separate admin user calling the endpoint.
+	adminID := testutil.SeedTestUser(t, db, "admin@example.com", "Admin", "orange")
+
+	req := httptest.NewRequest("GET", "/api/bookings", nil)
+	ctx := contextWithUser(req.Context(), adminID, "admin@example.com", true)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.ListBookings(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+
+	var bookings []map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &bookings); err != nil {
+		t.Fatalf("Failed to decode response: %v. Body: %s", err, rec.Body.String())
+	}
+
+	if len(bookings) != 1 {
+		t.Fatalf("Expected 1 booking, got %d", len(bookings))
+	}
+
+	userObj, ok := bookings[0]["user"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected bookings[0].user to be a populated object for admin; got %v", bookings[0]["user"])
+	}
+
+	if got := userObj["first_name"]; got != "Anna" {
+		t.Errorf("Expected user.first_name \"Anna\", got %v", got)
+	}
+	if got := userObj["last_name"]; got != "Schmidt" {
+		t.Errorf("Expected user.last_name \"Schmidt\", got %v", got)
+	}
+}
+
+// TestBookingHandler_ListBookings_NonAdminDoesNotReceiveUserNames locks in the privacy
+// contract: regular users only see their own bookings and must not receive the `user`
+// payload (the field is `omitempty` on the model).
+func TestBookingHandler_ListBookings_NonAdminDoesNotReceiveUserNames(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		JWTSecret:          "test-secret",
+		JWTExpirationHours: 24,
+	}
+	handler := NewBookingHandler(db, cfg)
+
+	walkerID := testutil.SeedTestUser(t, db, "walker@example.com", "Walker User", "green")
+	dogID := testutil.SeedTestDog(t, db, "Rex", "Shepherd", "green")
+	date := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
+	testutil.SeedTestBooking(t, db, walkerID, dogID, date, "09:00", "scheduled")
+
+	req := httptest.NewRequest("GET", "/api/bookings", nil)
+	ctx := contextWithUser(req.Context(), walkerID, "walker@example.com", false)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.ListBookings(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
+	}
+
+	var bookings []map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &bookings); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+	if len(bookings) != 1 {
+		t.Fatalf("Expected 1 booking, got %d", len(bookings))
+	}
+	if _, present := bookings[0]["user"]; present {
+		t.Errorf("Non-admin response should not include `user`, got: %v", bookings[0]["user"])
+	}
+}
+
 // DONE: TestBookingHandler_CancelBooking tests booking cancellation
 func TestBookingHandler_CancelBooking(t *testing.T) {
 	db := testutil.SetupTestDB(t)
