@@ -1,7 +1,11 @@
 package middleware
 
 import (
+	"context"
+	"database/sql"
+	"database/sql/driver"
 	"fmt"
+	"sync/atomic"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -60,6 +64,85 @@ func BenchmarkTenantRateLimiter_GetLimiters(b *testing.B) {
 				}
 			})
 		}
+	}
+}
+
+// countingConnectorAqaa wraps the sqlite driver and counts prepared statements
+// (every query goes through Prepare because the wrapped conn has no Queryer).
+type countingConnectorAqaa struct {
+	drv     driver.Driver
+	queries *atomic.Int64
+}
+
+func (c *countingConnectorAqaa) Connect(context.Context) (driver.Conn, error) {
+	conn, err := c.drv.Open(":memory:")
+	if err != nil {
+		return nil, err
+	}
+	return &countingConnAqaa{conn: conn, queries: c.queries}, nil
+}
+
+func (c *countingConnectorAqaa) Driver() driver.Driver { return c.drv }
+
+type countingConnAqaa struct {
+	conn    driver.Conn
+	queries *atomic.Int64
+}
+
+func (c *countingConnAqaa) Prepare(query string) (driver.Stmt, error) {
+	c.queries.Add(1)
+	return c.conn.Prepare(query)
+}
+func (c *countingConnAqaa) Close() error              { return c.conn.Close() }
+func (c *countingConnAqaa) Begin() (driver.Tx, error) { return c.conn.Begin() } //nolint:staticcheck
+
+// TestTenantRateLimiter_StaleTierCacheQueryCount: after the 5-minute tier cache of a
+// tenant expires, one refresh should serve later requests again; the number of
+// subscription queries must not grow with the number of requests.
+func TestTenantRateLimiter_StaleTierCacheQueryCount(t *testing.T) {
+	probe, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	drv := probe.Driver()
+	probe.Close()
+
+	queries := &atomic.Int64{}
+	sqlDB := sql.OpenDB(&countingConnectorAqaa{drv: drv, queries: queries})
+	sqlDB.SetMaxOpenConns(1)
+	sqlxDB := sqlx.NewDb(sqlDB, "sqlite")
+	db := database.WrapDB(sqlxDB, database.NewSQLiteDialect())
+	trl := NewTenantRateLimiter(db)
+	t.Cleanup(func() {
+		trl.Close()
+		sqlxDB.Close()
+	})
+
+	const tenantID = 1
+	trl.getTenantLimiter(tenantID)
+	trl.getIPLimiter(tenantID, "10.0.0.1")
+
+	countFor := func(n int) int64 {
+		trl.tenantMu.Lock()
+		trl.tenantLimiters[tenantID].cacheTime = time.Now().Add(-10 * time.Minute)
+		trl.tenantMu.Unlock()
+		queries.Store(0)
+		for i := 0; i < n; i++ {
+			trl.getTenantLimiter(tenantID)
+			trl.getIPLimiter(tenantID, "10.0.0.1")
+		}
+		return queries.Load()
+	}
+
+	n := 50
+	qn := countFor(n)
+	q2n := countFor(2 * n)
+	if qn == 0 {
+		t.Fatalf("expected the expired tier cache to be refreshed from the DB, got 0 queries")
+	}
+	if q2n >= 2*qn {
+		t.Errorf("subscription queries grow with requests after cache expiry: %d requests -> %d queries, %d requests -> %d queries",
+			n, qn, 2*n, q2n)
 	}
 }
 
