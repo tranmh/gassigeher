@@ -40,7 +40,7 @@ type Config struct {
 	// Admin Configuration
 	// Simple Mode: SuperAdminEmail is the local shelter admin
 	// SaaS Mode: CentralAdminEmail is the platform admin (can impersonate tenant super admins)
-	SuperAdminEmail  string // Simple Mode: local shelter admin email
+	SuperAdminEmail   string // Simple Mode: local shelter admin email
 	CentralAdminEmail string // SaaS Mode: platform admin email
 
 	// Passwords are read from .env.secrets (not stored in config for security)
@@ -142,8 +142,8 @@ func Load() *Config {
 		DBConnectionString: getEnv("DB_CONNECTION_STRING", ""),
 
 		// Connection Pool Configuration (PostgreSQL)
-		DBMaxOpenConns:    getEnvAsInt("DB_MAX_OPEN_CONNS", 25),  // Default: 25 connections
-		DBMaxIdleConns:    getEnvAsInt("DB_MAX_IDLE_CONNS", 5),   // Default: 5 idle connections
+		DBMaxOpenConns:    getEnvAsInt("DB_MAX_OPEN_CONNS", 25),   // Default: 25 connections
+		DBMaxIdleConns:    getEnvAsInt("DB_MAX_IDLE_CONNS", 5),    // Default: 5 idle connections
 		DBConnMaxLifetime: getEnvAsInt("DB_CONN_MAX_LIFETIME", 5), // Default: 5 minutes
 
 		// JWT (SECURITY: JWT_SECRET must be explicitly set in production)

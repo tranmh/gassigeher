@@ -194,38 +194,38 @@ func TestTenantActivityChecker_NilDB(t *testing.T) {
 func TestDaysInactiveCalculation(t *testing.T) {
 	// Simulate the calculation logic from GetInactiveTenants/GetAllTenantActivity
 	tests := []struct {
-		name          string
-		lastActivity  *time.Time
-		wantInactive  int // approximate days
-		wantIsActive  bool
+		name           string
+		lastActivity   *time.Time
+		wantInactive   int // approximate days
+		wantIsActive   bool
 		inactivityDays int
 	}{
 		{
-			name:          "nil activity returns 999",
-			lastActivity:  nil,
-			wantInactive:  999,
-			wantIsActive:  false,
+			name:           "nil activity returns 999",
+			lastActivity:   nil,
+			wantInactive:   999,
+			wantIsActive:   false,
 			inactivityDays: 30,
 		},
 		{
-			name:          "recent activity is active",
-			lastActivity:  timePtr(time.Now().Add(-1 * time.Hour)),
-			wantInactive:  0,
-			wantIsActive:  true,
+			name:           "recent activity is active",
+			lastActivity:   timePtr(time.Now().Add(-1 * time.Hour)),
+			wantInactive:   0,
+			wantIsActive:   true,
 			inactivityDays: 30,
 		},
 		{
-			name:          "activity 10 days ago with 30 day threshold",
-			lastActivity:  timePtr(time.Now().AddDate(0, 0, -10)),
-			wantInactive:  10,
-			wantIsActive:  true,
+			name:           "activity 10 days ago with 30 day threshold",
+			lastActivity:   timePtr(time.Now().AddDate(0, 0, -10)),
+			wantInactive:   10,
+			wantIsActive:   true,
 			inactivityDays: 30,
 		},
 		{
-			name:          "activity 45 days ago with 30 day threshold",
-			lastActivity:  timePtr(time.Now().AddDate(0, 0, -45)),
-			wantInactive:  45,
-			wantIsActive:  false,
+			name:           "activity 45 days ago with 30 day threshold",
+			lastActivity:   timePtr(time.Now().AddDate(0, 0, -45)),
+			wantInactive:   45,
+			wantIsActive:   false,
 			inactivityDays: 30,
 		},
 	}
@@ -268,10 +268,10 @@ func TestMostRecentActivitySelection(t *testing.T) {
 	muchEarlier := now.Add(-24 * time.Hour)
 
 	tests := []struct {
-		name            string
-		lastBooking     *time.Time
-		lastLogin       *time.Time
-		wantMostRecent  *time.Time
+		name           string
+		lastBooking    *time.Time
+		lastLogin      *time.Time
+		wantMostRecent *time.Time
 	}{
 		{
 			name:           "both nil",

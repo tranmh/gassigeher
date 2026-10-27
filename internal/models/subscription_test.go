@@ -62,9 +62,9 @@ func TestPricingPlan_GetYearlySavings(t *testing.T) {
 		},
 		{
 			name:          "Pro plan saves 2 months (€58)",
-			priceMonthly:  2900, // €29/month
+			priceMonthly:  2900,  // €29/month
 			priceYearly:   29000, // €290/year
-			expectedSaved: 5800, // 12*29 - 290 = 348 - 290 = €58
+			expectedSaved: 5800,  // 12*29 - 290 = 348 - 290 = €58
 		},
 	}
 

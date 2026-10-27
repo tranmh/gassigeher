@@ -308,10 +308,10 @@ func FuzzUnicodeHandling(f *testing.F) {
 	f.Add("🐕🦮🐩")
 	f.Add("Ñoño")
 	f.Add("café")
-	f.Add("\u0000") // Null
-	f.Add("\uFEFF") // BOM
-	f.Add("\u200B") // Zero-width space
-	f.Add("\u202E") // RTL override
+	f.Add("\u0000")  // Null
+	f.Add("\uFEFF")  // BOM
+	f.Add("\u200B")  // Zero-width space
+	f.Add("\u202E")  // RTL override
 	f.Add("a\u0300") // Combining character
 
 	f.Fuzz(func(t *testing.T, input string) {

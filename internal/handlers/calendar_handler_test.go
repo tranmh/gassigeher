@@ -218,7 +218,7 @@ func TestCalendarHandler_GetToken(t *testing.T) {
 			if tt.setupContext {
 				req = addCalendarUserContext(req, tt.userID)
 			}
-			
+
 			rr := httptest.NewRecorder()
 			handler.GetToken(rr, req)
 
@@ -372,7 +372,7 @@ func TestCalendarHandler_GetFeed(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", "/api/calendar/feed/"+tt.token, nil)
 			req = mux.SetURLVars(req, map[string]string{"token": tt.token})
-			
+
 			rr := httptest.NewRecorder()
 			handler.GetFeed(rr, req)
 
@@ -414,7 +414,7 @@ func TestCalendarHandler_GetFeed_WithBookings(t *testing.T) {
 	// Get feed
 	req := httptest.NewRequest("GET", "/api/calendar/feed/"+tokenResp.Token, nil)
 	req = mux.SetURLVars(req, map[string]string{"token": tokenResp.Token})
-	
+
 	rr := httptest.NewRecorder()
 	handler.GetFeed(rr, req)
 
@@ -459,7 +459,7 @@ func TestCalendarHandler_GetFeed_WithIcsExtension(t *testing.T) {
 	tokenWithExt := tokenResp.Token + ".ics"
 	req := httptest.NewRequest("GET", "/api/calendar/feed/"+tokenWithExt, nil)
 	req = mux.SetURLVars(req, map[string]string{"token": tokenWithExt})
-	
+
 	rr := httptest.NewRecorder()
 	handler.GetFeed(rr, req)
 
@@ -494,7 +494,7 @@ func TestCalendarHandler_GetFeed_InactiveUser(t *testing.T) {
 	// Try to get feed - should fail
 	req := httptest.NewRequest("GET", "/api/calendar/feed/"+tokenResp.Token, nil)
 	req = mux.SetURLVars(req, map[string]string{"token": tokenResp.Token})
-	
+
 	rr := httptest.NewRecorder()
 	handler.GetFeed(rr, req)
 
@@ -567,9 +567,9 @@ func TestGetICalStatus(t *testing.T) {
 
 func TestFoldICalLine(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		maxLen   int // expected max line length
+		name   string
+		input  string
+		maxLen int // expected max line length
 	}{
 		{
 			name:   "short line unchanged",
@@ -591,7 +591,7 @@ func TestFoldICalLine(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := foldICalLine(tt.input)
-			
+
 			// Check that result ends with CRLF
 			if !strings.HasSuffix(result, "\r\n") {
 				t.Error("folded line should end with CRLF")
@@ -642,7 +642,7 @@ func TestCalendarHandler_GetFeed_WithLocationAndDuration(t *testing.T) {
 	// Get feed
 	req := httptest.NewRequest("GET", "/api/calendar/feed/"+tokenResp.Token, nil)
 	req = mux.SetURLVars(req, map[string]string{"token": tokenResp.Token})
-	
+
 	rr := httptest.NewRecorder()
 	handler.GetFeed(rr, req)
 

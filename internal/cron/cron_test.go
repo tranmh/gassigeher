@@ -7,7 +7,6 @@ import (
 	"github.com/tranmh/gassigeher/internal/testutil"
 )
 
-
 // DONE: TestCronService_AutoCompleteBookings tests automatic booking completion
 func TestCronService_AutoCompleteBookings(t *testing.T) {
 	db := testutil.SetupTestDB(t)

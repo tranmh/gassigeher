@@ -10,18 +10,18 @@ import (
 
 // User represents a user in the system
 type User struct {
-	ID                       int              `json:"id"`
-	TenantID                 int              `json:"tenant_id,omitempty"` // SaaS: Tenant this user belongs to
-	FirstName                string           `json:"first_name"`
-	LastName                 string           `json:"last_name"`
-	Email                    *string          `json:"email,omitempty"`
-	Phone                    *string          `json:"phone,omitempty"`
-	PasswordHash             *string          `json:"-"`
-	Colors                   []ColorCategory  `json:"colors,omitempty"`
+	ID           int             `json:"id"`
+	TenantID     int             `json:"tenant_id,omitempty"` // SaaS: Tenant this user belongs to
+	FirstName    string          `json:"first_name"`
+	LastName     string          `json:"last_name"`
+	Email        *string         `json:"email,omitempty"`
+	Phone        *string         `json:"phone,omitempty"`
+	PasswordHash *string         `json:"-"`
+	Colors       []ColorCategory `json:"colors,omitempty"`
 	// DONE: Admin flags
-	IsAdmin                  bool             `json:"is_admin"`
-	IsSuperAdmin             bool             `json:"is_super_admin"`
-	IsCentralAdmin           bool             `json:"is_central_admin"` // SaaS: Platform-wide admin (not tied to tenant)
+	IsAdmin                  bool       `json:"is_admin"`
+	IsSuperAdmin             bool       `json:"is_super_admin"`
+	IsCentralAdmin           bool       `json:"is_central_admin"` // SaaS: Platform-wide admin (not tied to tenant)
 	IsVerified               bool       `json:"is_verified"`
 	IsActive                 bool       `json:"is_active"`
 	IsDeleted                bool       `json:"is_deleted"`
@@ -36,15 +36,15 @@ type User struct {
 	TermsAcceptedAt          time.Time  `json:"terms_accepted_at"`
 	LastActivityAt           time.Time  `json:"last_activity_at"`
 	// Brute force protection fields
-	FailedLoginAttempts      int        `json:"failed_login_attempts,omitempty"`
-	LockedUntil              *time.Time `json:"locked_until,omitempty"`
-	LastFailedLogin          *time.Time `json:"last_failed_login,omitempty"`
-	DeactivatedAt            *time.Time `json:"deactivated_at,omitempty"`
-	DeactivationReason       *string    `json:"deactivation_reason,omitempty"`
-	ReactivatedAt            *time.Time `json:"reactivated_at,omitempty"`
-	DeletedAt                *time.Time `json:"deleted_at,omitempty"`
-	CreatedAt                time.Time  `json:"created_at"`
-	UpdatedAt                time.Time  `json:"updated_at"`
+	FailedLoginAttempts int        `json:"failed_login_attempts,omitempty"`
+	LockedUntil         *time.Time `json:"locked_until,omitempty"`
+	LastFailedLogin     *time.Time `json:"last_failed_login,omitempty"`
+	DeactivatedAt       *time.Time `json:"deactivated_at,omitempty"`
+	DeactivationReason  *string    `json:"deactivation_reason,omitempty"`
+	ReactivatedAt       *time.Time `json:"reactivated_at,omitempty"`
+	DeletedAt           *time.Time `json:"deleted_at,omitempty"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
 // FullName returns the user's full name (FirstName LastName)
@@ -79,9 +79,9 @@ type LoginResponse struct {
 	Token              string `json:"token"`
 	User               *User  `json:"user"`
 	IsAdmin            bool   `json:"is_admin"`
-	IsCentralAdmin     bool   `json:"is_central_admin"`     // SaaS: true if user is platform-wide admin
+	IsCentralAdmin     bool   `json:"is_central_admin"` // SaaS: true if user is platform-wide admin
 	MustChangePassword bool   `json:"must_change_password"`
-	RedirectTo         string `json:"redirect_to"`          // SaaS: where to redirect after login
+	RedirectTo         string `json:"redirect_to"` // SaaS: where to redirect after login
 }
 
 // VerifyEmailRequest represents email verification payload

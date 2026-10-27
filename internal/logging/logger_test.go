@@ -40,10 +40,10 @@ func TestNewLogger(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 
 		cfg := &Config{
-			LogDir:        tmpDir,
-			MaxAgeDays:    30,
+			LogDir:         tmpDir,
+			MaxAgeDays:     30,
 			CompressSizeMB: 10,
-			ConsoleOutput: false, // Disable console for tests
+			ConsoleOutput:  false, // Disable console for tests
 		}
 
 		logger, err := NewLogger(cfg)
@@ -80,10 +80,10 @@ func TestNewLogger(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 
 		cfg := &Config{
-			LogDir:        tmpDir,
-			MaxAgeDays:    30,
+			LogDir:         tmpDir,
+			MaxAgeDays:     30,
 			CompressSizeMB: 10,
-			ConsoleOutput: false,
+			ConsoleOutput:  false,
 		}
 
 		logger, err := NewLogger(cfg)
@@ -108,10 +108,10 @@ func TestLoggerWrite(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	cfg := &Config{
-		LogDir:        tmpDir,
-		MaxAgeDays:    30,
+		LogDir:         tmpDir,
+		MaxAgeDays:     30,
 		CompressSizeMB: 10,
-		ConsoleOutput: false,
+		ConsoleOutput:  false,
 	}
 
 	logger, err := NewLogger(cfg)
@@ -152,10 +152,10 @@ func TestLoggerClose(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	cfg := &Config{
-		LogDir:        tmpDir,
-		MaxAgeDays:    30,
+		LogDir:         tmpDir,
+		MaxAgeDays:     30,
 		CompressSizeMB: 10,
-		ConsoleOutput: false,
+		ConsoleOutput:  false,
 	}
 
 	logger, err := NewLogger(cfg)
@@ -197,10 +197,10 @@ func TestLoggerGetLogFiles(t *testing.T) {
 	os.WriteFile(filepath.Join(tmpDir, "gassigeher_"+compressedDate+".log.gz"), []byte("compressed"), 0644)
 
 	cfg := &Config{
-		LogDir:        tmpDir,
-		MaxAgeDays:    30, // Keep files for 30 days
+		LogDir:         tmpDir,
+		MaxAgeDays:     30, // Keep files for 30 days
 		CompressSizeMB: 10,
-		ConsoleOutput: false,
+		ConsoleOutput:  false,
 	}
 
 	logger, err := NewLogger(cfg)
@@ -286,10 +286,10 @@ func TestLoggerCleanOldLogs(t *testing.T) {
 	os.WriteFile(recentFile, []byte("recent log"), 0644)
 
 	cfg := &Config{
-		LogDir:        tmpDir,
-		MaxAgeDays:    30,
+		LogDir:         tmpDir,
+		MaxAgeDays:     30,
 		CompressSizeMB: 10,
-		ConsoleOutput: false,
+		ConsoleOutput:  false,
 	}
 
 	logger, err := NewLogger(cfg)

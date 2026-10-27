@@ -45,7 +45,7 @@ type CreateBookingRequest struct {
 
 // AdminCreateBookingRequest represents an admin request to create a booking on behalf of another user
 type AdminCreateBookingRequest struct {
-	UserID        int    `json:"user_id"`        // Target user the booking is recorded for
+	UserID        int    `json:"user_id"` // Target user the booking is recorded for
 	DogID         int    `json:"dog_id"`
 	Date          string `json:"date"`           // YYYY-MM-DD
 	ScheduledTime string `json:"scheduled_time"` // HH:MM

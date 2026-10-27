@@ -7,14 +7,14 @@ import (
 
 // FeatureFlag represents a feature toggle for gradual rollout
 type FeatureFlag struct {
-	ID          int        `json:"id"`
-	Key         string     `json:"key"`          // Unique flag identifier (e.g., "new_booking_ui", "experimental_search")
-	Name        string     `json:"name"`         // Human-readable name
-	Description string     `json:"description"`  // What this flag controls
-	IsGlobal    bool       `json:"is_global"`    // True = applies to all tenants, False = per-tenant
-	IsEnabled   bool       `json:"is_enabled"`   // Global enable/disable state
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID          int       `json:"id"`
+	Key         string    `json:"key"`         // Unique flag identifier (e.g., "new_booking_ui", "experimental_search")
+	Name        string    `json:"name"`        // Human-readable name
+	Description string    `json:"description"` // What this flag controls
+	IsGlobal    bool      `json:"is_global"`   // True = applies to all tenants, False = per-tenant
+	IsEnabled   bool      `json:"is_enabled"`  // Global enable/disable state
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // TenantFeatureFlag represents a per-tenant feature flag override
@@ -30,9 +30,9 @@ type TenantFeatureFlag struct {
 // FeatureFlagWithStatus includes the flag with its effective status for a tenant
 type FeatureFlagWithStatus struct {
 	FeatureFlag
-	TenantEnabled     *bool      `json:"tenant_enabled,omitempty"`     // Tenant-specific override
-	EffectiveEnabled  bool       `json:"effective_enabled"`            // What's actually active
-	TenantEnabledAt   *time.Time `json:"tenant_enabled_at,omitempty"`
+	TenantEnabled    *bool      `json:"tenant_enabled,omitempty"` // Tenant-specific override
+	EffectiveEnabled bool       `json:"effective_enabled"`        // What's actually active
+	TenantEnabledAt  *time.Time `json:"tenant_enabled_at,omitempty"`
 }
 
 // Common feature flag keys (defined as constants for type safety)

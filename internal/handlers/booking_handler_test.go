@@ -1774,8 +1774,8 @@ func TestBookingHandler_DailyBookingLimit(t *testing.T) {
 		testDate2 := time.Now().AddDate(0, 0, 8).Format("2006-01-02")
 
 		// Create 2 bookings in different periods, cancel one
-		bookingID := testutil.SeedTestBooking(t, db, userID1, dogID, testDate2, "09:00", "scheduled")  // morning
-		testutil.SeedTestBooking(t, db, userID2, dogID, testDate2, "18:00", "scheduled")  // evening
+		bookingID := testutil.SeedTestBooking(t, db, userID1, dogID, testDate2, "09:00", "scheduled") // morning
+		testutil.SeedTestBooking(t, db, userID2, dogID, testDate2, "18:00", "scheduled")              // evening
 
 		// Cancel morning booking
 		db.Exec("UPDATE bookings SET status = 'cancelled' WHERE id = ?", bookingID)
@@ -1808,8 +1808,8 @@ func TestBookingHandler_DailyBookingLimit(t *testing.T) {
 		settingsRepo.Upsert(0, "max_bookings_per_dog_per_day", "3")
 
 		// Create 2 bookings in different periods
-		testutil.SeedTestBooking(t, db, userID1, dogID, testDate3, "09:00", "scheduled")  // morning
-		testutil.SeedTestBooking(t, db, userID2, dogID, testDate3, "18:00", "scheduled")  // evening
+		testutil.SeedTestBooking(t, db, userID1, dogID, testDate3, "09:00", "scheduled") // morning
+		testutil.SeedTestBooking(t, db, userID2, dogID, testDate3, "18:00", "scheduled") // evening
 
 		// Third booking in afternoon should succeed (limit is 3)
 		reqBody := map[string]interface{}{
@@ -1873,8 +1873,8 @@ func TestBookingHandler_MoveBookingDailyLimit(t *testing.T) {
 		bookingID := testutil.SeedTestBooking(t, db, userID1, dogID, sourceDate, "09:00", "scheduled")
 
 		// Create 2 bookings on target date (at limit) - use morning and evening, leaving afternoon free
-		testutil.SeedTestBooking(t, db, userID2, dogID, targetDate, "09:00", "scheduled")  // morning
-		testutil.SeedTestBooking(t, db, userID3, dogID, targetDate, "18:00", "scheduled")  // evening
+		testutil.SeedTestBooking(t, db, userID2, dogID, targetDate, "09:00", "scheduled") // morning
+		testutil.SeedTestBooking(t, db, userID3, dogID, targetDate, "18:00", "scheduled") // evening
 
 		// Try to move to target date in afternoon (free period, but daily limit exceeded)
 		reqBody := map[string]interface{}{
@@ -1914,8 +1914,8 @@ func TestBookingHandler_MoveBookingDailyLimit(t *testing.T) {
 		sameDayDate := time.Now().AddDate(0, 0, 12).Format("2006-01-02")
 
 		// Create 2 bookings on same date (at limit) - use morning and evening
-		bookingID := testutil.SeedTestBooking(t, db, userID1, dogID, sameDayDate, "09:00", "scheduled")  // morning
-		testutil.SeedTestBooking(t, db, userID2, dogID, sameDayDate, "18:00", "scheduled")  // evening
+		bookingID := testutil.SeedTestBooking(t, db, userID1, dogID, sameDayDate, "09:00", "scheduled") // morning
+		testutil.SeedTestBooking(t, db, userID2, dogID, sameDayDate, "18:00", "scheduled")              // evening
 
 		// Move first booking to different time in afternoon (free period)
 		reqBody := map[string]interface{}{

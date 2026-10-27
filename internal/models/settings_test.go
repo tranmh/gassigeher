@@ -41,8 +41,8 @@ func TestUpdateSettingRequest_Validate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "Missing value",
-			req:  UpdateSettingRequest{},
+			name:    "Missing value",
+			req:     UpdateSettingRequest{},
 			wantErr: true,
 		},
 		{

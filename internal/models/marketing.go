@@ -95,7 +95,7 @@ type ReferralUse struct {
 	AppliedAt       time.Time `json:"applied_at"`
 
 	// Joined fields
-	Code             *string `json:"code,omitempty"`
+	Code              *string `json:"code,omitempty"`
 	RefereeTenantName *string `json:"referee_tenant_name,omitempty"`
 }
 
@@ -153,9 +153,9 @@ type CreateReferenceEntryRequest struct {
 
 // MarketingStatsResponse contains marketing statistics
 type MarketingStatsResponse struct {
-	ActiveCampaigns     int `json:"active_campaigns"`
-	TotalReferralCodes  int `json:"total_referral_codes"`
-	TotalReferralUses   int `json:"total_referral_uses"`
-	ApprovedReferences  int `json:"approved_references"`
-	PendingReferences   int `json:"pending_references"`
+	ActiveCampaigns    int `json:"active_campaigns"`
+	TotalReferralCodes int `json:"total_referral_codes"`
+	TotalReferralUses  int `json:"total_referral_uses"`
+	ApprovedReferences int `json:"approved_references"`
+	PendingReferences  int `json:"pending_references"`
 }

@@ -66,8 +66,8 @@ func parseTimestampString(s string) (time.Time, error) {
 
 // TenantActivityChecker handles checking tenant activity and flagging inactive tenants
 type TenantActivityChecker struct {
-	db              *database.DB
-	inactivityDays  int // Number of days without activity to be considered inactive
+	db             *database.DB
+	inactivityDays int // Number of days without activity to be considered inactive
 }
 
 // NewTenantActivityChecker creates a new tenant activity checker
@@ -83,15 +83,15 @@ func NewTenantActivityChecker(db *database.DB, inactivityDays int) *TenantActivi
 
 // TenantActivity represents activity information for a tenant
 type TenantActivity struct {
-	TenantID         int        `json:"tenant_id"`
-	TenantSlug       string     `json:"tenant_slug"`
-	TenantName       string     `json:"tenant_name"`
-	LastBookingDate  *time.Time `json:"last_booking_date,omitempty"`
-	LastUserLogin    *time.Time `json:"last_user_login,omitempty"`
-	DaysInactive     int        `json:"days_inactive"`
-	TotalBookings    int        `json:"total_bookings"`
-	ActiveUsers      int        `json:"active_users"`
-	IsInactive       bool       `json:"is_inactive"`
+	TenantID        int        `json:"tenant_id"`
+	TenantSlug      string     `json:"tenant_slug"`
+	TenantName      string     `json:"tenant_name"`
+	LastBookingDate *time.Time `json:"last_booking_date,omitempty"`
+	LastUserLogin   *time.Time `json:"last_user_login,omitempty"`
+	DaysInactive    int        `json:"days_inactive"`
+	TotalBookings   int        `json:"total_bookings"`
+	ActiveUsers     int        `json:"active_users"`
+	IsInactive      bool       `json:"is_inactive"`
 }
 
 // CheckAndFlagInactiveTenants checks all tenants for inactivity

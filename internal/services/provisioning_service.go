@@ -221,17 +221,17 @@ func (s *ProvisioningService) CreateDemoDog(tx *sql.Tx, tenantID int) error {
 	`)
 	_, err = tx.Exec(insertQuery,
 		tenantID,
-		"Demo-Hund",                                   // name
-		"Mischling",                                   // breed
-		"medium",                                      // size
-		3,                                             // age
-		colorID,                                       // color_id (green - accessible to all)
-		s.db.BoolValue(true),                          // is_available
-		s.db.BoolValue(true),                          // is_featured
-		"Keine besonderen Bedürfnisse",                // special_needs
-		"Zwinger 1",                                   // pickup_location
-		"Standardrunde um das Tierheim",               // walk_route
-		30,                                            // walk_duration
+		"Demo-Hund",                     // name
+		"Mischling",                     // breed
+		"medium",                        // size
+		3,                               // age
+		colorID,                         // color_id (green - accessible to all)
+		s.db.BoolValue(true),            // is_available
+		s.db.BoolValue(true),            // is_featured
+		"Keine besonderen Bedürfnisse",  // special_needs
+		"Zwinger 1",                     // pickup_location
+		"Standardrunde um das Tierheim", // walk_route
+		30,                              // walk_duration
 		"Dies ist ein Demo-Hund zum Testen. Sie können diesen Hund bearbeiten oder löschen.", // special_instructions
 	)
 	if err != nil {

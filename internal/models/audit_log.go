@@ -10,8 +10,8 @@ type AuditLog struct {
 	Action     string    `json:"action"`      // e.g., "booking.created", "user.promoted"
 	EntityType string    `json:"entity_type"` // e.g., "booking", "user", "dog"
 	EntityID   *int      `json:"entity_id,omitempty"`
-	OldValue   *string   `json:"old_value,omitempty"`  // JSON representation
-	NewValue   *string   `json:"new_value,omitempty"`  // JSON representation
+	OldValue   *string   `json:"old_value,omitempty"` // JSON representation
+	NewValue   *string   `json:"new_value,omitempty"` // JSON representation
 	IPAddress  string    `json:"ip_address"`
 	UserAgent  string    `json:"user_agent"`
 	CreatedAt  time.Time `json:"created_at"`
@@ -28,15 +28,15 @@ const (
 	AuditActionBookingCompleted = "booking.completed"
 
 	// User actions
-	AuditActionUserCreated     = "user.created"
-	AuditActionUserUpdated     = "user.updated"
-	AuditActionUserDeleted     = "user.deleted"
-	AuditActionUserPromoted    = "user.promoted"
-	AuditActionUserDemoted     = "user.demoted"
-	AuditActionUserActivated   = "user.activated"
-	AuditActionUserDeactivated = "user.deactivated"
-	AuditActionUserLogin       = "user.login"
-	AuditActionUserLogout      = "user.logout"
+	AuditActionUserCreated      = "user.created"
+	AuditActionUserUpdated      = "user.updated"
+	AuditActionUserDeleted      = "user.deleted"
+	AuditActionUserPromoted     = "user.promoted"
+	AuditActionUserDemoted      = "user.demoted"
+	AuditActionUserActivated    = "user.activated"
+	AuditActionUserDeactivated  = "user.deactivated"
+	AuditActionUserLogin        = "user.login"
+	AuditActionUserLogout       = "user.logout"
 	AuditActionUserImpersonated = "user.impersonated"
 
 	// Dog actions
@@ -58,21 +58,21 @@ const (
 	AuditActionColorDenied    = "color.denied"
 
 	// Tenant actions
-	AuditActionTenantCreated    = "tenant.created"
-	AuditActionTenantUpdated    = "tenant.updated"
-	AuditActionTenantActivated  = "tenant.activated"
+	AuditActionTenantCreated     = "tenant.created"
+	AuditActionTenantUpdated     = "tenant.updated"
+	AuditActionTenantActivated   = "tenant.activated"
 	AuditActionTenantDeactivated = "tenant.deactivated"
 )
 
 // EntityType constants
 const (
-	EntityTypeBooking           = "booking"
-	EntityTypeUser              = "user"
-	EntityTypeDog               = "dog"
-	EntityTypeSettings          = "settings"
-	EntityTypeTenant            = "tenant"
+	EntityTypeBooking      = "booking"
+	EntityTypeUser         = "user"
+	EntityTypeDog          = "dog"
+	EntityTypeSettings     = "settings"
+	EntityTypeTenant       = "tenant"
 	EntityTypeColorRequest = "color_request"
-	EntityTypeTheme             = "theme"
+	EntityTypeTheme        = "theme"
 )
 
 // AuditLogFilter for querying audit logs

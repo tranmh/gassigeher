@@ -17,8 +17,8 @@ type DemoTenantState struct {
 type DemoCredentials struct {
 	AdminEmail    string `json:"admin_email"`
 	AdminPassword string `json:"admin_password"`
-	NextResetAt   string `json:"next_reset_at"`  // Formatted for display (e.g., "01.01.2025 00:00")
-	LastResetAt   string `json:"last_reset_at"`  // Formatted for display
+	NextResetAt   string `json:"next_reset_at"` // Formatted for display (e.g., "01.01.2025 00:00")
+	LastResetAt   string `json:"last_reset_at"` // Formatted for display
 }
 
 // DemoStatus represents the demo status returned by the API
@@ -32,8 +32,8 @@ type DemoUser struct {
 	Name     string `json:"name"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
-	Level    string `json:"level"`     // green, orange, blue
-	LevelDE  string `json:"level_de"`  // German: Anfänger, Fortgeschritten, Experte
+	Level    string `json:"level"`    // green, orange, blue
+	LevelDE  string `json:"level_de"` // German: Anfänger, Fortgeschritten, Experte
 }
 
 // DemoDog represents a demo dog for display on the landing page

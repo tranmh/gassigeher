@@ -30,7 +30,7 @@ func NewImportHandler(db *database.DB) *ImportHandler {
 		db:           db,
 		settingsRepo: repository.NewSettingsRepository(db),
 		dogRepo:      repository.NewDogRepository(db),
-		colorRepo: repository.NewColorCategoryRepository(db),
+		colorRepo:    repository.NewColorCategoryRepository(db),
 	}
 }
 

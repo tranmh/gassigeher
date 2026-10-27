@@ -68,8 +68,8 @@ func TestCSRF_TokenValidity(t *testing.T) {
 func TestCSRF_RejectionBodyAndMissingParts(t *testing.T) {
 	token := makeCSRFToken(time.Now(), CSRFTokenLength)
 	tests := []struct {
-		name          string
-		method        string
+		name           string
+		method         string
 		cookie, header string
 	}{
 		{"cookie only", http.MethodPost, token, ""},

@@ -40,14 +40,14 @@ func TestCustomHoliday_Validate(t *testing.T) {
 
 	t.Run("invalid date format", func(t *testing.T) {
 		invalidDates := []string{
-			"25-12-2025",      // DD-MM-YYYY
-			"12/25/2025",      // MM/DD/YYYY
-			"2025-25-12",      // Invalid month
-			"2025-12-32",      // Invalid day
-			"not-a-date",      // Not a date
-			"20251225",        // No separators
-			"2025-1-25",       // Single digit month
-			"2025-12-5",       // Single digit day
+			"25-12-2025", // DD-MM-YYYY
+			"12/25/2025", // MM/DD/YYYY
+			"2025-25-12", // Invalid month
+			"2025-12-32", // Invalid day
+			"not-a-date", // Not a date
+			"20251225",   // No separators
+			"2025-1-25",  // Single digit month
+			"2025-12-5",  // Single digit day
 		}
 
 		for _, date := range invalidDates {
