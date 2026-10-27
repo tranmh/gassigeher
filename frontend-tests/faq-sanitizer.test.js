@@ -219,7 +219,7 @@ describe('sanitizeFAQAnswer', () => {
     // The header documents href as allowlisted ("only http, https, mailto, /"),
     // but the code only denylists a few prefixes. Browsers strip tabs/newlines
     // inside URL schemes, so "java\tscript:" still executes when clicked.
-    it.skip('aqaa: suspected bug - href allowlist (only http, https, mailto, /) is not enforced; "java&#9;script:" survives', () => {
+    it('aqaa: suspected bug - href allowlist (only http, https, mailto, /) is not enforced; "java&#9;script:" survives', () => {
         const out = parse(sanitize('<a href="java&#9;script:alert(1)">Klick</a>'));
         expect(out.querySelector('a').hasAttribute('href')).toBe(false);
 
