@@ -177,11 +177,11 @@ func TestTenantHandler_UpdateBranding_OrganizationFields(t *testing.T) {
 
 	t.Run("saves organization fields via update branding", func(t *testing.T) {
 		reqBody := map[string]interface{}{
-			"theme_preset":        "classic",
-			"organization_name":    "Neuer Tierschutzverein e.V.",
-			"organization_address": "Hauptstr. 10, 70000 Stuttgart",
-			"organization_email":   "info@neuer-verein.de",
-			"organization_phone":   "0711 11111",
+			"theme_preset":          "classic",
+			"organization_name":     "Neuer Tierschutzverein e.V.",
+			"organization_address":  "Hauptstr. 10, 70000 Stuttgart",
+			"organization_email":    "info@neuer-verein.de",
+			"organization_phone":    "0711 11111",
 			"privacy_officer_email": "dsgvo@neuer-verein.de",
 		}
 		body, _ := json.Marshal(reqBody)
@@ -229,9 +229,9 @@ func TestTenantHandler_UpdateBranding_OrganizationFields(t *testing.T) {
 
 	t.Run("clears organization fields when set to null", func(t *testing.T) {
 		reqBody := map[string]interface{}{
-			"theme_preset":        "classic",
-			"organization_name":    nil,
-			"organization_email":   nil,
+			"theme_preset":          "classic",
+			"organization_name":     nil,
+			"organization_email":    nil,
 			"privacy_officer_email": nil,
 		}
 		body, _ := json.Marshal(reqBody)

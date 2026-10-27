@@ -10,16 +10,16 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	_ "modernc.org/sqlite"
 	"github.com/tranmh/gassigeher/internal/config"
 	"github.com/tranmh/gassigeher/internal/database"
+	_ "modernc.org/sqlite"
 )
 
 // Shared database connection for PostgreSQL tests
 // This avoids recreating the schema for each test
 var (
 	sharedDB       *database.DB
-	sharedRawDB    *sql.DB  // raw sql.DB for operations that need it
+	sharedRawDB    *sql.DB // raw sql.DB for operations that need it
 	sharedDialect  database.Dialect
 	sharedDBType   string
 	sharedDBMu     sync.Mutex
@@ -596,7 +596,6 @@ func SeedTestBlockedDateForDog(t *testing.T, db *database.DB, date, reason strin
 	id, _ := result.LastInsertId()
 	return int(id)
 }
-
 
 // SeedTestWalkReport creates a test walk report and returns the ID
 func SeedTestWalkReport(t *testing.T, db *database.DB, bookingID int, behaviorRating int, energyLevel, notes string) int {

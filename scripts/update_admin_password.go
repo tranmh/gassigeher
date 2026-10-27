@@ -1,3 +1,4 @@
+//go:build ignore
 // +build ignore
 
 package main
@@ -7,8 +8,8 @@ import (
 	"fmt"
 	"log"
 
-	_ "modernc.org/sqlite"
 	"golang.org/x/crypto/bcrypt"
+	_ "modernc.org/sqlite"
 )
 
 func main() {

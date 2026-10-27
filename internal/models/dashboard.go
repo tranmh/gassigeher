@@ -2,13 +2,13 @@ package models
 
 // DashboardStats represents admin dashboard statistics
 type DashboardStats struct {
-	TotalWalksCompleted   int `json:"total_walks_completed"`
-	UpcomingWalksToday    int `json:"upcoming_walks_today"`
-	UpcomingWalksTotal    int `json:"upcoming_walks_total"`
-	ActiveUsers           int `json:"active_users"`
-	InactiveUsers         int `json:"inactive_users"`
-	AvailableDogs         int `json:"available_dogs"`
-	UnavailableDogs       int `json:"unavailable_dogs"`
+	TotalWalksCompleted     int `json:"total_walks_completed"`
+	UpcomingWalksToday      int `json:"upcoming_walks_today"`
+	UpcomingWalksTotal      int `json:"upcoming_walks_total"`
+	ActiveUsers             int `json:"active_users"`
+	InactiveUsers           int `json:"inactive_users"`
+	AvailableDogs           int `json:"available_dogs"`
+	UnavailableDogs         int `json:"unavailable_dogs"`
 	PendingColorRequests    int `json:"pending_color_requests"`
 	PendingReactivationReqs int `json:"pending_reactivation_requests"`
 }

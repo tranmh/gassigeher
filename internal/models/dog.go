@@ -25,31 +25,31 @@ var timeFormatRegex = regexp.MustCompile(`^([01]?[0-9]|2[0-3]):[0-5][0-9]$`)
 
 // Dog represents a dog in the system
 type Dog struct {
-	ID                   int            `json:"id"`
-	TenantID             int            `json:"tenant_id"` // SaaS: Tenant this dog belongs to (0 = Simple-Mode default)
-	Name                 string         `json:"name"`
-	Breed                string         `json:"breed"`
-	Size                 string         `json:"size"` // small, medium, large
-	Age                  int            `json:"age"`
-	Category             string         `json:"category"` // green, blue, orange (legacy, use color_id)
-	ColorID              *int           `json:"color_id,omitempty"`
-	Color                *ColorCategory `json:"color,omitempty"`
-	Photo                *string        `json:"photo,omitempty"`
-	PhotoThumbnail       *string        `json:"photo_thumbnail,omitempty"`
-	SpecialNeeds         *string        `json:"special_needs,omitempty"`
-	PickupLocation       *string        `json:"pickup_location,omitempty"`
-	WalkRoute            *string        `json:"walk_route,omitempty"`
-	WalkDuration         *int           `json:"walk_duration,omitempty"` // minutes
-	SpecialInstructions  *string        `json:"special_instructions,omitempty"`
-	DefaultMorningTime   *string        `json:"default_morning_time,omitempty"` // HH:MM format
-	DefaultEveningTime   *string        `json:"default_evening_time,omitempty"` // HH:MM format
-	IsAvailable          bool           `json:"is_available"`
-	IsFeatured           bool           `json:"is_featured"`
-	ExternalLink         *string        `json:"external_link,omitempty"`
-	UnavailableReason    *string        `json:"unavailable_reason,omitempty"`
-	UnavailableSince     *time.Time     `json:"unavailable_since,omitempty"`
-	CreatedAt            time.Time      `json:"created_at"`
-	UpdatedAt            time.Time      `json:"updated_at"`
+	ID                  int            `json:"id"`
+	TenantID            int            `json:"tenant_id"` // SaaS: Tenant this dog belongs to (0 = Simple-Mode default)
+	Name                string         `json:"name"`
+	Breed               string         `json:"breed"`
+	Size                string         `json:"size"` // small, medium, large
+	Age                 int            `json:"age"`
+	Category            string         `json:"category"` // green, blue, orange (legacy, use color_id)
+	ColorID             *int           `json:"color_id,omitempty"`
+	Color               *ColorCategory `json:"color,omitempty"`
+	Photo               *string        `json:"photo,omitempty"`
+	PhotoThumbnail      *string        `json:"photo_thumbnail,omitempty"`
+	SpecialNeeds        *string        `json:"special_needs,omitempty"`
+	PickupLocation      *string        `json:"pickup_location,omitempty"`
+	WalkRoute           *string        `json:"walk_route,omitempty"`
+	WalkDuration        *int           `json:"walk_duration,omitempty"` // minutes
+	SpecialInstructions *string        `json:"special_instructions,omitempty"`
+	DefaultMorningTime  *string        `json:"default_morning_time,omitempty"` // HH:MM format
+	DefaultEveningTime  *string        `json:"default_evening_time,omitempty"` // HH:MM format
+	IsAvailable         bool           `json:"is_available"`
+	IsFeatured          bool           `json:"is_featured"`
+	ExternalLink        *string        `json:"external_link,omitempty"`
+	UnavailableReason   *string        `json:"unavailable_reason,omitempty"`
+	UnavailableSince    *time.Time     `json:"unavailable_since,omitempty"`
+	CreatedAt           time.Time      `json:"created_at"`
+	UpdatedAt           time.Time      `json:"updated_at"`
 }
 
 // CreateDogRequest represents the request to create a dog
@@ -96,14 +96,14 @@ type ToggleAvailabilityRequest struct {
 
 // DogFilterRequest represents dog filtering parameters
 type DogFilterRequest struct {
-	Breed       *string `json:"breed,omitempty"`
-	Size        *string `json:"size,omitempty"`
-	MinAge      *int    `json:"min_age,omitempty"`
-	MaxAge      *int    `json:"max_age,omitempty"`
-	Category    *string `json:"category,omitempty"`    // Legacy filter (green, blue, orange)
-	ColorID     *int    `json:"color_id,omitempty"`    // New color system filter
-	Available   *bool   `json:"available,omitempty"`
-	Search      *string `json:"search,omitempty"` // Search in name, breed
+	Breed     *string `json:"breed,omitempty"`
+	Size      *string `json:"size,omitempty"`
+	MinAge    *int    `json:"min_age,omitempty"`
+	MaxAge    *int    `json:"max_age,omitempty"`
+	Category  *string `json:"category,omitempty"` // Legacy filter (green, blue, orange)
+	ColorID   *int    `json:"color_id,omitempty"` // New color system filter
+	Available *bool   `json:"available,omitempty"`
+	Search    *string `json:"search,omitempty"` // Search in name, breed
 }
 
 // isValidDogSize checks if the size is valid

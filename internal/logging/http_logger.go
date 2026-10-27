@@ -49,20 +49,20 @@ func (rw *ResponseWriter) BytesWritten() int64 {
 
 // HTTPLogEntry represents a single HTTP request log entry
 type HTTPLogEntry struct {
-	Timestamp    time.Time
-	RequestID    string
-	Method       string
-	Path         string
-	Query        string
-	StatusCode   int
-	Duration     time.Duration
-	BytesIn      int64
-	BytesOut     int64
-	ClientIP     string
-	UserAgent    string
-	Referer      string
-	UserID       int    // 0 if not authenticated
-	Error        string // Error message if any
+	Timestamp  time.Time
+	RequestID  string
+	Method     string
+	Path       string
+	Query      string
+	StatusCode int
+	Duration   time.Duration
+	BytesIn    int64
+	BytesOut   int64
+	ClientIP   string
+	UserAgent  string
+	Referer    string
+	UserID     int    // 0 if not authenticated
+	Error      string // Error message if any
 }
 
 // Format returns a formatted log line

@@ -10,16 +10,16 @@ import (
 // Tenant represents an organization (Tierheim) in the multi-tenant system
 type Tenant struct {
 	ID              int        `json:"id"`
-	Slug            string     `json:"slug"`              // Subdomain: "tierheim-goeppingen"
-	Name            string     `json:"name"`              // Display name: "Tierheim Göppingen"
-	Status          string     `json:"status"`            // active, suspended, deleted
+	Slug            string     `json:"slug"`   // Subdomain: "tierheim-goeppingen"
+	Name            string     `json:"name"`   // Display name: "Tierheim Göppingen"
+	Status          string     `json:"status"` // active, suspended, deleted
 	ContactEmail    string     `json:"contact_email"`
 	ContactPhone    *string    `json:"contact_phone,omitempty"`
 	Address         *string    `json:"address,omitempty"`
 	City            *string    `json:"city,omitempty"`
 	PostalCode      *string    `json:"postal_code,omitempty"`
-	FederalState    string     `json:"federal_state"`     // For holiday API (default: "BW")
-	IsDemo          bool       `json:"is_demo"`           // Demo tenant flag
+	FederalState    string     `json:"federal_state"` // For holiday API (default: "BW")
+	IsDemo          bool       `json:"is_demo"`       // Demo tenant flag
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
 	SuspendedAt     *time.Time `json:"suspended_at,omitempty"`
@@ -32,21 +32,21 @@ type Tenant struct {
 
 // TenantSettings represents the customizable settings for a tenant
 type TenantSettings struct {
-	ID              int       `json:"id"`
-	TenantID        int       `json:"tenant_id"`
-	ThemePreset     string    `json:"theme_preset"`      // classic, ocean, forest, etc.
-	ColorPrimary    *string   `json:"color_primary,omitempty"`
-	ColorSecondary  *string   `json:"color_secondary,omitempty"`
-	ColorAccent     *string   `json:"color_accent,omitempty"`
-	ColorBackground *string   `json:"color_background,omitempty"`
-	ColorText       *string   `json:"color_text,omitempty"`
-	LogoURL         *string   `json:"logo_url,omitempty"`
-	FaviconURL      *string   `json:"favicon_url,omitempty"`
-	WelcomeMessage  *string   `json:"welcome_message,omitempty"`
-	Tagline         *string   `json:"tagline,omitempty"`         // Short subtitle for hero section
-	Description     *string   `json:"description,omitempty"`     // Longer description for hero section
-	FooterText      *string   `json:"footer_text,omitempty"`
-	WebsiteURL      *string   `json:"website_url,omitempty"`
+	ID                  int       `json:"id"`
+	TenantID            int       `json:"tenant_id"`
+	ThemePreset         string    `json:"theme_preset"` // classic, ocean, forest, etc.
+	ColorPrimary        *string   `json:"color_primary,omitempty"`
+	ColorSecondary      *string   `json:"color_secondary,omitempty"`
+	ColorAccent         *string   `json:"color_accent,omitempty"`
+	ColorBackground     *string   `json:"color_background,omitempty"`
+	ColorText           *string   `json:"color_text,omitempty"`
+	LogoURL             *string   `json:"logo_url,omitempty"`
+	FaviconURL          *string   `json:"favicon_url,omitempty"`
+	WelcomeMessage      *string   `json:"welcome_message,omitempty"`
+	Tagline             *string   `json:"tagline,omitempty"`     // Short subtitle for hero section
+	Description         *string   `json:"description,omitempty"` // Longer description for hero section
+	FooterText          *string   `json:"footer_text,omitempty"`
+	WebsiteURL          *string   `json:"website_url,omitempty"`
 	DonationURL         *string   `json:"donation_url,omitempty"`
 	OrganizationName    *string   `json:"organization_name,omitempty"`    // Legal org name for privacy/terms pages
 	OrganizationAddress *string   `json:"organization_address,omitempty"` // Postal address for privacy/terms pages

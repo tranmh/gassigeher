@@ -8,11 +8,11 @@ import (
 
 func TestMarketingCampaign_GetFOMOConfig(t *testing.T) {
 	tests := []struct {
-		name       string
-		config     *string
-		wantNil    bool
-		wantErr    bool
-		wantSlots  int
+		name      string
+		config    *string
+		wantNil   bool
+		wantErr   bool
+		wantSlots int
 	}{
 		{
 			name:    "nil config returns nil",
@@ -129,8 +129,8 @@ func TestReferralCode_IsValid(t *testing.T) {
 		{
 			name: "active code with no limits is valid",
 			code: ReferralCode{
-				IsActive: true,
-				MaxUses:  nil,
+				IsActive:  true,
+				MaxUses:   nil,
 				ExpiresAt: nil,
 			},
 			want: true,

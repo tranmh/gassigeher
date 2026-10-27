@@ -10,7 +10,7 @@ type PromoCode struct {
 	ID             int        `json:"id"`
 	Code           string     `json:"code"`
 	Description    string     `json:"description,omitempty"`
-	DiscountType   string     `json:"discount_type"` // percentage, fixed, free_months
+	DiscountType   string     `json:"discount_type"`  // percentage, fixed, free_months
 	DiscountValue  int        `json:"discount_value"` // percentage (0-100), cents, or months
 	MaxUses        *int       `json:"max_uses,omitempty"`
 	UsesCount      int        `json:"uses_count"`

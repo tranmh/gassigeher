@@ -26,19 +26,19 @@ type Logger struct {
 
 // Config holds logger configuration
 type Config struct {
-	LogDir        string // Directory for log files
-	MaxAgeDays    int    // Days to keep logs (default: 30)
-	CompressSizeMB int   // Compress files larger than this (default: 10MB)
-	ConsoleOutput bool   // Also output to console (default: true)
+	LogDir         string // Directory for log files
+	MaxAgeDays     int    // Days to keep logs (default: 30)
+	CompressSizeMB int    // Compress files larger than this (default: 10MB)
+	ConsoleOutput  bool   // Also output to console (default: true)
 }
 
 // DefaultConfig returns default logger configuration
 func DefaultConfig() *Config {
 	return &Config{
-		LogDir:        "./logs",
-		MaxAgeDays:    30,
+		LogDir:         "./logs",
+		MaxAgeDays:     30,
 		CompressSizeMB: 10,
-		ConsoleOutput: true,
+		ConsoleOutput:  true,
 	}
 }
 

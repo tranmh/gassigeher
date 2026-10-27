@@ -26,18 +26,18 @@ func getBerlinLocation() *time.Location {
 
 // CronService handles scheduled tasks
 type CronService struct {
-	db                     *database.DB
-	bookingRepo            *repository.BookingRepository
-	userRepo               *repository.UserRepository
-	settingsRepo           *repository.SettingsRepository
-	tenantRepo             *repository.TenantRepository
-	demoStateRepo          *repository.DemoTenantRepository
-	emailService           *services.EmailService
-	demoSeedService        *services.DemoSeedService
-	tenantActivityChecker  *TenantActivityChecker
-	saasMode               bool
-	stopChan               chan bool
-	stopOnce               sync.Once
+	db                    *database.DB
+	bookingRepo           *repository.BookingRepository
+	userRepo              *repository.UserRepository
+	settingsRepo          *repository.SettingsRepository
+	tenantRepo            *repository.TenantRepository
+	demoStateRepo         *repository.DemoTenantRepository
+	emailService          *services.EmailService
+	demoSeedService       *services.DemoSeedService
+	tenantActivityChecker *TenantActivityChecker
+	saasMode              bool
+	stopChan              chan bool
+	stopOnce              sync.Once
 }
 
 // NewCronService creates a new cron service

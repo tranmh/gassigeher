@@ -144,7 +144,7 @@ func TestUpdateColorCategoryRequest_Validate(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "valid - empty request (no updates)",
+			name:    "valid - empty request (no updates)",
 			req:     UpdateColorCategoryRequest{},
 			wantErr: false,
 		},

@@ -72,10 +72,10 @@ type TenantSubscription struct {
 
 // Free months source constants
 const (
-	FreeMonthsSourcePromo     = "promo"
-	FreeMonthsSourceReferral  = "referral"
+	FreeMonthsSourcePromo      = "promo"
+	FreeMonthsSourceReferral   = "referral"
 	FreeMonthsSourceAdminGrant = "admin_grant"
-	FreeMonthsSourceTrial     = "trial"
+	FreeMonthsSourceTrial      = "trial"
 )
 
 // CreateSubscriptionRequest represents a request to create/upgrade a subscription
@@ -223,8 +223,8 @@ func GetDefaultProPlan() *PricingPlan {
 		ID:           2,
 		Name:         "Pro",
 		Slug:         "pro",
-		MaxDogs:      -1, // Unlimited
-		PriceMonthly: 2900, // €29.00
+		MaxDogs:      -1,    // Unlimited
+		PriceMonthly: 2900,  // €29.00
 		PriceYearly:  29000, // €290.00
 		IsActive:     true,
 	}

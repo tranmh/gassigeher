@@ -37,10 +37,10 @@ func NewCalendarHandler(db *database.DB, cfg *config.Config) *CalendarHandler {
 
 // CalendarTokenResponse represents the response for calendar token endpoints
 type CalendarTokenResponse struct {
-	Token       string `json:"token"`
-	FeedURL     string `json:"feed_url"`
-	WebcalURL   string `json:"webcal_url"`
-	HasToken    bool   `json:"has_token"`
+	Token     string `json:"token"`
+	FeedURL   string `json:"feed_url"`
+	WebcalURL string `json:"webcal_url"`
+	HasToken  bool   `json:"has_token"`
 }
 
 // generateToken creates a secure random token
@@ -61,7 +61,7 @@ func (h *CalendarHandler) generateAndSaveToken(userID int) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		
+
 		err = h.userRepo.SetCalendarToken(userID, token)
 		if err != nil {
 			// Check if it's a unique constraint error (token collision)
@@ -158,10 +158,10 @@ func (h *CalendarHandler) RegenerateToken(w http.ResponseWriter, r *http.Request
 func (h *CalendarHandler) GetFeed(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	tokenWithExt := vars["token"]
-	
+
 	// Remove .ics extension if present
 	token := strings.TrimSuffix(tokenWithExt, ".ics")
-	
+
 	if token == "" {
 		http.Error(w, "Invalid token", http.StatusBadRequest)
 		return
@@ -195,7 +195,7 @@ func (h *CalendarHandler) GetFeed(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// BUG FIX: Add audit logging for calendar feed access
-	log.Printf("Calendar feed accessed for user %d (tenant %d), %d upcoming bookings", 
+	log.Printf("Calendar feed accessed for user %d (tenant %d), %d upcoming bookings",
 		user.ID, user.TenantID, len(bookings))
 
 	// Generate iCal content
@@ -258,9 +258,9 @@ func (h *CalendarHandler) generateVEvent(booking *models.Booking) string {
 
 	// Parse booking date and time
 	loc, _ := time.LoadLocation("Europe/Berlin")
-	
+
 	// Combine date and time
-	startTime, err := time.ParseInLocation("2006-01-02 15:04", 
+	startTime, err := time.ParseInLocation("2006-01-02 15:04",
 		fmt.Sprintf("%s %s", booking.Date, booking.ScheduledTime), loc)
 	if err != nil {
 		// Fallback: use booking date at midnight
@@ -341,7 +341,7 @@ func escapeICalText(s string) string {
 // BUG FIX: Implement line folding for RFC 5545 compliance
 func foldICalLine(line string) string {
 	const maxLineLen = 75
-	
+
 	if len(line) <= maxLineLen {
 		return line + "\r\n"
 	}
